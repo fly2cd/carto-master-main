@@ -6,10 +6,18 @@ import os
 import sys
 from pathlib import Path
 
+from .adapters.qgis_probe import QgisEnvironmentProbe
 from .errors import CartoError
 from .schema_registry import SchemaRegistry, load_document
 from .security.approval import ApprovalReceipt, SqliteNonceStore, verify_receipt
 from .security.paths import PathGuard
+from .workflow.data_preparation import DeterministicDataPreparer
+from .workflow.intent import IntentResolver
+from .workflow.models import ExecutionContext
+
+
+def _policy_path(name: str) -> Path:
+    return Path(__file__).resolve().parents[2] / "policies" / name
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -47,6 +55,26 @@ def build_parser() -> argparse.ArgumentParser:
     verify.add_argument("--object-type", required=True)
     verify.add_argument("--environment", required=True)
     verify.add_argument("--nonce-db", required=True)
+
+    intent = sub.add_parser("intent", help="Resolve a typed map intent")
+    intent_sub = intent.add_subparsers(dest="intent_command", required=True)
+    resolve = intent_sub.add_parser("resolve")
+    resolve.add_argument("request")
+    resolve.add_argument("--allowed-root", action="append", required=True)
+
+    environment = sub.add_parser("environment", help="Probe runtime capabilities")
+    environment_sub = environment.add_subparsers(dest="environment_command", required=True)
+    environment_sub.add_parser("probe-qgis")
+
+    data = sub.add_parser("data", help="Run deterministic data preparation")
+    data_sub = data.add_subparsers(dest="data_command", required=True)
+    prepare = data_sub.add_parser("prepare")
+    prepare.add_argument("task")
+    prepare.add_argument("--allowed-root", action="append", required=True)
+    prepare.add_argument("--run-id", required=True)
+    prepare.add_argument("--tenant-id", required=True)
+    prepare.add_argument("--project-id", required=True)
+    prepare.add_argument("--subject-id", required=True)
     return parser
 
 
@@ -79,6 +107,33 @@ def main(argv: list[str] | None = None) -> int:
                 expected_object_type=args.object_type, expected_environment=args.environment,
             )
             return _success({"receipt": str(path), "verified": True})
+        if args.command == "intent" and args.intent_command == "resolve":
+            path = PathGuard(args.allowed_root).resolve(args.request, must_exist=True)
+            request = load_document(path)
+            if not isinstance(request, dict):
+                raise ValueError("Intent request must be an object")
+            result = IntentResolver(_policy_path("intent-profiles.yaml")).resolve(request)
+            return _success({"intent": result})
+        if args.command == "environment" and args.environment_command == "probe-qgis":
+            result = QgisEnvironmentProbe().run()
+            SchemaRegistry().validate("environment-fingerprint", result)
+            return _success({"environment": result})
+        if args.command == "data" and args.data_command == "prepare":
+            path = PathGuard(args.allowed_root).resolve(args.task, must_exist=True)
+            task = load_document(path)
+            if not isinstance(task, dict):
+                raise ValueError("Data preparation task must be an object")
+            context = ExecutionContext(
+                run_id=args.run_id,
+                tenant_id=args.tenant_id,
+                project_id=args.project_id,
+                subject_id=args.subject_id,
+                roles=frozenset({"operator"}),
+                namespaces=frozenset({args.project_id}),
+                authorized_capabilities=frozenset(),
+            )
+            result = DeterministicDataPreparer(_policy_path("data-preparation-policy.yaml")).prepare_data(task, context)
+            return _success({"bundle": result})
     except (CartoError, OSError, ValueError) as exc:
         code = exc.code if isinstance(exc, CartoError) else "UNEXPECTED_ERROR"
         print(json.dumps({"ok": False, "code": code, "message": str(exc)}, ensure_ascii=False), file=sys.stderr)
