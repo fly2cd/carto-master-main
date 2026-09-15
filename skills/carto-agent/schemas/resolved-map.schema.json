@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://schemas.carto-agent.local/v1/resolved-map.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "candidate_id", "project_id", "run_id", "execution_digest", "execution", "open_issues", "created_at"],
+  "properties": {
+    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
+    "candidate_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"}, "project_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"}, "run_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "execution_digest": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"},
+    "execution": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/executionSnapshot"},
+    "open_issues": {"type": "array", "items": {"type": "string"}}, "created_at": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/timestamp"}
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://schemas.carto-agent.local/v1/approval-receipt.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "receipt_id", "issuer", "subject_id", "tenant_id", "action", "object_type", "object_digest", "scope", "policy_id", "environment", "issued_at", "expires_at", "nonce", "signature_algorithm", "signature"],
+  "properties": {
+    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"}, "receipt_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "issuer": {"type": "string", "minLength": 1}, "subject_id": {"type": "string", "minLength": 1}, "tenant_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"}, "action": {"type": "string", "minLength": 1}, "object_type": {"type": "string", "minLength": 1},
+    "object_digest": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"}, "scope": {"type": "string", "minLength": 1}, "policy_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"}, "environment": {"type": "string", "minLength": 1},
+    "issued_at": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/timestamp"}, "expires_at": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/timestamp"}, "nonce": {"type": "string", "minLength": 16, "maxLength": 128}, "signature_algorithm": {"const": "hmac-sha256"}, "signature": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

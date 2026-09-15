@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/spatial-behavior.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "source_crs_policy", "display_crs", "extent_policy", "scale_bands", "topology", "rules"],
+  "properties": {
+    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
+    "source_crs_policy": {"enum": ["preserve", "reproject-approved", "reject-mixed"]},
+    "display_crs": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/crs"},
+    "extent_policy": {"enum": ["data", "administrative-boundary", "approved-bbox", "route-buffer"]},
+    "scale_bands": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["id", "min_denominator", "max_denominator", "generalization"], "properties": {"id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"}, "min_denominator": {"type": "number", "minimum": 1}, "max_denominator": {"type": "number", "minimum": 1}, "generalization": {"enum": ["none", "simplify", "aggregate", "select"]}}}},
+    "topology": {"type": "object", "additionalProperties": false, "required": ["preserve_adjacency", "preserve_route_order"], "properties": {"preserve_adjacency": {"type": "boolean"}, "preserve_route_order": {"type": "boolean"}}},
+    "rules": {"type": "array", "items": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/rule"}}
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/cartography.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "style_id", "version", "visual_language", "symbolization", "labeling", "generalization", "rules"],
+  "properties": {
+    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
+    "style_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"},
+    "visual_language": {"enum": ["editorial", "technical", "minimal", "statistical", "narrative"]},
+    "symbolization": {"type": "object", "minProperties": 1, "additionalProperties": {"type": ["string", "number", "boolean", "array", "object"]}},
+    "labeling": {"type": "object", "required": ["density", "collision_policy"], "properties": {"density": {"enum": ["low", "medium", "high"]}, "collision_policy": {"enum": ["avoid", "prioritize", "allow-explicit"]}}, "additionalProperties": false},
+    "generalization": {"type": "object", "required": ["scale_dependent"], "properties": {"scale_dependent": {"type": "boolean"}, "strategy": {"enum": ["simplify", "aggregate", "select", "none"]}}, "additionalProperties": false},
+    "defaults": {"type": "object", "additionalProperties": true},
+    "rules": {"type": "array", "items": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/rule"}}
+  }
+}

@@ -1,0 +1,12 @@
+schema_version: 1
+baseline_id: carto-core
+version: 1.0.0
+required_checks:
+  - protocol.schema-valid@1.0.0
+  - security.path-contained@1.0.0
+  - approval.receipt-valid@1.0.0
+minimum_severity_behavior:
+  blocker: stop
+  error: fail-validation
+  warning: disposition-required
+  info: record

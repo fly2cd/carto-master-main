@@ -1,0 +1,27 @@
+schema_version: 1
+registry_id: carto-tool-bindings
+version: 1.0.0
+default: deny
+bindings:
+  - capability_id: local-file-read
+    adapter: local
+    effect: read
+    authorization_policy: project-source-read
+    path_guard_required: true
+    credential_mode: none
+    snapshot_policy: required
+  - capability_id: schema-validate
+    adapter: local
+    effect: transform
+    authorization_policy: protocol-validation
+    path_guard_required: true
+    credential_mode: none
+    snapshot_policy: receipt-only
+  - capability_id: qgis-environment-probe
+    adapter: local
+    effect: read
+    authorization_policy: environment-probe
+    path_guard_required: false
+    credential_mode: none
+    snapshot_policy: receipt-only
+unregistered_capability: reject

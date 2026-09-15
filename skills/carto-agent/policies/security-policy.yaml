@@ -1,0 +1,29 @@
+schema_version: 1
+policy_id: carto-security
+version: 1.0.1
+effective_date: 2026-09-14
+deployment_mode: controlled-single-host
+path_security:
+  configured_root_tokens: [repository_root, project_root, template_library_root]
+  reject_parent_traversal: true
+  reject_out_of_root_links: true
+  reject_windows_reserved_names: true
+document_limits:
+  max_bytes: 5242880
+  max_depth: 64
+approval:
+  algorithm: hmac-sha256
+  minimum_key_bytes: 32
+  bind: [issuer, subject_id, tenant_id, action, object_type, object_digest, scope, policy_id, environment, issued_at, expires_at, nonce]
+  replay_protection_required: true
+  replay_store: sqlite-persistent
+  verifier_required_context: [issuer, subject_id, tenant_id, action, object_type, object_digest, scope, policy_id, environment]
+authorization:
+  model: rbac-with-resource-namespace
+  deny_unknown_action: true
+external_access:
+  default: deny
+  leadership_itinerary: explicit-approval-required
+  emergency_location: explicit-approval-required
+logging:
+  forbidden_fields: [credential, token, password, secret, geometry, coordinates, itinerary]

@@ -1,0 +1,26 @@
+schema_version: 1
+registry_id: carto-checkers
+version: 1.0.0
+unknown_checker: reject
+checks:
+  - id: protocol.schema-valid
+    version: 1.0.0
+    phase: validate
+    strength: hard_rule
+    failure_severity: blocker
+    repair_owner: protocol
+    implementation: registered:schema_valid
+  - id: security.path-contained
+    version: 1.0.0
+    phase: intake
+    strength: hard_rule
+    failure_severity: blocker
+    repair_owner: caller
+    implementation: registered:path_contained
+  - id: approval.receipt-valid
+    version: 1.0.0
+    phase: approval
+    strength: hard_rule
+    failure_severity: blocker
+    repair_owner: approval-system
+    implementation: registered:approval_receipt_valid

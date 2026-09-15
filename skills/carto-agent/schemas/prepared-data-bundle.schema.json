@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://schemas.carto-agent.local/v1/prepared-data-bundle.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "bundle_id", "task_ref", "datasets", "transformations", "tool_receipts", "quality_evidence", "open_issues", "digest"],
+  "properties": {
+    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
+    "bundle_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "task_ref": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"},
+    "datasets": {"type": "array", "minItems": 1, "items": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"}},
+    "transformations": {"type": "array", "items": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"}},
+    "tool_receipts": {"type": "array", "items": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"}},
+    "quality_evidence": {"type": "array", "minItems": 1, "items": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"}},
+    "open_issues": {"type": "array", "items": {"type": "string"}},
+    "digest": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"}
+  }
+}

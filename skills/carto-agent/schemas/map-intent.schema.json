@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://schemas.carto-agent.local/v1/map-intent.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "intent_id", "revision", "profile_version", "business_scene", "tasks", "intent_status", "readiness_status", "evidence_refs"],
+  "properties": {
+    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
+    "intent_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "revision": {"type": "integer", "minimum": 1},
+    "profile_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"},
+    "business_scene": {"enum": ["government_thematic", "emergency_mapping", "leadership_visit"]},
+    "theme": {"type": "string", "minLength": 1, "maxLength": 128},
+    "tasks": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"}},
+    "intent_status": {"enum": ["resolved", "ambiguous", "unsupported"]},
+    "readiness_status": {"enum": ["ready", "missing_information", "missing_capability", "awaiting_approval"]},
+    "missing_items": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "evidence_refs": {"type": "array", "minItems": 1, "items": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"}}
+  }
+}

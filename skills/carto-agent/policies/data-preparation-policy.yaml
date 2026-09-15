@@ -1,0 +1,13 @@
+schema_version: 1
+policy_id: data-preparation
+version: 1.0.0
+default_mode: deterministic
+allowed_operations: [read, filter, join, reproject, aggregate, classify]
+forbidden_operations: [dynamic-python, shell, arbitrary-sql, unapproved-download]
+data_agent:
+  enabled: false
+  enablement_requires: [approved-task, fixed-process-gap-evidence, budget, acceptance-checks]
+outputs:
+  snapshot_required: true
+  transformation_receipts_required: true
+  quality_evidence_required: true

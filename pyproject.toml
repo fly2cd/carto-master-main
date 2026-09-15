@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "carto-agent"
+version = "0.1.0"
+description = "Deterministic protocol and security foundation for Carto Agent"
+requires-python = ">=3.11"
+dependencies = [
+  "jsonschema[format]>=4.23,<5",
+  "PyYAML>=6.0.2,<7",
+]
+
+[project.scripts]
+carto = "carto_core.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "skills/carto-agent/scripts"}
+
+[tool.setuptools.packages.find]
+where = ["skills/carto-agent/scripts"]
+include = ["carto_core*"]
+
+[tool.pytest.ini_options]
+testpaths = ["skills/carto-agent/scripts/tests"]

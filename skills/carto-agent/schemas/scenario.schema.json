@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/scenario.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "scenario_id", "version", "business_scene", "tasks", "owned_segments", "data_role_refs", "target_ids", "rules"],
+  "properties": {
+    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
+    "scenario_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"},
+    "business_scene": {"enum": ["government_thematic", "emergency_mapping", "leadership_visit"]},
+    "tasks": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"}},
+    "owned_segments": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["identity", "cartography", "layout", "scenario", "data", "spatial-behavior", "portrayal", "delivery", "quality-gates"]}},
+    "embedded": {"type": "object", "additionalProperties": false, "properties": {"identity": {"type": "object"}, "cartography": {"type": "object"}, "layout": {"type": "object"}}},
+    "replaceable_segments": {"type": "array", "uniqueItems": true, "items": {"enum": ["identity", "cartography", "layout"]}},
+    "data_role_refs": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"}},
+    "target_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"}},
+    "rules": {"type": "array", "items": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/rule"}}
+  }
+}

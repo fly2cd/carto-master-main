@@ -1,0 +1,20 @@
+schema_version: 1
+registry_id: carto-knowledge-sources
+version: 1.0.0
+default: deny
+sources:
+  - source_id: platform-term-dictionary
+    kind: structured-dictionary
+    access: local-read-only
+    classification: internal
+    authority: platform-reviewed
+  - source_id: approved-standard-catalog
+    kind: document-catalog
+    access: local-read-only
+    classification: internal
+    authority: domain-review-required
+external_search:
+  enabled: false
+  require_explicit_source_registration: true
+  credentials_from_document: forbidden
+evidence_required_fields: [publisher, version, applicability, source_ref, digest]

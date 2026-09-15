@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1680" height="1800" viewBox="0 0 1680 1800" role="img" aria-labelledby="title desc">
+  <title id="title">地图制图智能体总体架构</title>
+  <desc id="desc">单主智能体分阶段承担 MapPlanner 制图规划和 MapComposer 图面实现。MapComposer 在冻结前细化布局并修订候选，G2 后 Renderer 按实例锁确定性输出。两个独立工作流使用五模块共享内核，经受控工具、知识和数据资源生产不可变模板版本或地图成果。数据准备子智能体按需启用，编辑原生地图和目录治理路由暂未详设。审批、安全、质量、加载、状态和审计贯穿所有层。各框表示逻辑职责，不代表独立智能体或微服务。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 Z" fill="#52677e"/>
+    </marker>
+    <marker id="green-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 Z" fill="#277a68"/>
+    </marker>
+    <style>
+      text { font-family: "Microsoft YaHei", "Noto Sans CJK SC", "PingFang SC", sans-serif; fill: #18324b; }
+      .title { font-size: 32px; font-weight: 700; }
+      .subtitle { font-size: 18px; fill: #52677e; }
+      .section { font-size: 23px; font-weight: 700; }
+      .heading { font-size: 21px; font-weight: 700; }
+      .body { font-size: 19px; }
+      .small { font-size: 17px; fill: #52677e; }
+      .code { font-family: Consolas, "Microsoft YaHei", monospace; font-size: 20px; font-weight: 600; }
+      .layer { fill: #ffffff; stroke: #c7d3df; stroke-width: 1.5; }
+      .blue { fill: #f0f6fc; stroke: #a9c6e3; stroke-width: 1.5; }
+      .teal { fill: #eef8f5; stroke: #a5cdbf; stroke-width: 1.5; }
+      .neutral { fill: #f5f7f9; stroke: #bec9d3; stroke-width: 1.5; }
+      .reserved { fill: #f7f8fa; stroke: #9eacba; stroke-width: 1.5; stroke-dasharray: 7 5; }
+      .optional { fill: #edf8f3; stroke: #277a68; stroke-width: 1.8; stroke-dasharray: 7 5; }
+      .flow { fill: none; stroke: #52677e; stroke-width: 2; marker-end: url(#arrow); }
+      .divider { stroke: #d7e0e8; stroke-width: 1; }
+      .tag { font-size: 16px; font-weight: 600; fill: #52677e; }
+    </style>
+  </defs>
+
+  <rect width="1680" height="1800" fill="#f5f8fc"/>
+  <text x="40" y="56" class="title">地图制图智能体 · 总体架构</text>
+  <text x="40" y="91" class="subtitle">单主智能体 + 确定性工作流 + 模块化单体 + 隔离 GIS 工作进程</text>
+  <rect x="1082" y="37" width="24" height="18" rx="4" class="blue"/>
+  <text x="1116" y="53" class="small">首期详设</text>
+  <rect x="1242" y="37" width="24" height="18" rx="4" class="optional"/>
+  <text x="1276" y="53" class="small">按需启用</text>
+  <rect x="1402" y="37" width="24" height="18" rx="4" class="reserved"/>
+  <text x="1436" y="53" class="small">暂未详设</text>
+  <text x="1082" y="90" class="small">逻辑职责图，不代表每个组件独立部署</text>
+
+  <!-- 入口层 -->
+  <rect x="40" y="124" width="1220" height="108" rx="14" class="layer"/>
+  <text x="62" y="158" class="section">入口与业务需求</text>
+  <text x="62" y="197" class="body">对话 / CLI / 企业 API</text>
+  <line x1="300" y1="175" x2="300" y2="211" class="divider"/>
+  <text x="323" y="197" class="body">政务专题制图</text>
+  <text x="507" y="197" class="body">应急测绘制图</text>
+  <text x="691" y="197" class="body">领导调研用图</text>
+  <text x="926" y="157" class="small">真实主体 · 项目 · 授权范围</text>
+  <text x="926" y="197" class="small">文字 / 数据 / 参考 / 模板</text>
+  <path d="M 650 232 V 263" class="flow"/>
+
+  <!-- 四条顶层路由 -->
+  <rect x="40" y="270" width="1220" height="174" rx="14" class="layer"/>
+  <text x="62" y="301" class="section">顶层路由</text>
+  <text x="216" y="301" class="small">先判定产物目的；各路由独立作业、审批与交付语义</text>
+  <rect x="60" y="318" width="276" height="104" rx="10" class="blue"/>
+  <text x="78" y="350" class="code">generate-map</text>
+  <text x="78" y="379" class="body">生成业务地图</text>
+  <text x="78" y="406" class="small">场景 → 任务 → 候选模板</text>
+  <rect x="356" y="318" width="276" height="104" rx="10" class="blue"/>
+  <text x="374" y="350" class="code">create-template</text>
+  <text x="374" y="379" class="body">创建可复用模板</text>
+  <text x="374" y="406" class="small">四类模板 · 四种作者策略</text>
+  <rect x="652" y="318" width="276" height="104" rx="10" class="reserved"/>
+  <text x="670" y="350" class="code">edit-native-map</text>
+  <text x="670" y="379" class="body">保留并编辑原生地图</text>
+  <text x="670" y="406" class="small">预留输入输出与权限边界</text>
+  <rect x="948" y="318" width="292" height="104" rx="10" class="reserved"/>
+  <text x="966" y="350" class="code">curate-catalog</text>
+  <text x="966" y="379" class="body">治理专业资源目录</text>
+  <text x="966" y="406" class="small">表达 / 符号 / 标准 / 配置</text>
+  <path d="M 650 444 V 473" class="flow"/>
+
+  <!-- 独立工作流和智能体 -->
+  <rect x="40" y="480" width="1220" height="376" rx="14" class="layer"/>
+  <text x="62" y="512" class="section">主智能体与独立路由编排</text>
+  <text x="800" y="512" class="small">主智能体提出方案，程序掌握状态推进和门禁</text>
+  <rect x="60" y="528" width="768" height="52" rx="8" class="blue"/>
+  <text x="78" y="561" class="body">单主智能体：MapPlanner / MapComposer 分阶段承担</text>
+  <rect x="850" y="528" width="390" height="52" rx="8" class="optional"/>
+  <text x="867" y="561" class="body">数据准备子智能体〔按需、受限〕</text>
+  <path d="M 829 554 H 847" fill="none" stroke="#277a68" stroke-width="1.8" marker-end="url(#green-arrow)"/>
+  <rect x="60" y="602" width="340" height="96" rx="9" class="blue"/>
+  <text x="78" y="632" class="code">MapPlanner · 制图规划</text>
+  <text x="78" y="659" class="small">业务语义、表达策略、准备责任</text>
+  <text x="78" y="684" class="small">交接：MapPlan + 数据包与资源</text>
+  <path d="M 403 650 H 434" class="flow"/>
+  <rect x="440" y="602" width="360" height="96" rx="9" class="blue"/>
+  <text x="458" y="632" class="code">MapComposer · 图面实现</text>
+  <text x="458" y="659" class="small">布局、标注、预览与有界修订</text>
+  <text x="458" y="684" class="small">冻结前：提案 → 编译 → 校验候选</text>
+  <path d="M 803 650 H 821" class="flow"/>
+  <rect x="828" y="602" width="80" height="96" rx="9" fill="#fff4de" stroke="#d9b362" stroke-width="1.5"/>
+  <text x="868" y="637" class="heading" text-anchor="middle">G2</text>
+  <text x="868" y="670" class="body" text-anchor="middle">冻结</text>
+  <path d="M 911 650 H 930" class="flow"/>
+  <rect x="936" y="602" width="304" height="96" rx="9" class="teal"/>
+  <text x="954" y="632" class="code">Renderer · 正式渲染</text>
+  <text x="954" y="659" class="small">MapSpecLock → QGIS 输出</text>
+  <text x="954" y="684" class="small">锁后按固定输入，不再设计</text>
+  <text x="74" y="748" class="heading">创建</text>
+  <text x="145" y="748" class="body">来源分析 → 简报确认 → 模板编写 → 校验与样例渲染 → 发布批准 → 发布</text>
+  <text x="74" y="788" class="heading">生成</text>
+  <text x="145" y="788" class="body">接入 → 简报 G1 → 规划 → 预览 → 冻结 G2 → 渲染 → 检查 → 交付 G3</text>
+  <text x="74" y="830" class="small">职责细化不新增流程步骤；图面实现位于 plan / preview；数据或语义问题退回所属层，锁后改变输入须重新冻结。</text>
+  <path d="M 650 856 V 887" class="flow"/>
+
+  <!-- 五模块内核 -->
+  <g transform="translate(0 160)">
+  <rect x="40" y="734" width="1220" height="188" rx="14" class="layer"/>
+  <text x="62" y="767" class="section">共享确定性内核 · 五模块</text>
+  <text x="825" y="767" class="small">复用类型、规则与工具，不复制执行引擎</text>
+  <rect x="60" y="788" width="224" height="108" rx="9" class="blue"/>
+  <text x="76" y="818" class="code">workflow</text>
+  <text x="76" y="849" class="small">规划 / 图面实现 / 编排</text>
+  <text x="76" y="875" class="small">知识、准备、审批恢复</text>
+  <rect x="298" y="788" width="224" height="108" rx="9" class="blue"/>
+  <text x="314" y="818" class="code">compiler</text>
+  <text x="314" y="849" class="small">契约组合、语义绑定</text>
+  <text x="314" y="875" class="small">候选快照、实例锁</text>
+  <rect x="536" y="788" width="224" height="108" rx="9" class="blue"/>
+  <text x="552" y="818" class="code">validation</text>
+  <text x="552" y="849" class="small">注册检查器、专业校验</text>
+  <text x="552" y="875" class="small">数据、预览、成品证据</text>
+  <rect x="774" y="788" width="224" height="108" rx="9" class="blue"/>
+  <text x="790" y="818" class="code">adapters</text>
+  <text x="790" y="849" class="small">ToolGateway 与连接器</text>
+  <text x="790" y="875" class="small">Renderer / QGIS 进程</text>
+  <rect x="1012" y="788" width="224" height="108" rx="9" class="blue"/>
+  <text x="1028" y="818" class="code">repository</text>
+  <text x="1028" y="849" class="small">模板、证据与成果存储</text>
+  <text x="1028" y="875" class="small">独立权限、不可变版本</text>
+  <path d="M 650 922 V 951" class="flow"/>
+
+  <!-- 资源与执行支撑 -->
+  <rect x="40" y="958" width="1220" height="260" rx="14" class="layer"/>
+  <text x="62" y="990" class="section">受控资源接入与计算支撑</text>
+  <text x="805" y="990" class="small">证据先核验再采用；大数据以固定产物引用传递</text>
+  <rect x="60" y="1008" width="373" height="188" rx="10" class="teal"/>
+  <text x="80" y="1040" class="heading">工具与 GIS 能力</text>
+  <text x="80" y="1075" class="body">本地函数 / 企业 API / MCP</text>
+  <text x="80" y="1104" class="body">查询、统计、叠加、求路、渲染</text>
+  <text x="80" y="1135" class="small">能力绑定 · 输入输出类型 · 调用回执</text>
+  <text x="80" y="1165" class="small">MCP 是接入协议，不是权限来源</text>
+  <rect x="453" y="1008" width="373" height="188" rx="10" class="teal"/>
+  <text x="473" y="1040" class="heading">领域知识供给</text>
+  <text x="473" y="1075" class="body">术语与指标 / 标准 / 实体 / 方法</text>
+  <text x="473" y="1104" class="body">结构化查询 + 带来源文档检索</text>
+  <text x="473" y="1135" class="small">权威 · 版本 · 时空适用性 · 冲突检查</text>
+  <text x="473" y="1165" class="small">检索结果不自动成为执行规则</text>
+  <rect x="846" y="1008" width="394" height="188" rx="10" class="teal"/>
+  <text x="866" y="1040" class="heading">数据、模板与专业资产</text>
+  <text x="866" y="1075" class="body">业务数据快照 / 派生数据 / 边界</text>
+  <text x="866" y="1104" class="body">四类模板 / 符号 / 标准 / 交付配置</text>
+  <text x="866" y="1135" class="small">精确版本 · 摘要 · 来源与许可</text>
+  <text x="866" y="1165" class="small">事实数据不由模型或案例文本补齐</text>
+  <path d="M 650 1218 V 1251" class="flow"/>
+
+  <!-- 两种独立产物 -->
+  <rect x="40" y="1258" width="1220" height="240" rx="14" class="layer"/>
+  <text x="62" y="1291" class="section">两类独立交付物</text>
+  <text x="761" y="1291" class="small">模板创建的测试地图不能替代真实业务地图</text>
+  <rect x="60" y="1310" width="568" height="132" rx="10" class="blue"/>
+  <text x="80" y="1343" class="heading">模板发布 · publish</text>
+  <text x="80" y="1376" class="body">机器契约 + 说明 / 原型 / 资产 + 固定依赖</text>
+  <text x="80" y="1407" class="small">验证证据 → 发布批准 → 不可变版本与注册可见性</text>
+  <rect x="648" y="1310" width="592" height="132" rx="10" class="blue"/>
+  <text x="668" y="1343" class="heading">地图交付 · deliver</text>
+  <text x="668" y="1376" class="body">MapSpecLock + PDF / PNG + 成品检查</text>
+  <text x="668" y="1407" class="small">G3 → 已授权成果集合 + 接收方 / 目的地 + 回执</text>
+  <text x="80" y="1476" class="small">模板通过精确版本被生成路由消费；发布批准、当前业务制图批准和交付批准不能互相替代。</text>
+  </g>
+
+  <!-- 贯穿所有层的治理能力 -->
+  <rect x="1284" y="124" width="356" height="1534" rx="14" fill="#eaf0f7" stroke="#bdccdc" stroke-width="1.5"/>
+  <text x="1308" y="160" class="section">贯穿治理</text>
+  <rect x="1300" y="180" width="324" height="162" rx="10" class="layer"/>
+  <text x="1318" y="212" class="heading">可信审批</text>
+  <text x="1318" y="247" class="body">创建：简报 / 发布</text>
+  <text x="1318" y="278" class="body">生成：G1 / G2 / G3</text>
+  <text x="1318" y="313" class="small">真实主体 + 范围 + 对象摘要</text>
+  <rect x="1300" y="360" width="324" height="162" rx="10" class="layer"/>
+  <text x="1318" y="392" class="heading">安全与专业合规</text>
+  <text x="1318" y="427" class="body">权限 / 租户 / 敏感数据隔离</text>
+  <text x="1318" y="458" class="body">来源许可 / 适用标准 / 审核</text>
+  <text x="1318" y="493" class="small">工作进程 ≠ 恶意输入沙箱</text>
+  <rect x="1300" y="540" width="324" height="162" rx="10" class="layer"/>
+  <text x="1318" y="572" class="heading">规则与质量</text>
+  <text x="1318" y="607" class="body">六种语义标签 ≠ 优先级阶梯</text>
+  <text x="1318" y="638" class="body">四种结果严重度 / 注册检查器</text>
+  <text x="1318" y="673" class="small">平台与行业最低要求不可削弱</text>
+  <rect x="1300" y="720" width="324" height="172" rx="10" class="layer"/>
+  <text x="1318" y="752" class="heading">分级加载</text>
+  <text x="1318" y="786" class="body">L0 索引 · L1 候选 Manifest</text>
+  <text x="1318" y="817" class="body">L2 确认后完整解析小契约</text>
+  <text x="1318" y="848" class="body">L3 按需上下文 / 资产 / 后端</text>
+  <text x="1318" y="875" class="small">强制检查与完整性不能漏载</text>
+  <rect x="1300" y="910" width="324" height="162" rx="10" class="layer"/>
+  <text x="1318" y="942" class="heading">状态与恢复</text>
+  <text x="1318" y="977" class="body">作业状态 + 路由当前步骤</text>
+  <text x="1318" y="1008" class="body">固定修订 / 幂等 / 取消</text>
+  <text x="1318" y="1043" class="small">新输入 → 新候选 / 新锁</text>
+  <rect x="1300" y="1090" width="324" height="162" rx="10" class="layer"/>
+  <text x="1318" y="1122" class="heading">审计与资源预算</text>
+  <text x="1318" y="1157" class="body">知识 / 数据 / 工具 / 规则证据</text>
+  <text x="1318" y="1188" class="body">模型、调用、内存与时限</text>
+  <text x="1318" y="1223" class="small">备份恢复 / 脱敏日志 / 版本追踪</text>
+  <rect x="1300" y="1270" width="324" height="194" rx="10" class="layer"/>
+  <text x="1318" y="1302" class="heading">生产与演进边界</text>
+  <text x="1318" y="1337" class="body">首期：QGIS · PDF / PNG</text>
+  <text x="1318" y="1368" class="body">共享部署按容量需求扩展</text>
+  <text x="1318" y="1399" class="body">公开部署需要另行授权</text>
+  <text x="1318" y="1440" class="small">设计方案，不代表已实现能力</text>
+  <rect x="1300" y="1482" width="324" height="154" rx="10" class="layer"/>
+  <text x="1318" y="1514" class="heading">分层交接与修复</text>
+  <text x="1318" y="1549" class="body">业务事实 / 图面选择分权</text>
+  <text x="1318" y="1580" class="body">角色上下文与动作受程序约束</text>
+  <text x="1318" y="1611" class="small">新候选需新证据，旧锁不可改</text>
+
+  <!-- 核心执行证据链 -->
+  <g transform="translate(0 160)">
+  <rect x="40" y="1522" width="1600" height="78" rx="12" fill="#18324b"/>
+  <text x="64" y="1553" style="fill:#ffffff;font-size:19px;font-weight:600">生成执行主链</text>
+  <text x="236" y="1553" style="fill:#ffffff;font-size:19px">MapPlanner → MapPlan / 已准备材料 → MapComposer / 候选预览 → G2 / 锁 → Renderer → 检查 → G3 / 交付</text>
+  <text x="64" y="1582" style="fill:#cbd9e8;font-size:17px">人读说明负责解释；机器契约约束执行；候选预览与 G2 绑定同一执行摘要；正式渲染不重新选择事实、模板或表达参数。</text>
+  </g>
+</svg>

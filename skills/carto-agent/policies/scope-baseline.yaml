@@ -1,0 +1,37 @@
+schema_version: 1
+baseline_id: first-production-scope
+version: 0.1.0
+status: pending_trusted_approval
+prepared_at: 2026-09-14
+deployment:
+  mode: controlled-single-host
+  trust_boundary: authenticated-operating-system-user
+  enterprise_shared_service: not-claimed
+first_vertical_slice:
+  scenario: emergency-mapping-flood
+  source_formats: [geopackage, geojson, csv]
+  required_portrayals: [choropleth-risk, point-shelter]
+  outputs: [a3-pdf, a3-png]
+formal_capability_boundary:
+  scenes: [government_thematic, emergency_mapping, leadership_visit]
+  production_tasks: []
+  note: 每项生产任务须在 U-P4 的正式能力矩阵通过后加入，不能由本基线提前声明。
+  unavailable: [hazard-prediction, remote-sensing-auto-extraction, command-decision, public-web-publishing, native-gis-editing]
+model_boundary:
+  host: application-managed
+  public_model_sensitive_data: forbidden
+  typed_candidate_only: true
+  arbitrary_code_execution: forbidden
+  prompt_and_model_version_required: true
+  budgets_required: true
+  logs: metadata-and-redacted-summary-only
+acceptance_roles:
+  protocol_owner: carto-platform
+  security_approver: pending-assignment
+  business_approver: pending-assignment
+  evidence_root: reports/u-p0
+  decision_deadline: before-u-p1-entry
+approval_required:
+  action: approve-scope-baseline
+  object_type: scope-baseline
+  policy_id: carto-security

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/template-brief.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "brief_id", "kind", "purpose", "sources", "authoring_mode", "targets", "revision"],
+  "properties": {
+    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
+    "brief_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "kind": {"enum": ["map-brand", "map-style", "map-layout", "map-scenario"]},
+    "purpose": {"type": "string", "minLength": 1, "maxLength": 1000},
+    "sources": {"type": "array", "minItems": 1, "items": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"}},
+    "authoring_mode": {"enum": ["standard", "fidelity", "mirror"]},
+    "targets": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["pdf", "png", "qgis-preview"]}},
+    "decisions": {"type": "object", "additionalProperties": true},
+    "open_questions": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "revision": {"type": "integer", "minimum": 1}
+  }
+}

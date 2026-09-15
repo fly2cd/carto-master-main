@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/identity.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "identity_id", "version", "organization", "colors", "typography", "attribution", "rules"],
+  "properties": {
+    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
+    "identity_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"},
+    "organization": {"type": "string", "minLength": 1, "maxLength": 200},
+    "colors": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["role", "hex", "provenance"], "properties": {"role": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"}, "hex": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"}, "provenance": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/provenance"}}}},
+    "typography": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["role", "family", "weight"], "properties": {"role": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"}, "family": {"type": "string", "minLength": 1}, "weight": {"type": "integer", "minimum": 100, "maximum": 900}}}},
+    "logo": {"type": "object", "additionalProperties": false, "required": ["asset_ref", "placement_rules"], "properties": {"asset_ref": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"}, "placement_rules": {"type": "array", "minItems": 1, "items": {"type": "string"}}}},
+    "attribution": {"type": "object", "additionalProperties": false, "required": ["organization_format", "data_source_format"], "properties": {"organization_format": {"type": "string", "minLength": 1}, "data_source_format": {"type": "string", "minLength": 1}}},
+    "rules": {"type": "array", "items": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/rule"}}
+  }
+}

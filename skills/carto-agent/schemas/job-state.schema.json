@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://schemas.carto-agent.local/v1/job-state.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "status", "step", "attempt", "run_id", "input_fingerprint"],
+  "properties": {
+    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"}, "status": {"enum": ["pending", "running", "waiting_approval", "failed", "succeeded", "cancelled"]},
+    "step": {"type": "string", "minLength": 1, "maxLength": 64}, "attempt": {"type": "integer", "minimum": 1}, "run_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"}, "input_fingerprint": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"}, "last_receipt": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/relativePath"}
+  }
+}

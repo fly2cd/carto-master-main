@@ -1,0 +1,15 @@
+schema_version: 1
+catalog_version: 1.0.0
+profiles:
+  - scene_id: government_thematic
+    task_ids: [administrative-map, indicator-map, facility-map]
+    required_information: [theme, geography, time, source, output]
+    unsupported_actions: [invent-unconfirmed-policy-theme]
+  - scene_id: emergency_mapping
+    task_ids: [hazard-result-map, resource-map, situation-map]
+    required_information: [hazard, event-phase, data-nature, observation-time, geography, source, output]
+    unsupported_actions: [hazard-prediction, remote-sensing-auto-extraction, command-decision]
+  - scene_id: leadership_visit
+    task_ids: [visit-route-map]
+    required_information: [itinerary, visit-order, route-mode, geography, confidentiality, output]
+    unsupported_actions: [reorder-visits, replace-road-route-with-straight-line]

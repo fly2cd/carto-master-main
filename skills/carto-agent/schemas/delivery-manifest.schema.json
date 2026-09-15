@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://schemas.carto-agent.local/v1/delivery-manifest.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "delivery_id", "project_id", "lock_ref", "execution_digest", "artifacts", "limitations", "delivered_at"],
+  "properties": {
+    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"}, "delivery_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"}, "project_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "lock_ref": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"}, "execution_digest": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"},
+    "artifacts": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["path", "format", "digest", "size_bytes"], "properties": {"path": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/relativePath"}, "format": {"enum": ["pdf", "png", "json"]}, "digest": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"}, "size_bytes": {"type": "integer", "minimum": 1}}}},
+    "limitations": {"type": "array", "items": {"type": "string"}}, "delivered_at": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/timestamp"}
+  }
+}

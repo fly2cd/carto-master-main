@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/common.schema.json",
+  "title": "Carto Agent shared protocol definitions",
+  "$defs": {
+    "schemaVersion": {"const": 1},
+    "identifier": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$", "maxLength": 80},
+    "semanticVersion": {"type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?$"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "relativePath": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^(?![/\\\\])(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$))(?!.*[\\u0000-\\u001f]).+$"},
+    "artifactRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "digest"],
+      "properties": {
+        "id": {"$ref": "#/$defs/identifier"},
+        "version": {"$ref": "#/$defs/semanticVersion"},
+        "digest": {"$ref": "#/$defs/digest"},
+        "uri": {"type": "string", "minLength": 1, "maxLength": 1024}
+      }
+    },
+    "templateRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id", "version", "digest"],
+      "properties": {
+        "kind": {"enum": ["map-brand", "map-style", "map-layout", "map-scenario"]},
+        "id": {"$ref": "#/$defs/identifier"},
+        "version": {"$ref": "#/$defs/semanticVersion"},
+        "digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_type", "source_ref", "classification"],
+      "properties": {
+        "source_type": {"enum": ["user", "official", "internal", "derived", "inferred"]},
+        "source_ref": {"type": "string", "minLength": 1, "maxLength": 512},
+        "version": {"type": "string", "maxLength": 128},
+        "retrieved_at": {"$ref": "#/$defs/timestamp"},
+        "classification": {"enum": ["public", "internal", "confidential", "restricted"]}
+      }
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "strength", "path", "description"],
+      "properties": {
+        "id": {"$ref": "#/$defs/identifier"},
+        "strength": {"enum": ["hard_rule", "forbidden", "mandatory", "binding", "default", "reference"]},
+        "path": {"type": "string", "pattern": "^/", "maxLength": 256},
+        "description": {"type": "string", "minLength": 1, "maxLength": 1000},
+        "value": {},
+        "condition": {"type": "object", "additionalProperties": {"type": ["string", "number", "boolean"]}}
+      }
+    },
+    "bbox": {
+      "type": "array",
+      "prefixItems": [{"type": "number"}, {"type": "number"}, {"type": "number"}, {"type": "number"}],
+      "items": false,
+      "minItems": 4,
+      "maxItems": 4
+    },
+    "crs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authority", "code"],
+      "properties": {
+        "authority": {"enum": ["EPSG", "CGCS2000", "CUSTOM"]},
+        "code": {"type": "string", "minLength": 1, "maxLength": 64},
+        "wkt_digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "executionSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["intent_ref", "business_scene", "map_tasks", "template_refs", "dataset_refs", "ownership", "shared_semantics", "views", "targets", "environment"],
+      "properties": {
+        "intent_ref": {"$ref": "#/$defs/artifactRef"},
+        "profile_refs": {"type": "array", "items": {"$ref": "#/$defs/artifactRef"}, "uniqueItems": true},
+        "business_scene": {"enum": ["government_thematic", "emergency_mapping", "leadership_visit"]},
+        "map_tasks": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/identifier"}},
+        "template_refs": {"type": "array", "items": {"$ref": "#/$defs/templateRef"}, "uniqueItems": true},
+        "dependency_refs": {"type": "array", "items": {"$ref": "#/$defs/artifactRef"}, "uniqueItems": true},
+        "policy_refs": {"type": "array", "items": {"$ref": "#/$defs/artifactRef"}, "uniqueItems": true},
+        "dataset_refs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/artifactRef"}, "uniqueItems": true},
+        "prepared_data_refs": {"type": "array", "items": {"$ref": "#/$defs/artifactRef"}, "uniqueItems": true},
+        "knowledge_evidence_refs": {"type": "array", "items": {"$ref": "#/$defs/artifactRef"}, "uniqueItems": true},
+        "tool_binding_refs": {"type": "array", "items": {"$ref": "#/$defs/artifactRef"}, "uniqueItems": true},
+        "transformation_refs": {"type": "array", "items": {"$ref": "#/$defs/artifactRef"}, "uniqueItems": true},
+        "ownership": {"type": "object", "minProperties": 1, "additionalProperties": {"enum": ["platform", "map-brand", "map-style", "map-layout", "map-scenario", "project"]}},
+        "shared_semantics": {"type": "object", "additionalProperties": true},
+        "views": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "extent", "layer_ids", "target_ids"],
+            "properties": {
+              "id": {"$ref": "#/$defs/identifier"},
+              "extent": {"$ref": "#/$defs/bbox"},
+              "layer_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/identifier"}},
+              "target_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/identifier"}}
+            }
+          }
+        },
+        "targets": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["format", "display_crs", "dpi"],
+            "properties": {
+              "format": {"enum": ["pdf", "png"]},
+              "display_crs": {"$ref": "#/$defs/crs"},
+              "dpi": {"type": "integer", "minimum": 72, "maximum": 1200},
+              "width_mm": {"type": "number", "exclusiveMinimum": 0},
+              "height_mm": {"type": "number", "exclusiveMinimum": 0}
+            }
+          }
+        },
+        "resolved_assets": {"type": "array", "items": {"$ref": "#/$defs/artifactRef"}, "uniqueItems": true},
+        "environment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["adapter_id", "adapter_version", "fingerprint"],
+          "properties": {
+            "adapter_id": {"$ref": "#/$defs/identifier"},
+            "adapter_version": {"$ref": "#/$defs/semanticVersion"},
+            "fingerprint": {"$ref": "#/$defs/digest"}
+          }
+        }
+      }
+    }
+  }
+}

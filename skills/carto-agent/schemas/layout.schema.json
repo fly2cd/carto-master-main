@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/layout.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "layout_id", "version", "category", "canvas", "frames", "placeholders", "rules"],
+  "properties": {
+    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
+    "layout_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"},
+    "category": {"enum": ["general", "report", "poster", "atlas", "web", "mobile"]},
+    "canvas": {"type": "object", "additionalProperties": false, "required": ["width", "height", "unit"], "properties": {"width": {"type": "number", "exclusiveMinimum": 0}, "height": {"type": "number", "exclusiveMinimum": 0}, "unit": {"enum": ["mm", "px"]}}},
+    "frames": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["id", "type", "bounds"], "properties": {"id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"}, "type": {"enum": ["map", "title", "legend", "scale-bar", "north-arrow", "inset", "marginalia"]}, "bounds": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/bbox"}}}},
+    "placeholders": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^\\{\\{[A-Z][A-Z0-9_]+\\}\\}$"}},
+    "capacity": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "rules": {"type": "array", "items": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/rule"}}
+  }
+}

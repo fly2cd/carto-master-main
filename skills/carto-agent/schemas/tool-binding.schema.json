@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://schemas.carto-agent.local/v1/tool-binding.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "binding_id", "version", "capability_id", "adapter", "input_schema_digest", "output_schema_digest", "authorization_policy", "effect", "snapshot_policy"],
+  "properties": {
+    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
+    "binding_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"},
+    "capability_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "adapter": {"enum": ["local", "api", "mcp"]},
+    "input_schema_digest": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"},
+    "output_schema_digest": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"},
+    "authorization_policy": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "effect": {"enum": ["read", "transform", "write-project", "external-query"]},
+    "snapshot_policy": {"enum": ["required", "receipt-only", "not-applicable"]}
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/quality-gates.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "baseline", "checks"],
+  "properties": {
+    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
+    "baseline": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"},
+    "checks": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["id", "version", "strength", "failure_severity", "params"], "properties": {
+      "id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+      "version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"},
+      "strength": {"enum": ["hard_rule", "forbidden", "mandatory", "binding", "default", "reference"]},
+      "failure_severity": {"enum": ["blocker", "error", "warning", "info"]},
+      "params": {"type": "object", "additionalProperties": {"type": ["string", "number", "boolean", "array"]}}
+    }}}
+  }
+}
