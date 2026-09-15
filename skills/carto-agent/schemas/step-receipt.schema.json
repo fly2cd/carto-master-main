@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/step-receipt.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "receipt_id", "run_id", "step", "attempt", "status", "input_fingerprint", "prerequisite_fingerprints", "tool_versions", "output_refs", "started_at", "completed_at"],
+  "properties": {
+    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
+    "receipt_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "run_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "step": {"type": "string", "minLength": 1, "maxLength": 64},
+    "attempt": {"type": "integer", "minimum": 1},
+    "status": {"enum": ["succeeded", "failed", "waiting_approval"]},
+    "input_fingerprint": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"},
+    "prerequisite_fingerprints": {"type": "object", "propertyNames": {"pattern": "^[a-z][a-z0-9_-]{0,79}$"}, "additionalProperties": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"}},
+    "tool_versions": {"type": "object", "propertyNames": {"pattern": "^[a-z][a-z0-9-]{0,79}$"}, "additionalProperties": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"}},
+    "output_refs": {"type": "array", "items": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"}},
+    "started_at": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/timestamp"},
+    "completed_at": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/timestamp"},
+    "error": {"type": "object", "additionalProperties": false, "required": ["code", "message"], "properties": {"code": {"type": "string", "minLength": 1}, "message": {"type": "string", "minLength": 1}}}
+  }
+}

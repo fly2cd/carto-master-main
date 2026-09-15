@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/environment-fingerprint.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "probe_id", "status", "platform", "python_version", "tools", "chinese_fonts", "capabilities", "probed_at", "fingerprint"],
+  "properties": {
+    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
+    "probe_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "status": {"enum": ["available", "unavailable"]},
+    "platform": {"type": "string", "minLength": 1},
+    "python_version": {"type": "string", "minLength": 1},
+    "tools": {"type": "object", "additionalProperties": false, "required": ["qgis_process", "gdalinfo", "projinfo"], "properties": {"qgis_process": {"$ref": "#/$defs/tool"}, "gdalinfo": {"$ref": "#/$defs/tool"}, "projinfo": {"$ref": "#/$defs/tool"}}},
+    "chinese_fonts": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "capabilities": {"type": "object", "additionalProperties": false, "required": ["qgis_headless", "crs_transform", "a3_pdf_png", "chinese_font", "isolated_process_exit"], "properties": {"qgis_headless": {"type": "boolean"}, "crs_transform": {"type": "boolean"}, "a3_pdf_png": {"type": "boolean"}, "chinese_font": {"type": "boolean"}, "isolated_process_exit": {"type": "boolean"}}},
+    "probed_at": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/timestamp"},
+    "fingerprint": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"},
+    "error": {"type": "object", "additionalProperties": false, "required": ["code", "message"], "properties": {"code": {"const": "CAPABILITY_NOT_AVAILABLE"}, "message": {"type": "string", "minLength": 1}}}
+  },
+  "$defs": {
+    "tool": {"type": "object", "additionalProperties": false, "required": ["available", "executable", "version", "exit_code"], "properties": {"available": {"type": "boolean"}, "executable": {"type": ["string", "null"]}, "version": {"type": ["string", "null"]}, "exit_code": {"type": ["integer", "null"]}, "error": {"type": "string"}}}
+  }
+}

@@ -2,8 +2,8 @@
 
 | 路由 | 请求目标 | 当前状态 |
 |---|---|---|
-| `create-template` | 创建可复用地图模板包 | 协议底座已实现，业务流程待 U-P1/U-P2 |
-| `generate-map` | 从业务意图和数据生成地图成果 | 协议底座已实现，业务流程待 U-P1/U-P2 |
+| `create-template` | 创建可复用地图模板包 | 内核与协议骨架已实现，业务闭环待 U-P2 |
+| `generate-map` | 从业务意图和数据生成地图成果 | 意图、状态和协议骨架已实现，渲染与冻结闭环待 U-P2 |
 | `edit-native-map` | 保留原生 GIS 工程并编辑 | 未开放，返回 `CAPABILITY_NOT_AVAILABLE` |
 | `curate-catalog` | 治理符号、标准和目录 | 未开放，返回 `CAPABILITY_NOT_AVAILABLE` |
 

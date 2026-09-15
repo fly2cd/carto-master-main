@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/validation-report.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "report_id", "phase", "subject_digest", "status", "results", "created_at"],
+  "properties": {
+    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
+    "report_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "phase": {"enum": ["intake", "validate", "plan", "preview", "approval", "delivery"]},
+    "subject_digest": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"},
+    "status": {"enum": ["passed", "failed"]},
+    "results": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["check_id", "version", "status", "severity", "details"], "properties": {"check_id": {"type": "string", "minLength": 1}, "version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"}, "status": {"enum": ["passed", "failed"]}, "severity": {"enum": ["blocker", "error", "warning", "info"]}, "details": {"type": "object"}}}},
+    "created_at": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/timestamp"}
+  }
+}

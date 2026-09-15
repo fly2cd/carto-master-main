@@ -1,11 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://schemas.carto-agent.local/v1/knowledge-evidence.schema.json",
   "type": "object", "additionalProperties": false,
-  "required": ["schema_version", "evidence_id", "claim", "source", "applicability", "digest"],
+  "required": ["schema_version", "evidence_id", "claim", "publisher", "source", "applicability", "digest"],
   "properties": {
     "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
     "evidence_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
     "claim": {"type": "string", "minLength": 1, "maxLength": 2000},
+    "publisher": {"type": "string", "minLength": 1, "maxLength": 256},
     "source": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/provenance"},
     "applicability": {"type": "object", "additionalProperties": false, "required": ["jurisdiction", "valid_from"], "properties": {"jurisdiction": {"type": "string", "minLength": 1}, "valid_from": {"type": "string", "format": "date"}, "valid_to": {"type": "string", "format": "date"}, "industry": {"type": "string"}}},
     "digest": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"}
