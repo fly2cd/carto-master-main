@@ -422,7 +422,7 @@ resolved_assets: []
 4. 实现一个通用分析制图 Style。
 5. 实现一个真实业务 MapScenario，例如“城市统计专题图”。
 6. 建立数据、空间、制图语义和视觉回归校验器。
-7. 先实现 Mapbox 或 QGIS 中的一个编译适配器，再扩展到其他引擎。
+7. 先实现 MapLibre GL JS + SVG overlay 编译适配器和受控浏览器导出，再按明确场景扩展其他引擎。
 
 最关键的设计原则是：
 
@@ -464,7 +464,7 @@ MapBrand + MapStyle + MapLayout + MapScenario
       ▼
 MapPlan → 数据绑定与预检 → 预览与修复 → MapSpecLock
       ▼
-QGIS / Mapbox / ArcGIS 等渲染适配器
+MapLibre Web 主适配器 / 其他受控渲染适配器
 ```
 
 分段优先级建议为：

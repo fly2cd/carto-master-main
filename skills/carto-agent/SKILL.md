@@ -18,7 +18,7 @@ version: 0.1.0
 ## 当前阶段边界
 
 - 已实现：Schema 注册与结构校验、安全底座、五模块骨架、状态与回执、意图解析、类型化智能体提交、审批协调、固定数据准备、ToolGateway、MCP 授权边界、知识服务、编译器与校验器骨架。
-- 暂缓实现：生产级 QGIS/API/MCP 适配器，以及真实 CRS 转换、A3 PDF/PNG 和中文字体渲染冒烟；当前只提供结构化环境探测骨架。
+- 暂缓实现：生产级 MapLibre/SVG 前端渲染器、无头浏览器导出服务和真实 CRS 转换、A3 SVG/PDF/PNG 和中文字体渲染冒烟；当前只提供结构化环境探测骨架。
 - 尚未实现：U-P2 模板创建与地图生成业务闭环、候选渲染、实例冻结和发布事务。
 - CLI 入口：`python skills/carto-agent/scripts/carto.py --help`。
 - 测试入口：`python -m unittest discover -s skills/carto-agent/scripts/tests -v`。

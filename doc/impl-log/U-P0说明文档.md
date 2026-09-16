@@ -723,13 +723,16 @@ carto approval verify <receipt>              # 审批回执验证
 
 ### 7.2 工具绑定注册 — `tool-bindings.yaml`
 
-注册了三个初始工具能力，默认拒绝（`default: deny`）未注册能力：
+当前注册六个工具能力，默认拒绝（`default: deny`）未注册能力：
 
 | capability_id | adapter | effect | 授权策略 | 快照策略 |
 |---|---|---|---|---|
 | local-file-read | local | read | project-source-read | required |
 | schema-validate | local | transform | protocol-validation | receipt-only |
-| qgis-environment-probe | local | read | environment-probe | receipt-only |
+| renderer-capability-register | local | read | environment-probe | receipt-only |
+| web-map-preview | local | transform | renderer-preview | required |
+| web-map-export | local | write-project | renderer-export | required |
+| svg-compose | local | write-project | svg-composition | required |
 
 每个绑定声明了 `path_guard_required` 和 `credential_mode`，确保工具调用受路径安全和凭据隔离约束。
 

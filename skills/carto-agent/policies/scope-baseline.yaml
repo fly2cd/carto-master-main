@@ -11,12 +11,13 @@ first_vertical_slice:
   scenario: emergency-mapping-flood
   source_formats: [geopackage, geojson, csv]
   required_portrayals: [choropleth-risk, point-shelter]
-  outputs: [a3-pdf, a3-png]
+  outputs: [a3-svg, a3-pdf, a3-png]
 formal_capability_boundary:
   scenes: [government_thematic, emergency_mapping, leadership_visit]
   production_tasks: []
   note: 每项生产任务须在 U-P4 的正式能力矩阵通过后加入，不能由本基线提前声明。
-  unavailable: [hazard-prediction, remote-sensing-auto-extraction, command-decision, public-web-publishing, native-gis-editing]
+  unavailable: [hazard-prediction, remote-sensing-auto-extraction, command-decision, public-web-publishing, native-gis-editing, vector-pdf-export]
+  note_2: 地图画面为栅格嵌入 SVG，overlay 部分为矢量；矢量 PDF 导出暂不支持。
 model_boundary:
   host: application-managed
   public_model_sensitive_data: forbidden
@@ -30,7 +31,7 @@ acceptance_roles:
   security_approver: pending-assignment
   business_approver: pending-assignment
   evidence_root: reports/u-p0
-  decision_deadline: before-u-p1-entry
+  decision_deadline: before-production-capability-enable
 approval_required:
   action: approve-scope-baseline
   object_type: scope-baseline

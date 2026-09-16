@@ -19,7 +19,7 @@ bindings:
     path_guard_required: true
     credential_mode: none
     snapshot_policy: receipt-only
-  - capability_id: qgis-environment-probe
+  - capability_id: renderer-capability-register
     version: 1.0.0
     adapter: local
     effect: read
@@ -27,4 +27,28 @@ bindings:
     path_guard_required: false
     credential_mode: none
     snapshot_policy: receipt-only
+  - capability_id: web-map-preview
+    version: 1.0.0
+    adapter: local
+    effect: transform
+    authorization_policy: renderer-preview
+    path_guard_required: true
+    credential_mode: none
+    snapshot_policy: required
+  - capability_id: web-map-export
+    version: 1.0.0
+    adapter: local
+    effect: write-project
+    authorization_policy: renderer-export
+    path_guard_required: true
+    credential_mode: none
+    snapshot_policy: required
+  - capability_id: svg-compose
+    version: 1.0.0
+    adapter: local
+    effect: write-project
+    authorization_policy: svg-composition
+    path_guard_required: true
+    credential_mode: none
+    snapshot_policy: required
 unregistered_capability: reject

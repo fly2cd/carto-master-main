@@ -10,7 +10,7 @@
 | 实施日期 | 2026-09-15 |
 | 依据 | [实施计划 v2.1](../implement-plan.md) 第三章 |
 | 前置阶段 | [U-P0：规范收敛与安全底座](U-P0说明文档.md) |
-| 状态 | 退出标准 9 项已完成，1 项生产 QGIS 适配器显式延期 |
+| 状态 | 退出标准 9 项已完成，1 项生产 MapLibre Web/SVG 渲染适配器显式延期 |
 
 ---
 
@@ -78,7 +78,7 @@
 
 **类比**：就像小区的门禁卡系统——物业预先录入哪些卡能开哪些门。你没录入的卡，门禁不开。
 
-**在本项目中**：`tool-bindings.yaml` 策略文件定义了三个初始能力（local-file-read、schema-validate、qgis-environment-probe）。`ToolGateway` 构造时加载策略，运行时只认白名单内的能力。
+**在本项目中**：`tool-bindings.yaml` 策略文件定义了六个能力：`local-file-read`、`schema-validate`、`renderer-capability-register`、`web-map-preview`、`web-map-export` 和 `svg-compose`。`ToolGateway` 构造时加载策略，运行时只认白名单内的能力。
 
 ---
 
@@ -104,11 +104,11 @@
 
 #### 环境指纹（Environment Fingerprint）
 
-**一句话**：探测当前运行环境（QGIS、GDAL、PROJ、中文字体等）的状态，生成一个哈希"指纹"，用于检测环境变化。
+**一句话**：探测当前 Web 地图渲染环境（受控浏览器、Node、WebGL、离线能力、导出格式和中文字体）的状态，生成一个哈希“指纹”，用于检测环境变化。
 
-**类比**：就像给电脑做体检——检查各软件版本，生成一份报告。下次运行前再体检一次对比指纹，如果变了（比如 QGIS 升级了），需要重新验证。
+**类比**：就像给电脑做体检——检查浏览器、Node、字体和渲染能力，生成一份报告。下次运行前再体检一次对比指纹，如果环境变化，需要重新验证。
 
-**在本项目中**：`QgisEnvironmentProbe.run()` 探测 qgis_process、gdalinfo、projinfo 的可用性和版本，检查中文字体，生成 capabilities 字典和 fingerprint 哈希。结果通过 `environment-fingerprint` Schema 校验。
+**在本项目中**：`RendererCapabilityProbe.run()` 检查浏览器和 Node 命令、中文字体及静态能力配置，生成 capabilities 和 fingerprint。除非后续受控浏览器/WebGL 握手真正建立生产能力，否则它按 fail-closed 返回 `status=unavailable`、`webgl_available=false`、`headless_export=false`。
 
 ---
 
@@ -296,11 +296,13 @@ skills/carto-agent/scripts/carto_core/
 │   └── registry.py              # 检查器注册表：按阶段执行、生成报告（CheckerRegistry）
 │
 ├── adapters/                    # [新] 适配器模块
-│   ├── __init__.py              # 导出 ToolGateway, ToolResult, McpAdapter, QgisEnvironmentProbe
+│   ├── __init__.py              # 导出 ToolGateway、McpAdapter、RendererCapabilityProbe、WebMapRendererAdapter、SvgCompositor
 │   ├── contracts.py             # 能力处理器与地图适配器协议接口（Protocol 类型）
 │   ├── tool_gateway.py          # 工具网关：注册、授权、预算、调用、固定产物（ToolGateway）
 │   ├── mcp.py                   # MCP 发现门面：发现不等于授权（McpAdapter）
-│   └── qgis_probe.py            # QGIS 环境探测骨架（QgisEnvironmentProbe）
+│   ├── renderer_probe.py        # Web 渲染环境能力探测（RendererCapabilityProbe）
+│   ├── webmap_renderer.py       # RenderScene 编译、语义校验、会话和回执验证
+│   └── svg_compositor.py        # 地图截图与 SVG overlay 安全合成
 │
 ├── repository/                  # [新] 存储模块
 │   ├── __init__.py              # 导出 ImmutableArtifactStore, VersionedCatalog, DomainKnowledgeService
@@ -308,7 +310,7 @@ skills/carto-agent/scripts/carto_core/
 │   ├── catalog.py               # 版本化目录索引（VersionedCatalog）
 │   └── knowledge.py             # 领域知识服务（DomainKnowledgeService）
 │
-├── cli.py                       # [更新] 新增 intent resolve、environment probe-qgis、data prepare 子命令
+├── cli.py                       # [更新] 新增 intent resolve、environment probe-renderer、data prepare 子命令
 ├── canonical.py                 # [U-P0] 规范化 JSON 与摘要
 ├── errors.py                    # [U-P0] 统一错误类型
 ├── schema_registry.py           # [U-P0] Schema 注册表
@@ -320,7 +322,7 @@ skills/carto-agent/scripts/carto_core/
     └── sensitive.py
 ```
 
-**新增 Schema（4 个）**：
+**新增 Schema（6 个）**：
 
 | Schema 文件 | 用途 |
 |---|---|
@@ -328,12 +330,14 @@ skills/carto-agent/scripts/carto_core/
 | `tool-result.schema.json` | 工具调用结果数据结构 |
 | `validation-report.schema.json` | 校验报告数据结构 |
 | `environment-fingerprint.schema.json` | 环境探测指纹数据结构 |
+| `render-scene.schema.json` | 后端到前端的渲染场景、资源、图层和 overlay 协议 |
+| `render-receipt.schema.json` | 绑定场景、渲染器版本、资源证据和输出产物的 HMAC 回执 |
 
 **新增测试**：
 
 | 测试文件 | 行数 | 测试用例数 |
 |---|---|---|
-| `test_up1.py` | 223 | 10 |
+| `test_up1.py` | 504 | 31 |
 
 ---
 
@@ -447,7 +451,10 @@ skills/carto-agent/scripts/carto_core/
 |---|---|
 | `ToolGateway` | 能力查表 → 项目范围 → 授权检查 → 预算 → 输入校验 → 调用 → 输出校验 → 不可变存储 → 回执 |
 | `McpAdapter` | MCP 能力发现门面，发现不等于授权，`bind()` 时走 ToolGateway 注册 |
-| `QgisEnvironmentProbe` | 探测 qgis_process/gdalinfo/projinfo 可用性、中文字体、生成环境指纹 |
+| `RendererCapabilityProbe` | 探测浏览器、Node、中文字体和声明能力；未完成真实 WebGL 握手时按 fail-closed 返回不可用 |
+| `WebMapRendererAdapter` | 编译并校验 `RenderScene`，绑定 Renderer Profile 和受控渲染会话 |
+| `RenderReceiptValidator` | 验证回执 HMAC、场景/版本/资源/输出和时间证据 |
+| `SvgCompositor` | 在允许根内将地图截图和 overlay 合成为可编辑 SVG |
 | `contracts` | `CapabilityHandler` 和 `MapAdapter` 协议接口定义 |
 
 ### 3.5 repository 模块
@@ -472,7 +479,7 @@ skills/carto-agent/scripts/carto_core/
 carto intent resolve <request>           # 意图解析
   --allowed-root <dir> (required)
 
-carto environment probe-qgis              # QGIS 环境探测
+carto environment probe-renderer          # Web 渲染环境能力探测
 
 carto data prepare <task>                 # 固定数据准备
   --allowed-root <dir> (required)
@@ -503,7 +510,9 @@ carto data prepare <task>                 # 固定数据准备
 | | 编译器和校验器返回结构化结果 | 快照含摘要 + 报告通过 Schema 校验 |
 | | G1/G2/G3 验证精确上下文 | 三门禁各自通过 + 错误回执被拒绝 |
 | | 固定数据准备返回合法包 | bundle 通过 Schema 校验 |
-| | QGIS 探测始终返回合法可重放指纹 | 指纹以 sha256 开头 + Schema 校验通过 |
+| | 渲染器探测始终返回合法可重放指纹 | 指纹以 sha256 开头 + Schema 校验通过；未握手时能力为 unavailable |
+| WebMapRendererAdapterTests | RenderScene、Renderer Profile、会话与 RenderReceipt | 引用/能力/版本/HMAC/资源证据不一致均被拒绝 |
+| SvgCompositorTests | 截图与 overlay 安全合成 | 路径越界、覆盖、未解析坐标和不支持类型均被拒绝 |
 | | 环境 CLI 返回结构化结果 | subprocess 调用返回码 0 |
 
 ---
@@ -521,7 +530,7 @@ carto data prepare <task>                 # 固定数据准备
 | 固定流程数据准备可交付带验收报告的 PreparedDataBundle | 已完成 | test_deterministic_data_preparation_returns_valid_bundle |
 | Planner/Composer 类型化输出、有限修复、预算终止、配置版本和敏感信息边界可验证 | 已完成 | test_agent_runtime_accepts_only_typed_non_executable_candidates + test_sensitive_values_do_not_cross_role_context |
 | 三场景最小评测集能够区分正确识别、缺项、歧义、拒识和越权提案 | 已完成 | test_ambiguity_missing_information_capability_and_rejection 中 4 种状态各一例 |
-| 延期：生产 QGIS 适配器及真实 CRS/A3 PDF/PNG/中文字体冒烟 | 显式延期 | QgisEnvironmentProbe 只做结构化探测骨架，不声明生产能力 |
+| 延期：生产 MapLibre Web/SVG 适配器、受控浏览器/WebGL 握手及真实 CRS/A3 PDF/PNG/中文字体冒烟 | 显式延期 | RendererCapabilityProbe 只提供结构化、fail-closed 探测；当前明确不声明生产能力 |
 
 ---
 
@@ -550,7 +559,7 @@ carto data prepare <task>                 # 固定数据准备
 |---|---|
 | WorkflowStateStore | 模板创建和地图生成的步骤状态推进 |
 | IntentResolver | 地图生成路由的意图解析入口 |
-| ToolGateway | QGIS 渲染、数据读取等能力调用 |
+| ToolGateway | Web 地图预览/导出、SVG 合成、数据读取等能力调用 |
 | ProtocolCompiler | 六契约编译为候选快照 |
 | CheckerRegistry | 候选预览和冻结的校验检查 |
 | ImmutableArtifactStore | 模板包不可变版本存储 |

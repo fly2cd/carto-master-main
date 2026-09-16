@@ -35,7 +35,7 @@
 |---|---|---|---|---|---|
 | U-P0 | 规范收敛与安全底座 | A（前半） | P0 | GM-P0 | 对齐 Schema、契约、命名和审批协议 |
 | U-P1 | 内核骨架与协议层 | A（后半） | P1 | GM-P1 | 五模块骨架、状态机、工具网关和知识服务 |
-| U-P2 | 首个模板与生成最小内核 | B（前半） | P2–P3 | GM-P2–GM-P3 | 围绕首个场景完成编译器、校验器、QGIS 预览和冻结 |
+| U-P2 | 首个模板与生成最小内核 | B（前半） | P2–P3 | GM-P2–GM-P3 | 围绕首个场景完成编译器、校验器、MapLibre Web 预览和冻结 |
 | U-P3 | 首个纵向工程闭环 | B（后半） | P4–P6（部分） | GM-P4（部分） | 洪涝演示场景从创建到交付全链路打通并可恢复 |
 | U-P4 | 三场景业务与生产闭环 | C | P4–P6（续） | GM-P4 | 政务、应急、调研三场景验收 |
 | U-P5 | 复杂数据、连接器与共享部署 | D | P7（部分） | GM-P5（部分） | 按独立触发条件推进数据子智能体、企业连接器和共享部署 |
@@ -140,7 +140,7 @@ Schema 文件创建只表示协议草案落盘，不表示协议已经验收。�
 
 ### 3.1 目标
 
-建立五模块骨架、状态推进、回执、工具网关、知识服务和审批协调，形成可运行的协议层。本阶段不包含业务候选渲染流程，也不实现生产级 QGIS/API/MCP 适配器；仅保留适配器接口、授权边界和结构化环境探测骨架。
+建立五模块骨架、状态推进、回执、工具网关、知识服务和审批协调，形成可运行的协议层。本阶段不包含业务候选渲染流程，也不实现生产级受控浏览器/API/MCP 适配器；仅保留适配器接口、授权边界和结构化环境探测骨架。
 
 ### 3.2 前置依赖
 
@@ -173,7 +173,7 @@ invoke(capability_id, typed_input, execution_context) -> ToolResult
 - 能力注册表：版本化能力 ID、输入输出 Schema、授权策略、效果类别。
 - 调用链：能力查表 → 身份与范围校验 → 输入校验 → 预算检查 → 调用 → 输出语义校验 → 固定产物 → 回执登记。
 - MCP 适配：弱耦合协议，发现不等于授权。
-- U-P1 只实现网关和适配协议，不接入生产 QGIS、企业 API 或 MCP 服务；真实连接器由后续场景切片按需实现。
+- U-P1 只实现网关和适配协议，不接入生产受控浏览器、企业 API 或 MCP 服务；真实连接器由后续场景切片按需实现。
 
 #### 3.3.4 领域知识服务（DomainKnowledgeService）
 
@@ -224,18 +224,18 @@ prepare_data(approved_requirements, execution_context) -> PreparedDataBundle
 - 数据准备策略 `data-preparation-policy.yaml`：允许方式及触发条件。
 - 输出 `PreparedDataBundle`：快照、元数据、处理链、工具回执、质量报告、未决项。
 
-#### 3.3.9 QGIS 环境探测骨架
+#### 3.3.9 MapLibre Web 渲染环境探测骨架
 
 - 输出符合 Schema 的环境指纹，区分工具可发现、不可用和探测失败，并提供稳定错误码。
-- 当前探测不承担 QGIS 安装目录自动发现、CRS 转换、A3 PDF/PNG 导出或无界面工作进程验证。
-- 生产 QGIS 适配器与真实环境冒烟延期到需要首个候选渲染的阶段，并在进入 U-P2 的 QGIS 预览前完成。
+- 当前探测只确认浏览器/Node 命令与字体事实，不把“命令存在”解释为 WebGL、离线渲染或无头导出可用；没有受控浏览器握手时必须返回 `unavailable`。
+- 生产 MapLibre GL JS + SVG overlay 适配器、WebGL 握手和真实无头导出冒烟延期到需要首个候选渲染的阶段，并在进入 U-P2 预览前完成。
 
 #### 3.3.10 当前实施状态（2026-09-15）
 
 - 五模块骨架、状态机、步骤回执、意图解析、任务分派、智能体类型化提交、审批协调、固定数据准备、工具网关、MCP 授权边界、知识服务、编译器骨架和校验器骨架已实现。
 - 新增 `step-receipt`、`tool-result`、`validation-report`、`environment-fingerprint` 四项协议，并为全部实例 Schema 提供合法/非法 Fixture。
-- 本机存在 QGIS 安装目录的人工发现记录，但当前探测骨架不将其声明为可执行生产能力；根据当前实施决策，不在 U-P1 继续实现或验证生产 QGIS 适配器。
-- 调整后的 U-P1 内核范围已完成；生产适配器及真实 CRS/A3 PDF/PNG 冒烟作为显式延期项，不计入本阶段完成判定。
+- 当前环境探测、RenderScene/RenderReceipt、会话能力匹配和 SVG 合成骨架已落地；没有受控浏览器/WebGL 握手时不声明生产渲染能力。
+- 调整后的 U-P1 内核范围已完成；生产受控浏览器适配器及真实 CRS/A3 PDF/PNG 冒烟作为显式延期项，不计入本阶段完成判定。
 
 ### 3.4 退出标准
 
@@ -248,7 +248,7 @@ prepare_data(approved_requirements, execution_context) -> PreparedDataBundle
 - [x] 固定流程数据准备可交付带验收报告的 `PreparedDataBundle`。
 - [x] Planner/Composer 类型化输出、有限修复、预算终止、配置版本和敏感信息边界可验证。
 - [x] 三场景最小评测集能够区分正确识别、缺项、歧义、拒识和越权提案。
-- [ ] 延期：生产 QGIS 适配器及真实 CRS 转换、A3 PDF/PNG、中文字体和无界面进程冒烟验证；该项不阻断调整后的 U-P1 内核范围完成。
+- [ ] 延期：生产 MapLibre Web/SVG 适配器、受控浏览器/WebGL 握手、真实 CRS 转换、A3 PDF/PNG、中文字体和无界面进程冒烟验证；该项不阻断调整后的 U-P1 内核范围完成。
 
 ---
 
@@ -315,12 +315,13 @@ prepare_data(approved_requirements, execution_context) -> PreparedDataBundle
 - 四级检查：数据接入 → 计划编译 → 候选预览 → 冻结/正式成品。
 - 模板和模型不能把必需错误降为警告。
 
-#### 4.3.5 QGIS 适配器与预览
+#### 4.3.5 MapLibre Web 适配器与预览
 
-- 能力接口：`capabilities()` / `compile()` / `render()`。
+- 能力接口：`capabilities()` / `compile_scene()` / `submit_render()` / `validate_receipt()`。
 - 首期最小能力：矢量图层、顺序分级设色、容量比例符号、CRS 转换、A3 印刷布局、PDF/PNG 导出。
-- 独立工作进程：超时、内存、CPU、临时磁盘限制。
-- 可重放：固定环境、字体、随机种子和排序。
+- 前端执行：MapLibre GL JS 承载底图与专题图层，SVG overlay 承载图名、图例、指北针、比例尺及专题标记。
+- 独立受控浏览器进程：WebGL 能力握手、超时、内存、CPU、临时磁盘和网络白名单限制。
+- 可重放：固定 RenderScene/RenderBundle、前端构建、MapLibre、overlay 引擎、浏览器、字体、随机种子和排序；返回经过验证的 RenderReceipt。
 
 ### 4.4 退出标准
 
@@ -328,7 +329,7 @@ prepare_data(approved_requirements, execution_context) -> PreparedDataBundle
 - [ ] 地图生成从接入到冻结全链路可运行（Fixture 数据）。
 - [ ] 编译器可解析六契约并生成无未决参数的候选快照。
 - [ ] 校验器可执行注册检查并返回结构化报告。
-- [ ] QGIS 预览可渲染候选并输出 PDF/PNG。
+- [ ] MapLibre Web 预览可渲染候选，受控浏览器可输出 PDF/PNG，并提交有效 RenderReceipt。
 - [ ] `MapSpecLock` 不可变且与候选执行摘要一致。
 - [ ] 冻结后变更触发新候选和新锁，旧锁不可修改。
 
@@ -368,9 +369,9 @@ prepare_data(approved_requirements, execution_context) -> PreparedDataBundle
 | 意图 | `emergency_mapping` + `hazard_result_map`，灾种 flood，阶段 preparedness |
 | 数据准备 | 固定流程：GeoJSON 接入、字段绑定、单位检查、CRS 验证 |
 | 规划 | 安装模板精确版本、解析六契约、绑定数据角色、计算分类断点 |
-| 预览 | QGIS 渲染候选，检查图例同步、无数据表达和比例符号面积 |
+| 预览 | MapLibre Web 渲染候选，检查图例同步、无数据表达和比例符号面积 |
 | 冻结 | G2 审批后构造 `MapSpecLock` |
-| 渲染 | QGIS 正式输出 PDF/PNG |
+| 渲染 | 受控无头浏览器组合 MapLibre 与 SVG overlay，正式输出 PDF/PNG |
 | 检查 | 成品检查：文件完整性、字体、裁剪、标签和署名 |
 | 交付 | G3 授权后原子提交成果包 |
 
@@ -464,7 +465,7 @@ prepare_data(approved_requirements, execution_context) -> PreparedDataBundle
 | 能力 | 最低验收 |
 |---|---|
 | 可信身份与权限 | 审批绑定内容、动作、目标和有效身份 |
-| 隔离与限额 | QGIS 超时、取消、资源超限和租户越界可受控 |
+| 隔离与限额 | 受控浏览器渲染超时、取消、资源超限和租户越界可受控 |
 | 完整性与幂等 | 摘要校验、不可变版本、并发冲突和重试语义 |
 | 证据与审计 | 每次运行可追溯到来源、确认、验证和最终产物 |
 | 备份恢复 | 注册表、包、证据和授权信息有备份及恢复演练 |
@@ -532,7 +533,7 @@ prepare_data(approved_requirements, execution_context) -> PreparedDataBundle
 | 入口与编排 | 单个应用进程 | 多个无状态入口实例 |
 | 状态 | 本地单写者锁 | 事务数据库、租约及修订号比较 |
 | 数据与产物 | 文件系统 | 对象存储或受控文件服务 |
-| 计算 | 隔离 QGIS 工作进程 | 工作进程池 + 任务队列 |
+| 计算 | 隔离受控浏览器渲染进程 | 渲染工作进程池 + 任务队列 |
 | 身份与凭据 | 宿主身份 | 企业身份服务、集中凭据管理 |
 | 扩展触发 | 单机吞吐 | 队列时延、渲染资源、隔离与可用性 |
 
@@ -606,7 +607,7 @@ prepare_data(approved_requirements, execution_context) -> PreparedDataBundle
 workflow（编排）
   ├→ compiler（编译/冻结）
   ├→ validation（校验/检查）
-  ├→ adapters（工具网关/QGIS/Renderer）
+  ├→ adapters（工具网关/MapLibre Web/SVG Renderer）
   └→ repository（模板/证据/成果存储）
 ```
 
@@ -641,7 +642,7 @@ workflow（编排）
 | 模板存储 | TemplateRepository | repository |
 | 知识存储 | KnowledgeRepository | repository |
 | 成果存储 | DeliveryRepository | repository |
-| 渲染 | QGISAdapter / Renderer | adapters |
+| 渲染 | WebMapRendererAdapter / SvgCompositor | adapters |
 
 ---
 
@@ -749,7 +750,7 @@ workflow（编排）
 | 渲染器自行修改图面 | Renderer 只消费锁中的固定结果，不重新选择事实或设计参数 |
 | 并发写入覆盖 | 项目锁和修订号比较，不同项目可并行 |
 | 模型或提示配置漂移 | 固定运行配置版本，变更触发回归评测；实例锁后不重新调用模型设计 |
-| QGIS/字体/PROJ 环境漂移 | 在生产 QGIS 适配器接入时执行环境冒烟并形成指纹；候选与锁绑定执行环境，变化时重新验证或冻结 |
+| 浏览器/MapLibre/overlay/字体/PROJ 环境漂移 | 在生产 Web 渲染适配器接入时执行能力握手和环境冒烟并形成指纹；候选与锁绑定执行环境，变化时重新验证或冻结 |
 
 ---
 
@@ -759,7 +760,7 @@ workflow（编排）
 |---|---|---|---|
 | M0 | U-P0 | Schema 草案、安全底座、仓库治理、首期范围与部署基线 | 文档定稿 |
 | M1 | U-P1 | 五模块与智能体运行骨架、工具网关、知识服务、审批门禁、环境探测协议骨架 | M0 |
-| M2 | U-P2 | 首个 MapScenario 创建全链路、地图生成最小内核、生产 QGIS 适配器、环境冒烟、预览和冻结 | M1 |
+| M2 | U-P2 | 首个 MapScenario 创建全链路、地图生成最小内核、生产 MapLibre Web 适配器、受控浏览器环境冒烟、预览和冻结 | M1 |
 | M3 | U-P3 | 洪涝场景工程闭环、交接、恢复和修复边界验证 | M2 |
 | M4 | U-P4 | 三场景业务闭环、生产运维基线 | M3 + 业务数据 |
 | M5 | U-P5 | 按条件启用的数据子智能体、企业连接器和/或共享部署 | M4；各工作包使用独立触发条件 |

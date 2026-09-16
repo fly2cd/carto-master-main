@@ -115,7 +115,7 @@
             "additionalProperties": false,
             "required": ["format", "display_crs", "dpi"],
             "properties": {
-              "format": {"enum": ["pdf", "png"]},
+              "format": {"enum": ["svg", "pdf", "png"]},
               "display_crs": {"$ref": "#/$defs/crs"},
               "dpi": {"type": "integer", "minimum": 72, "maximum": 1200},
               "width_mm": {"type": "number", "exclusiveMinimum": 0},
@@ -124,13 +124,41 @@
           }
         },
         "resolved_assets": {"type": "array", "items": {"$ref": "#/$defs/artifactRef"}, "uniqueItems": true},
+        "render_scene_ref": {"$ref": "#/$defs/artifactRef"},
+        "renderer_profile_ref": {"$ref": "#/$defs/artifactRef"},
+        "camera": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["bounds", "bearing", "pitch"],
+          "properties": {
+            "bounds": {"$ref": "#/$defs/bbox"},
+            "bearing": {"type": "number", "minimum": 0, "maximum": 360},
+            "pitch": {"type": "number", "minimum": 0, "maximum": 90},
+            "padding": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["top", "right", "bottom", "left"],
+              "properties": {
+                "top": {"type": "number", "minimum": 0},
+                "right": {"type": "number", "minimum": 0},
+                "bottom": {"type": "number", "minimum": 0},
+                "left": {"type": "number", "minimum": 0}
+              }
+            }
+          }
+        },
+        "overlay_coordinate_policy": {"enum": ["page", "viewport", "geographic", "feature"]},
+        "interaction_policy": {"enum": ["static", "preview", "interactive"]},
         "environment": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["adapter_id", "adapter_version", "fingerprint"],
+          "required": ["renderer_id", "renderer_version", "frontend_build", "maplibre_version", "overlay_engine_version", "fingerprint"],
           "properties": {
-            "adapter_id": {"$ref": "#/$defs/identifier"},
-            "adapter_version": {"$ref": "#/$defs/semanticVersion"},
+            "renderer_id": {"$ref": "#/$defs/identifier"},
+            "renderer_version": {"$ref": "#/$defs/semanticVersion"},
+            "frontend_build": {"type": "string", "minLength": 1},
+            "maplibre_version": {"type": "string", "minLength": 1},
+            "overlay_engine_version": {"type": "string", "minLength": 1},
             "fingerprint": {"$ref": "#/$defs/digest"}
           }
         }

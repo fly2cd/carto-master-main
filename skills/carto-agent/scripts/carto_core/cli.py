@@ -6,7 +6,7 @@ import os
 import sys
 from pathlib import Path
 
-from .adapters.qgis_probe import QgisEnvironmentProbe
+from .adapters.renderer_probe import RendererCapabilityProbe
 from .errors import CartoError
 from .schema_registry import SchemaRegistry, load_document
 from .security.approval import ApprovalReceipt, SqliteNonceStore, verify_receipt
@@ -62,9 +62,9 @@ def build_parser() -> argparse.ArgumentParser:
     resolve.add_argument("request")
     resolve.add_argument("--allowed-root", action="append", required=True)
 
-    environment = sub.add_parser("environment", help="Probe runtime capabilities")
+    environment = sub.add_parser("environment", help="Probe renderer capabilities")
     environment_sub = environment.add_subparsers(dest="environment_command", required=True)
-    environment_sub.add_parser("probe-qgis")
+    environment_sub.add_parser("probe-renderer")
 
     data = sub.add_parser("data", help="Run deterministic data preparation")
     data_sub = data.add_subparsers(dest="data_command", required=True)
@@ -114,8 +114,8 @@ def main(argv: list[str] | None = None) -> int:
                 raise ValueError("Intent request must be an object")
             result = IntentResolver(_policy_path("intent-profiles.yaml")).resolve(request)
             return _success({"intent": result})
-        if args.command == "environment" and args.environment_command == "probe-qgis":
-            result = QgisEnvironmentProbe().run()
+        if args.command == "environment" and args.environment_command == "probe-renderer":
+            result = RendererCapabilityProbe().run()
             SchemaRegistry().validate("environment-fingerprint", result)
             return _success({"environment": result})
         if args.command == "data" and args.data_command == "prepare":

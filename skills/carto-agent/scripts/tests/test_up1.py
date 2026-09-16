@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from copy import deepcopy
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -15,9 +16,18 @@ POLICIES = AGENT_ROOT / "policies"
 if str(SCRIPTS_ROOT) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_ROOT))
 
-from carto_core.adapters.qgis_probe import QgisEnvironmentProbe
+from carto_core.adapters.renderer_probe import RendererCapabilityProbe
 from carto_core.adapters.mcp import McpAdapter, McpCapabilityDescriptor
+from carto_core.adapters.svg_compositor import SvgCompositor
 from carto_core.adapters.tool_gateway import ToolGateway
+from carto_core.adapters.webmap_renderer import (
+    RenderReceiptValidator,
+    RenderSessionGateway,
+    RendererCapabilityProfile,
+    RendererCapabilityRegistry,
+    WebMapRendererAdapter,
+    compute_renderer_attestation,
+)
 from carto_core.canonical import sha256_digest
 from carto_core.compiler.dependencies import DependencyResolver
 from carto_core.compiler.ownership import OwnershipResolver
@@ -27,6 +37,7 @@ from carto_core.repository.immutable_store import ImmutableArtifactStore
 from carto_core.repository.knowledge import DomainKnowledgeService
 from carto_core.schema_registry import SchemaRegistry
 from carto_core.security.approval import ApprovalReceipt, InMemoryNonceStore, sign_receipt
+from carto_core.security.paths import PathGuard
 from carto_core.workflow.agent_runtime import AgentSubmission, BoundedAgentRuntime
 from carto_core.workflow.approvals import ApprovalGateCoordinator, GATES
 from carto_core.workflow.data_preparation import DeterministicDataPreparer
@@ -146,7 +157,7 @@ class IntentAndRuntimeTests(unittest.TestCase):
         self.assertEqual(ambiguous["intent_status"], "ambiguous")
         missing = self.resolver.resolve({"text": "洪涝应急图", "fields": {}})
         self.assertEqual(missing["readiness_status"], "missing_information")
-        capability = self.resolver.resolve({"text": "洪涝应急图", "fields": self.fields("emergency_mapping"), "required_capabilities": ["qgis-render"], "available_capabilities": []})
+        capability = self.resolver.resolve({"text": "洪涝应急图", "fields": self.fields("emergency_mapping"), "required_capabilities": ["web-map-export"], "available_capabilities": []})
         self.assertEqual(capability["readiness_status"], "missing_capability")
         rejected = self.resolver.resolve({"text": "写一首诗", "fields": {}})
         self.assertEqual(rejected["intent_status"], "unsupported")
@@ -205,17 +216,288 @@ class ProtocolAndGateTests(unittest.TestCase):
         SchemaRegistry().validate("prepared-data-bundle", bundle)
         self.assertTrue(bundle["quality_evidence"])
 
-    def test_qgis_probe_always_returns_valid_replayable_fingerprint(self) -> None:
-        result = QgisEnvironmentProbe(timeout_seconds=2).run()
+    def test_renderer_probe_always_returns_valid_replayable_fingerprint(self) -> None:
+        result = RendererCapabilityProbe(timeout_seconds=2).run()
         SchemaRegistry().validate("environment-fingerprint", result)
         self.assertTrue(result["fingerprint"].startswith("sha256:"))
-        if result["status"] == "unavailable":
-            self.assertEqual(result["error"]["code"], "CAPABILITY_NOT_AVAILABLE")
+        self.assertEqual(result["probe_id"], "renderer-capability-probe")
+        self.assertEqual(result["status"], "unavailable")
+        self.assertFalse(result["capabilities"]["webgl_available"])
+        self.assertFalse(result["capabilities"]["headless_export"])
+        self.assertEqual(result["error"]["code"], "CAPABILITY_NOT_AVAILABLE")
 
     def test_environment_cli_returns_structured_result(self) -> None:
-        completed = subprocess.run([sys.executable, str(SCRIPTS_ROOT / "carto.py"), "environment", "probe-qgis"], capture_output=True, text=True, check=False)
+        completed = subprocess.run([sys.executable, str(SCRIPTS_ROOT / "carto.py"), "environment", "probe-renderer"], capture_output=True, text=True, check=False)
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn("environment", json.loads(completed.stdout))
+
+
+class WebMapRendererAdapterTests(unittest.TestCase):
+    @staticmethod
+    def profile(
+        *,
+        renderer_id: str = "maplibre-web",
+        formats: tuple[str, ...] = ("svg", "png"),
+        width: int = 16384,
+        height: int = 16384,
+    ) -> RendererCapabilityProfile:
+        return RendererCapabilityProfile(
+            renderer_id=renderer_id,
+            frontend_build="2026.09.15",
+            renderer_version="1.0.0",
+            maplibre_version="3.6.0",
+            overlay_engine_version="1.0.0",
+            browser_engine="Chromium 117.0",
+            webgl_available=True,
+            supported_export_formats=formats,
+            max_canvas_width=width,
+            max_canvas_height=height,
+            device_pixel_ratio=2.0,
+            available_fonts=("Noto Sans CJK SC",),
+            offline_rendering=True,
+        )
+
+    def submitted(self) -> tuple[WebMapRendererAdapter, RendererCapabilityProfile, dict[str, object]]:
+        profile = self.profile()
+        adapter = WebMapRendererAdapter(RendererCapabilityRegistry([profile]))
+        scene = deepcopy(VALID_CASES["render-scene"])
+        adapter.submit_render("session-one", scene, profile.renderer_id, profile.frontend_build)
+        return adapter, profile, scene
+
+    @staticmethod
+    def signed_receipt(
+        profile: RendererCapabilityProfile,
+        scene: dict[str, object],
+        key: bytes,
+    ) -> dict[str, object]:
+        receipt = deepcopy(VALID_CASES["render-receipt"])
+        receipt["scene_digest"] = sha256_digest(scene)
+        receipt["renderer_profile_digest"] = profile.profile_digest()
+        receipt["renderer_attestation"] = compute_renderer_attestation(receipt, key)
+        return receipt
+
+    def test_compile_scene_validates_render_scene_schema(self) -> None:
+        adapter = WebMapRendererAdapter()
+        scene = deepcopy(VALID_CASES["render-scene"])
+        compiled = adapter.compile_scene(scene)
+        self.assertEqual(compiled["renderer_id"], "maplibre-web")
+        SchemaRegistry().validate("render-scene", compiled)
+
+    def test_compile_scene_rejects_duplicate_and_broken_references(self) -> None:
+        adapter = WebMapRendererAdapter()
+        duplicate = deepcopy(VALID_CASES["render-scene"])
+        duplicate["resources"].append(deepcopy(duplicate["resources"][0]))
+        with self.assertRaises(ProtocolError) as raised:
+            adapter.compile_scene(duplicate)
+        self.assertEqual(raised.exception.code, "RENDER_SCENE_DUPLICATE_ID")
+
+        broken = deepcopy(VALID_CASES["render-scene"])
+        broken["map"]["layers"][0]["source_id"] = "missing-source"
+        with self.assertRaises(ProtocolError) as raised:
+            adapter.compile_scene(broken)
+        self.assertEqual(raised.exception.code, "RENDER_LAYER_SOURCE_UNKNOWN")
+
+    def test_schema_rejects_overlay_without_coordinate_or_type_payload(self) -> None:
+        scene = deepcopy(VALID_CASES["render-scene"])
+        del scene["overlays"][0]["position"]
+        with self.assertRaises(ProtocolError):
+            SchemaRegistry().validate("render-scene", scene)
+        scene = deepcopy(VALID_CASES["render-scene"])
+        del scene["overlays"][0]["content"]
+        with self.assertRaises(ProtocolError):
+            SchemaRegistry().validate("render-scene", scene)
+
+    def test_submit_render_rejects_untrusted_renderer(self) -> None:
+        adapter = WebMapRendererAdapter()
+        scene = deepcopy(VALID_CASES["render-scene"])
+        with self.assertRaises(SecurityError) as raised:
+            adapter.submit_render("session-one", scene, "untrusted-renderer", "2026.09.15")
+        self.assertEqual(raised.exception.code, "RENDERER_NOT_TRUSTED")
+
+    def test_submit_render_accepts_trusted_renderer(self) -> None:
+        profile = self.profile()
+        adapter = WebMapRendererAdapter(RendererCapabilityRegistry([profile]))
+        scene = deepcopy(VALID_CASES["render-scene"])
+        result = adapter.submit_render("session-one", scene, "maplibre-web", "2026.09.15")
+        self.assertEqual(result["status"], "submitted")
+        self.assertEqual(result["renderer_profile_digest"], profile.profile_digest())
+
+    def test_submit_rejects_renderer_export_and_viewport_mismatches(self) -> None:
+        profile = self.profile()
+        adapter = WebMapRendererAdapter(RendererCapabilityRegistry([profile]))
+        scene = deepcopy(VALID_CASES["render-scene"])
+        scene["renderer_id"] = "other-renderer"
+        scene["renderer_requirements"]["renderer_id"] = "other-renderer"
+        with self.assertRaises(SecurityError) as raised:
+            adapter.submit_render("session-renderer", scene, profile.renderer_id, profile.frontend_build)
+        self.assertEqual(raised.exception.code, "RENDERER_SCENE_MISMATCH")
+
+        adapter = WebMapRendererAdapter(RendererCapabilityRegistry([self.profile(formats=("svg",))]))
+        with self.assertRaises(ProtocolError) as raised:
+            adapter.submit_render("session-export", deepcopy(VALID_CASES["render-scene"]), "maplibre-web", "2026.09.15")
+        self.assertEqual(raised.exception.code, "RENDER_EXPORT_UNSUPPORTED")
+
+        adapter = WebMapRendererAdapter(RendererCapabilityRegistry([self.profile(width=1000)]))
+        with self.assertRaises(ProtocolError) as raised:
+            adapter.submit_render("session-viewport", deepcopy(VALID_CASES["render-scene"]), "maplibre-web", "2026.09.15")
+        self.assertEqual(raised.exception.code, "RENDER_VIEWPORT_UNSUPPORTED")
+
+    def test_render_receipt_validation(self) -> None:
+        adapter, profile, scene = self.submitted()
+        key = b"render-attestation-key-32-bytes!!"
+        receipt = self.signed_receipt(profile, scene, key)
+        adapter.validate_receipt(receipt, key)
+
+        with self.assertRaises(ProtocolError) as raised:
+            adapter.validate_receipt(receipt, key)
+        self.assertEqual(raised.exception.code, "RENDER_SESSION_STATE_INVALID")
+
+        adapter, profile, scene = self.submitted()
+        receipt = self.signed_receipt(profile, scene, key)
+        tampered = deepcopy(receipt)
+        tampered["warnings"] = ["modified after signing"]
+        with self.assertRaises(SecurityError) as raised:
+            adapter.validate_receipt(tampered, key)
+        self.assertEqual(raised.exception.code, "RENDER_ATTESTATION_INVALID")
+
+    def test_submitted_scene_is_an_immutable_snapshot(self) -> None:
+        adapter, profile, scene = self.submitted()
+        key = b"render-attestation-key-32-bytes!!"
+        receipt = self.signed_receipt(profile, scene, key)
+        scene["viewport"]["width_px"] = 1
+        scene["resources"][0]["ref"]["digest"] = "sha256:" + "f" * 64
+        adapter.validate_receipt(receipt, key)
+
+    def test_render_receipt_rejects_binding_time_and_resource_failures(self) -> None:
+        key = b"render-attestation-key-32-bytes!!"
+        adapter, profile, scene = self.submitted()
+        receipt = self.signed_receipt(profile, scene, key)
+        receipt["renderer_version"] = "9.0.0"
+        receipt["renderer_attestation"] = compute_renderer_attestation(receipt, key)
+        with self.assertRaises(ProtocolError) as raised:
+            adapter.validate_receipt(receipt, key)
+        self.assertEqual(raised.exception.code, "RENDER_RECEIPT_BINDING_MISMATCH")
+
+        receipt = self.signed_receipt(profile, scene, key)
+        receipt["render_completed_at"] = "2026-09-14T23:59:59Z"
+        receipt["renderer_attestation"] = compute_renderer_attestation(receipt, key)
+        with self.assertRaises(ProtocolError) as raised:
+            adapter.validate_receipt(receipt, key)
+        self.assertEqual(raised.exception.code, "RENDER_RECEIPT_TIME_INVALID")
+
+        receipt = self.signed_receipt(profile, scene, key)
+        receipt["resource_evidence"][0]["status"] = "missing"
+        receipt["renderer_attestation"] = compute_renderer_attestation(receipt, key)
+        with self.assertRaises(ProtocolError) as raised:
+            adapter.validate_receipt(receipt, key)
+        self.assertEqual(raised.exception.code, "RENDER_REQUIRED_RESOURCE_NOT_LOADED")
+
+        receipt = self.signed_receipt(profile, scene, key)
+        receipt["resource_evidence"].append({
+            "resource_id": "unknown-resource",
+            "status": "loaded",
+            "digest": "sha256:" + "f" * 64,
+        })
+        receipt["renderer_attestation"] = compute_renderer_attestation(receipt, key)
+        with self.assertRaises(ProtocolError) as raised:
+            adapter.validate_receipt(receipt, key)
+        self.assertEqual(raised.exception.code, "RENDER_RESOURCE_EVIDENCE_UNKNOWN")
+
+    def test_renderer_profile_and_session_ids_are_immutable(self) -> None:
+        profile = self.profile()
+        registry = RendererCapabilityRegistry([profile])
+        with self.assertRaises(SecurityError):
+            registry.register(profile)
+        adapter = WebMapRendererAdapter(registry)
+        scene = deepcopy(VALID_CASES["render-scene"])
+        adapter.submit_render("session-one", scene, profile.renderer_id, profile.frontend_build)
+        with self.assertRaises(ProtocolError) as raised:
+            adapter.submit_render("session-one", scene, profile.renderer_id, profile.frontend_build)
+        self.assertEqual(raised.exception.code, "RENDER_SESSION_DUPLICATE")
+
+
+class SvgCompositorTests(unittest.TestCase):
+    def test_compose_creates_svg_with_image_and_overlay(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            screenshot = root / "map.png"
+            screenshot.write_bytes(b"\x89PNG\r\n\x1a\n")
+            output = root / "output.svg"
+            compositor = SvgCompositor(800, 600, PathGuard([root]))
+            overlays = [{"id": "title", "type": "text", "coordinate_space": "page", "position": {"x": 0.5, "y": 0.1, "unit": "normalized"}, "content": "Test Map"}]
+            compositor.compose(screenshot, overlays, output)
+            self.assertTrue(output.exists())
+            text = output.read_text(encoding="utf-8")
+            self.assertIn("<svg", text)
+            self.assertIn("Test Map", text)
+            self.assertIn('x="400"', text)
+
+    def test_compose_supports_declared_overlay_vocabulary(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            screenshot = root / "map.jpg"
+            screenshot.write_bytes(b"\xff\xd8\xff\xe0")
+            overlays = [
+                {"id": "symbol-one", "type": "symbol", "coordinate_space": "geographic", "screen_position": {"x": 20, "y": 30, "unit": "pixel"}, "symbol_ref": "icon-one", "label": "Point"},
+                {"id": "legend-one", "type": "legend", "coordinate_space": "page", "position": {"x": 10, "y": 50, "unit": "pixel"}, "legend_items": [{"label": "Risk", "color": "#FF0000"}]},
+                {"id": "north-one", "type": "north-arrow", "coordinate_space": "page", "position": {"x": 760, "y": 40, "unit": "pixel"}},
+                {"id": "scale-one", "type": "scale-bar", "coordinate_space": "page", "position": {"x": 20, "y": 570, "unit": "pixel"}, "length_px": 100, "distance_label": "10 km"},
+            ]
+            output = root / "supported.svg"
+            SvgCompositor(800, 600, PathGuard([root])).compose(screenshot, overlays, output)
+            text = output.read_text(encoding="utf-8")
+            self.assertIn("10 km", text)
+            self.assertIn("north-one", text)
+            self.assertIn("legend-one", text)
+
+    def test_compose_rejects_unresolved_and_unsupported_overlays(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            screenshot = root / "map.png"
+            screenshot.write_bytes(b"\x89PNG\r\n\x1a\n")
+            compositor = SvgCompositor(800, 600, PathGuard([root]))
+            unresolved = {"id": "point-one", "type": "symbol", "coordinate_space": "geographic", "anchor": {"longitude": 1, "latitude": 1}, "symbol_ref": "icon-one"}
+            with self.assertRaises(ProtocolError) as raised:
+                compositor.compose(screenshot, [unresolved], root / "unresolved.svg")
+            self.assertEqual(raised.exception.code, "OVERLAY_COORDINATE_UNRESOLVED")
+
+            unsupported = {"id": "custom-one", "type": "custom", "coordinate_space": "page", "position": {"x": 1, "y": 1, "unit": "pixel"}}
+            with self.assertRaises(ProtocolError) as raised:
+                compositor.compose(screenshot, [unsupported], root / "unsupported.svg")
+            self.assertEqual(raised.exception.code, "OVERLAY_TYPE_UNSUPPORTED")
+
+    def test_compose_enforces_allowed_roots_and_output_immutability(self) -> None:
+        with tempfile.TemporaryDirectory() as temp, tempfile.TemporaryDirectory() as outside:
+            root = Path(temp)
+            screenshot = root / "map.png"
+            screenshot.write_bytes(b"\x89PNG\r\n\x1a\n")
+            compositor = SvgCompositor(800, 600, PathGuard([root]))
+            overlays = [{"id": "title", "type": "text", "coordinate_space": "page", "position": {"x": 10, "y": 20, "unit": "pixel"}, "content": "Map"}]
+            with self.assertRaises(SecurityError) as raised:
+                compositor.compose(screenshot, overlays, Path(outside) / "escaped.svg")
+            self.assertEqual(raised.exception.code, "PATH_OUTSIDE_ALLOWED_ROOT")
+
+            output = root / "existing.svg"
+            output.write_text("existing", encoding="utf-8")
+            with self.assertRaises(SecurityError) as raised:
+                compositor.compose(screenshot, overlays, output)
+            self.assertEqual(raised.exception.code, "COMPOSITE_OUTPUT_EXISTS")
+
+    def test_inline_font_rejects_css_injection_family(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            screenshot = root / "map.png"
+            screenshot.write_bytes(b"\x89PNG\r\n\x1a\n")
+            compositor = SvgCompositor(800, 600, PathGuard([root]))
+            overlays = [{"id": "title", "type": "text", "coordinate_space": "page", "position": {"x": 10, "y": 20, "unit": "pixel"}, "content": "Map"}]
+            with self.assertRaises(ProtocolError) as raised:
+                compositor.compose(
+                    screenshot,
+                    overlays,
+                    root / "font.svg",
+                    inline_fonts=[('unsafe";}svg{display:none}', b"wOF2")],
+                )
+            self.assertEqual(raised.exception.code, "COMPOSITE_FONT_FAMILY_INVALID")
 
 
 if __name__ == "__main__":

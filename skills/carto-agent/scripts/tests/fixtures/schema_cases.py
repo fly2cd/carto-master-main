@@ -27,7 +27,7 @@ EXECUTION = {
     "views": [{"id": "main-view", "extent": [100, 20, 101, 21], "layer_ids": ["risk-layer"], "target_ids": ["a3-pdf"]}],
     "targets": {"a3-pdf": {"format": "pdf", "display_crs": {"authority": "EPSG", "code": "4490"}, "dpi": 300, "width_mm": 420, "height_mm": 297}},
     "resolved_assets": [],
-    "environment": {"adapter_id": "qgis", "adapter_version": "3.40.0", "fingerprint": D},
+    "environment": {"renderer_id": "maplibre-web", "renderer_version": "1.0.0", "frontend_build": "2026.09.15", "maplibre_version": "3.6.0", "overlay_engine_version": "1.0.0", "fingerprint": D},
 }
 EXECUTION_DIGEST = sha256_digest(EXECUTION)
 
@@ -48,7 +48,7 @@ VALID_CASES = {
     "intent-profiles": {"schema_version": 1, "catalog_version": "1.0.0", "profiles": [{"scene_id": "government_thematic", "task_ids": ["indicator-map"], "required_information": ["theme"], "unsupported_actions": []}, {"scene_id": "emergency_mapping", "task_ids": ["hazard-result-map"], "required_information": ["hazard"], "unsupported_actions": ["hazard-prediction"]}, {"scene_id": "leadership_visit", "task_ids": ["visit-route-map"], "required_information": ["itinerary"], "unsupported_actions": ["reorder-visits"]}]},
     "map-brief": {"schema_version": 1, "brief_id": "map-brief-one", "revision": 1, "intent_ref": A, "purpose": "风险研判", "audience": "应急管理人员", "source_plan": [{"role": "risk-area", "source_ref": A, "allowed_operations": ["read", "join", "classify"]}], "targets": ["pdf", "png"], "template_candidates": [T], "delegation": {"allow_data_agent": False, "max_tool_calls": 10}, "approval_required": True},
     "source-manifest": {"schema_version": 1, "manifest_id": "source-manifest-one", "sources": [{"source_id": "risk-data", "kind": "geopackage", "location_ref": "project-source:risk.gpkg", "digest": D, "provenance": P, "license": "project-approved", "captured_at": "2026-09-14T00:00:00Z"}]},
-    "tool-binding": {"schema_version": 1, "binding_id": "qgis-probe", "version": "1.0.0", "capability_id": "qgis-environment-probe", "adapter": "local", "input_schema_digest": D, "output_schema_digest": D, "authorization_policy": "environment-probe", "effect": "read", "snapshot_policy": "receipt-only"},
+    "tool-binding": {"schema_version": 1, "binding_id": "renderer-capability-register", "version": "1.0.0", "capability_id": "renderer-capability-register", "adapter": "local", "input_schema_digest": D, "output_schema_digest": D, "authorization_policy": "environment-probe", "effect": "read", "snapshot_policy": "receipt-only"},
     "knowledge-evidence": {"schema_version": 1, "evidence_id": "evidence-one", "claim": "风险等级字段单位为百分比", "publisher": "示例标准机构", "source": P, "applicability": {"jurisdiction": "示例地区", "valid_from": "2026-01-01", "industry": "emergency"}, "digest": D},
     "data-preparation-task": {"schema_version": 1, "task_id": "prepare-one", "required_roles": ["risk-area"], "allowed_sources": [A], "allowed_operations": ["filter", "join", "reproject", "classify"], "budget": {"max_tool_calls": 10, "max_seconds": 300}, "acceptance_checks": ["schema-valid"]},
     "prepared-data-bundle": {"schema_version": 1, "bundle_id": "bundle-one", "task_ref": A, "datasets": [A], "transformations": [], "tool_receipts": [A], "quality_evidence": [A], "open_issues": [], "digest": D},
@@ -61,7 +61,26 @@ VALID_CASES = {
     "step-receipt": {"schema_version": 1, "receipt_id": "receipt-step-one", "run_id": "run-one", "step": "validate", "attempt": 1, "status": "succeeded", "input_fingerprint": D, "prerequisite_fingerprints": {"policy": D}, "tool_versions": {"schema-validate": "1.0.0"}, "output_refs": [A], "started_at": "2026-09-15T00:00:00Z", "completed_at": "2026-09-15T00:00:01Z"},
     "tool-result": {"schema_version": 1, "invocation_id": "invocation-one", "capability_id": "schema-validate", "binding_version": "1.0.0", "status": "succeeded", "input_digest": D, "output_digest": D, "artifact_refs": [A], "started_at": "2026-09-15T00:00:00Z", "completed_at": "2026-09-15T00:00:01Z"},
     "validation-report": {"schema_version": 1, "report_id": "report-one", "phase": "validate", "subject_digest": D, "status": "passed", "results": [{"check_id": "protocol.schema-valid", "version": "1.0.0", "status": "passed", "severity": "blocker", "details": {}}], "created_at": "2026-09-15T00:00:00Z"},
-    "environment-fingerprint": {"schema_version": 1, "probe_id": "qgis-environment-probe", "status": "unavailable", "platform": "Windows", "python_version": "3.11.0", "tools": {"qgis_process": {"available": False, "executable": None, "version": None, "exit_code": None}, "gdalinfo": {"available": False, "executable": None, "version": None, "exit_code": None}, "projinfo": {"available": False, "executable": None, "version": None, "exit_code": None}}, "chinese_fonts": [], "capabilities": {"qgis_headless": False, "crs_transform": False, "a3_pdf_png": False, "chinese_font": False, "isolated_process_exit": True}, "probed_at": "2026-09-15T00:00:00Z", "fingerprint": D, "error": {"code": "CAPABILITY_NOT_AVAILABLE", "message": "QGIS unavailable"}},
+    "environment-fingerprint": {"schema_version": 1, "probe_id": "renderer-capability-probe", "status": "unavailable", "platform": "Windows", "python_version": "3.11.0", "tools": {"browser": {"available": False, "command": None, "executable": None, "version": None, "exit_code": None}, "node": {"available": False, "executable": None, "version": None, "exit_code": None}}, "chinese_fonts": [], "capabilities": {"webgl_available": False, "offline_rendering": False, "svg_composition": True, "headless_export": False, "chinese_font": False, "max_canvas_width": 16384, "max_canvas_height": 16384, "supported_export_formats": ["svg"]}, "renderer_profile": {"renderer_id": "maplibre-web", "frontend_build": "2026.09.15", "renderer_version": "1.0.0", "maplibre_version": "3.6.0", "overlay_engine_version": "1.0.0", "browser_engine": "unavailable", "webgl_available": False, "supported_export_formats": ["svg"], "max_canvas_width": 16384, "max_canvas_height": 16384, "device_pixel_ratio": 2.0, "available_fonts": [], "offline_rendering": False}, "probed_at": "2026-09-15T00:00:00Z", "fingerprint": D, "error": {"code": "CAPABILITY_NOT_AVAILABLE", "message": "Controlled renderer handshake unavailable"}},
+    "render-scene": {
+        "schema_version": 1, "scene_id": "scene-flood-001", "revision": 1, "renderer_id": "maplibre-web",
+        "spatial_context": {"display_crs": {"authority": "EPSG", "code": "4490"}, "axis_order": "longitude-latitude", "coordinate_units": "degrees"},
+        "renderer_requirements": {"renderer_id": "maplibre-web", "require_webgl": True, "require_offline_rendering": True, "required_capabilities": ["svg-overlay", "geographic-anchor", "headless-export"], "required_fonts": ["Noto Sans CJK SC"], "minimum_device_pixel_ratio": 2},
+        "viewport": {"width_px": 1684, "height_px": 1191, "device_pixel_ratio": 2, "background": "#FFFFFF"},
+        "camera": {"bounds": [112.1, 28.0, 114.2, 29.8], "bearing": 0, "pitch": 0, "padding": {"top": 80, "right": 320, "bottom": 90, "left": 80}},
+        "map": {"style_ref": A, "sources": [{"id": "risk-source", "type": "geojson", "resource_id": "risk-data"}], "layers": [{"id": "risk-layer", "source_id": "risk-source", "type": "fill", "paint": {"fill-color": "#005EA8"}, "z_index": 10}]},
+        "overlays": [{"id": "map-title", "type": "text", "coordinate_space": "page", "position": {"x": 0.05, "y": 0.04, "unit": "normalized"}, "content": "洪涝灾害风险专题图", "style_role": "map-title"}, {"id": "survey-point-01", "type": "symbol", "coordinate_space": "geographic", "anchor": {"longitude": 113.1, "latitude": 28.7}, "screen_position": {"x": 840, "y": 600, "unit": "pixel"}, "symbol_ref": "survey-location", "label": "调研点一"}],
+        "resources": [{"id": "risk-data", "kind": "geojson", "ref": A, "required": True}, {"id": "survey-location", "kind": "icon", "ref": A, "required": True}, {"id": "noto-font", "kind": "font", "ref": A, "required": True}],
+        "export": {"targets": ["svg", "png"], "dpi": 300}, "provenance": [P]
+    },
+    "render-receipt": {
+        "schema_version": 1, "receipt_id": "render-receipt-one", "session_id": "session-one", "scene_id": "scene-flood-001", "scene_revision": 1, "scene_digest": D,
+        "renderer_id": "maplibre-web", "renderer_profile_digest": D, "frontend_build_version": "2026.09.15", "renderer_version": "1.0.0", "maplibre_version": "3.6.0", "overlay_engine_version": "1.0.0", "browser_version": "Chromium 117.0", "status": "succeeded",
+        "viewport": {"width_px": 1684, "height_px": 1191, "device_pixel_ratio": 2},
+        "resource_evidence": [{"resource_id": "risk-data", "digest": D, "status": "loaded"}, {"resource_id": "survey-location", "digest": D, "status": "loaded"}, {"resource_id": "noto-font", "digest": D, "status": "loaded"}],
+        "output_artifacts": [{"target": "svg", "artifact_ref": A}, {"target": "png", "artifact_ref": A}], "warnings": [],
+        "render_started_at": "2026-09-15T00:00:00Z", "render_completed_at": "2026-09-15T00:00:05Z", "attestation_algorithm": "hmac-sha256", "renderer_attestation": "0" * 64
+    },
 }
 
 INVALID_CASES = {}
