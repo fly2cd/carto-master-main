@@ -5,8 +5,8 @@
 | 项目 | 内容 |
 |---|---|
 | 系统名称 | 地图制图智能体（Carto Agent） |
-| 文档版本 | 2.1 |
-| 日期 | 2026-09-14 |
+| 文档版本 | 2.2 |
+| 日期 | 2026-09-17 |
 | 状态 | 实施计划稿；文中程序、接口和部署均为拟实现方案 |
 | 架构依据 | [总体架构设计方案 v1.1](carto-agent-architecture.md) |
 | 实现基线 | [地图生成 TRD v1.2](carto-generate-map-TRD.md)、[模板创建 TRD v1.1](carto-create-template-TRD.md) |
@@ -118,7 +118,7 @@ Schema 文件创建只表示协议草案落盘，不表示协议已经验收。�
 | 项目 | 必须形成的决定 |
 |---|---|
 | 首期部署形态 | 受控单机或企业共享；身份、存储、隔离和恢复能力按所选形态进入生产门槛 |
-| 首个纵向切片 | 一个 MapScenario、必要来源格式、两种必要表达、A3 PDF/PNG；不以四类作者策略全部实现为前提 |
+| 首个纵向切片 | 一个 MapScenario、YAML/JSON 简报与元数据、GeoJSON/CSV 数据、两种必要表达、A3 横版 SVG/PDF/PNG 工程预览；不以四类作者策略全部实现为前提 |
 | 正式能力声明 | 三类业务场景中首期承诺的任务、输入格式、数据规模和明确未开放能力 |
 | 模型运行边界 | 模型宿主、可进入上下文的数据、角色配置版本、调用预算和日志脱敏原则 |
 | 验收责任 | 每个工作包的负责人、验收人、证据位置、工作量区间和决策截止点 |
@@ -262,6 +262,25 @@ prepare_data(approved_requirements, execution_context) -> PreparedDataBundle
 
 - U-P1 完成。
 
+### 4.2.1 强制子阶段顺序
+
+U-P2 不得一次性实现。详细任务、代码范围、禁止提前实现项和退出门槛见 [U-P2 分阶段实施细化计划](u-p2-implementation-plan.md)。固定顺序为：
+
+```text
+U-P2.0 范围冻结
+  → U-P2.1 协议与资源目录
+  → U-P2.2 MapScenario 草稿创建
+  → U-P2.3 确定性渲染底座
+  → U-P2.4 模板校验与发布
+  → U-P2.5 地图规划与候选编译
+  → U-P2.6 候选预览与实例冻结
+  → U-P2.7 集成收口与阶段验收
+```
+
+实施状态（2026-09-18）：U-P2.0～U-P2.7 已完成并通过全量回归，验收结果见 [U-P2.7 Integration Closure](impl-log/U-P2.7-integration-closure.md)。
+
+每个子阶段必须独立提交、独立验收并运行全量回归。前一子阶段未满足退出门槛时，不得批量生成或合入后续子阶段代码。
+
 ### 4.3 工作内容
 
 #### 4.3.1 模板创建路由（对应 P2–P3）
@@ -318,7 +337,7 @@ prepare_data(approved_requirements, execution_context) -> PreparedDataBundle
 #### 4.3.5 MapLibre Web 适配器与预览
 
 - 能力接口：`capabilities()` / `compile_scene()` / `submit_render()` / `validate_receipt()`。
-- 首期最小能力：矢量图层、顺序分级设色、容量比例符号、CRS 转换、A3 印刷布局、PDF/PNG 导出。
+- 首期最小能力：矢量图层、顺序分级设色、容量面积比例符号、EPSG:4326 至 EPSG:3857 显示转换、A3 横版布局、SVG/PDF/PNG 工程预览；不声明全矢量 PDF。
 - 前端执行：MapLibre GL JS 承载底图与专题图层，SVG overlay 承载图名、图例、指北针、比例尺及专题标记。
 - 独立受控浏览器进程：WebGL 能力握手、超时、内存、CPU、临时磁盘和网络白名单限制。
 - 可重放：固定 RenderScene/RenderBundle、前端构建、MapLibre、overlay 引擎、浏览器、字体、随机种子和排序；返回经过验证的 RenderReceipt。
@@ -353,7 +372,7 @@ prepare_data(approved_requirements, execution_context) -> PreparedDataBundle
 |---|---|
 | 场景方案 | `urban-flood-risk/1.0.0`，MapScenario，A3 印刷 |
 | 数据角色 | `risk_regions`（行政区风险率，Polygon）、`shelters`（避难场所容量，Point） |
-| 表达编码 | `choropleth/sequential`（顺序分级设色）、`proportional-symbol/count`（容量比例符号） |
+| 表达编码 | `choropleth/sequential`（顺序分级设色）、`proportional-symbol/count`（容量面积比例符号）；`point-symbol/shelter` 作为符号资源 |
 | 六契约 | scenario/data.schema/spatial-behavior/portrayal/delivery/quality-gates |
 | Fixture | 合成区域和避难点，覆盖空值、并列值、无效几何和越界风险率 |
 | 验证 | Schema、所有权、数据/空间/表达语义、Fixture 渲染、视觉检查 |
@@ -367,7 +386,7 @@ prepare_data(approved_requirements, execution_context) -> PreparedDataBundle
 |---|---|
 | 请求 | `execution_mode: demonstration`，合成数据，A3 横向，PDF/PNG |
 | 意图 | `emergency_mapping` + `hazard_result_map`，灾种 flood，阶段 preparedness |
-| 数据准备 | 固定流程：GeoJSON 接入、字段绑定、单位检查、CRS 验证 |
+| 数据准备 | 固定流程：GeoJSON/CSV 接入、Join 与字段绑定、单位检查、CRS 验证 |
 | 规划 | 安装模板精确版本、解析六契约、绑定数据角色、计算分类断点 |
 | 预览 | MapLibre Web 渲染候选，检查图例同步、无数据表达和比例符号面积 |
 | 冻结 | G2 审批后构造 `MapSpecLock` |
@@ -454,7 +473,7 @@ prepare_data(approved_requirements, execution_context) -> PreparedDataBundle
 
 | 能力 | 说明 |
 |---|---|
-| GeoPackage/GeoJSON 接入 | 本地文件一致性快照 |
+| GeoJSON/CSV 接入 | 本地文件一致性快照；GeoPackage 延后 |
 | 可信地名/POI 库 | 本地或获准内部服务 |
 | 行政区划数据 | 权威边界版本 |
 | 指标字典 | 结构化术语、单位、口径和适用范围 |
@@ -760,7 +779,7 @@ workflow（编排）
 |---|---|---|---|
 | M0 | U-P0 | Schema 草案、安全底座、仓库治理、首期范围与部署基线 | 文档定稿 |
 | M1 | U-P1 | 五模块与智能体运行骨架、工具网关、知识服务、审批门禁、环境探测协议骨架 | M0 |
-| M2 | U-P2 | 首个 MapScenario 创建全链路、地图生成最小内核、生产 MapLibre Web 适配器、受控浏览器环境冒烟、预览和冻结 | M1 |
+| M2 | U-P2.0–U-P2.7 | 分阶段完成首个 MapScenario、确定性 MapLibre Web 渲染、模板发布、地图候选、预览和冻结 | M1；子阶段串行验收 |
 | M3 | U-P3 | 洪涝场景工程闭环、交接、恢复和修复边界验证 | M2 |
 | M4 | U-P4 | 三场景业务闭环、生产运维基线 | M3 + 业务数据 |
 | M5 | U-P5 | 按条件启用的数据子智能体、企业连接器和/或共享部署 | M4；各工作包使用独立触发条件 |

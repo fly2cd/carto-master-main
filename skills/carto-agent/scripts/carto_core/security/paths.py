@@ -65,8 +65,10 @@ class PathGuard:
                 raise SecurityError("RELATIVE_PATH_WITHOUT_ROOT", "Relative path needs a base root")
             base = Path(base_root).expanduser()
             base_resolved = base.resolve(strict=True)
-            if base_resolved not in self._roots:
-                raise SecurityError("BASE_ROOT_NOT_ALLOWED", f"Base root is not registered: {base}")
+            containing_root = self._containing_root(base_resolved)
+            if containing_root is None:
+                raise SecurityError("BASE_ROOT_NOT_ALLOWED", f"Base root is outside allowed roots: {base}")
+            self._reject_linked_segments(containing_root, base_resolved)
             raw = base_resolved / raw
 
         absolute = Path(os.path.abspath(raw))

@@ -3,11 +3,12 @@
   "$id": "https://schemas.carto-agent.local/v1/manifest.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "package", "files", "checksums"],
+  "required": ["schema_version", "package", "dependency_lock", "files", "checksums"],
   "properties": {
     "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
     "package": {
-      "type": "object", "additionalProperties": false,
+      "type": "object",
+      "additionalProperties": false,
       "required": ["namespace", "kind", "id", "version", "status", "summary"],
       "properties": {
         "namespace": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
@@ -18,9 +19,30 @@
         "summary": {"type": "string", "minLength": 1, "maxLength": 500}
       }
     },
+    "business_contracts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scenario", "data_schema", "spatial_behavior", "portrayal", "delivery", "quality_gates"],
+      "properties": {
+        "scenario": {"const": "contracts/scenario.yaml"},
+        "data_schema": {"const": "contracts/data.schema.yaml"},
+        "spatial_behavior": {"const": "contracts/spatial-behavior.yaml"},
+        "portrayal": {"const": "contracts/portrayal.yaml"},
+        "delivery": {"const": "contracts/delivery.yaml"},
+        "quality_gates": {"const": "contracts/quality-gates.yaml"}
+      }
+    },
     "dependencies": {"type": "array", "uniqueItems": true, "items": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/templateRef"}},
+    "dependency_lock": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/relativePath"},
     "targets": {"type": "array", "uniqueItems": true, "items": {"enum": ["svg", "pdf", "png"]}},
     "files": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/relativePath"}},
     "checksums": {"type": "object", "minProperties": 1, "propertyNames": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/relativePath"}, "additionalProperties": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"}}
-  }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"package": {"properties": {"kind": {"const": "map-scenario"}}, "required": ["kind"]}}, "required": ["package"]},
+      "then": {"required": ["business_contracts"]},
+      "else": {"not": {"required": ["business_contracts"]}}
+    }
+  ]
 }

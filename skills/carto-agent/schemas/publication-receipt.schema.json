@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/publication-receipt.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "receipt_id",
+    "package_ref",
+    "namespace",
+    "manifest_digest",
+    "evidence_ref",
+    "dependency_lock_ref",
+    "index_digest_before",
+    "index_digest_after",
+    "repository_scope",
+    "approval_ref",
+    "published_at",
+    "idempotency_key"
+  ],
+  "properties": {
+    "schema_version": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"
+    },
+    "receipt_id": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+    },
+    "package_ref": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/templateRef"
+    },
+    "manifest_digest": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+    },
+    "evidence_ref": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+    },
+    "dependency_lock_ref": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+    },
+    "index_digest_before": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+    },
+    "index_digest_after": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+    },
+    "repository_scope": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*:[a-z][a-z0-9-]*$",
+      "maxLength": 160
+    },
+    "approval_ref": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+    },
+    "published_at": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/timestamp"
+    },
+    "idempotency_key": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$"
+    },
+    "namespace": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+    }
+  }
+}

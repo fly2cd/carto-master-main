@@ -24,3 +24,5 @@ include = ["carto_core*"]
 
 [tool.pytest.ini_options]
 testpaths = ["skills/carto-agent/scripts/tests"]
+[tool.setuptools.package-data]
+"carto_core.adapters" = ["web_assets/*"]

@@ -221,10 +221,14 @@ class ProtocolAndGateTests(unittest.TestCase):
         SchemaRegistry().validate("environment-fingerprint", result)
         self.assertTrue(result["fingerprint"].startswith("sha256:"))
         self.assertEqual(result["probe_id"], "renderer-capability-probe")
-        self.assertEqual(result["status"], "unavailable")
-        self.assertFalse(result["capabilities"]["webgl_available"])
-        self.assertFalse(result["capabilities"]["headless_export"])
-        self.assertEqual(result["error"]["code"], "CAPABILITY_NOT_AVAILABLE")
+        self.assertIn(result["status"], {"available", "unavailable"})
+        if result["status"] == "available":
+            self.assertTrue(result["capabilities"]["webgl_available"])
+            self.assertTrue(result["capabilities"]["headless_export"])
+            self.assertNotIn("error", result)
+        else:
+            self.assertFalse(result["capabilities"]["headless_export"])
+            self.assertEqual(result["error"]["code"], "CAPABILITY_NOT_AVAILABLE")
 
     def test_environment_cli_returns_structured_result(self) -> None:
         completed = subprocess.run([sys.executable, str(SCRIPTS_ROOT / "carto.py"), "environment", "probe-renderer"], capture_output=True, text=True, check=False)
@@ -273,6 +277,18 @@ class WebMapRendererAdapterTests(unittest.TestCase):
         receipt = deepcopy(VALID_CASES["render-receipt"])
         receipt["scene_digest"] = sha256_digest(scene)
         receipt["renderer_profile_digest"] = profile.profile_digest()
+        evidence = [
+            {"resource_id": item["resource_id"], "digest": item["digest"], "status": item["status"]}
+            for item in sorted(receipt["resource_evidence"], key=lambda item: item["resource_id"])
+        ]
+        receipt["resource_set_digest"] = sha256_digest(evidence)
+        receipt["execution_digest"] = sha256_digest({
+            "scene_digest": receipt["scene_digest"],
+            "resource_set_digest": receipt["resource_set_digest"],
+            "renderer_profile_digest": receipt["renderer_profile_digest"],
+            "environment_fingerprint": receipt["environment_fingerprint"],
+            "random_seed": receipt["random_seed"],
+        })
         receipt["renderer_attestation"] = compute_renderer_attestation(receipt, key)
         return receipt
 

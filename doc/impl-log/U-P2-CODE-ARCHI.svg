@@ -1,0 +1,716 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="3560" viewBox="0 0 1800 3560" font-family="'Microsoft YaHei','PingFang SC','Noto Sans CJK SC','Source Han Sans SC',sans-serif">
+<defs>
+<marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" fill="#94A3B8"/>
+</marker>
+<marker id="arwB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" fill="#2563EB"/>
+</marker>
+<marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" fill="#EF4444"/>
+</marker>
+<marker id="arwG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" fill="#059669"/>
+</marker>
+</defs>
+
+<rect x="0" y="0" width="1800" height="3560" fill="#FFFFFF"/>
+
+<!-- ============ HEADER ============ -->
+<text x="40" y="40" font-size="26" font-weight="700" fill="#0F172A">carto-master-main 代码架构图 · U-P2</text>
+<text x="40" y="68" font-size="14" fill="#475569">Skill: carto-agent v0.1.0 ｜ 首个模板与地图生成最小内核（U-P2.0～U-P2.7 八个子阶段全部完成）｜ 沿用 U-P1 九层视图并扩展为十层</text>
+<rect x="1300" y="18" width="460" height="56" rx="8" fill="#ECFDF5" stroke="#059669" stroke-width="1.5"/>
+<text x="1318" y="40" font-size="12" font-weight="700" fill="#065F46">分支 U-P2 ｜ 101 用例：100 通过 / 1 跳过 / 0 失败</text>
+<text x="1318" y="60" font-size="11" fill="#047857">43 Schema · 9 Policy · 51 Python 模块（6853 行）· 24 CLI 子命令</text>
+
+<!-- ============ L1 宿主接入层 ============ -->
+<rect x="40" y="90" width="1720" height="190" rx="10" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.5"/>
+<rect x="40" y="90" width="1720" height="32" rx="10" fill="#6366F1"/>
+<rect x="40" y="108" width="1720" height="14" fill="#6366F1"/>
+<text x="58" y="112" font-size="16" font-weight="700" fill="#FFFFFF">L1 · 宿主接入层（Agent Host）</text>
+<text x="1742" y="112" font-size="11.5" fill="#E0E7FF" text-anchor="end">U-P2 变化：四条路由中两条已开放完整闭环，routing.md 增补 U-P2.7 运维收口条款</text>
+
+<rect x="60" y="140" width="230" height="110" rx="8" fill="#FFFFFF" stroke="#6366F1" stroke-width="1.5"/>
+<text x="74" y="163" font-size="13" font-weight="700" fill="#312E81">宿主 Agent</text>
+<text x="74" y="184" font-size="11.5" fill="#475569">Hermes Agent</text>
+<text x="74" y="201" font-size="11.5" fill="#475569">Claude Code / Qoder</text>
+<text x="74" y="222" font-size="10.5" fill="#94A3B8">通过 shell 调用唯一 carto CLI</text>
+<text x="74" y="239" font-size="10.5" fill="#94A3B8">不存在平行 CLI 入口</text>
+
+<rect x="320" y="140" width="230" height="110" rx="8" fill="#FFFFFF" stroke="#6366F1" stroke-width="1.5"/>
+<text x="334" y="163" font-size="13" font-weight="700" fill="#312E81">SKILL.md</text>
+<text x="334" y="184" font-size="11.5" fill="#475569">阶段边界已改写为 U-P2</text>
+<text x="334" y="201" font-size="11.5" fill="#475569">新增模板发布边界条款</text>
+<text x="334" y="218" font-size="11.5" fill="#475569">新增地图生成边界条款</text>
+<text x="334" y="239" font-size="10.5" fill="#94A3B8">明确列出 Not implemented 清单</text>
+
+<rect x="580" y="140" width="250" height="110" rx="8" fill="#FFFFFF" stroke="#6366F1" stroke-width="1.5"/>
+<text x="594" y="163" font-size="13" font-weight="700" fill="#312E81">workflows/（4 个文件）</text>
+<text x="594" y="184" font-size="11.5" fill="#475569">routing.md — 四路由互斥选择</text>
+<text x="594" y="201" font-size="11.5" fill="#475569">create-template.md ★</text>
+<text x="594" y="218" font-size="11.5" fill="#475569">create-template/map-scenario.md ★</text>
+<text x="594" y="235" font-size="11.5" fill="#475569">generate-map.md ★</text>
+
+<rect x="860" y="140" width="430" height="52" rx="6" fill="#ECFDF5" stroke="#10B981" stroke-width="2"/>
+<text x="874" y="160" font-size="12" font-weight="700" fill="#065F46">create-template ★ 已开放（U-P2.4）</text>
+<text x="874" y="179" font-size="10.5" fill="#047857">analyze → brief → author → validate → publish（仅 map-scenario）</text>
+
+<rect x="860" y="200" width="430" height="52" rx="6" fill="#ECFDF5" stroke="#10B981" stroke-width="2"/>
+<text x="874" y="220" font-size="12" font-weight="700" fill="#065F46">generate-map ★ 已开放（U-P2.5 / U-P2.6）</text>
+<text x="874" y="239" font-size="10.5" fill="#047857">intake → brief → compile → preview → freeze（合成洪涝数据）</text>
+
+<rect x="1310" y="140" width="200" height="52" rx="6" fill="#FEF2F2" stroke="#EF4444" stroke-width="1.5" stroke-dasharray="4 3"/>
+<text x="1324" y="160" font-size="12" font-weight="700" fill="#991B1B">edit-native-map</text>
+<text x="1324" y="178" font-size="9" fill="#B91C1C">未开放 → CAPABILITY_NOT_AVAILABLE</text>
+
+<rect x="1530" y="140" width="200" height="52" rx="6" fill="#FEF2F2" stroke="#EF4444" stroke-width="1.5" stroke-dasharray="4 3"/>
+<text x="1544" y="160" font-size="12" font-weight="700" fill="#991B1B">curate-catalog</text>
+<text x="1544" y="178" font-size="9" fill="#B91C1C">未开放 → CAPABILITY_NOT_AVAILABLE</text>
+
+<rect x="1310" y="200" width="420" height="52" rx="6" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+<text x="1324" y="219" font-size="10.5" fill="#475569">Brand / Style / Layout 业务创建仍未开放；</text>
+<text x="1324" y="236" font-size="10.5" fill="#475569">U-P2 只完成其协议、所有权与组合边界测试。</text>
+
+<path d="M290,195 L320,195" stroke="#94A3B8" stroke-width="1.5" fill="none" marker-end="url(#arw)"/>
+<path d="M550,195 L580,195" stroke="#94A3B8" stroke-width="1.5" fill="none" marker-end="url(#arw)"/>
+<path d="M830,166 L860,166" stroke="#94A3B8" stroke-width="1.5" fill="none" marker-end="url(#arw)"/>
+<path d="M830,226 L860,226" stroke="#94A3B8" stroke-width="1.5" fill="none" marker-end="url(#arw)"/>
+
+<!-- ============ L2 CLI 入口层 ============ -->
+<rect x="40" y="300" width="1720" height="270" rx="10" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.5"/>
+<rect x="40" y="300" width="1720" height="32" rx="10" fill="#0EA5E9"/>
+<rect x="40" y="318" width="1720" height="14" fill="#0EA5E9"/>
+<text x="58" y="322" font-size="16" font-weight="700" fill="#FFFFFF">L2 · CLI 入口层（唯一受控命令面，24 个子命令）</text>
+<text x="1742" y="322" font-size="11.5" fill="#E0F2FE" text-anchor="end">scripts/carto.py → carto_core/cli.py：build_parser() · main() · _success() · _policy_path() · _add_template_paths() ★</text>
+
+<rect x="56" y="348" width="520" height="190" rx="8" fill="#FFFFFF" stroke="#0EA5E9" stroke-width="1.5"/>
+<rect x="56" y="348" width="520" height="28" rx="8" fill="#0EA5E9"/>
+<rect x="56" y="362" width="520" height="14" fill="#0EA5E9"/>
+<text x="70" y="368" font-size="13" font-weight="700" fill="#FFFFFF">基础命令组（U-P0 / U-P1 沿用，7 个）</text>
+<text x="70" y="398" font-size="11" fill="#334155">
+<tspan x="70" dy="0" font-family="Consolas,Menlo,monospace">schema check</tspan><tspan font-family="'Microsoft YaHei'" fill="#64748B"> — 全量 Schema 自检</tspan>
+<tspan x="70" dy="18" font-family="Consolas,Menlo,monospace">schema validate &lt;name&gt; &lt;instance&gt;</tspan><tspan font-family="'Microsoft YaHei'" fill="#64748B"> — 单文档校验</tspan>
+<tspan x="70" dy="18" font-family="Consolas,Menlo,monospace">security check-path &lt;path&gt;</tspan><tspan font-family="'Microsoft YaHei'" fill="#64748B"> — 路径白名单解析</tspan>
+<tspan x="70" dy="18" font-family="Consolas,Menlo,monospace">approval verify &lt;receipt&gt;</tspan><tspan font-family="'Microsoft YaHei'" fill="#64748B"> — HMAC + nonce 校验</tspan>
+<tspan x="70" dy="18" font-family="Consolas,Menlo,monospace">intent resolve &lt;request&gt;</tspan><tspan font-family="'Microsoft YaHei'" fill="#64748B"> — 类型化意图解析</tspan>
+<tspan x="70" dy="18" font-family="Consolas,Menlo,monospace">environment probe-renderer</tspan><tspan font-family="'Microsoft YaHei'" fill="#64748B"> — 环境指纹探测</tspan>
+<tspan x="70" dy="18" font-family="Consolas,Menlo,monospace">data prepare &lt;task&gt;</tspan><tspan font-family="'Microsoft YaHei'" fill="#64748B"> — 确定性数据准备</tspan>
+</text>
+<text x="70" y="527" font-size="10" fill="#94A3B8">这 7 个命令的签名与行为在 U-P2 保持不变，构成回归基线。</text>
+
+<rect x="596" y="348" width="560" height="190" rx="8" fill="#FFFFFF" stroke="#10B981" stroke-width="2"/>
+<rect x="596" y="348" width="560" height="28" rx="8" fill="#10B981"/>
+<rect x="596" y="362" width="560" height="14" fill="#10B981"/>
+<text x="610" y="368" font-size="13" font-weight="700" fill="#FFFFFF">create-template ★ 新增（9 个子命令）</text>
+<text x="610" y="398" font-size="11" fill="#334155">
+<tspan x="610" dy="0" font-family="Consolas,Menlo,monospace">analyze</tspan><tspan font-family="'Microsoft YaHei'" fill="#64748B"> — 登记并分析受控来源</tspan>
+<tspan x="610" dy="18" font-family="Consolas,Menlo,monospace">brief</tspan><tspan font-family="'Microsoft YaHei'" fill="#64748B"> — 生成需独立审批的模板简报</tspan>
+<tspan x="610" dy="18" font-family="Consolas,Menlo,monospace">author</tspan><tspan font-family="'Microsoft YaHei'" fill="#64748B"> — 在 staging 写入草稿包（--approval 必需）</tspan>
+<tspan x="610" dy="18" font-family="Consolas,Menlo,monospace">validate</tspan><tspan font-family="'Microsoft YaHei'" fill="#64748B"> — 静态校验链 + Fixture 真实渲染</tspan>
+<tspan x="610" dy="18" font-family="Consolas,Menlo,monospace">publish</tspan><tspan font-family="'Microsoft YaHei'" fill="#64748B"> — 单一发布事务（--idempotency-key）</tspan>
+<tspan x="610" dy="18" font-family="Consolas,Menlo,monospace">status / retry / receipts</tspan><tspan font-family="'Microsoft YaHei'" fill="#64748B"> — 状态、受限重试、回执查询</tspan>
+<tspan x="610" dy="18" font-family="Consolas,Menlo,monospace" fill="#B91C1C">render</tspan><tspan font-family="'Microsoft YaHei'" fill="#B91C1C"> — 恒定抛 CAPABILITY_NOT_AVAILABLE</tspan>
+</text>
+<text x="610" y="527" font-size="10" fill="#94A3B8">渲染不是独立步骤，只在 validate 内部执行，故 render 子命令永久拒绝。</text>
+
+<rect x="1176" y="348" width="568" height="190" rx="8" fill="#FFFFFF" stroke="#10B981" stroke-width="2"/>
+<rect x="1176" y="348" width="568" height="28" rx="8" fill="#10B981"/>
+<rect x="1176" y="362" width="568" height="14" fill="#10B981"/>
+<text x="1190" y="368" font-size="13" font-weight="700" fill="#FFFFFF">generate-map ★ 新增（8 个子命令）</text>
+<text x="1190" y="398" font-size="11" fill="#334155">
+<tspan x="1190" dy="0" font-family="Consolas,Menlo,monospace">intake</tspan><tspan font-family="'Microsoft YaHei'" fill="#64748B"> — 校验并登记地图生成请求</tspan>
+<tspan x="1190" dy="18" font-family="Consolas,Menlo,monospace">brief</tspan><tspan font-family="'Microsoft YaHei'" fill="#64748B"> — 生成需独立审批的制图简报</tspan>
+<tspan x="1190" dy="18" font-family="Consolas,Menlo,monospace">compile</tspan><tspan font-family="'Microsoft YaHei'" fill="#64748B"> — 安装精确模板版本并编译候选（G1）</tspan>
+<tspan x="1190" dy="18" font-family="Consolas,Menlo,monospace">preview</tspan><tspan font-family="'Microsoft YaHei'" fill="#64748B"> — 真实浏览器渲染并签署回执</tspan>
+<tspan x="1190" dy="18" font-family="Consolas,Menlo,monospace">freeze</tspan><tspan font-family="'Microsoft YaHei'" fill="#64748B"> — 校验 G2 并创建不可变 MapSpecLock</tspan>
+<tspan x="1190" dy="18" font-family="Consolas,Menlo,monospace">status / retry / receipts</tspan><tspan font-family="'Microsoft YaHei'" fill="#64748B"> — 状态、受限重试、回执查询</tspan>
+</text>
+<text x="1190" y="509" font-size="10" fill="#94A3B8">公共必填参数：--project-root --workdir --repository-root</text>
+<text x="1190" y="526" font-size="10" fill="#94A3B8">--repository-scope --allowed-root（可重复，构成多根白名单）</text>
+
+<text x="56" y="558" font-size="11" fill="#64748B" font-style="italic">输出契约不变：成功 → stdout 打印 {"ok": true, ...}（sort_keys，ensure_ascii=False）并 exit 0；失败 → stderr 打印 {"ok": false, "code", "message"} 并 exit 2。密钥一律经 --key-env / --attestation-key-env 从环境变量读取，不出现在命令行。</text>
+
+<!-- ============ L3 公共基座 ============ -->
+<rect x="40" y="590" width="1720" height="150" rx="10" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.5"/>
+<rect x="40" y="590" width="1720" height="32" rx="10" fill="#64748B"/>
+<rect x="40" y="608" width="1720" height="14" fill="#64748B"/>
+<text x="58" y="612" font-size="16" font-weight="700" fill="#FFFFFF">L3 · 公共基座（被所有模块单向依赖，禁止反向引用）</text>
+<text x="1742" y="612" font-size="11.5" fill="#E2E8F0" text-anchor="end">U-P2 未新增基座模块，仅扩展 schema_registry 以承载 43 个 Schema</text>
+
+<rect x="60" y="638" width="540" height="86" rx="8" fill="#FFFFFF" stroke="#64748B" stroke-width="1.5"/>
+<text x="74" y="661" font-size="13" font-weight="700" fill="#1E293B">canonical.py — 规范化与摘要（未改动）</text>
+<text x="74" y="682" font-size="11.5" fill="#475569">canonical_json_bytes(value) → 确定性字节序列（sort_keys / 紧凑分隔符）</text>
+<text x="74" y="699" font-size="11.5" fill="#475569">sha256_digest(value) → 全项目唯一摘要口径</text>
+<text x="74" y="716" font-size="10.5" fill="#94A3B8">U-P2 新增用途：包摘要 / 证据摘要 / 候选摘要 / 锁摘要 / 幂等键判定</text>
+
+<rect x="620" y="638" width="440" height="86" rx="8" fill="#FFFFFF" stroke="#64748B" stroke-width="1.5"/>
+<text x="634" y="661" font-size="13" font-weight="700" fill="#1E293B">errors.py — 错误类型体系（未改动）</text>
+<text x="634" y="682" font-size="11.5" fill="#475569">CartoError（基类，携带 code）</text>
+<text x="634" y="699" font-size="11.5" fill="#475569">ProtocolError — 协议 / 结构违规</text>
+<text x="634" y="716" font-size="11.5" fill="#475569">SecurityError — 安全边界违规</text>
+
+<rect x="1080" y="638" width="642" height="86" rx="8" fill="#FFFFFF" stroke="#64748B" stroke-width="2"/>
+<text x="1094" y="661" font-size="13" font-weight="700" fill="#1E293B">schema_registry.py — Schema 注册与文档加载 ★ 已扩展</text>
+<text x="1094" y="682" font-size="11.5" fill="#475569">SchemaRegistry.check_all() / .validate(name, instance) ｜ load_document(path)</text>
+<text x="1094" y="699" font-size="11.5" fill="#475569">防护：MAX_DOCUMENT_BYTES = 5 MiB ｜ MAX_DOCUMENT_DEPTH = 64 ｜ 循环 alias 检测</text>
+<text x="1094" y="716" font-size="10.5" fill="#94A3B8">Draft 2020-12 + referencing.Registry 跨文件 $ref；注册表由 33 项扩至 43 项</text>
+
+<!-- ============ L4 五模块（上）workflow ============ -->
+<rect x="40" y="760" width="1720" height="540" rx="10" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.5"/>
+<rect x="40" y="760" width="1720" height="32" rx="10" fill="#0F172A"/>
+<rect x="40" y="778" width="1720" height="14" fill="#0F172A"/>
+<text x="58" y="782" font-size="16" font-weight="700" fill="#FFFFFF">L4 · 五模块核心（上）— ① workflow/ 工作流编排层：16 个模块，按路由分为三组</text>
+<text x="1742" y="782" font-size="11.5" fill="#CBD5E1" text-anchor="end">U-P2 从 7 个模块增至 16 个；两条路由各自独立编排，不共享审批与状态</text>
+
+<rect x="56" y="808" width="549" height="476" rx="8" fill="#FFFFFF" stroke="#10B981" stroke-width="2"/>
+<rect x="56" y="808" width="549" height="30" rx="8" fill="#10B981"/>
+<rect x="56" y="824" width="549" height="14" fill="#10B981"/>
+<text x="70" y="829" font-size="14" font-weight="700" fill="#FFFFFF">①-A 基础与状态（7 个模块 · 两路由共享）</text>
+<text x="70" y="862" font-size="11.5" fill="#334155">
+<tspan x="70" dy="0" font-weight="700" fill="#065F46">models.py</tspan>
+<tspan x="84" dy="16" font-size="10.5">ExecutionBudget · ExecutionContext · StepReceipt</tspan>
+<tspan x="84" dy="15" font-size="10.5">JobState ★ 新增 revision 字段，支持 CAS 陈旧态拒绝</tspan>
+<tspan x="70" dy="21" font-weight="700" fill="#065F46">router.py</tspan>
+<tspan x="84" dy="16" font-size="10.5">RouteRegistry — 四路由互斥注册与查询</tspan>
+<tspan x="70" dy="21" font-weight="700" fill="#065F46">intent.py</tspan>
+<tspan x="84" dy="16" font-size="10.5">IntentResolver · TaskDispatcher — generate-map intake 复用</tspan>
+<tspan x="70" dy="21" font-weight="700" fill="#065F46">state_machine.py ★ 大幅增强（U-P2.7）</tspan>
+<tspan x="84" dy="16" font-size="10.5">WorkflowStateStore — operation() 跨进程单写者上下文</tspan>
+<tspan x="84" dy="15" font-size="10.5">_RunFileLock — 运行级文件锁，覆盖完整变更步骤</tspan>
+<tspan x="84" dy="15" font-size="10.5">回执先写、状态后写的转换日志 + 自动恢复</tspan>
+<tspan x="84" dy="15" font-size="10.5">recovery_status() · resume(inputs, prerequisites)</tspan>
+<tspan x="70" dy="21" font-weight="700" fill="#065F46">approvals.py</tspan>
+<tspan x="84" dy="16" font-size="10.5">GateDefinition · ApprovalGateCoordinator</tspan>
+<tspan x="84" dy="15" font-size="10.5">模板 T1/TP 与地图 G1/G2 严格隔离，不可跨路由复用</tspan>
+<tspan x="70" dy="21" font-weight="700" fill="#065F46">agent_runtime.py</tspan>
+<tspan x="84" dy="16" font-size="10.5">AgentSubmission · BoundedAgentRuntime — 预算受控提交</tspan>
+<tspan x="70" dy="21" font-weight="700" fill="#065F46">data_preparation.py</tspan>
+<tspan x="84" dy="16" font-size="10.5">DeterministicDataPreparer — U-P1 固定管线，保持不变</tspan>
+</text>
+<rect x="70" y="1200" width="521" height="70" rx="6" fill="#ECFDF5" stroke="#10B981" stroke-width="1"/>
+<text x="84" y="1220" font-size="10.5" font-weight="700" fill="#065F46">状态机三条硬约束</text>
+<text x="84" y="1238" font-size="10.5" fill="#047857">① revision 单调递增，陈旧态直接拒绝；② waiting_approval 独立保留，</text>
+<text x="84" y="1254" font-size="10.5" fill="#047857">不塌缩为 pending；③ retry 受限，绝不覆盖或删除任何不可变产物。</text>
+
+<rect x="625" y="808" width="549" height="476" rx="8" fill="#FFFFFF" stroke="#10B981" stroke-width="2"/>
+<rect x="625" y="808" width="549" height="30" rx="8" fill="#10B981"/>
+<rect x="625" y="824" width="549" height="14" fill="#10B981"/>
+<text x="639" y="829" font-size="14" font-weight="700" fill="#FFFFFF">①-B create-template 路由 ★ 全部新增（5 个模块）</text>
+<text x="639" y="862" font-size="11.5" fill="#334155">
+<tspan x="639" dy="0" font-weight="700" fill="#065F46">template_analysis.py（U-P2.2）</tspan>
+<tspan x="653" dy="16" font-size="10.5">ControlledSourceAnalyzer — 受控来源登记与分析</tspan>
+<tspan x="653" dy="15" font-size="10.5">只接受冻结格式：请求 YAML/JSON，数据 GeoJSON/CSV</tspan>
+<tspan x="653" dy="15" font-size="10.5">严格区分事实 / 用户决定 / 系统建议 / 推导值</tspan>
+<tspan x="639" dy="21" font-weight="700" fill="#065F46">template_brief.py（U-P2.2）</tspan>
+<tspan x="653" dy="16" font-size="10.5">build_template_brief() — 生成模板简报，需独立审批</tspan>
+<tspan x="639" dy="21" font-weight="700" fill="#065F46">template_author.py（U-P2.2）</tspan>
+<tspan x="653" dy="16" font-size="10.5">MapScenarioAuthor — 在允许根下 staging 写草稿包</tspan>
+<tspan x="653" dy="15" font-size="10.5">Manifest + Design Spec + 六份业务契约 + 合成 Fixture</tspan>
+<tspan x="653" dy="15" font-size="10.5">+ 原型描述 + 依赖锁 + checksums</tspan>
+<tspan x="639" dy="21" font-weight="700" fill="#065F46">template_validation.py（U-P2.4）</tspan>
+<tspan x="653" dy="16" font-size="10.5">TemplatePackageValidator — 静态优先校验链</tspan>
+<tspan x="653" dy="15" font-size="10.5">Schema → 文件 → 依赖 → kind/所有权 → 语义 → 目标能力</tspan>
+<tspan x="653" dy="15" font-size="10.5">静态全通过后才启动 Fixture 渲染与产物检查</tspan>
+<tspan x="653" dy="15" font-size="10.5">证据写入 validation/attempt-N/，失败证据保留</tspan>
+<tspan x="639" dy="21" font-weight="700" fill="#065F46">template_workflow.py（编排入口）</tspan>
+<tspan x="653" dy="16" font-size="10.5">TemplateCreationWorkflow — analyze / brief / author /</tspan>
+<tspan x="653" dy="15" font-size="10.5">validate / publish / status / retry / receipts</tspan>
+<tspan x="653" dy="15" font-size="10.5">_resume_request() 恢复时校验输入与前置摘要漂移</tspan>
+</text>
+<rect x="639" y="1200" width="521" height="70" rx="6" fill="#FFFBEB" stroke="#F59E0B" stroke-width="1"/>
+<text x="653" y="1220" font-size="10.5" font-weight="700" fill="#92400E">publish 单一事务（U-P2.4）</text>
+<text x="653" y="1238" font-size="10.5" fill="#B45309">重新验证包 / 依赖锁 / Fixture / 检查器 / RenderReceipt / 环境绑定</text>
+<text x="653" y="1254" font-size="10.5" fill="#B45309">→ 不可变落地 → 读回校验 → 索引提交 → 幂等回执</text>
+
+<rect x="1194" y="808" width="549" height="476" rx="8" fill="#FFFFFF" stroke="#10B981" stroke-width="2"/>
+<rect x="1194" y="808" width="549" height="30" rx="8" fill="#10B981"/>
+<rect x="1194" y="824" width="549" height="14" fill="#10B981"/>
+<text x="1208" y="829" font-size="14" font-weight="700" fill="#FFFFFF">①-C generate-map 路由 ★ 全部新增（4 个模块）</text>
+<text x="1208" y="862" font-size="11.5" fill="#334155">
+<tspan x="1208" dy="0" font-weight="700" fill="#065F46">map_data_preparation.py（U-P2.5）</tspan>
+<tspan x="1222" dy="16" font-size="10.5">FloodDataPreparer — 绑定风险区域与避难场所数据角色</tspan>
+<tspan x="1222" dy="15" font-size="10.5">产出 PreparedDataBundle；单位 / 几何 / CRS / 时效 /</tspan>
+<tspan x="1222" dy="15" font-size="10.5">Join 覆盖率任一不合规即阻塞</tspan>
+<tspan x="1208" dy="21" font-weight="700" fill="#065F46">map_planning.py（U-P2.5）</tspan>
+<tspan x="1222" dy="16" font-size="10.5">MapPlanner — 组织模板 / 数据 / 知识 / 空间 / 交付决定</tspan>
+<tspan x="1222" dy="15" font-size="10.5">MapComposer 只提交类型化图面参数修订，</tspan>
+<tspan x="1222" dy="15" font-size="10.5">不得成为第二个编译器</tspan>
+<tspan x="1208" dy="21" font-weight="700" fill="#065F46">map_preview.py（U-P2.6）</tspan>
+<tspan x="1222" dy="16" font-size="10.5">MapPreviewService — 提交候选 RenderScene</tspan>
+<tspan x="1222" dy="15" font-size="10.5">保存预览产物与 RenderReceipt</tspan>
+<tspan x="1222" dy="15" font-size="10.5">执行数据语义 / 空间范围 / 表达 / 图例 / 布局容量 /</tspan>
+<tspan x="1222" dy="15" font-size="10.5">资源 / 环境七类检查</tspan>
+<tspan x="1222" dy="15" font-size="10.5">按修复所有者退回模板 / 数据 / 计划 / 适配器层，</tspan>
+<tspan x="1222" dy="15" font-size="10.5">校验器不得静默改语义</tspan>
+<tspan x="1208" dy="21" font-weight="700" fill="#065F46">map_generation.py（编排入口）</tspan>
+<tspan x="1222" dy="16" font-size="10.5">MapGenerationWorkflow — intake / brief / compile /</tspan>
+<tspan x="1222" dy="15" font-size="10.5">preview / freeze / status / retry / receipts</tspan>
+</text>
+<rect x="1208" y="1200" width="521" height="70" rx="6" fill="#F1F5F9" stroke="#94A3B8" stroke-width="1"/>
+<text x="1222" y="1220" font-size="10.5" font-weight="700" fill="#334155">两路由隔离原则</text>
+<text x="1222" y="1238" font-size="10.5" fill="#475569">只共享 Schema、安全组件与受信资源目录；各自独立 run 目录</text>
+<text x="1222" y="1254" font-size="10.5" fill="#475569">与状态历史，审批动作 / 对象 / 作用域 / 身份 / 环境 / 时效全绑定。</text>
+
+<!-- ============ L5 五模块（下）其余四模块 ============ -->
+<rect x="40" y="1320" width="1720" height="610" rx="10" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.5"/>
+<rect x="40" y="1320" width="1720" height="32" rx="10" fill="#0F172A"/>
+<rect x="40" y="1338" width="1720" height="14" fill="#0F172A"/>
+<text x="58" y="1342" font-size="16" font-weight="700" fill="#FFFFFF">L5 · 五模块核心（下）— ② compiler ③ validation ④ adapters ⑤ repository</text>
+<text x="1742" y="1342" font-size="11.5" fill="#CBD5E1" text-anchor="end">依赖方向严格单向：workflow → compiler → validation → adapters → repository</text>
+
+<rect x="56" y="1368" width="407" height="546" rx="8" fill="#FFFFFF" stroke="#F59E0B" stroke-width="2"/>
+<rect x="56" y="1368" width="407" height="30" rx="8" fill="#F59E0B"/>
+<rect x="56" y="1384" width="407" height="14" fill="#F59E0B"/>
+<text x="70" y="1389" font-size="14" font-weight="700" fill="#FFFFFF">② compiler/ · 5 个模块</text>
+<text x="70" y="1422" font-size="11.5" fill="#334155">
+<tspan x="70" dy="0" font-weight="700" fill="#92400E">protocol.py（未改动）</tspan>
+<tspan x="84" dy="16" font-size="10.5">CompileRequest · ProtocolCompiler</tspan>
+<tspan x="70" dy="21" font-weight="700" fill="#92400E">ownership.py ★ 升级</tspan>
+<tspan x="84" dy="16" font-size="10.5">OwnershipResolver.merge() 固定分段解析</tspan>
+<tspan x="84" dy="15" font-size="10.5">compose_scenario() — 六契约组合</tspan>
+<tspan x="84" dy="15" font-size="10.5">_require_compatible() 替换后兼容性检查</tspan>
+<tspan x="84" dy="15" font-size="10.5">kind 边界 / 同 kind 重复拒绝 / 整段替换</tspan>
+<tspan x="70" dy="21" font-weight="700" fill="#92400E">dependencies.py ★ 升级</tspan>
+<tspan x="84" dy="16" font-size="10.5">resolve() 拓扑排序 + 环检测</tspan>
+<tspan x="84" dy="15" font-size="10.5">require_pinned() — 强制精确版本引用</tspan>
+<tspan x="84" dy="15" font-size="10.5">validate_lock() / validate_manifest()</tspan>
+<tspan x="70" dy="21" font-weight="700" fill="#92400E">map_candidate.py ★ 新增（U-P2.5）</tspan>
+<tspan x="84" dy="16" font-size="10.5">MapCandidateCompiler</tspan>
+<tspan x="84" dy="15" font-size="10.5">load_contracts() 一次解析六契约</tspan>
+<tspan x="84" dy="15" font-size="10.5">compile() → MapPlan / ResolvedMap / RenderScene</tspan>
+<tspan x="84" dy="15" font-size="10.5">_preflight() 前置阻断 · _scene() 场景构造</tspan>
+<tspan x="84" dy="15" font-size="10.5">_validate_expression_bindings() 表达绑定</tspan>
+<tspan x="84" dy="15" font-size="10.5">_quantile_breaks() 确定性分位断点</tspan>
+<tspan x="84" dy="15" font-size="10.5">_legend() 由实际编码生成图例</tspan>
+<tspan x="70" dy="21" font-weight="700" fill="#92400E">map_lock.py ★ 新增（U-P2.6）</tspan>
+<tspan x="84" dy="16" font-size="10.5">MapSpecLockCompiler.compile(request,</tspan>
+<tspan x="84" dy="15" font-size="10.5">candidate, evidence, ...) → 不可变锁</tspan>
+</text>
+<rect x="70" y="1810" width="379" height="88" rx="6" fill="#FFFBEB" stroke="#F59E0B" stroke-width="1"/>
+<text x="84" y="1830" font-size="10.5" font-weight="700" fill="#92400E">编译器独占权</text>
+<text x="84" y="1848" font-size="10.5" fill="#B45309">只有 compiler 能生成 MapSpecLock，模型不得</text>
+<text x="84" y="1864" font-size="10.5" fill="#B45309">直接写锁；锁为 create-once 语义，模板 / 数据 /</text>
+<text x="84" y="1880" font-size="10.5" fill="#B45309">断点 / 目标 / 环境任一变化 → 新候选 + 新锁。</text>
+
+<rect x="483" y="1368" width="407" height="546" rx="8" fill="#FFFFFF" stroke="#8B5CF6" stroke-width="2"/>
+<rect x="483" y="1368" width="407" height="30" rx="8" fill="#8B5CF6"/>
+<rect x="483" y="1384" width="407" height="14" fill="#8B5CF6"/>
+<text x="497" y="1389" font-size="14" font-weight="700" fill="#FFFFFF">③ validation/ · 2 个模块（未改动）</text>
+<text x="497" y="1422" font-size="11.5" fill="#334155">
+<tspan x="497" dy="0" font-weight="700" fill="#5B21B6">models.py</tspan>
+<tspan x="511" dy="16" font-size="10.5">CheckResult — 单项检查结果</tspan>
+<tspan x="511" dy="15" font-size="10.5">ValidationReport — 结构化汇总报告</tspan>
+<tspan x="497" dy="21" font-weight="700" fill="#5B21B6">registry.py</tspan>
+<tspan x="511" dy="16" font-size="10.5">CheckerRegistry — 按 id 注册确定性 checker</tspan>
+<tspan x="511" dy="15" font-size="10.5">由 policies/checker-registry.yaml 驱动</tspan>
+</text>
+<rect x="497" y="1530" width="379" height="126" rx="6" fill="#F5F3FF" stroke="#8B5CF6" stroke-width="1"/>
+<text x="511" y="1550" font-size="10.5" font-weight="700" fill="#5B21B6">U-P2 校验链落点</text>
+<text x="511" y="1568" font-size="10.5" fill="#6D28D9">静态优先：Schema → 文件存在 → 依赖锁 →</text>
+<text x="511" y="1584" font-size="10.5" fill="#6D28D9">kind/所有权 → 数据/空间/表达语义 → 目标能力</text>
+<text x="511" y="1604" font-size="10.5" fill="#6D28D9">动态在后：静态全通过才启动 Fixture 渲染</text>
+<text x="511" y="1624" font-size="10.5" fill="#6D28D9">blocker / error 非零 → 禁止发布、禁止冻结</text>
+<text x="511" y="1644" font-size="10.5" fill="#6D28D9">模板与模型均不得降低强制错误级别</text>
+<rect x="497" y="1676" width="379" height="106" rx="6" fill="#F5F3FF" stroke="#8B5CF6" stroke-width="1"/>
+<text x="511" y="1696" font-size="10.5" font-weight="700" fill="#5B21B6">七类预览检查（U-P2.6）</text>
+<text x="511" y="1714" font-size="10.5" fill="#6D28D9">数据语义 · 空间范围 · 表达合法性 · 图例一致</text>
+<text x="511" y="1730" font-size="10.5" fill="#6D28D9">布局容量 · 资源可用 · 环境匹配</text>
+<text x="511" y="1750" font-size="10.5" fill="#6D28D9">失败按修复所有者退回对应层，</text>
+<text x="511" y="1766" font-size="10.5" fill="#6D28D9">校验器不得静默修改语义。</text>
+<rect x="497" y="1802" width="379" height="96" rx="6" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1"/>
+<text x="511" y="1822" font-size="10.5" font-weight="700" fill="#334155">固定枚举（未改动）</text>
+<text x="511" y="1840" font-size="10.5" fill="#475569">严重度：blocker · error · warning · info</text>
+<text x="511" y="1858" font-size="10.5" fill="#475569">规则语义：hard_rule · forbidden · mandatory</text>
+<text x="511" y="1874" font-size="10.5" fill="#475569">· binding · default · reference</text>
+
+<rect x="910" y="1368" width="407" height="546" rx="8" fill="#FFFFFF" stroke="#EF4444" stroke-width="2.5"/>
+<rect x="910" y="1368" width="407" height="30" rx="8" fill="#EF4444"/>
+<rect x="910" y="1384" width="407" height="14" fill="#EF4444"/>
+<text x="924" y="1389" font-size="14" font-weight="700" fill="#FFFFFF">④ adapters/ · 7 个模块 + 前端资产</text>
+<text x="924" y="1420" font-size="11.5" fill="#334155">
+<tspan x="924" dy="0" font-weight="700" fill="#991B1B">controlled_renderer.py ★ 新增（U-P2.3）</tspan>
+<tspan x="938" dy="15" font-size="10.5">ControlledBrowserRenderer — 离线受限 Chromium</tspan>
+<tspan x="938" dy="14" font-size="10.5">BrowserLimits — timeout 30s / cpu 25s / mem 1 GiB</tspan>
+<tspan x="938" dy="14" font-size="10.5">_WindowsJob — Job Object 限 CPU/内存并清理进程树</tspan>
+<tspan x="938" dy="14" font-size="10.5">_WebSocketClient — CDP 协议驱动浏览器</tspan>
+<tspan x="938" dy="14" font-size="10.5">render() / probe_webgl() / receipt_controls()</tspan>
+<tspan x="938" dy="14" font-size="10.5">network_policy = deny-all（禁一切外部底图联网）</tspan>
+<tspan x="924" dy="20" font-weight="700" fill="#991B1B">web_assets/ ★ 新增（离线前端）</tspan>
+<tspan x="938" dy="15" font-size="10.5">maplibre-gl-3.6.0.js（744.6 KB）+ .css（62.2 KB）</tspan>
+<tspan x="938" dy="14" font-size="10.5">MAPLIBRE-LICENSE.txt — 版本与摘要固定</tspan>
+<tspan x="924" dy="20" font-weight="700" fill="#991B1B">webmap_renderer.py ★ 实现补全</tspan>
+<tspan x="938" dy="15" font-size="10.5">RendererCapabilityProfile / Registry</tspan>
+<tspan x="938" dy="14" font-size="10.5">RenderSceneSemanticValidator · RenderSessionGateway</tspan>
+<tspan x="938" dy="14" font-size="10.5">RenderReceiptValidator · WebMapRendererAdapter</tspan>
+<tspan x="938" dy="14" font-size="10.5">compute_renderer_attestation() — HMAC 签署回执</tspan>
+<tspan x="924" dy="20" font-weight="700" fill="#991B1B">svg_compositor.py ★ 实现补全</tspan>
+<tspan x="938" dy="15" font-size="10.5">SvgCompositor — 栅格底图 + 矢量 overlay 合成</tspan>
+<tspan x="924" dy="20" font-weight="700" fill="#991B1B">renderer_probe.py ★ 真实探测</tspan>
+<tspan x="938" dy="15" font-size="10.5">RendererCapabilityProbe — DEFAULT_RENDERER=maplibre-web</tspan>
+<tspan x="924" dy="20" font-weight="700" fill="#991B1B">tool_gateway.py / mcp.py / contracts.py（未改动）</tspan>
+<tspan x="938" dy="15" font-size="10.5">ToolGateway deny-by-default · 4 个中立能力</tspan>
+</text>
+<rect x="924" y="1810" width="379" height="88" rx="6" fill="#FEF2F2" stroke="#EF4444" stroke-width="1"/>
+<text x="938" y="1830" font-size="10.5" font-weight="700" fill="#991B1B">确定性渲染六固定（U-P2.3）</text>
+<text x="938" y="1848" font-size="10.5" fill="#B91C1C">前端构建 · MapLibre 版本 · 浏览器版本 · 字体 ·</text>
+<text x="938" y="1864" font-size="10.5" fill="#B91C1C">随机种子 · 资源摘要与排序全部固定；</text>
+<text x="938" y="1880" font-size="10.5" fill="#B91C1C">同场景同环境必须产出一致的执行与资源摘要。</text>
+
+<rect x="1337" y="1368" width="407" height="546" rx="8" fill="#FFFFFF" stroke="#14B8A6" stroke-width="2"/>
+<rect x="1337" y="1368" width="407" height="30" rx="8" fill="#14B8A6"/>
+<rect x="1337" y="1384" width="407" height="14" fill="#14B8A6"/>
+<text x="1351" y="1389" font-size="14" font-weight="700" fill="#FFFFFF">⑤ repository/ · 6 个模块</text>
+<text x="1351" y="1422" font-size="11.5" fill="#334155">
+<tspan x="1351" dy="0" font-weight="700" fill="#115E59">staging_package.py ★ 新增（U-P2.2）</tspan>
+<tspan x="1365" dy="16" font-size="10.5">StagingPackageWriter — 在允许根下写暂存包</tspan>
+<tspan x="1365" dy="15" font-size="10.5">确定性 YAML 证据写入：同内容幂等重放，</tspan>
+<tspan x="1365" dy="15" font-size="10.5">内容变更则拒绝（冲突）</tspan>
+<tspan x="1351" dy="21" font-weight="700" fill="#115E59">template_repository.py ★ 新增（U-P2.4）</tspan>
+<tspan x="1365" dy="16" font-size="10.5">TemplateRepository — 不可变模板仓库 + 权威索引</tspan>
+<tspan x="1365" dy="15" font-size="10.5">_RepositoryLock — 仓库级互斥</tspan>
+<tspan x="1365" dy="15" font-size="10.5">发现端只读索引，不扫描目录、不解析裸模板名</tspan>
+<tspan x="1365" dy="15" font-size="10.5">同幂等键同摘要 → 返回已有发布；</tspan>
+<tspan x="1365" dy="15" font-size="10.5">同版本不同摘要 → 返回冲突</tspan>
+<tspan x="1351" dy="21" font-weight="700" fill="#115E59">template_installer.py ★ 新增（U-P2.5）</tspan>
+<tspan x="1365" dy="16" font-size="10.5">ProjectTemplateInstaller — 安装到项目私有目录</tspan>
+<tspan x="1365" dy="15" font-size="10.5">固定全部摘要，只接受已发布精确版本</tspan>
+<tspan x="1351" dy="21" font-weight="700" fill="#115E59">catalog.py / immutable_store.py / knowledge.py</tspan>
+<tspan x="1365" dy="16" font-size="10.5">VersionedCatalog · CatalogEntry（未改动）</tspan>
+<tspan x="1365" dy="15" font-size="10.5">ImmutableArtifactStore · StoredArtifact（未改动）</tspan>
+<tspan x="1365" dy="15" font-size="10.5">DomainKnowledgeService · KnowledgeEvidence</tspan>
+</text>
+<rect x="1351" y="1810" width="379" height="88" rx="6" fill="#F0FDFA" stroke="#14B8A6" stroke-width="1"/>
+<text x="1365" y="1830" font-size="10.5" font-weight="700" fill="#115E59">三级存储职责分离</text>
+<text x="1365" y="1848" font-size="10.5" fill="#0F766E">staging（可写草稿）→ repository（不可变发布 +</text>
+<text x="1365" y="1864" font-size="10.5" fill="#0F766E">权威索引）→ project 私有安装（摘要固定）。</text>
+<text x="1365" y="1880" font-size="10.5" fill="#0F766E">未进入索引的残留包不可被发现。</text>
+
+
+<!-- ============ L6 安全底座 ============ -->
+<rect x="40" y="1950" width="1720" height="170" rx="10" fill="#FFF1F2" stroke="#B91C1C" stroke-width="2"/>
+<rect x="40" y="1950" width="1720" height="32" rx="10" fill="#B91C1C"/>
+<rect x="40" y="1968" width="1720" height="14" fill="#B91C1C"/>
+<text x="58" y="1972" font-size="16" font-weight="700" fill="#FFFFFF">L6 · 安全底座（横切关注点 — 被 L2 / L4 / L5 所有模块强制调用，无豁免路径）</text>
+<text x="1742" y="1972" font-size="11.5" fill="#FECDD3" text-anchor="end">U-P2 未放宽任何安全约束；paths.py 扩展以支撑多根允许目录</text>
+
+<rect x="56" y="1998" width="409" height="106" rx="8" fill="#FFFFFF" stroke="#B91C1C" stroke-width="2"/>
+<text x="70" y="2021" font-size="13" font-weight="700" fill="#7F1D1D">paths.py — 路径边界 ★ 已扩展</text>
+<text x="70" y="2042" font-size="11.5" fill="#475569">PathGuard(allowed_roots).resolve(p, must_exist=)</text>
+<text x="70" y="2059" font-size="11.5" fill="#475569">staging / repository / project 三类根统一纳管</text>
+<text x="70" y="2080" font-size="10.5" fill="#94A3B8">所有落盘（含浏览器临时目录）均经此解析，白名单外即拒</text>
+
+<rect x="482" y="1998" width="409" height="106" rx="8" fill="#FFFFFF" stroke="#B91C1C" stroke-width="1.5"/>
+<text x="496" y="2021" font-size="13" font-weight="700" fill="#7F1D1D">authorization.py — 主体授权</text>
+<text x="496" y="2042" font-size="11.5" fill="#475569">Role(StrEnum) · Action(StrEnum) · SubjectContext</text>
+<text x="496" y="2059" font-size="11.5" fill="#475569">authorize(subject, action, resource) 显式判定</text>
+<text x="496" y="2080" font-size="10.5" fill="#94A3B8">默认拒绝；策略来源 policies/security-policy.yaml</text>
+
+<rect x="908" y="1998" width="409" height="106" rx="8" fill="#FFFFFF" stroke="#B91C1C" stroke-width="2"/>
+<text x="922" y="2021" font-size="13" font-weight="700" fill="#7F1D1D">approval.py — 审批回执 ★ 负载加重</text>
+<text x="922" y="2042" font-size="11.5" fill="#475569">ApprovalReceipt · sign_receipt() · verify_receipt()</text>
+<text x="922" y="2059" font-size="11.5" fill="#475569">NonceStore(Protocol) / InMemory / Sqlite 三实现</text>
+<text x="922" y="2080" font-size="10.5" fill="#94A3B8">nonce 严格一次性；T1/TP/G1/G2 仅凭已认证恢复证据续跑，普通重放仍拒绝</text>
+
+<rect x="1334" y="1998" width="410" height="106" rx="8" fill="#FFFFFF" stroke="#B91C1C" stroke-width="1.5"/>
+<text x="1348" y="2021" font-size="13" font-weight="700" fill="#7F1D1D">sensitive.py — 数据分级</text>
+<text x="1348" y="2042" font-size="11.5" fill="#475569">DataClassification(StrEnum) 数据密级</text>
+<text x="1348" y="2059" font-size="11.5" fill="#475569">ExternalAccessPolicy 外部访问策略</text>
+<text x="1348" y="2076" font-size="11.5" fill="#475569">redact_for_log() — 日志脱敏</text>
+
+<!-- ============ L7 协议资产层 ============ -->
+<rect x="40" y="2140" width="1720" height="460" rx="10" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.5"/>
+<rect x="40" y="2140" width="1720" height="32" rx="10" fill="#2563EB"/>
+<rect x="40" y="2158" width="1720" height="14" fill="#2563EB"/>
+<text x="58" y="2162" font-size="16" font-weight="700" fill="#FFFFFF">L7 · 协议资产层（声明式数据，运行时只读）</text>
+<text x="1742" y="2162" font-size="11.5" fill="#DBEAFE" text-anchor="end">schemas/ 43 个（+10）｜ policies/ 9 个（+1）</text>
+
+<rect x="56" y="2188" width="1060" height="396" rx="8" fill="#FFFFFF" stroke="#2563EB" stroke-width="2"/>
+<text x="70" y="2208" font-size="13.5" font-weight="700" fill="#1E3A8A">schemas/ — 43 个 JSON Schema（Draft 2020-12，全部 additionalProperties: false）</text>
+
+<rect x="70" y="2216" width="1032" height="42" rx="6" fill="#EFF6FF" stroke="#93C5FD" stroke-width="1"/>
+<text x="82" y="2233" font-size="11" font-weight="700" fill="#1E40AF">基础与身份（5）</text>
+<text x="82" y="2250" font-size="10.5" fill="#334155" font-family="Consolas,Menlo,monospace">common · identity · environment-fingerprint · tool-binding · tool-result</text>
+
+<rect x="70" y="2263" width="1032" height="42" rx="6" fill="#EFF6FF" stroke="#93C5FD" stroke-width="1"/>
+<text x="82" y="2280" font-size="11" font-weight="700" fill="#1E40AF">意图与数据（7）</text>
+<text x="82" y="2297" font-size="10.5" fill="#334155" font-family="Consolas,Menlo,monospace">map-intent · intent-profiles · generate-request · data-role · data-preparation-task · prepared-data-bundle · source-manifest</text>
+
+<rect x="70" y="2310" width="1032" height="42" rx="6" fill="#EFF6FF" stroke="#93C5FD" stroke-width="1"/>
+<text x="82" y="2327" font-size="11" font-weight="700" fill="#1E40AF">模板与规划（10）</text>
+<text x="82" y="2344" font-size="10.5" fill="#334155" font-family="Consolas,Menlo,monospace">template-brief · map-brief · map-plan · resolved-map · map-spec-lock · scenario · layout · portrayal · cartography · spatial-behavior</text>
+
+<rect x="70" y="2357" width="1032" height="42" rx="6" fill="#EFF6FF" stroke="#93C5FD" stroke-width="1"/>
+<text x="82" y="2374" font-size="11" font-weight="700" fill="#1E40AF">渲染协议（2 · U-P1 引入，U-P2 补全实现）</text>
+<text x="82" y="2391" font-size="10.5" fill="#334155" font-family="Consolas,Menlo,monospace">render-scene · render-receipt</text>
+
+<rect x="70" y="2404" width="1032" height="42" rx="6" fill="#EFF6FF" stroke="#93C5FD" stroke-width="1"/>
+<text x="82" y="2421" font-size="11" font-weight="700" fill="#1E40AF">交付 · 质量 · 状态（9）</text>
+<text x="82" y="2438" font-size="10.5" fill="#334155" font-family="Consolas,Menlo,monospace">delivery · delivery-manifest · manifest · quality-gates · validation-report · step-receipt · job-state · approval-receipt · knowledge-evidence</text>
+
+<rect x="70" y="2451" width="1032" height="42" rx="6" fill="#FEF2F2" stroke="#EF4444" stroke-width="2"/>
+<text x="82" y="2468" font-size="11" font-weight="700" fill="#991B1B">★ 模板生命周期（6 · U-P2 新增）</text>
+<text x="82" y="2485" font-size="10.5" fill="#7F1D1D" font-family="Consolas,Menlo,monospace">template-create-request · template-analysis · prototype-description · template-validation-evidence · template-index · publication-receipt</text>
+
+<rect x="70" y="2498" width="1032" height="42" rx="6" fill="#FEF2F2" stroke="#EF4444" stroke-width="2"/>
+<text x="82" y="2515" font-size="11" font-weight="700" fill="#991B1B">★ 地图表达与冻结（4 · U-P2 新增）</text>
+<text x="82" y="2532" font-size="10.5" fill="#7F1D1D" font-family="Consolas,Menlo,monospace">map-expression · dependency-lock · map-preview-evidence · state-transition</text>
+
+<text x="70" y="2558" font-size="10.5" fill="#64748B">公共片段集中于 common.schema.json 的 $defs（identifier / semanticVersion / digest）；state-transition 为 U-P2.7 引入的可恢复转换日志协议。</text>
+<text x="70" y="2575" font-size="10.5" fill="#64748B">U-P2.1 收紧了 manifest / scenario / cartography / layout / portrayal / delivery / quality-gates，并验证 MapScenario 恰含六份业务契约。</text>
+
+<rect x="1136" y="2188" width="608" height="396" rx="8" fill="#FFFFFF" stroke="#7C3AED" stroke-width="2"/>
+<text x="1150" y="2208" font-size="13.5" font-weight="700" fill="#4C1D95">policies/ — 9 个 YAML 策略</text>
+<text x="1150" y="2230" font-size="11.5" font-weight="700" fill="#5B21B6">map-expression-catalog.yaml ★ 新增</text>
+<text x="1160" y="2247" font-size="10.5" fill="#475569">2 条表达：choropleth/sequential、proportional-symbol/count</text>
+<text x="1150" y="2270" font-size="11.5" font-weight="700" fill="#5B21B6">scope-baseline.yaml ★ 升至 v0.2.0</text>
+<text x="1160" y="2287" font-size="10.5" fill="#475569">first_vertical_slice 冻结来源格式与 A3 输出剖面</text>
+<text x="1150" y="2310" font-size="11.5" font-weight="700" fill="#5B21B6">checker-registry.yaml</text>
+<text x="1160" y="2327" font-size="10.5" fill="#475569">校验器注册表 → CheckerRegistry</text>
+<text x="1150" y="2350" font-size="11.5" font-weight="700" fill="#5B21B6">data-preparation-policy.yaml</text>
+<text x="1160" y="2367" font-size="10.5" fill="#475569">固定数据准备管线（无自由裁量）</text>
+<text x="1150" y="2390" font-size="11.5" font-weight="700" fill="#5B21B6">intent-profiles.yaml</text>
+<text x="1160" y="2407" font-size="10.5" fill="#475569">意图画像 → IntentResolver</text>
+<text x="1150" y="2430" font-size="11.5" font-weight="700" fill="#5B21B6">knowledge-sources.yaml</text>
+<text x="1160" y="2447" font-size="10.5" fill="#475569">受信知识源白名单 → DomainKnowledgeService</text>
+<text x="1150" y="2470" font-size="11.5" font-weight="700" fill="#5B21B6">security-policy.yaml</text>
+<text x="1160" y="2487" font-size="10.5" fill="#475569">安全策略 → authorization / sensitive</text>
+<text x="1150" y="2510" font-size="11.5" font-weight="700" fill="#5B21B6">tool-bindings.yaml</text>
+<text x="1160" y="2527" font-size="10.5" fill="#475569">4 个中立能力绑定（deny-by-default）</text>
+<text x="1150" y="2550" font-size="11.5" font-weight="700" fill="#5B21B6">baselines/carto-core-1.0.0.yaml</text>
+<text x="1160" y="2567" font-size="10.5" fill="#475569">规则基线，六级规则语义的定义源</text>
+
+<!-- ============ L8 端到端双路由链路 ============ -->
+<rect x="40" y="2620" width="1720" height="350" rx="10" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.5"/>
+<rect x="40" y="2620" width="1720" height="32" rx="10" fill="#0891B2"/>
+<rect x="40" y="2638" width="1720" height="14" fill="#0891B2"/>
+<text x="58" y="2642" font-size="16" font-weight="700" fill="#FFFFFF">L8 · 端到端双路由链路（U-P2 两条链路均已真实跑通，非骨架）</text>
+<text x="1742" y="2642" font-size="11.5" fill="#CFFAFE" text-anchor="end">★ = U-P2 新增节点</text>
+
+<text x="56" y="2674" font-size="12.5" font-weight="700" fill="#065F46">路由一 · create-template（仅 map-scenario）</text>
+
+<g font-size="11.5" font-weight="700" text-anchor="middle">
+<rect x="56" y="2680" width="248" height="56" rx="6" fill="#ECFDF5" stroke="#10B981" stroke-width="1.8"/>
+<text x="180" y="2702" fill="#065F46">1. analyze ★</text>
+<text x="180" y="2721" font-size="10" font-weight="400" fill="#047857">ControlledSourceAnalyzer</text>
+
+<rect x="336" y="2680" width="248" height="56" rx="6" fill="#ECFDF5" stroke="#10B981" stroke-width="1.8"/>
+<text x="460" y="2702" fill="#065F46">2. brief ★</text>
+<text x="460" y="2721" font-size="10" font-weight="400" fill="#047857">build_template_brief()</text>
+
+<rect x="616" y="2680" width="248" height="56" rx="6" fill="#ECFDF5" stroke="#10B981" stroke-width="1.8"/>
+<text x="740" y="2702" fill="#065F46">3. author ★</text>
+<text x="740" y="2721" font-size="10" font-weight="400" fill="#047857">MapScenarioAuthor → staging</text>
+
+<rect x="896" y="2680" width="248" height="56" rx="6" fill="#ECFDF5" stroke="#10B981" stroke-width="1.8"/>
+<text x="1020" y="2702" fill="#065F46">4. validate ★</text>
+<text x="1020" y="2721" font-size="10" font-weight="400" fill="#047857">静态链 + Fixture 真实渲染</text>
+
+<rect x="1176" y="2680" width="248" height="56" rx="6" fill="#ECFDF5" stroke="#10B981" stroke-width="1.8"/>
+<text x="1300" y="2702" fill="#065F46">5. publish ★</text>
+<text x="1300" y="2721" font-size="10" font-weight="400" fill="#047857">TemplateRepository 单一事务</text>
+
+<rect x="1456" y="2680" width="248" height="56" rx="6" fill="#EFF6FF" stroke="#2563EB" stroke-width="1.8"/>
+<text x="1580" y="2702" fill="#1E3A8A">6. 发布产物</text>
+<text x="1580" y="2721" font-size="10" font-weight="400" fill="#1D4ED8">template-index + publication-receipt</text>
+</g>
+
+<rect x="616" y="2746" width="248" height="26" rx="5" fill="#FFF1F2" stroke="#B91C1C" stroke-width="1.5"/>
+<text x="740" y="2764" font-size="10.5" font-weight="700" fill="#7F1D1D" text-anchor="middle">T1 审批门 — 绑定简报摘要</text>
+<rect x="1176" y="2746" width="248" height="26" rx="5" fill="#FFF1F2" stroke="#B91C1C" stroke-width="1.5"/>
+<text x="1300" y="2764" font-size="10.5" font-weight="700" fill="#7F1D1D" text-anchor="middle">TP 审批门 — 绑定包 + 证据摘要</text>
+
+<text x="56" y="2802" font-size="12.5" font-weight="700" fill="#1E3A8A">路由二 · generate-map（合成洪涝数据）</text>
+
+<g font-size="11.5" font-weight="700" text-anchor="middle">
+<rect x="56" y="2810" width="248" height="56" rx="6" fill="#ECFDF5" stroke="#10B981" stroke-width="1.8"/>
+<text x="180" y="2832" fill="#065F46">1. intake ★</text>
+<text x="180" y="2851" font-size="10" font-weight="400" fill="#047857">复用 IntentResolver</text>
+
+<rect x="336" y="2810" width="248" height="56" rx="6" fill="#ECFDF5" stroke="#10B981" stroke-width="1.8"/>
+<text x="460" y="2832" fill="#065F46">2. brief ★</text>
+<text x="460" y="2851" font-size="10" font-weight="400" fill="#047857">制图简报 + 模板候选</text>
+
+<rect x="616" y="2810" width="248" height="56" rx="6" fill="#ECFDF5" stroke="#10B981" stroke-width="1.8"/>
+<text x="740" y="2832" fill="#065F46">3. compile ★</text>
+<text x="740" y="2851" font-size="10" font-weight="400" fill="#047857">安装精确版本 → 候选</text>
+
+<rect x="896" y="2810" width="248" height="56" rx="6" fill="#ECFDF5" stroke="#10B981" stroke-width="1.8"/>
+<text x="1020" y="2832" fill="#065F46">4. preview ★</text>
+<text x="1020" y="2851" font-size="10" font-weight="400" fill="#047857">真实浏览器 + 签署回执</text>
+
+<rect x="1176" y="2810" width="248" height="56" rx="6" fill="#ECFDF5" stroke="#10B981" stroke-width="1.8"/>
+<text x="1300" y="2832" fill="#065F46">5. freeze ★</text>
+<text x="1300" y="2851" font-size="10" font-weight="400" fill="#047857">MapSpecLockCompiler</text>
+
+<rect x="1456" y="2810" width="248" height="56" rx="6" fill="#EFF6FF" stroke="#2563EB" stroke-width="1.8"/>
+<text x="1580" y="2832" fill="#1E3A8A">6. 冻结产物</text>
+<text x="1580" y="2851" font-size="10" font-weight="400" fill="#1D4ED8">MapSpecLock（create-once）</text>
+</g>
+
+<rect x="616" y="2876" width="248" height="26" rx="5" fill="#FFF1F2" stroke="#B91C1C" stroke-width="1.5"/>
+<text x="740" y="2894" font-size="10.5" font-weight="700" fill="#7F1D1D" text-anchor="middle">G1 审批门 — 简报/数据/版本/能力</text>
+<rect x="1176" y="2876" width="248" height="26" rx="5" fill="#FFF1F2" stroke="#B91C1C" stroke-width="1.5"/>
+<text x="1300" y="2894" font-size="10.5" font-weight="700" fill="#7F1D1D" text-anchor="middle">G2 审批门 — candidate + execution digest</text>
+
+<g stroke="#059669" stroke-width="1.8" fill="none">
+<path d="M304,2708 L336,2708" marker-end="url(#arwG)"/>
+<path d="M584,2708 L616,2708" marker-end="url(#arwG)"/>
+<path d="M864,2708 L896,2708" marker-end="url(#arwG)"/>
+<path d="M1144,2708 L1176,2708" marker-end="url(#arwG)"/>
+<path d="M1424,2708 L1456,2708" marker-end="url(#arwB)"/>
+<path d="M304,2838 L336,2838" marker-end="url(#arwG)"/>
+<path d="M584,2838 L616,2838" marker-end="url(#arwG)"/>
+<path d="M864,2838 L896,2838" marker-end="url(#arwG)"/>
+<path d="M1144,2838 L1176,2838" marker-end="url(#arwG)"/>
+<path d="M1424,2838 L1456,2838" marker-end="url(#arwB)"/>
+</g>
+
+<text x="56" y="2928" font-size="11" fill="#64748B" font-style="italic">每个变更步骤都持有运行级单写者锁，写不可变回执后再更新状态；status / retry / receipts 三个运维子命令仅通过既有 carto CLI 暴露，无平行入口。</text>
+<text x="56" y="2950" font-size="11" fill="#B91C1C">跨路由复用审批会被拒绝：模板 T1/TP 与地图 G1/G2 在动作、对象、作用域、身份、环境、时效、nonce 七个维度全绑定，已用测试验证不可互换。</text>
+
+<!-- ============ L9 测试与验证 ============ -->
+<rect x="40" y="2990" width="1720" height="170" rx="10" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.5"/>
+<rect x="40" y="2990" width="1720" height="32" rx="10" fill="#059669"/>
+<rect x="40" y="3008" width="1720" height="14" fill="#059669"/>
+<text x="58" y="3012" font-size="16" font-weight="700" fill="#FFFFFF">L9 · 测试与验证（8 个套件 · 101 用例 · 2322 行）</text>
+<text x="1742" y="3012" font-size="11.5" fill="#D1FAE5" text-anchor="end">100 通过 / 1 跳过（符号链接创建不可用）/ 0 失败</text>
+
+<rect x="56" y="3038" width="410" height="50" rx="8" fill="#FFFFFF" stroke="#059669" stroke-width="1.5"/>
+<text x="70" y="3058" font-size="12" font-weight="700" fill="#065F46">test_schemas.py（157 行）</text>
+<text x="70" y="3076" font-size="10.5" fill="#475569">43 个 Schema 结构自检 + 正反例夹具</text>
+
+<rect x="482" y="3038" width="410" height="50" rx="8" fill="#FFFFFF" stroke="#059669" stroke-width="1.5"/>
+<text x="496" y="3058" font-size="12" font-weight="700" fill="#065F46">test_security.py（156 行）</text>
+<text x="496" y="3076" font-size="10.5" fill="#475569">PathGuard 越界 · 授权拒绝 · HMAC / nonce</text>
+
+<rect x="908" y="3038" width="410" height="50" rx="8" fill="#FFFFFF" stroke="#059669" stroke-width="1.5"/>
+<text x="922" y="3058" font-size="12" font-weight="700" fill="#065F46">test_up1.py（461 行）</text>
+<text x="922" y="3076" font-size="10.5" fill="#475569">渲染协议回归：Scene / 会话 / 回执绑定</text>
+
+<rect x="1334" y="3038" width="410" height="50" rx="8" fill="#FFFFFF" stroke="#059669" stroke-width="2"/>
+<text x="1348" y="3058" font-size="12" font-weight="700" fill="#065F46">test_up2_template.py ★（316 行）</text>
+<text x="1348" y="3076" font-size="10.5" fill="#475569">U-P2.1/2.2 协议收紧与草稿创建</text>
+
+<rect x="56" y="3096" width="410" height="50" rx="8" fill="#FFFFFF" stroke="#059669" stroke-width="2"/>
+<text x="70" y="3116" font-size="12" font-weight="700" fill="#065F46">test_up23_renderer.py ★（277 行）</text>
+<text x="70" y="3134" font-size="10.5" fill="#475569">受控 Chromium 真实渲染 SVG/PNG/PDF</text>
+
+<rect x="482" y="3096" width="410" height="50" rx="8" fill="#FFFFFF" stroke="#059669" stroke-width="2"/>
+<text x="496" y="3116" font-size="12" font-weight="700" fill="#065F46">test_up24_template_publish.py ★（284 行）</text>
+<text x="496" y="3134" font-size="10.5" fill="#475569">发布事务 · 幂等 · 冲突 · 证据失效</text>
+
+<rect x="908" y="3096" width="410" height="50" rx="8" fill="#FFFFFF" stroke="#059669" stroke-width="2"/>
+<text x="922" y="3116" font-size="12" font-weight="700" fill="#065F46">test_up25_up26_map_generation.py ★（371 行）</text>
+<text x="922" y="3134" font-size="10.5" fill="#475569">候选编译 · 预览 · G2 · 实例冻结</text>
+
+<rect x="1334" y="3096" width="410" height="50" rx="8" fill="#FFFFFF" stroke="#059669" stroke-width="2"/>
+<text x="1348" y="3116" font-size="12" font-weight="700" fill="#065F46">test_up27_integration.py ★（306 行）</text>
+<text x="1348" y="3134" font-size="10.5" fill="#475569">锁 · revision/CAS · 恢复 · 重试 · 跨路由隔离</text>
+
+<!-- ============ L10 外部依赖与边界 ============ -->
+<rect x="40" y="3180" width="1720" height="260" rx="10" fill="#FAFAFA" stroke="#9CA3AF" stroke-width="2" stroke-dasharray="7 4"/>
+<rect x="40" y="3180" width="1720" height="32" rx="10" fill="#6B7280"/>
+<rect x="40" y="3198" width="1720" height="14" fill="#6B7280"/>
+<text x="58" y="3202" font-size="16" font-weight="700" fill="#FFFFFF">L10 · 外部依赖、已验证真实环境与仍未开放边界</text>
+<text x="1742" y="3202" font-size="11.5" fill="#E5E7EB" text-anchor="end">U-P1 的"渲染管线断裂"已在 U-P2.3 接通</text>
+
+<rect x="56" y="3228" width="520" height="196" rx="8" fill="#FFFFFF" stroke="#6B7280" stroke-width="1.5"/>
+<text x="70" y="3252" font-size="13" font-weight="700" fill="#1F2937">运行时依赖</text>
+<text x="70" y="3276" font-size="11.5" fill="#475569">Python ≥ 3.11（实测 3.14.7）</text>
+<text x="70" y="3295" font-size="11.5" fill="#475569">jsonschema[format] ≥ 4 ｜ PyYAML ≥ 6.0.2, &lt; 7</text>
+<text x="70" y="3314" font-size="11.5" fill="#475569">referencing（$ref 注册表）</text>
+<text x="70" y="3333" font-size="11.5" fill="#475569">★ 本机 Chromium（实测 152.0.7977.83）</text>
+<text x="70" y="3352" font-size="11.5" fill="#475569">★ Node.js（实测 v24.20.0）</text>
+<text x="70" y="3371" font-size="11.5" fill="#475569">★ 内置 MapLibre GL 3.6.0（离线，仓库内随附）</text>
+<text x="70" y="3398" font-size="10.5" fill="#94A3B8">Python 侧仍只有 2 个直接第三方依赖；浏览器与 Node</text>
+<text x="70" y="3415" font-size="10.5" fill="#94A3B8">属宿主环境能力，缺失时相关阶段判定为未完成而非降级。</text>
+
+<rect x="596" y="3228" width="540" height="196" rx="8" fill="#ECFDF5" stroke="#059669" stroke-width="2"/>
+<text x="610" y="3252" font-size="13" font-weight="700" fill="#065F46">★ 已验证的真实环境（非 mock）</text>
+<text x="610" y="3276" font-size="11.5" fill="#475569">平台 Windows-11-10.0.26200-SP0</text>
+<text x="610" y="3295" font-size="11.5" fill="#475569">探测时刻 2026-09-18T04:27:04Z</text>
+<text x="610" y="3314" font-size="11.5" fill="#475569">渲染指纹 sha256:2f581a82f086272d…7534aa4b</text>
+<text x="610" y="3337" font-size="11.5" fill="#047857">已可用：离线渲染 · WebGL · SVG 合成 ·</text>
+<text x="610" y="3355" font-size="11.5" fill="#047857">无头导出 · SVG/PNG/PDF 三格式导出</text>
+<text x="610" y="3378" font-size="11.5" fill="#047857">真实受控 Chromium 的 SVG/PNG/PDF 测试</text>
+<text x="610" y="3396" font-size="11.5" fill="#047857">已在全量套件中通过。</text>
+<text x="610" y="3416" font-size="10.5" fill="#94A3B8">对比 U-P1：webgl / offline / headless 三项已由 False 转为真实可用</text>
+
+<rect x="1156" y="3228" width="588" height="196" rx="8" fill="#FFFFFF" stroke="#EF4444" stroke-width="1.8" stroke-dasharray="6 4"/>
+<text x="1170" y="3252" font-size="13" font-weight="700" fill="#991B1B">仍未开放（U-P2 明确不声明）</text>
+<text x="1170" y="3276" font-size="11.5" fill="#475569">1. 真实 CRS 转换（仅声明 4326 → 3857 边界，未做实测转换）</text>
+<text x="1170" y="3295" font-size="11.5" fill="#475569">2. G3 与正式交付事务（U-P3 负责）</text>
+<text x="1170" y="3314" font-size="11.5" fill="#475569">3. 生产数据洪涝研判 / 指挥决策能力</text>
+<text x="1170" y="3333" font-size="11.5" fill="#475569">4. 外部底图联网（network_policy = deny-all）</text>
+<text x="1170" y="3352" font-size="11.5" fill="#475569">5. map-brand / map-style / map-layout 业务创建路由</text>
+<text x="1170" y="3371" font-size="11.5" fill="#475569">6. 矢量 PDF（PDF 仅声明为工程预览）· 公开 Web 发布</text>
+<text x="1170" y="3390" font-size="11.5" fill="#475569">7. GeoPackage / QGIS 工程 / Shapefile / GeoTIFF / 数据库 / 实时 API</text>
+<text x="1170" y="3409" font-size="11.5" fill="#475569">8. 点密度 / 分级符号 / 流向 / 等值线 / 热力图等表达（仅留协议位）</text>
+
+<!-- ============ LEGEND ============ -->
+<rect x="40" y="3460" width="1720" height="100" rx="10" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5"/>
+<text x="58" y="3484" font-size="13" font-weight="700" fill="#0F172A">图例</text>
+
+<rect x="110" y="3472" width="26" height="16" rx="3" fill="#ECFDF5" stroke="#10B981" stroke-width="1.5"/>
+<text x="144" y="3485" font-size="11" fill="#475569">workflow</text>
+<rect x="220" y="3472" width="26" height="16" rx="3" fill="#FFFBEB" stroke="#F59E0B" stroke-width="1.5"/>
+<text x="254" y="3485" font-size="11" fill="#475569">compiler</text>
+<rect x="330" y="3472" width="26" height="16" rx="3" fill="#F5F3FF" stroke="#8B5CF6" stroke-width="1.5"/>
+<text x="364" y="3485" font-size="11" fill="#475569">validation</text>
+<rect x="450" y="3472" width="26" height="16" rx="3" fill="#FEF2F2" stroke="#EF4444" stroke-width="1.5"/>
+<text x="484" y="3485" font-size="11" fill="#475569">adapters</text>
+<rect x="560" y="3472" width="26" height="16" rx="3" fill="#F0FDFA" stroke="#14B8A6" stroke-width="1.5"/>
+<text x="594" y="3485" font-size="11" fill="#475569">repository</text>
+<rect x="680" y="3472" width="26" height="16" rx="3" fill="#FFF1F2" stroke="#B91C1C" stroke-width="1.5"/>
+<text x="714" y="3485" font-size="11" fill="#475569">security（横切）</text>
+<rect x="830" y="3472" width="26" height="16" rx="3" fill="#EFF6FF" stroke="#2563EB" stroke-width="1.5"/>
+<text x="864" y="3485" font-size="11" fill="#475569">schemas</text>
+<rect x="940" y="3472" width="26" height="16" rx="3" fill="#F5F3FF" stroke="#7C3AED" stroke-width="1.5"/>
+<text x="974" y="3485" font-size="11" fill="#475569">policies</text>
+
+<rect x="1060" y="3472" width="26" height="16" rx="3" fill="#FFFFFF" stroke="#EF4444" stroke-width="1.8" stroke-dasharray="5 3"/>
+<text x="1094" y="3485" font-size="11" fill="#475569">未开放 / 不声明</text>
+<text x="1210" y="3485" font-size="11" font-weight="700" fill="#059669">★ U-P2 新增或增强</text>
+<path d="M1400,3480 L1450,3480" stroke="#059669" stroke-width="1.8" fill="none" marker-end="url(#arwG)"/>
+<text x="1460" y="3485" font-size="11" fill="#475569">路由执行流</text>
+<path d="M1560,3480 L1610,3480" stroke="#94A3B8" stroke-width="1.5" fill="none" marker-end="url(#arw)"/>
+<text x="1620" y="3485" font-size="11" fill="#475569">调用 / 加载</text>
+
+<text x="58" y="3516" font-size="11" fill="#64748B">依赖方向（严格单向，禁止环）：宿主 → CLI → workflow → compiler → validation → adapters → repository → 公共基座；security/ 为横切层，被所有层强制调用；schemas/ 与 policies/ 为只读声明式资产。</text>
+<text x="58" y="3538" font-size="11" fill="#64748B">关键不变量：① 一切文件访问经 PathGuard；② 一切能力调用经 ToolGateway（deny-by-default）；③ 一切产物经 ImmutableArtifactStore（digest 寻址）；④ 一切审批经 HMAC + nonce 且不可跨路由复用；⑤ 一切渲染经 RenderScene 合同、受控浏览器与签署回执；⑥ 一切锁由 compiler 独占生成且 create-once。</text>
+
+<!-- ============ 层间连接箭头 ============ -->
+<g stroke="#94A3B8" stroke-width="1.8" fill="none">
+<path d="M300,280 L300,300" marker-end="url(#arw)"/>
+<path d="M900,280 L900,300" marker-end="url(#arw)"/>
+<path d="M1500,280 L1500,300" marker-end="url(#arw)"/>
+<path d="M300,570 L300,590" marker-end="url(#arw)"/>
+<path d="M900,570 L900,590" marker-end="url(#arw)"/>
+<path d="M1500,570 L1500,590" marker-end="url(#arw)"/>
+<path d="M300,740 L300,760" marker-end="url(#arw)"/>
+<path d="M900,740 L900,760" marker-end="url(#arw)"/>
+<path d="M1500,740 L1500,760" marker-end="url(#arw)"/>
+<path d="M300,1300 L300,1320" marker-end="url(#arw)"/>
+<path d="M900,1300 L900,1320" marker-end="url(#arw)"/>
+<path d="M1500,1300 L1500,1320" marker-end="url(#arw)"/>
+<path d="M300,1930 L300,1950" marker-end="url(#arw)"/>
+<path d="M900,1930 L900,1950" marker-end="url(#arw)"/>
+<path d="M1500,1930 L1500,1950" marker-end="url(#arw)"/>
+<path d="M300,2120 L300,2140" marker-end="url(#arw)"/>
+<path d="M900,2120 L900,2140" marker-end="url(#arw)"/>
+<path d="M1500,2120 L1500,2140" marker-end="url(#arw)"/>
+<path d="M300,2600 L300,2620" marker-end="url(#arw)"/>
+<path d="M900,2600 L900,2620" marker-end="url(#arw)"/>
+<path d="M1500,2600 L1500,2620" marker-end="url(#arw)"/>
+<path d="M300,2970 L300,2990" marker-end="url(#arw)"/>
+<path d="M900,2970 L900,2990" marker-end="url(#arw)"/>
+<path d="M1500,2970 L1500,2990" marker-end="url(#arw)"/>
+<path d="M300,3160 L300,3180" marker-end="url(#arw)"/>
+<path d="M900,3160 L900,3180" marker-end="url(#arw)"/>
+<path d="M1500,3160 L1500,3180" marker-end="url(#arw)"/>
+<path d="M300,3440 L300,3460" marker-end="url(#arw)"/>
+<path d="M900,3440 L900,3460" marker-end="url(#arw)"/>
+<path d="M1500,3440 L1500,3460" marker-end="url(#arw)"/>
+</g>
+
+</svg>

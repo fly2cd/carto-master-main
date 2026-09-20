@@ -16,6 +16,8 @@
 
 本次只更新 TRD。配套文档中尚存的八契约清单、规则优先级、动态加载单元和旧 CLI，应在实施前按本版对齐，不应视为并行可选实现。本文的目录、命令和接口均是 Carto Agent 的拟实现设计，不表示仓库已经提供这些能力。
 
+> **U-P2 实施冻结说明（2026-09-17）**：U-P2 只开放 MapScenario 创建，来源限安全解析的 YAML/JSON、GeoJSON 和 UTF-8 CSV；实际 CLI 使用唯一入口 `carto create-template ...`。本文中更宽的来源和旧 `carto_template.py` 命令保留为后续目标，不属于 U-P2 已开放合同。详细决定见 [U-P2.0 实施说明](impl-log/U-P2.0说明文档.md)。
+
 ## 一、结论与设计取舍
 
 地图模板创建是独立路由 `Create Map Template`，四个互斥子路由根据“稳定复用什么”选择：

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/template-analysis.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "analysis_id", "request_digest", "source_manifest_digest", "source_summaries", "evidence_records", "open_questions"],
+  "properties": {
+    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
+    "analysis_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "request_digest": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"},
+    "source_manifest_digest": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"},
+    "source_summaries": {
+      "type": "array", "minItems": 2, "uniqueItems": true,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["source_id", "kind", "digest", "license", "data_nature", "record_count", "field_names", "geometry_types"],
+        "properties": {
+          "source_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+          "kind": {"enum": ["geojson", "csv"]},
+          "digest": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"},
+          "license": {"enum": ["public", "project-approved"]},
+          "data_nature": {"const": "synthetic"},
+          "record_count": {"type": "integer", "minimum": 0, "maximum": 1000},
+          "field_names": {"type": "array", "maxItems": 100, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 128}},
+          "geometry_types": {"type": "array", "maxItems": 8, "uniqueItems": true, "items": {"enum": ["point", "multipoint", "line", "multiline", "polygon", "multipolygon", "none"]}}
+        }
+      }
+    },
+    "evidence_records": {"type": "array", "minItems": 4, "items": {"$ref": "#/$defs/evidenceRecord"}},
+    "open_questions": {"type": "array", "items": {"type": "string", "minLength": 1, "maxLength": 500}}
+  },
+  "$defs": {
+    "evidenceRecord": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "value_origin", "value"],
+      "properties": {
+        "path": {"type": "string", "pattern": "^/", "maxLength": 256},
+        "value_origin": {"enum": ["source_fact", "user_decision", "system_suggestion", "derived"]},
+        "value": {"oneOf": [{"type": "string", "maxLength": 1000}, {"type": "number"}, {"type": "boolean"}, {"type": "array", "maxItems": 100, "items": {"type": ["string", "number", "boolean"]}}]},
+        "source_ref": {"type": "string", "minLength": 1, "maxLength": 512},
+        "rationale": {"type": "string", "minLength": 1, "maxLength": 1000}
+      },
+      "allOf": [
+        {"if": {"properties": {"value_origin": {"enum": ["source_fact", "user_decision", "derived"]}}}, "then": {"required": ["source_ref"]}},
+        {"if": {"properties": {"value_origin": {"enum": ["system_suggestion", "derived"]}}}, "then": {"required": ["rationale"]}}
+      ]
+    }
+  }
+}

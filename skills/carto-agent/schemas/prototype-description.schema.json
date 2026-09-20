@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/prototype-description.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "prototype_id", "status", "render_required", "renderer_execution", "layout_id", "target_ids", "layer_ids", "fixture_ref", "limitations"],
+  "properties": {
+    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
+    "prototype_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "status": {"const": "pending-validation"},
+    "render_required": {"const": true},
+    "renderer_execution": {"const": "not-run"},
+    "layout_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "target_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"}},
+    "layer_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"}},
+    "fixture_ref": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/relativePath"},
+    "limitations": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1, "maxLength": 500}}
+  }
+}

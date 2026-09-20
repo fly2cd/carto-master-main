@@ -1,5 +1,6 @@
 """Controlled external capability adapters."""
 
+from .controlled_renderer import BrowserLimits, ControlledBrowserRenderer
 from .mcp import McpAdapter, McpCapabilityDescriptor
 from .renderer_probe import RendererCapabilityProbe
 from .svg_compositor import SvgCompositor
@@ -15,6 +16,8 @@ from .webmap_renderer import (
 )
 
 __all__ = [
+    "BrowserLimits",
+    "ControlledBrowserRenderer",
     "McpAdapter",
     "McpCapabilityDescriptor",
     "RendererCapabilityProbe",

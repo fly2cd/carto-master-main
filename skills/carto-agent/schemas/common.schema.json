@@ -31,6 +31,43 @@
         "digest": {"$ref": "#/$defs/digest"}
       }
     },
+    "mapExpressionRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "digest"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]*/[a-z][a-z0-9-]*$", "maxLength": 120},
+        "version": {"$ref": "#/$defs/semanticVersion"},
+        "digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "resourceRef": {
+      "oneOf": [
+        {"$ref": "#/$defs/artifactRef"},
+        {"$ref": "#/$defs/mapExpressionRef"}
+      ]
+    },
+    "checkerRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]*(?:\\.[a-z][a-z0-9-]*)+$", "maxLength": 160},
+        "version": {"$ref": "#/$defs/semanticVersion"}
+      }
+    },
+    "pageBox": {
+      "type": "array",
+      "prefixItems": [
+        {"type": "number", "minimum": 0},
+        {"type": "number", "minimum": 0},
+        {"type": "number", "exclusiveMinimum": 0},
+        {"type": "number", "exclusiveMinimum": 0}
+      ],
+      "items": false,
+      "minItems": 4,
+      "maxItems": 4
+    },
     "provenance": {
       "type": "object",
       "additionalProperties": false,
@@ -83,7 +120,7 @@
         "business_scene": {"enum": ["government_thematic", "emergency_mapping", "leadership_visit"]},
         "map_tasks": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/identifier"}},
         "template_refs": {"type": "array", "items": {"$ref": "#/$defs/templateRef"}, "uniqueItems": true},
-        "dependency_refs": {"type": "array", "items": {"$ref": "#/$defs/artifactRef"}, "uniqueItems": true},
+        "dependency_refs": {"type": "array", "items": {"$ref": "#/$defs/resourceRef"}, "uniqueItems": true},
         "policy_refs": {"type": "array", "items": {"$ref": "#/$defs/artifactRef"}, "uniqueItems": true},
         "dataset_refs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/artifactRef"}, "uniqueItems": true},
         "prepared_data_refs": {"type": "array", "items": {"$ref": "#/$defs/artifactRef"}, "uniqueItems": true},
@@ -123,7 +160,7 @@
             }
           }
         },
-        "resolved_assets": {"type": "array", "items": {"$ref": "#/$defs/artifactRef"}, "uniqueItems": true},
+        "resolved_assets": {"type": "array", "items": {"$ref": "#/$defs/resourceRef"}, "uniqueItems": true},
         "render_scene_ref": {"$ref": "#/$defs/artifactRef"},
         "renderer_profile_ref": {"$ref": "#/$defs/artifactRef"},
         "camera": {

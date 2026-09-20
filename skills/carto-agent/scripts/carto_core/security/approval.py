@@ -22,6 +22,8 @@ MINIMUM_HMAC_KEY_BYTES = 32
 class NonceStore(Protocol):
     def consume(self, issuer: str, nonce: str, expires_at: datetime) -> bool: ...
 
+    def contains(self, issuer: str, nonce: str) -> bool: ...
+
 
 class InMemoryNonceStore:
     def __init__(self) -> None:
@@ -35,6 +37,10 @@ class InMemoryNonceStore:
                 return False
             self._seen.add(key)
             return True
+
+    def contains(self, issuer: str, nonce: str) -> bool:
+        with self._lock:
+            return (issuer, nonce) in self._seen
 
 
 class SqliteNonceStore:
@@ -66,6 +72,18 @@ class SqliteNonceStore:
             )
             connection.commit()
             return cursor.rowcount == 1
+
+    def contains(self, issuer: str, nonce: str) -> bool:
+        now = datetime.now(timezone.utc).timestamp()
+        with closing(self._connect()) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            connection.execute("DELETE FROM consumed_nonce WHERE expires_at <= ?", (now,))
+            row = connection.execute(
+                "SELECT 1 FROM consumed_nonce WHERE issuer = ? AND nonce = ?",
+                (issuer, nonce),
+            ).fetchone()
+            connection.commit()
+            return row is not None
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,6 +143,78 @@ def verify_receipt(
     expected_environment: str,
     now: datetime | None = None,
 ) -> None:
+    expires = verify_receipt_claims(
+        receipt,
+        key,
+        expected_action=expected_action,
+        expected_object_digest=expected_object_digest,
+        expected_scope=expected_scope,
+        expected_policy_id=expected_policy_id,
+        expected_tenant_id=expected_tenant_id,
+        expected_issuer=expected_issuer,
+        expected_subject_id=expected_subject_id,
+        expected_object_type=expected_object_type,
+        expected_environment=expected_environment,
+        now=now,
+    )
+    if not nonce_store.consume(receipt.issuer, receipt.nonce, expires):
+        raise SecurityError("APPROVAL_REPLAYED", "Approval nonce has already been consumed")
+
+
+def verify_consumed_receipt(
+    receipt: ApprovalReceipt,
+    key: bytes,
+    nonce_store: NonceStore,
+    *,
+    expected_action: str,
+    expected_object_digest: str,
+    expected_scope: str,
+    expected_policy_id: str,
+    expected_tenant_id: str,
+    expected_issuer: str,
+    expected_subject_id: str,
+    expected_object_type: str,
+    expected_environment: str,
+    now: datetime | None = None,
+) -> None:
+    """Verify a recovery receipt without consuming its nonce a second time."""
+    verify_receipt_claims(
+        receipt,
+        key,
+        expected_action=expected_action,
+        expected_object_digest=expected_object_digest,
+        expected_scope=expected_scope,
+        expected_policy_id=expected_policy_id,
+        expected_tenant_id=expected_tenant_id,
+        expected_issuer=expected_issuer,
+        expected_subject_id=expected_subject_id,
+        expected_object_type=expected_object_type,
+        expected_environment=expected_environment,
+        now=now,
+    )
+    if not nonce_store.contains(receipt.issuer, receipt.nonce):
+        raise SecurityError(
+            "APPROVAL_NONCE_NOT_CONSUMED",
+            "Approval nonce was not consumed by a prior authorized attempt",
+        )
+
+
+def verify_receipt_claims(
+    receipt: ApprovalReceipt,
+    key: bytes,
+    *,
+    expected_action: str,
+    expected_object_digest: str,
+    expected_scope: str,
+    expected_policy_id: str,
+    expected_tenant_id: str,
+    expected_issuer: str,
+    expected_subject_id: str,
+    expected_object_type: str,
+    expected_environment: str,
+    now: datetime | None = None,
+) -> datetime:
+    """Validate signed approval claims and time bounds without touching replay state."""
     _validate_shape(receipt, require_signature=True)
     _validate_key(key)
     expected_signature = hmac.new(
@@ -155,8 +245,7 @@ def verify_receipt(
     current = current.astimezone(timezone.utc)
     if issued > current or expires <= current or expires <= issued:
         raise SecurityError("APPROVAL_TIME_INVALID", "Approval is not currently valid")
-    if not nonce_store.consume(receipt.issuer, receipt.nonce, expires):
-        raise SecurityError("APPROVAL_REPLAYED", "Approval nonce has already been consumed")
+    return expires
 
 
 def _validate_shape(receipt: ApprovalReceipt, *, require_signature: bool) -> None:

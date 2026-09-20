@@ -150,8 +150,17 @@ class SvgCompositor:
     def _inline_font(family: str, data: bytes) -> str:
         if not _FONT_FAMILY.fullmatch(family):
             raise ProtocolError("COMPOSITE_FONT_FAMILY_INVALID", family)
-        if not data.startswith(b"wOF2"):
+        if data.startswith(b"wOF2"):
+            mime, font_format = "font/woff2", "woff2"
+        elif data.startswith(b"\x00\x01\x00\x00") or data.startswith(b"true"):
+            mime, font_format = "font/ttf", "truetype"
+        elif data.startswith(b"OTTO"):
+            mime, font_format = "font/otf", "opentype"
+        else:
             raise ProtocolError("COMPOSITE_FONT_FORMAT_UNSUPPORTED", family)
         encoded = base64.b64encode(data).decode("ascii")
         safe_family = html.escape(family, quote=True)
-        return f'<style>@font-face{{font-family:"{safe_family}";src:url("data:font/woff2;base64,{encoded}")}}</style>'
+        return (
+            f'<style>@font-face{{font-family:"{safe_family}";src:url("data:{mime};base64,{encoded}") '
+            f'format("{font_format}");font-weight:100 900}}svg,text{{font-family:"{safe_family}"}}</style>'
+        )

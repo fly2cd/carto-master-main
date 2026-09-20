@@ -16,7 +16,14 @@ if str(SCRIPTS_ROOT) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_ROOT))
 
 from carto_core.errors import SecurityError
-from carto_core.security.approval import ApprovalReceipt, InMemoryNonceStore, SqliteNonceStore, sign_receipt, verify_receipt
+from carto_core.security.approval import (
+    ApprovalReceipt,
+    InMemoryNonceStore,
+    SqliteNonceStore,
+    sign_receipt,
+    verify_consumed_receipt,
+    verify_receipt,
+)
 from carto_core.security.authorization import Action, Role, SubjectContext, authorize
 from carto_core.security.paths import PathGuard
 from carto_core.security.sensitive import DataClassification, ExternalAccessPolicy, redact_for_log
@@ -87,6 +94,28 @@ class ApprovalTests(unittest.TestCase):
             with self.assertRaises(SecurityError) as raised:
                 verify_receipt(receipt, key, SqliteNonceStore(database), **self._verification_kwargs())
             self.assertEqual(raised.exception.code, "APPROVAL_REPLAYED")
+
+    def test_consumed_receipt_can_be_verified_for_recovery_without_replay(self) -> None:
+        key = b"test-only-secret-that-is-at-least-32-bytes"
+        receipt = sign_receipt(self._receipt(), key)
+        with tempfile.TemporaryDirectory() as temp:
+            database = str(Path(temp) / "approval-nonces.sqlite3")
+            verify_receipt(receipt, key, SqliteNonceStore(database), **self._verification_kwargs())
+            verify_consumed_receipt(
+                receipt, key, SqliteNonceStore(database), **self._verification_kwargs()
+            )
+            with self.assertRaises(SecurityError) as replay:
+                verify_receipt(receipt, key, SqliteNonceStore(database), **self._verification_kwargs())
+            self.assertEqual("APPROVAL_REPLAYED", replay.exception.code)
+
+    def test_recovery_rejects_receipt_whose_nonce_was_not_consumed(self) -> None:
+        key = b"test-only-secret-that-is-at-least-32-bytes"
+        receipt = sign_receipt(self._receipt(), key)
+        with self.assertRaises(SecurityError) as raised:
+            verify_consumed_receipt(
+                receipt, key, InMemoryNonceStore(), **self._verification_kwargs()
+            )
+        self.assertEqual("APPROVAL_NONCE_NOT_CONSUMED", raised.exception.code)
 
     def test_approval_context_must_match(self) -> None:
         key = b"test-only-secret-that-is-at-least-32-bytes"

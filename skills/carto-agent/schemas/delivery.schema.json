@@ -1,18 +1,46 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schemas.carto-agent.local/v1/delivery.schema.json",
-  "type": "object", "additionalProperties": false,
+  "type": "object",
+  "additionalProperties": false,
   "required": ["schema_version", "targets", "rules"],
   "properties": {
     "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
-    "targets": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["id", "medium", "format", "color_mode"], "properties": {
-      "id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
-      "medium": {"enum": ["print", "report", "atlas", "web", "mobile"]},
-      "format": {"enum": ["pdf", "png"]},
-      "page": {"type": "object", "additionalProperties": false, "required": ["width_mm", "height_mm", "dpi", "safe_margin_mm"], "properties": {"width_mm": {"type": "number", "exclusiveMinimum": 0}, "height_mm": {"type": "number", "exclusiveMinimum": 0}, "dpi": {"type": "integer", "minimum": 72, "maximum": 1200}, "safe_margin_mm": {"type": "number", "minimum": 0}, "bleed_mm": {"type": "number", "minimum": 0}}},
-      "color_mode": {"enum": ["rgb", "cmyk-approved"]},
-      "font_policy": {"enum": ["embed-approved", "outline-approved", "system-resolved"]}
-    }}},
+    "targets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "delivery_class", "format", "composition", "vector_claim", "page", "color_mode", "font_policy", "production_ready"],
+        "properties": {
+          "id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+          "delivery_class": {"const": "engineering-preview"},
+          "format": {"enum": ["svg", "pdf", "png"]},
+          "composition": {"enum": ["raster-map-vector-overlay", "flattened-raster"]},
+          "vector_claim": {"enum": ["overlay-only", "none"]},
+          "page": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["width_mm", "height_mm", "orientation", "dpi", "safe_margin_mm"],
+            "properties": {
+              "width_mm": {"const": 420},
+              "height_mm": {"const": 297},
+              "orientation": {"const": "landscape"},
+              "dpi": {"type": "integer", "minimum": 72, "maximum": 600},
+              "safe_margin_mm": {"type": "number", "minimum": 0, "maximum": 50}
+            }
+          },
+          "color_mode": {"const": "rgb"},
+          "font_policy": {"enum": ["embed-approved", "outline-approved", "system-resolved"]},
+          "production_ready": {"const": false}
+        },
+        "allOf": [
+          {"if": {"properties": {"format": {"const": "png"}}}, "then": {"properties": {"composition": {"const": "flattened-raster"}, "vector_claim": {"const": "none"}}}},
+          {"if": {"properties": {"format": {"enum": ["svg", "pdf"]}}}, "then": {"properties": {"composition": {"const": "raster-map-vector-overlay"}, "vector_claim": {"const": "overlay-only"}}}}
+        ]
+      }
+    },
     "rules": {"type": "array", "items": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/rule"}}
   }
 }

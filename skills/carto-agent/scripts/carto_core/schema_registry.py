@@ -24,14 +24,14 @@ def load_document(path: Path) -> Any:
     if path.stat().st_size > MAX_DOCUMENT_BYTES:
         raise SecurityError("DOCUMENT_TOO_LARGE", f"Document exceeds {MAX_DOCUMENT_BYTES} bytes")
     suffix = path.suffix.lower()
-    if suffix not in {".json", ".yaml", ".yml"}:
+    if suffix not in {".json", ".geojson", ".yaml", ".yml"}:
         raise ProtocolError("DOCUMENT_TYPE_UNSUPPORTED", f"Unsupported document type: {suffix}")
     try:
         text = path.read_text(encoding="utf-8")
     except UnicodeDecodeError as exc:
         raise ProtocolError("DOCUMENT_ENCODING_INVALID", "Document must be UTF-8") from exc
     try:
-        value = json.loads(text) if suffix == ".json" else yaml.safe_load(text)
+        value = json.loads(text) if suffix in {".json", ".geojson"} else yaml.safe_load(text)
     except (json.JSONDecodeError, yaml.YAMLError) as exc:
         raise ProtocolError("DOCUMENT_PARSE_FAILED", str(exc)) from exc
     _check_depth(value)

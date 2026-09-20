@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/map-preview-evidence.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_id",
+    "project_id",
+    "run_id",
+    "candidate_digest",
+    "candidate_execution_digest",
+    "render_scene_digest",
+    "render_receipt_ref",
+    "render_execution_digest",
+    "environment_fingerprint",
+    "output_artifacts",
+    "checks",
+    "status",
+    "created_at",
+    "evidence_digest"
+  ],
+  "properties": {
+    "schema_version": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"
+    },
+    "evidence_id": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+    },
+    "project_id": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+    },
+    "run_id": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+    },
+    "candidate_digest": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+    },
+    "candidate_execution_digest": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+    },
+    "render_scene_digest": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+    },
+    "render_receipt_ref": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+    },
+    "render_execution_digest": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+    },
+    "environment_fingerprint": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+    },
+    "output_artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "target",
+          "artifact_ref"
+        ],
+        "properties": {
+          "target": {
+            "enum": [
+              "svg",
+              "pdf",
+              "png"
+            ]
+          },
+          "artifact_ref": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+          }
+        }
+      }
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "check_id",
+          "owner",
+          "status",
+          "severity"
+        ],
+        "properties": {
+          "check_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "owner": {
+            "enum": [
+              "template",
+              "data",
+              "plan",
+              "adapter"
+            ]
+          },
+          "status": {
+            "enum": [
+              "passed",
+              "failed"
+            ]
+          },
+          "severity": {
+            "enum": [
+              "blocker",
+              "error",
+              "warning",
+              "info"
+            ]
+          },
+          "details": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "status": {
+      "enum": [
+        "passed",
+        "failed"
+      ]
+    },
+    "created_at": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/timestamp"
+    },
+    "evidence_digest": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+    }
+  }
+}

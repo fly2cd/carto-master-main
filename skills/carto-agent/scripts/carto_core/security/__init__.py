@@ -5,7 +5,9 @@ from .approval import (
     InMemoryNonceStore,
     SqliteNonceStore,
     sign_receipt,
+    verify_consumed_receipt,
     verify_receipt,
+    verify_receipt_claims,
 )
 from .authorization import Action, Role, SubjectContext, authorize
 from .paths import PathGuard
@@ -24,5 +26,7 @@ __all__ = [
     "authorize",
     "redact_for_log",
     "sign_receipt",
+    "verify_consumed_receipt",
     "verify_receipt",
+    "verify_receipt_claims",
 ]

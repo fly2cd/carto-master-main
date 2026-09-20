@@ -1,0 +1,86 @@
+schema_version: 1
+catalog_id: carto-map-expressions
+version: 1.0.0
+entries:
+  - schema_version: 1
+    expression_id: choropleth/sequential
+    version: 1.0.0
+    title: Sequential choropleth
+    status: active
+    geometry_types: [polygon]
+    field_requirements:
+      - semantic_role: thematic-value
+        value_type: number
+        required: true
+        nullable: true
+    parameter_definitions:
+      - name: classification-method
+        type: enum
+        required: true
+        default: quantile
+        allowed_values: [equal-interval, quantile, jenks, manual]
+      - name: class-count
+        type: integer
+        required: true
+        default: 5
+        minimum: 2
+        maximum: 12
+    visual_variables:
+      - variable: fill-color
+        source_role: thematic-value
+        algorithm_id: sequential-classification
+    legend:
+      type: classed-color
+      show_no_data: true
+      label_source: class-breaks
+    missing_value_policy: explicit-symbol
+    outlier_policy: clip-to-domain
+    checker_refs:
+      - id: protocol.schema-valid
+        version: 1.0.0
+    fixture_refs:
+      - id: synthetic-choropleth-fixture
+        version: 1.0.0
+        digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  - schema_version: 1
+    expression_id: proportional-symbol/count
+    version: 1.0.0
+    title: Count proportional symbols
+    status: active
+    geometry_types: [point]
+    field_requirements:
+      - semantic_role: count-value
+        value_type: number
+        required: true
+        nullable: false
+        minimum: 0
+    parameter_definitions:
+      - name: minimum-size-mm
+        type: number
+        required: true
+        default: 2
+        minimum: 0.1
+        maximum: 50
+      - name: maximum-size-mm
+        type: number
+        required: true
+        default: 12
+        minimum: 0.1
+        maximum: 50
+    visual_variables:
+      - variable: symbol-area
+        source_role: count-value
+        algorithm_id: area-proportional-scaling
+    legend:
+      type: graduated-size
+      show_no_data: true
+      label_source: representative-values
+    missing_value_policy: explicit-symbol
+    outlier_policy: clip-to-domain
+    checker_refs:
+      - id: protocol.schema-valid
+        version: 1.0.0
+    fixture_refs:
+      - id: synthetic-proportional-fixture
+        version: 1.0.0
+        digest: sha256:0000000000000000000000000000000000000000000000000000000000000000

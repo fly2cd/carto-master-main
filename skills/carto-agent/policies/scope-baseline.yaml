@@ -1,23 +1,39 @@
 schema_version: 1
-baseline_id: first-production-scope
-version: 0.1.0
+baseline_id: first-vertical-slice-scope
+version: 0.2.0
 status: pending_trusted_approval
-prepared_at: 2026-09-14
+prepared_at: 2026-09-17
 deployment:
   mode: controlled-single-host
   trust_boundary: authenticated-operating-system-user
   enterprise_shared_service: not-claimed
 first_vertical_slice:
   scenario: emergency-mapping-flood
-  source_formats: [geopackage, geojson, csv]
-  required_portrayals: [choropleth-risk, point-shelter]
-  outputs: [a3-svg, a3-pdf, a3-png]
+  data_nature: simulated-only
+  request_formats: [yaml, json]
+  dataset_formats: [geojson, csv]
+  metadata_formats: [yaml, json]
+  unsupported_source_formats: [geopackage, qgis-project, shapefile, geotiff, database, live-api]
+  required_map_expressions: [choropleth/sequential, proportional-symbol/count]
+  required_symbol_resources: [point-symbol/shelter]
+  source_crs: EPSG:4326
+  display_crs: EPSG:3857
+  output_profile:
+    id: print-a3-landscape-preview
+    page_width_mm: 420
+    page_height_mm: 297
+    preview_formats: [svg, pdf, png]
+    map_content: rasterized-map-image
+    overlay_content: vector-svg-overlay
+    pdf_claim: preview-only-not-vector-pdf
+    formal_delivery: not-in-u-p2
+  renderer: controlled-maplibre-web
 formal_capability_boundary:
   scenes: [government_thematic, emergency_mapping, leadership_visit]
   production_tasks: []
   note: 每项生产任务须在 U-P4 的正式能力矩阵通过后加入，不能由本基线提前声明。
-  unavailable: [hazard-prediction, remote-sensing-auto-extraction, command-decision, public-web-publishing, native-gis-editing, vector-pdf-export]
-  note_2: 地图画面为栅格嵌入 SVG，overlay 部分为矢量；矢量 PDF 导出暂不支持。
+  unavailable: [hazard-prediction, remote-sensing-auto-extraction, command-decision, public-web-publishing, native-gis-editing, vector-pdf-export, geopackage-input, qgis-project-input]
+  note_2: U-P2 的地图主体可作为栅格图像嵌入 SVG，overlay 可保持矢量；PDF 仅为工程预览，不声明全矢量输出。
 model_boundary:
   host: application-managed
   public_model_sensitive_data: forbidden
@@ -30,8 +46,8 @@ acceptance_roles:
   protocol_owner: carto-platform
   security_approver: pending-assignment
   business_approver: pending-assignment
-  evidence_root: reports/u-p0
-  decision_deadline: before-production-capability-enable
+  evidence_root: reports/u-p2/scope-baseline
+  decision_deadline: before-u-p2-capability-enable
 approval_required:
   action: approve-scope-baseline
   object_type: scope-baseline

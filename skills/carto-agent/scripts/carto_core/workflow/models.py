@@ -87,6 +87,7 @@ class StepReceipt:
 @dataclass(frozen=True, slots=True)
 class JobState:
     schema_version: int
+    revision: int
     status: str
     step: str
     attempt: int
