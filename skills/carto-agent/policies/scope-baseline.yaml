@@ -1,8 +1,8 @@
 schema_version: 1
 baseline_id: first-vertical-slice-scope
-version: 0.2.0
-status: pending_trusted_approval
-prepared_at: 2026-09-17
+version: 0.3.3
+status: u-p3-local-synthetic-delivery-enabled
+prepared_at: 2026-09-21
 deployment:
   mode: controlled-single-host
   trust_boundary: authenticated-operating-system-user
@@ -26,8 +26,45 @@ first_vertical_slice:
     map_content: rasterized-map-image
     overlay_content: vector-svg-overlay
     pdf_claim: preview-only-not-vector-pdf
-    formal_delivery: not-in-u-p2
+    formal_delivery: local-synthetic-demo-only
   renderer: controlled-maplibre-web
+formal_render:
+  enabled: true
+  source_of_truth: map-spec-lock
+  required_formats: [pdf, png]
+  output_layout: output/<lock-id>/formal-map/<attempt-id>/
+  synthetic_data_notice: 合成数据演示，非真实风险研判
+  next_state: pending/check
+  quality_checked: false
+  delivery_enabled: false
+final_check:
+  enabled: true
+  checker_registry_version: 1.1.0
+  required_formats: [pdf, png]
+  output_profile:
+    page_width_mm: 420
+    page_height_mm: 297
+    dpi: 144
+    png_width_px: 2381
+    png_height_px: 1684
+  report_layout: final-checks/<attempt-id>/validation-report.yaml
+  manifest_layout: delivery-manifests/<manifest-id>.yaml
+  next_state: waiting_approval/deliver
+  consumes_g3: false
+  destination_side_effects: false
+  delivery_receipt_enabled: false
+delivery:
+  enabled: true
+  mode: local-allowed-root
+  journal_layout: .carto/delivery/
+  package_files: [map.pdf, map.png, README.md, delivery-manifest.yaml, checksums.sha256]
+  atomic_directory_commit: true
+  consumes_g3: true
+  transaction_enabled: true
+  delivery_receipt_enabled: true
+  status_query_by_idempotency_key: true
+  synthetic_data_only: true
+  external_publish: false
 formal_capability_boundary:
   scenes: [government_thematic, emergency_mapping, leadership_visit]
   production_tasks: []
@@ -46,8 +83,8 @@ acceptance_roles:
   protocol_owner: carto-platform
   security_approver: pending-assignment
   business_approver: pending-assignment
-  evidence_root: reports/u-p2/scope-baseline
-  decision_deadline: before-u-p2-capability-enable
+  evidence_root: reports/u-p3/prerequisites
+  decision_deadline: before-production-capability-enable
 approval_required:
   action: approve-scope-baseline
   object_type: scope-baseline

@@ -1,0 +1,17 @@
+schema_version: 1
+prototype_id: risk-overview
+status: pending-validation
+render_required: true
+renderer_execution: not-run
+layout_id: a3-landscape
+target_ids:
+- a3-svg
+- a3-pdf
+- a3-png
+layer_ids:
+- risk-layer
+- shelter-layer
+fixture_ref: fixtures/flood-risk.synthetic.geojson
+limitations:
+- No browser renderer is executed in U-P2.2.
+- The fixture is synthetic and is not suitable for operational emergency decisions.

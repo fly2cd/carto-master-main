@@ -116,7 +116,7 @@ class MapGenerationWorkflowTests(unittest.TestCase):
                         "namespace": "local", "approver_subject_id": "reviewer-one"},
             "idempotency_key": f"generate-{suffix}-00000001", "scope": f"project:project-{suffix}",
             "environment": "local", "requested_at": now,
-            "template": {"namespace": "local", "kind": "map-scenario", "id": "flood-scenario",
+            "template": {"namespace": "local", "kind": "map-scenario", "id": "urban-flood-risk",
                          "version": "1.0.0", "digest": self.template_digest},
             "allowed_capabilities": ["read", "filter", "classify", "render-preview"],
             "source_bindings": [
@@ -323,7 +323,8 @@ class MapGenerationWorkflowTests(unittest.TestCase):
             nonce_db="g2.sqlite3", policy_id="carto-security", issuer="trusted-local",
         )
         self.assertTrue(recovered["idempotent_replay"])
-        self.assertEqual("succeeded", recovered["state"]["status"])
+        self.assertEqual("pending", recovered["state"]["status"])
+        self.assertEqual("render", recovered["state"]["step"])
         self.assertEqual(original_bytes, lock_path.read_bytes())
         self.assertEqual(
             sha256_digest(recovered["lock"]),
@@ -563,7 +564,8 @@ class MapGenerationWorkflowTests(unittest.TestCase):
         g2 = self._approval(project, request, g2_digest, gate="G2", nonce="map-g2-freeze-00000001")
         frozen = workflow.freeze(request_path, g2, approval_key=APPROVAL_KEY, attestation_key=RENDER_KEY,
                                  nonce_db="g2.sqlite3", policy_id="carto-security", issuer="trusted-local")
-        self.assertEqual("succeeded", frozen["state"]["status"])
+        self.assertEqual("pending", frozen["state"]["status"])
+        self.assertEqual("render", frozen["state"]["step"])
         self.assertEqual(compiled["candidate"]["execution"], frozen["lock"]["execution"])
         self.assertEqual(preview["evidence"]["evidence_digest"], frozen["lock"]["preview_evidence_digest"])
         self.assertFalse((project / "generation/delivery").exists())

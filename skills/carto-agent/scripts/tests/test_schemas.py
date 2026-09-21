@@ -14,7 +14,7 @@ from carto_core.compiler.dependencies import DependencyResolver
 from carto_core.compiler.ownership import OwnershipResolver
 from carto_core.errors import ProtocolError
 from carto_core.schema_registry import SchemaRegistry, load_document
-from tests.fixtures.schema_cases import INVALID_CASES, SEMANTIC_INVALID_CASES, VALID_CASES
+from tests.fixtures.schema_cases import A, D, INVALID_CASES, SEMANTIC_INVALID_CASES, VALID_CASES
 
 
 class SchemaTests(unittest.TestCase):
@@ -44,6 +44,75 @@ class SchemaTests(unittest.TestCase):
                 with self.assertRaises(ProtocolError):
                     self.registry.validate(schema_name, instance)
 
+    def test_final_check_report_requires_complete_frozen_evidence(self) -> None:
+        report = deepcopy(VALID_CASES["validation-report"])
+        report.update({
+            "report_id": "final-check-one",
+            "phase": "final-check",
+            "subject_ref": A,
+            "checker_set_digest": D,
+            "checked_artifacts": [
+                {"target": "pdf", "artifact_ref": A, "size_bytes": 1024, "media_type": "application/pdf"},
+                {"target": "png", "artifact_ref": A, "size_bytes": 2048, "media_type": "image/png"},
+            ],
+            "counts": {
+                "blocker": 1, "error": 0, "warning": 1, "info": 0,
+                "failed_blocker": 0, "failed_error": 0, "failed_warning": 0,
+            },
+            "results": [
+                {"check_id": "final.artifact-integrity", "version": "1.0.0", "status": "passed", "severity": "blocker", "details": {}},
+                {"check_id": "final.renderer-warnings", "version": "1.0.0", "status": "passed", "severity": "warning", "disposition": "accepted", "details": {}},
+            ],
+        })
+        self.registry.validate("validation-report", report)
+        for field in ("subject_ref", "checker_set_digest", "checked_artifacts", "counts"):
+            with self.subTest(missing=field):
+                invalid = deepcopy(report)
+                invalid.pop(field)
+                with self.assertRaises(ProtocolError):
+                    self.registry.validate("validation-report", invalid)
+        warning_without_disposition = deepcopy(report)
+        warning_without_disposition["results"][1].pop("disposition")
+        with self.assertRaises(ProtocolError):
+            self.registry.validate("validation-report", warning_without_disposition)
+        unknown = deepcopy(report)
+        unknown["unexpected"] = True
+        with self.assertRaises(ProtocolError):
+            self.registry.validate("validation-report", unknown)
+
+    def test_delivery_manifest_requires_tenant_and_licenses(self) -> None:
+        manifest = VALID_CASES["delivery-manifest"]
+        self.registry.validate("delivery-manifest", manifest)
+        for field in ("tenant_id", "licenses"):
+            with self.subTest(missing=field):
+                invalid = deepcopy(manifest)
+                invalid.pop(field)
+                with self.assertRaises(ProtocolError):
+                    self.registry.validate("delivery-manifest", invalid)
+        unknown = deepcopy(manifest)
+        unknown["unexpected"] = True
+        with self.assertRaises(ProtocolError):
+            self.registry.validate("delivery-manifest", unknown)
+    def test_delivery_transaction_and_receipt_require_commit_bindings(self) -> None:
+        transaction = VALID_CASES["delivery-transaction"]
+        receipt = VALID_CASES["delivery-receipt"]
+        self.registry.validate("delivery-transaction", transaction)
+        self.registry.validate("delivery-receipt", receipt)
+        for schema_name, fixture, fields in (
+            ("delivery-transaction", transaction, ("manifest_ref", "approval_ref", "final_path")),
+            ("delivery-receipt", receipt, ("manifest_ref", "g3_approval_ref", "final_path", "artifacts")),
+        ):
+            for field in fields:
+                with self.subTest(schema=schema_name, missing=field):
+                    invalid = deepcopy(fixture)
+                    invalid.pop(field)
+                    with self.assertRaises(ProtocolError):
+                        self.registry.validate(schema_name, invalid)
+            with self.subTest(schema=schema_name, unknown="unexpected"):
+                invalid = deepcopy(fixture)
+                invalid["unexpected"] = True
+                with self.assertRaises(ProtocolError):
+                    self.registry.validate(schema_name, invalid)
     def test_candidate_and_lock_share_identical_execution_contract(self) -> None:
         candidate = VALID_CASES["resolved-map"]
         lock = VALID_CASES["map-spec-lock"]
@@ -135,7 +204,7 @@ class SchemaTests(unittest.TestCase):
             "segment": "cartography",
             "value": {"style_id": "replacement-only"},
             "compatibility": {
-                "scenario_ids": ["flood-scenario"],
+                "scenario_ids": ["urban-flood-risk"],
                 "target_profiles": ["a3-landscape"],
                 "data_roles": ["risk-area"],
                 "placeholders": ["{{MAP_FRAME}}"],

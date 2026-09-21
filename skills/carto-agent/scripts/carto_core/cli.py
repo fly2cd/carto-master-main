@@ -124,7 +124,7 @@ def build_parser() -> argparse.ArgumentParser:
     unavailable = create_sub.add_parser("render", help="Standalone rendering is not a template workflow step")
     _add_template_paths(unavailable, request=False)
 
-    generate = sub.add_parser("generate-map", help="Run the U-P2 map generation workflow")
+    generate = sub.add_parser("generate-map", help="Run the map generation workflow")
     generate_sub = generate.add_subparsers(dest="generate_command", required=True)
     for name, help_text in (
         ("intake", "Validate and register a map generation request"),
@@ -132,6 +132,9 @@ def build_parser() -> argparse.ArgumentParser:
         ("compile", "Install the exact template and compile a map candidate"),
         ("preview", "Render and attest the candidate preview"),
         ("freeze", "Verify G2 approval and create an immutable MapSpecLock"),
+        ("render", "Render immutable formal PDF/PNG outputs from MapSpecLock"),
+        ("check", "Check formal outputs and freeze the G3 delivery manifest"),
+        ("deliver", "Verify G3 and atomically commit the local delivery package"),
     ):
         item = generate_sub.add_parser(name, help=help_text)
         item.add_argument("request")
@@ -140,19 +143,25 @@ def build_parser() -> argparse.ArgumentParser:
         item.add_argument("--repository-root", required=True)
         item.add_argument("--repository-scope", required=True)
         item.add_argument("--allowed-root", action="append", required=True)
-        if name in {"compile", "freeze"}:
+        if name in {"compile", "freeze", "deliver"}:
             item.add_argument("--approval", required=True)
             item.add_argument("--key-env", default="CARTO_APPROVAL_HMAC_KEY")
             item.add_argument("--nonce-db", required=True)
             item.add_argument("--policy-id", default="carto-security")
             item.add_argument("--issuer", required=True)
-        if name in {"preview", "freeze"}:
+        if name in {"preview", "freeze", "render", "check"}:
             item.add_argument("--attestation-key-env", default="CARTO_RENDER_ATTESTATION_KEY")
             item.add_argument("--browser")
+        if name == "check":
+            item.add_argument("--recipient-id", required=True)
+            item.add_argument("--recipient-type", choices=("project-user", "project-team"), required=True)
+            item.add_argument("--destination", required=True)
+            item.add_argument("--idempotency-key", required=True)
     for name, help_text in (
         ("status", "Read current map generation state"),
         ("retry", "Retry the current failed map generation step"),
         ("receipts", "Read immutable map generation receipts"),
+        ("delivery-status", "Query a delivery transaction by idempotency key"),
     ):
         item = generate_sub.add_parser(name, help=help_text)
         item.add_argument("--project-root", required=True)
@@ -160,6 +169,8 @@ def build_parser() -> argparse.ArgumentParser:
         item.add_argument("--repository-root", required=True)
         item.add_argument("--repository-scope", required=True)
         item.add_argument("--allowed-root", action="append", required=True)
+        if name == "delivery-status":
+            item.add_argument("--idempotency-key", required=True)
     return parser
 
 
@@ -248,6 +259,30 @@ def main(argv: list[str] | None = None) -> int:
                     nonce_db=args.nonce_db, policy_id=args.policy_id, issuer=args.issuer,
                     browser=args.browser,
                 ))
+            if args.generate_command == "render":
+                return _success(workflow.render(
+                    args.request,
+                    attestation_key=os.environ.get(args.attestation_key_env, "").encode("utf-8"),
+                    browser=args.browser,
+                ))
+            if args.generate_command == "check":
+                return _success(workflow.check(
+                    args.request,
+                    attestation_key=os.environ.get(args.attestation_key_env, "").encode("utf-8"),
+                    browser=args.browser,
+                    recipient_id=args.recipient_id,
+                    recipient_type=args.recipient_type,
+                    destination=args.destination,
+                    idempotency_key=args.idempotency_key,
+                ))
+            if args.generate_command == "deliver":
+                return _success(workflow.deliver(
+                    args.request, args.approval,
+                    approval_key=os.environ.get(args.key_env, "").encode("utf-8"),
+                    nonce_db=args.nonce_db, policy_id=args.policy_id, issuer=args.issuer,
+                ))
+            if args.generate_command == "delivery-status":
+                return _success(workflow.delivery_status(args.idempotency_key))
             if args.generate_command == "status":
                 return _success(workflow.status())
             if args.generate_command == "retry":

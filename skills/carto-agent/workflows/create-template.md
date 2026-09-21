@@ -8,6 +8,7 @@
 - `validate` 先执行模板包闭合、Schema、依赖锁、类型所有权、业务语义和目标能力校验；静态检查通过后，才使用合成 Fixture 生成 SVG、PNG、PDF 预览及带签名的 RenderReceipt。
 - `publish` 会重新核验模板包、依赖锁、Fixture、检查器集合、RenderReceipt、预览成果和渲染器环境绑定，再验证 TP `approve-template-publish` 回执并写入不可变模板仓库及权威索引。
 - 已发布模板使用 `namespace + kind + id + version` 精确标识；同版本内容不可覆盖，发布请求必须携带幂等键。
+- Skill 内置 `local/map-scenario/urban-flood-risk/1.0.0` 的 `draft` 合成示例包，位于 `templates/`；它仅用于开发与回归验证，不属于 `TemplateRepository` 权威发布仓库，也不能绕过 `validate → TP → publish` 成为运行时模板。
 
 ## 能力边界
 

@@ -1,0 +1,43 @@
+schema_version: 1
+package:
+  namespace: local
+  kind: map-scenario
+  id: urban-flood-risk
+  version: 1.0.0
+  status: draft
+  summary: Synthetic urban flood-risk engineering preview
+business_contracts:
+  scenario: contracts/scenario.yaml
+  data_schema: contracts/data.schema.yaml
+  spatial_behavior: contracts/spatial-behavior.yaml
+  portrayal: contracts/portrayal.yaml
+  delivery: contracts/delivery.yaml
+  quality_gates: contracts/quality-gates.yaml
+dependencies: []
+dependency_lock: dependencies.lock.yaml
+targets:
+- svg
+- pdf
+- png
+files:
+- contracts/data.schema.yaml
+- contracts/delivery.yaml
+- contracts/portrayal.yaml
+- contracts/quality-gates.yaml
+- contracts/scenario.yaml
+- contracts/spatial-behavior.yaml
+- dependencies.lock.yaml
+- fixtures/flood-risk.synthetic.geojson
+- prototypes/risk-overview.yaml
+- templates/design_spec.md
+checksums:
+  contracts/data.schema.yaml: sha256:d0d309e7b0e69bf07ab4938dcdbecd7f890374a3ffa847fb05b747530cee3874
+  contracts/delivery.yaml: sha256:971120fe52a25094eb5db1c7a8d6c7c3fbfcf9465a04ca35bfa69678375a0d16
+  contracts/portrayal.yaml: sha256:b5c425dca493fef0d31a9083ee3d3f7f30ac3000117a97c7b6cf0808a12885b2
+  contracts/quality-gates.yaml: sha256:93fc3be05d4cedc415cfd6ca9d817abfcf8dead842b2d5274f2785c207aa1c7d
+  contracts/scenario.yaml: sha256:c7ef7ecbe44cee9e31a5ccf5bbf4b810c9612699078289d12b0e1f5c4ae4f44b
+  contracts/spatial-behavior.yaml: sha256:d4ea49fceeb5850d991a89e34c0cbc98d976dd5af984e9fb974e0b8b7e6e9b25
+  dependencies.lock.yaml: sha256:a1c573380fbecfe04b87483f3af97669bcce104705579bdd53cbaaa75d6cd71e
+  fixtures/flood-risk.synthetic.geojson: sha256:f0834e8ef3ee4c0cb83394b60f86ea34fbc591d126314beaa34503edd42b8cd9
+  prototypes/risk-overview.yaml: sha256:1235ab40564a82727c64304fae1f90253ccdd80bfbf72baa966e3782b5881410
+  templates/design_spec.md: sha256:5433c77fb6edf271962a69672adffd4ef8713c215b349d3a6ab09abe40cb4592

@@ -99,7 +99,10 @@ class MapCandidateCompiler:
         counts = sorted(float(item["properties"]["count_value"]) for item in shelters["features"])
         breaks = self._quantile_breaks(values, plan["decisions"]["class_count"])
         colors = PALETTE[:max(1, len(breaks) - 1)]
-        legend = self._legend(breaks, colors)
+        legend = [
+            *self._legend(breaks, colors),
+            {"label": "无数据", "color": "#D1D5DB", "symbol": "fill"},
+        ]
         scene = self._scene(request, plan, bundle, installation, contracts, font_path, breaks, colors, counts, legend)
         scene = WebMapRendererAdapter().compile_scene(scene)
 
@@ -185,9 +188,9 @@ class MapCandidateCompiler:
             "renderer_requirements": {"renderer_id": "maplibre-web", "require_webgl": True,
                 "require_offline_rendering": True, "required_capabilities": ["svg-overlay", "headless-export"],
                 "required_fonts": [request["font"]["family"]], "minimum_device_pixel_ratio": 1},
-            "viewport": {"width_px": 1120, "height_px": 792, "device_pixel_ratio": 1, "background": "#F8FAFC"},
+            "viewport": {"width_px": 2381, "height_px": 1684, "device_pixel_ratio": 1, "background": "#F8FAFC"},
             "camera": {"bounds": extent, "bearing": 0, "pitch": 0,
-                       "padding": {"top": 72, "right": 250, "bottom": 72, "left": 72}},
+                       "padding": {"top": 153, "right": 532, "bottom": 153, "left": 153}},
             "map": {"style_ref": {"id": "compiled-style", "version": installation["template_ref"]["version"],
                                     "digest": sha256_digest(contracts["scenario"]["embedded"]["cartography"])},
                     "sources": sources,
@@ -201,16 +204,22 @@ class MapCandidateCompiler:
                     ]},
             "overlays": [
                 {"id": "title", "type": "text", "coordinate_space": "page",
-                 "position": {"x": 48, "y": 42, "unit": "pixel"}, "content": plan["decisions"]["title"],
+                 "position": {"x": 102, "y": 89, "unit": "pixel"}, "content": plan["decisions"]["title"],
                  "style_role": "map-title"},
                 {"id": "legend", "type": "legend", "coordinate_space": "page",
-                 "position": {"x": 890, "y": 110, "unit": "pixel"},
-                 "legend_items": [*legend, {"label": "????????", "color": "#087E8B", "symbol": "circle"}]},
+                 "position": {"x": 1892, "y": 234, "unit": "pixel"},
+                 "legend_items": [*legend, {"label": "避难场所（容纳人数）", "color": "#087E8B", "symbol": "circle"}]},
                 {"id": "north", "type": "north-arrow", "coordinate_space": "page",
-                 "position": {"x": 1030, "y": 55, "unit": "pixel"}},
+                 "position": {"x": 2190, "y": 117, "unit": "pixel"}},
+                {"id": "scale", "type": "scale-bar", "coordinate_space": "page",
+                 "position": {"x": 153, "y": 1565, "unit": "pixel"},
+                 "length_px": 298, "distance_label": "合成比例尺"},
                 {"id": "source", "type": "attribution", "coordinate_space": "page",
-                 "position": {"x": 760, "y": 760, "unit": "pixel"},
-                 "content": "??????????????", "style_role": "source-note"},
+                 "position": {"x": 1616, "y": 1615, "unit": "pixel"},
+                 "content": "数据来源：纯合成数据", "style_role": "source-note"},
+                {"id": "synthetic-data-notice", "type": "text", "coordinate_space": "page",
+                 "position": {"x": 102, "y": 1615, "unit": "pixel"},
+                 "content": "合成数据演示，非真实风险研判", "style_role": "synthetic-data-notice"},
             ],
             "resources": resources, "export": {"targets": sorted(request["requested_outputs"]), "dpi": 144},
             "random_seed": RANDOM_SEED,
@@ -269,7 +278,7 @@ class MapCandidateCompiler:
     def _legend(breaks: list[float], colors: list[str]) -> list[dict[str, Any]]:
         if len(breaks) == 1:
             return [{"label": f"{breaks[0]:g}%", "color": colors[0], "symbol": "fill"}]
-        return [{"label": f"{low:g}% ? {high:g}%", "color": colors[index], "symbol": "fill"}
+        return [{"label": f"{low:g}% ～ {high:g}%", "color": colors[index], "symbol": "fill"}
                 for index, (low, high) in enumerate(zip(breaks[:-1], breaks[1:]))]
 
     @staticmethod

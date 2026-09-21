@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/formal-render-evidence.schema.json",
+  "title": "Evidence for a successful lock-driven formal render",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "evidence_id", "project_id", "run_id", "lock_ref", "lock_digest",
+    "business_execution_digest", "attempt_ref", "attempt_digest", "render_scene_digest",
+    "renderer_profile_digest", "renderer_execution_digest", "resource_set_digest",
+    "environment_fingerprint", "render_receipt_ref", "output_artifacts",
+    "required_targets", "synthetic_data_notice", "quality_status", "created_at", "evidence_digest"
+  ],
+  "properties": {
+    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
+    "evidence_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "project_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "run_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "lock_ref": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"},
+    "lock_digest": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"},
+    "business_execution_digest": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"},
+    "attempt_ref": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"},
+    "attempt_digest": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"},
+    "render_scene_digest": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"},
+    "renderer_profile_digest": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"},
+    "renderer_execution_digest": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"},
+    "resource_set_digest": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"},
+    "environment_fingerprint": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"},
+    "render_receipt_ref": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"},
+    "output_artifacts": {
+      "type": "array", "minItems": 2,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["target", "artifact_ref", "size_bytes", "media_type"],
+        "properties": {
+          "target": {"enum": ["svg", "png", "pdf"]},
+          "artifact_ref": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"},
+          "size_bytes": {"type": "integer", "minimum": 1},
+          "media_type": {"enum": ["image/svg+xml", "image/png", "application/pdf"]}
+        }
+      }
+    },
+    "required_targets": {
+      "type": "array", "minItems": 2, "maxItems": 2, "uniqueItems": true,
+      "items": {"enum": ["pdf", "png"]}, "contains": {"const": "pdf"}, "minContains": 1
+    },
+    "synthetic_data_notice": {"const": "合成数据演示，非真实风险研判"},
+    "quality_status": {"const": "not-checked"},
+    "created_at": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/timestamp"},
+    "evidence_digest": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"}
+  }
+}

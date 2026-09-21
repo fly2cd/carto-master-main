@@ -236,7 +236,7 @@ class MapScenarioAuthor:
                     "format": target,
                     "composition": "raster-map-vector-overlay" if is_vector_container else "flattened-raster",
                     "vector_claim": "overlay-only" if is_vector_container else "none",
-                    "page": {"width_mm": 420, "height_mm": 297, "orientation": "landscape", "dpi": 300, "safe_margin_mm": 10},
+                    "page": {"width_mm": 420, "height_mm": 297, "orientation": "landscape", "dpi": 144, "safe_margin_mm": 10},
                     "color_mode": "rgb",
                     "font_policy": "embed-approved",
                     "production_ready": False,

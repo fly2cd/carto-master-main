@@ -113,7 +113,7 @@ class TemplateWorkflowTests(unittest.TestCase):
             "request_id": "flood-template-request",
             "kind": kind,
             "namespace": "local",
-            "template_id": "flood-scenario",
+            "template_id": "urban-flood-risk",
             "version": "1.0.0",
             "profile": "flood-risk-overview",
             "purpose": "Synthetic flood-risk engineering preview",

@@ -1,0 +1,25 @@
+schema_version: 1
+roles:
+- id: risk-area
+  required: true
+  geometry_types:
+  - polygon
+  - multipolygon
+  fields:
+  - name: risk_pct
+    type: number
+    unit: percent
+    nullable: true
+    semantic_role: risk-value
+  license_policy: project-approved
+- id: shelter-point
+  required: true
+  geometry_types:
+  - point
+  fields:
+  - name: capacity
+    type: integer
+    unit: people
+    nullable: false
+    semantic_role: count-value
+  license_policy: project-approved

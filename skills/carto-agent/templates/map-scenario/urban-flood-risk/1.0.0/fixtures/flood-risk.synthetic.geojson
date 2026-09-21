@@ -1,0 +1,111 @@
+{
+  "carto_metadata": {
+    "contains_production_data": false,
+    "contains_sensitive_coordinates": false,
+    "data_nature": "synthetic",
+    "source_crs": "EPSG:4326"
+  },
+  "features": [
+    {
+      "geometry": {
+        "coordinates": [
+          [
+            [
+              0.0,
+              0.0
+            ],
+            [
+              0.08,
+              0.0
+            ],
+            [
+              0.08,
+              0.08
+            ],
+            [
+              0.0,
+              0.08
+            ],
+            [
+              0.0,
+              0.0
+            ]
+          ]
+        ],
+        "type": "Polygon"
+      },
+      "id": "synthetic-risk-a",
+      "properties": {
+        "fixture_role": "risk-area",
+        "risk_pct": 25.0
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": {
+        "coordinates": [
+          [
+            [
+              0.1,
+              0.0
+            ],
+            [
+              0.18,
+              0.0
+            ],
+            [
+              0.18,
+              0.08
+            ],
+            [
+              0.1,
+              0.08
+            ],
+            [
+              0.1,
+              0.0
+            ]
+          ]
+        ],
+        "type": "Polygon"
+      },
+      "id": "synthetic-risk-b",
+      "properties": {
+        "fixture_role": "risk-area",
+        "risk_pct": 70.0
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": {
+        "coordinates": [
+          0.04,
+          0.04
+        ],
+        "type": "Point"
+      },
+      "id": "synthetic-shelter-a",
+      "properties": {
+        "capacity": 120,
+        "fixture_role": "shelter-point"
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": {
+        "coordinates": [
+          0.14,
+          0.04
+        ],
+        "type": "Point"
+      },
+      "id": "synthetic-shelter-b",
+      "properties": {
+        "capacity": 300,
+        "fixture_role": "shelter-point"
+      },
+      "type": "Feature"
+    }
+  ],
+  "type": "FeatureCollection"
+}

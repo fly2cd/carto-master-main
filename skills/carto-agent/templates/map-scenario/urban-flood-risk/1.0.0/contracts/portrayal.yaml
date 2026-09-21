@@ -1,0 +1,50 @@
+schema_version: 1
+layers:
+- id: risk-layer
+  data_role: risk-area
+  geometry: polygon
+  z_order: 10
+  map_expression_ref:
+    id: choropleth/sequential
+    version: 1.0.0
+    digest: sha256:4a7d8adef3c9394ca61f04044d1931f3e014070c0b1ba025b38dc384b01c4e5e
+  value_role: risk-value
+  symbol:
+    catalog_ref: ramps/flood-risk@1.0.0
+    parameters:
+      opacity: 0.82
+  classification:
+    method: quantile
+    classes: 5
+    field_role: risk-value
+  no_data: explicit-symbol
+- id: shelter-layer
+  data_role: shelter-point
+  geometry: point
+  z_order: 20
+  map_expression_ref:
+    id: proportional-symbol/count
+    version: 1.0.0
+    digest: sha256:f5b74755bfa00dee5bf26151e6886780e9e59488d3142bb7a39f967789dc3260
+  value_role: count-value
+  symbol:
+    catalog_ref: symbols/shelter@1.0.0
+    parameters:
+      shape: circle
+  scaling:
+    method: area-proportional
+    field_role: count-value
+    minimum_size_mm: 2
+    maximum_size_mm: 12
+  no_data: explicit-symbol
+legend:
+  generated_from_layers: true
+  show_no_data: true
+  overflow_policy: reject
+rules:
+- id: synthetic-preview-only
+  strength: hard_rule
+  path: /application/excluded_uses
+  description: Draft package is limited to synthetic engineering previews and is not
+    a published product.
+  value: true

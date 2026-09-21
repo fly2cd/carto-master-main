@@ -1,0 +1,21 @@
+schema_version: 1
+source_crs_policy: reproject-approved
+display_crs:
+  authority: EPSG
+  code: '3857'
+extent_policy: data
+scale_bands:
+- id: overview
+  min_denominator: 10000
+  max_denominator: 1000000
+  generalization: simplify
+topology:
+  preserve_adjacency: true
+  preserve_route_order: false
+rules:
+- id: synthetic-preview-only
+  strength: hard_rule
+  path: /application/excluded_uses
+  description: Draft package is limited to synthetic engineering previews and is not
+    a published product.
+  value: true

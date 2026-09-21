@@ -128,7 +128,7 @@ class TemplateValidationPublicationTests(unittest.TestCase):
                 repository_scope=SCOPE,
             )
             entry = repository.discover(
-                namespace="local", kind="map-scenario", template_id="flood-scenario", version="1.0.0",
+                namespace="local", kind="map-scenario", template_id="urban-flood-risk", version="1.0.0",
             )
             self.assertEqual(evidence["package_ref"]["digest"], entry["digest"])
             self.assertEqual(evidence["evidence_digest"], entry["evidence_digest"])
@@ -320,7 +320,7 @@ class TemplateValidationPublicationTests(unittest.TestCase):
                 repository.discover(namespace="local", kind="map-scenario", template_id="residue", version="9.9.9")
             self.assertEqual("TEMPLATE_NOT_INDEXED", unindexed.exception.code)
             with self.assertRaises(ProtocolError) as inexact:
-                repository.discover(namespace="local", kind="map-scenario", template_id="flood-scenario", version="")
+                repository.discover(namespace="local", kind="map-scenario", template_id="urban-flood-risk", version="")
             self.assertEqual("EXACT_TEMPLATE_REF_REQUIRED", inexact.exception.code)
 
     def test_repository_detects_published_package_corruption(self) -> None:
@@ -332,18 +332,18 @@ class TemplateValidationPublicationTests(unittest.TestCase):
             repository = TemplateRepository(
                 path_guard=PathGuard([root]), root=project / "template-repository", repository_scope=SCOPE,
             )
-            entry = repository.discover(namespace="local", kind="map-scenario", template_id="flood-scenario", version="1.0.0")
+            entry = repository.discover(namespace="local", kind="map-scenario", template_id="urban-flood-risk", version="1.0.0")
             manifest = project / "template-repository" / entry["manifest_path"]
             original = manifest.read_bytes()
             manifest.write_bytes(original + b" ")
             with self.assertRaises(ProtocolError) as manifest_error:
-                repository.discover(namespace="local", kind="map-scenario", template_id="flood-scenario", version="1.0.0")
+                repository.discover(namespace="local", kind="map-scenario", template_id="urban-flood-risk", version="1.0.0")
             self.assertEqual("PUBLISHED_MANIFEST_CORRUPT", manifest_error.exception.code)
             manifest.write_bytes(original)
             contract = manifest.parent / "contracts/scenario.yaml"
             contract.write_bytes(contract.read_bytes() + b" ")
             with self.assertRaises(ProtocolError) as package_error:
-                repository.discover(namespace="local", kind="map-scenario", template_id="flood-scenario", version="1.0.0")
+                repository.discover(namespace="local", kind="map-scenario", template_id="urban-flood-risk", version="1.0.0")
             self.assertEqual("PUBLISHED_PACKAGE_CORRUPT", package_error.exception.code)
 
 

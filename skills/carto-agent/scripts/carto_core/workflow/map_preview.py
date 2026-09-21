@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -47,7 +48,7 @@ class MapPreviewService:
         receipt = adapter.submit_render(session_id, scene, "maplibre-web", FRONTEND_BUILD)
         adapter.validate_receipt(receipt, self.attestation_key)
         evidence = self.build_evidence(request, candidate, scene, receipt)
-        return {"receipt": receipt, "evidence": evidence, "profile": profile}
+        return {"receipt": receipt, "evidence": evidence, "profile": asdict(profile)}
 
     def validate_persisted(self, candidate: dict[str, Any], scene: dict[str, Any], receipt: dict[str, Any]) -> None:
         renderer = ControlledBrowserRenderer(

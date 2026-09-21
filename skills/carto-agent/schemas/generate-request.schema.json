@@ -123,10 +123,10 @@
           "const": "map-scenario"
         },
         "id": {
-          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+          "const": "urban-flood-risk"
         },
         "version": {
-          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"
+          "const": "1.0.0"
         },
         "digest": {
           "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"

@@ -1,0 +1,14 @@
+schema_version: 1
+baseline:
+  id: first-vertical-slice-scope
+  version: 0.3.3
+  digest: sha256:7291e15bd562d22c8c08e1ba1152ebe23c00835cbe4102608ae9c752c387f4e1
+  uri: policy:scope-baseline
+checks:
+- id: protocol.schema-valid
+  version: 1.0.0
+  params: {}
+- id: security.synthetic-only
+  version: 1.0.0
+  params:
+    contains_production_data: false

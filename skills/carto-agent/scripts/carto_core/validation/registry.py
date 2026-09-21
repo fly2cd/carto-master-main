@@ -35,7 +35,7 @@ class CheckerRegistry:
                 raise ProtocolError("CHECKER_NOT_AVAILABLE", check_id)
             passed, details = handler(subject, context or {})
             results.append(CheckResult(check_id, str(definition["version"]), "passed" if passed else "failed", definition["failure_severity"], details))
-        failed = any(item.status == "failed" and item.severity == "blocker" for item in results)
+        failed = any(item.status == "failed" and item.severity in {"blocker", "error"} for item in results)
         digest = sha256_digest(subject)
         report = ValidationReport(1, f"report-{digest[7:23]}", phase, digest, "failed" if failed else "passed", results, datetime.now(UTC).isoformat().replace("+00:00", "Z"))
         self._schemas.validate("validation-report", report.to_dict())

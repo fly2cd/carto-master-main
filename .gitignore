@@ -15,3 +15,14 @@ build/
 .idea/
 .vscode/
 *.swp
+
+# Host bootstrap artifacts (machine-specific, never commit)
+tools/host/carto-host.env.json
+tools/host/reports/
+tools/host/.scratch/
+
+# Hermes project-local skill registration (junction created by Install-CartoSkill.ps1 -HermesProjectLocal)
+.hermes/
+
+# Carto project space (runtime artifacts: runs, receipts, deliverables, immutable repo)
+projects/

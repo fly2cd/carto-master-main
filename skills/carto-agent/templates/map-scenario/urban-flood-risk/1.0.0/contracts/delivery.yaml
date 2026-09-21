@@ -1,0 +1,51 @@
+schema_version: 1
+targets:
+- id: a3-svg
+  delivery_class: engineering-preview
+  format: svg
+  composition: raster-map-vector-overlay
+  vector_claim: overlay-only
+  page:
+    width_mm: 420
+    height_mm: 297
+    orientation: landscape
+    dpi: 144
+    safe_margin_mm: 10
+  color_mode: rgb
+  font_policy: embed-approved
+  production_ready: false
+- id: a3-pdf
+  delivery_class: engineering-preview
+  format: pdf
+  composition: raster-map-vector-overlay
+  vector_claim: overlay-only
+  page:
+    width_mm: 420
+    height_mm: 297
+    orientation: landscape
+    dpi: 144
+    safe_margin_mm: 10
+  color_mode: rgb
+  font_policy: embed-approved
+  production_ready: false
+- id: a3-png
+  delivery_class: engineering-preview
+  format: png
+  composition: flattened-raster
+  vector_claim: none
+  page:
+    width_mm: 420
+    height_mm: 297
+    orientation: landscape
+    dpi: 144
+    safe_margin_mm: 10
+  color_mode: rgb
+  font_policy: embed-approved
+  production_ready: false
+rules:
+- id: synthetic-preview-only
+  strength: hard_rule
+  path: /application/excluded_uses
+  description: Draft package is limited to synthetic engineering previews and is not
+    a published product.
+  value: true

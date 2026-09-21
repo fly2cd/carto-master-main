@@ -1,0 +1,18 @@
+schema_version: 1
+lock_id: urban-flood-risk-lock
+package:
+  namespace: local
+  kind: map-scenario
+  id: urban-flood-risk
+  version: 1.0.0
+  digest: sha256:2a9ede5815bee95e500fd62384a4de0be4911d5439a1c01c3fbe1f28ef31df33
+dependencies: []
+resources:
+- id: choropleth/sequential
+  version: 1.0.0
+  digest: sha256:4a7d8adef3c9394ca61f04044d1931f3e014070c0b1ba025b38dc384b01c4e5e
+- id: proportional-symbol/count
+  version: 1.0.0
+  digest: sha256:f5b74755bfa00dee5bf26151e6886780e9e59488d3142bb7a39f967789dc3260
+resolver_version: 1.0.0
+generated_at: '2026-09-21T00:00:00Z'

@@ -7,7 +7,7 @@ from carto_core.canonical import sha256_digest
 D = "sha256:" + "0" * 64
 A = {"id": "artifact", "version": "1.0.0", "digest": D}
 E = {"id": "choropleth/sequential", "version": "1.0.0", "digest": D}
-T = {"kind": "map-scenario", "id": "flood-scenario", "version": "1.0.0", "digest": D}
+T = {"kind": "map-scenario", "id": "urban-flood-risk", "version": "1.0.0", "digest": D}
 P = {"source_type": "official", "source_ref": "catalog:item", "version": "2026", "retrieved_at": "2026-09-14T00:00:00Z", "classification": "internal"}
 R = {"id": "required-rule", "strength": "hard_rule", "path": "/value", "description": "必须满足"}
 EXECUTION = {
@@ -44,7 +44,7 @@ TEMPLATE_CREATE_REQUEST = {
     "request_id": "flood-template-request",
     "kind": "map-scenario",
     "namespace": "local",
-    "template_id": "flood-scenario",
+    "template_id": "urban-flood-risk",
     "version": "1.0.0",
     "profile": "flood-risk-overview",
     "purpose": "Synthetic flood-risk engineering preview",
@@ -97,7 +97,7 @@ TEMPLATE_BRIEF = {
     "brief_id": "brief-flood-template-request",
     "kind": "map-scenario",
     "namespace": "local",
-    "template_id": "flood-scenario",
+    "template_id": "urban-flood-risk",
     "version": "1.0.0",
     "scope": "project:project-one",
     "purpose": TEMPLATE_CREATE_REQUEST["purpose"],
@@ -139,7 +139,7 @@ PROTOTYPE_DESCRIPTION = {
 }
 
 VALID_CASES = {
-    "manifest": {"schema_version": 1, "package": {"namespace": "local", "kind": "map-scenario", "id": "flood-scenario", "version": "1.0.0", "status": "draft", "summary": "洪涝制图场景"}, "business_contracts": BUSINESS_CONTRACTS, "dependencies": [], "dependency_lock": "dependencies.lock.yaml", "targets": ["svg", "pdf", "png"], "files": PACKAGE_FILES, "checksums": {path: D for path in PACKAGE_FILES}},
+    "manifest": {"schema_version": 1, "package": {"namespace": "local", "kind": "map-scenario", "id": "urban-flood-risk", "version": "1.0.0", "status": "draft", "summary": "洪涝制图场景"}, "business_contracts": BUSINESS_CONTRACTS, "dependencies": [], "dependency_lock": "dependencies.lock.yaml", "targets": ["svg", "pdf", "png"], "files": PACKAGE_FILES, "checksums": {path: D for path in PACKAGE_FILES}},
     "template-create-request": TEMPLATE_CREATE_REQUEST,
     "template-analysis": TEMPLATE_ANALYSIS,
     "template-brief": TEMPLATE_BRIEF,
@@ -147,15 +147,15 @@ VALID_CASES = {
     "identity": IDENTITY,
     "cartography": CARTOGRAPHY,
     "layout": LAYOUT,
-    "scenario": {"schema_version": 1, "scenario_id": "flood-scenario", "version": "1.0.0", "business_scene": "emergency_mapping", "tasks": ["hazard-result-map"], "owned_segments": ["scenario", "data", "spatial-behavior", "portrayal", "delivery", "quality-gates"], "embedded": {"identity": IDENTITY, "cartography": CARTOGRAPHY, "layout": LAYOUT}, "replaceable_segments": ["identity", "cartography", "layout"], "data_role_refs": ["risk-area", "shelter-point"], "target_ids": ["a3-pdf", "a3-png"], "application": {"supported_uses": ["engineering-preview"], "excluded_uses": ["navigation", "formal-delivery"]}, "compatibility": {"target_profiles": ["a3-landscape"], "placeholders": ["{{MAP_TITLE}}", "{{MAP_FRAME}}"]}, "rules": [R]},
+    "scenario": {"schema_version": 1, "scenario_id": "urban-flood-risk", "version": "1.0.0", "business_scene": "emergency_mapping", "tasks": ["hazard-result-map"], "owned_segments": ["scenario", "data", "spatial-behavior", "portrayal", "delivery", "quality-gates"], "embedded": {"identity": IDENTITY, "cartography": CARTOGRAPHY, "layout": LAYOUT}, "replaceable_segments": ["identity", "cartography", "layout"], "data_role_refs": ["risk-area", "shelter-point"], "target_ids": ["a3-pdf", "a3-png"], "application": {"supported_uses": ["engineering-preview"], "excluded_uses": ["navigation", "formal-delivery"]}, "compatibility": {"target_profiles": ["a3-landscape"], "placeholders": ["{{MAP_TITLE}}", "{{MAP_FRAME}}"]}, "rules": [R]},
     "data-role": {"schema_version": 1, "roles": [{"id": "risk-area", "required": True, "geometry_types": ["polygon", "multipolygon"], "fields": [{"name": "risk_pct", "type": "number", "unit": "percent", "nullable": True, "semantic_role": "risk-value"}], "join": {"key": "admin_code", "minimum_coverage": 0.98}, "freshness": {"max_age_days": 30}, "license_policy": "project-approved"}]},
     "spatial-behavior": {"schema_version": 1, "source_crs_policy": "reproject-approved", "display_crs": {"authority": "EPSG", "code": "4490"}, "extent_policy": "administrative-boundary", "scale_bands": [{"id": "regional", "min_denominator": 10000, "max_denominator": 1000000, "generalization": "simplify"}], "topology": {"preserve_adjacency": True, "preserve_route_order": False}, "rules": [R]},
     "portrayal": {"schema_version": 1, "layers": [{"id": "risk-layer", "data_role": "risk-area", "geometry": "polygon", "z_order": 10, "map_expression_ref": {"id": "choropleth/sequential", "version": "1.0.0", "digest": D}, "value_role": "risk-value", "symbol": {"catalog_ref": "ramps/flood-risk@1.0.0", "parameters": {"opacity": 0.8}}, "classification": {"method": "quantile", "classes": 4, "field_role": "risk-value"}, "no_data": "explicit-symbol"}], "legend": {"generated_from_layers": True, "show_no_data": True, "overflow_policy": "reject"}, "rules": [R]},
     "delivery": {"schema_version": 1, "targets": [{"id": "a3-pdf", "delivery_class": "engineering-preview", "format": "pdf", "composition": "raster-map-vector-overlay", "vector_claim": "overlay-only", "page": {"width_mm": 420, "height_mm": 297, "orientation": "landscape", "dpi": 300, "safe_margin_mm": 10}, "color_mode": "rgb", "font_policy": "embed-approved", "production_ready": False}], "rules": [R]},
     "quality-gates": {"schema_version": 1, "baseline": A, "checks": [{"id": "protocol.schema-valid", "version": "1.0.0", "params": {}}]},
     "map-expression": MAP_EXPRESSION,
-    "template-index": {"schema_version": 1, "index_id": "local-template-index", "version": "1.0.0", "repository_scope": "local:templates", "entries": [{"namespace": "local", "kind": "map-scenario", "id": "flood-scenario", "version": "1.0.0", "digest": D, "manifest_path": "map-scenario/flood-scenario/1.0.0/manifest.yaml", "manifest_digest": D, "evidence_digest": D, "publication_receipt_path": "transactions/publication.yaml", "status": "published", "published_at": "2026-09-17T00:00:00Z"}], "generated_at": "2026-09-17T00:00:00Z", "digest": D},
-    "dependency-lock": {"schema_version": 1, "lock_id": "flood-scenario-lock", "package": {"namespace": "local", "kind": "map-scenario", "id": "flood-scenario", "version": "1.0.0", "digest": D}, "dependencies": [], "resources": [{"id": "choropleth/sequential", "version": "1.0.0", "digest": D}, {"id": "proportional-symbol/count", "version": "1.0.0", "digest": D}], "resolver_version": "1.0.0", "generated_at": "2026-09-17T00:00:00Z"},
+    "template-index": {"schema_version": 1, "index_id": "local-template-index", "version": "1.0.0", "repository_scope": "local:templates", "entries": [{"namespace": "local", "kind": "map-scenario", "id": "urban-flood-risk", "version": "1.0.0", "digest": D, "manifest_path": "map-scenario/urban-flood-risk/1.0.0/manifest.yaml", "manifest_digest": D, "evidence_digest": D, "publication_receipt_path": "transactions/publication.yaml", "status": "published", "published_at": "2026-09-17T00:00:00Z"}], "generated_at": "2026-09-17T00:00:00Z", "digest": D},
+    "dependency-lock": {"schema_version": 1, "lock_id": "urban-flood-risk-lock", "package": {"namespace": "local", "kind": "map-scenario", "id": "urban-flood-risk", "version": "1.0.0", "digest": D}, "dependencies": [], "resources": [{"id": "choropleth/sequential", "version": "1.0.0", "digest": D}, {"id": "proportional-symbol/count", "version": "1.0.0", "digest": D}], "resolver_version": "1.0.0", "generated_at": "2026-09-17T00:00:00Z"},
     "template-validation-evidence": {"schema_version": 1, "evidence_id": "validation-evidence-one", "namespace": "local", "package_ref": T, "manifest_digest": D, "dependency_lock_digest": D, "fixture_set_digest": D, "checker_set_digest": D, "renderer": {"renderer_id": "maplibre-web", "renderer_profile_digest": D, "adapter_version": "1.0.0", "frontend_build": "2026.09.18", "renderer_version": "1.0.0", "maplibre_version": "3.6.0", "overlay_engine_version": "1.0.0", "environment_fingerprint": D}, "render_receipt_ref": A, "preview_artifacts": [{"target": "svg", "artifact_ref": A}], "status": "passed", "counts": {"blocker": 0, "error": 0, "warning": 0, "info": 0}, "results": [{"check_id": "template.package-closed", "version": "1.0.0", "status": "passed", "severity": "blocker", "details": {}}], "created_at": "2026-09-18T00:00:00Z", "evidence_digest": D},
     "publication-receipt": {"schema_version": 1, "receipt_id": "publication-receipt-one", "namespace": "local", "package_ref": T, "manifest_digest": D, "evidence_ref": A, "dependency_lock_ref": A, "index_digest_before": D, "index_digest_after": D, "repository_scope": "local:templates", "approval_ref": A, "published_at": "2026-09-17T00:00:00Z", "idempotency_key": "publish-flood-0001"},
     "generate-request": {"schema_version": 1, "request_id": "request-one", "project_id": "flood-project", "goal": "制作洪涝风险专题图", "scene_hint": "emergency_mapping", "sources": [A], "requested_outputs": ["pdf", "png"], "subject": {"subject_id": "user-1", "tenant_id": "tenant-one", "namespace": "project-one"}, "idempotency_key": "request-one-00001"},
@@ -170,8 +170,12 @@ VALID_CASES = {
     "map-plan": {"schema_version": 1, "plan_id": "plan-one", "revision": 1, "project_id": "flood-project", "intent_ref": A, "brief_ref": A, "business_scene": "emergency_mapping", "tasks": ["hazard-result-map"], "template_refs": [T], "data_bindings": [{"role": "risk-area", "dataset_ref": A}], "decisions": {"classification": "quantile", "class_count": 5, "extent": [100, 20, 101, 21], "title": "Flood risk overview", "legend_source": "actual-encoding", "renderer_id": "maplibre-web", "point_scaling": "area-proportional"}, "open_issues": []},
     "resolved-map": {"schema_version": 1, "candidate_id": "candidate-one", "project_id": "flood-project", "run_id": "run-one", "execution_digest": EXECUTION_DIGEST, "execution": EXECUTION, "open_issues": [], "created_at": "2026-09-14T00:00:00Z"},
     "map-spec-lock": {"schema_version": 1, "lock_id": "lock-one", "project_id": "flood-project", "run_id": "run-one", "candidate_ref": A, "execution_digest": EXECUTION_DIGEST, "execution": EXECUTION, "evidence": {"preflight_ref": A, "preview_ref": A}, "approvals": {"brief_ref": "approval:brief", "freeze_ref": "approval:freeze"}, "candidate_digest": D, "preview_evidence_digest": D, "render_receipt_ref": A, "environment_fingerprint": D, "created_at": "2026-09-14T00:00:00Z"},
+    "render-attempt": {"schema_version": 1, "attempt_id": "render-attempt-run-one-1", "project_id": "flood-project", "run_id": "run-one", "lock_ref": A, "lock_digest": D, "business_execution_digest": EXECUTION_DIGEST, "target_id": "formal-map", "attempt_number": 1, "status": "succeeded", "render_scene_digest": D, "renderer_profile_digest": D, "renderer_execution_digest": D, "resource_set_digest": D, "environment_fingerprint": D, "output_artifacts": [{"target": "pdf", "artifact_ref": A}, {"target": "png", "artifact_ref": A}], "render_receipt_ref": A, "retryable": False, "started_at": "2026-09-21T00:00:00Z", "completed_at": "2026-09-21T00:00:05Z"},
+    "formal-render-evidence": {"schema_version": 1, "evidence_id": "formal-render-run-one-1", "project_id": "flood-project", "run_id": "run-one", "lock_ref": A, "lock_digest": D, "business_execution_digest": EXECUTION_DIGEST, "attempt_ref": A, "attempt_digest": D, "render_scene_digest": D, "renderer_profile_digest": D, "renderer_execution_digest": D, "resource_set_digest": D, "environment_fingerprint": D, "render_receipt_ref": A, "output_artifacts": [{"target": "pdf", "artifact_ref": A, "size_bytes": 1024, "media_type": "application/pdf"}, {"target": "png", "artifact_ref": A, "size_bytes": 2048, "media_type": "image/png"}], "required_targets": ["pdf", "png"], "synthetic_data_notice": "合成数据演示，非真实风险研判", "quality_status": "not-checked", "created_at": "2026-09-21T00:00:05Z", "evidence_digest": D},
     "map-preview-evidence": {"schema_version": 1, "evidence_id": "preview-evidence-one", "project_id": "flood-project", "run_id": "run-one", "candidate_digest": D, "candidate_execution_digest": EXECUTION_DIGEST, "render_scene_digest": D, "render_receipt_ref": A, "render_execution_digest": D, "environment_fingerprint": D, "output_artifacts": [{"target": "svg", "artifact_ref": A}], "checks": [{"check_id": "preview.binding", "owner": "adapter", "status": "passed", "severity": "blocker", "details": {}}], "status": "passed", "created_at": "2026-09-18T00:00:00Z", "evidence_digest": D},
-    "delivery-manifest": {"schema_version": 1, "delivery_id": "delivery-one", "project_id": "flood-project", "lock_ref": A, "execution_digest": EXECUTION_DIGEST, "artifacts": [{"path": "output/map.pdf", "format": "pdf", "digest": D, "size_bytes": 1024}], "limitations": ["模拟数据"], "delivered_at": "2026-09-14T00:00:00Z"},
+    "delivery-manifest": {"schema_version": 1, "manifest_id": "manifest-one", "project_id": "flood-project", "tenant_id": "tenant-one", "run_id": "run-one", "lock_ref": A, "lock_digest": D, "execution_digest": EXECUTION_DIGEST, "render_attempt_ref": A, "renderer_execution_digest": D, "validation_report_ref": A, "artifacts": [{"path": "output/map.pdf", "format": "pdf", "digest": D, "size_bytes": 1024}, {"path": "output/map.png", "format": "png", "digest": D, "size_bytes": 2048}], "recipient": {"recipient_id": "reviewer-one", "recipient_type": "project-user"}, "destination": {"kind": "local-allowed-root", "relative_path": "deliveries/delivery-one"}, "scope": "project:flood-project", "environment": "local", "licenses": ["synthetic-demo-only"], "limitations": ["合成数据演示，非真实风险研判"], "idempotency_key": "delivery-one-00000001", "created_at": "2026-09-21T00:00:00Z"},
+    "delivery-receipt": {"schema_version": 1, "receipt_id": "delivery-receipt-one", "delivery_id": "delivery-one", "transaction_id": "transaction-one", "manifest_ref": A, "manifest_digest": D, "idempotency_key": "delivery-one-00000001", "final_path": "deliveries/delivery-one", "artifacts": [{"path": "package/map.pdf", "format": "pdf", "digest": D, "size_bytes": 1024}, {"path": "package/map.png", "format": "png", "digest": D, "size_bytes": 2048}], "g3_approval_ref": A, "status": "committed", "delivered_at": "2026-09-21T00:00:00Z"},
+    "delivery-transaction": {"schema_version": 1, "transaction_id": "transaction-one", "delivery_id": "delivery-one", "project_id": "flood-project", "tenant_id": "tenant-one", "run_id": "run-one", "manifest_ref": A, "manifest_digest": D, "idempotency_key": "delivery-one-00000001", "recipient": {"recipient_id": "reviewer-one", "recipient_type": "project-user"}, "destination": {"kind": "local-allowed-root", "relative_path": "deliveries/delivery-one"}, "staging_path": "deliveries/.delivery-one.staging-0000000000000000", "final_path": "deliveries/delivery-one", "approval_ref": A, "status": "receipt-written", "phase": "receipt", "artifacts": [{"path": "map.pdf", "format": "pdf", "digest": D, "size_bytes": 1024}, {"path": "map.png", "format": "png", "digest": D, "size_bytes": 2048}], "receipt_ref": A, "created_at": "2026-09-21T00:00:00Z", "updated_at": "2026-09-21T00:00:02Z", "committed_at": "2026-09-21T00:00:01Z"},
     "approval-receipt": {"schema_version": 1, "receipt_id": "receipt-one", "issuer": "local-host", "subject_id": "user-1", "tenant_id": "tenant-one", "action": "approve-freeze", "object_type": "resolved-map", "object_digest": D, "scope": "project:flood-project", "policy_id": "carto-security", "environment": "local", "issued_at": "2026-09-14T00:00:00Z", "expires_at": "2026-09-15T00:00:00Z", "nonce": "nonce-0000000001", "signature_algorithm": "hmac-sha256", "signature": "0" * 64},
     "job-state": {"schema_version": 1, "revision": 1, "status": "running", "step": "validate", "attempt": 1, "run_id": "run-one", "input_fingerprint": D, "last_receipt": "receipts/validate-1.json"},
     "step-receipt": {"schema_version": 1, "receipt_id": "receipt-step-one", "run_id": "run-one", "step": "validate", "attempt": 1, "status": "succeeded", "input_fingerprint": D, "prerequisite_fingerprints": {"policy": D}, "tool_versions": {"schema-validate": "1.0.0"}, "output_refs": [A], "started_at": "2026-09-15T00:00:00Z", "completed_at": "2026-09-15T00:00:01Z"},
@@ -270,3 +274,94 @@ SEMANTIC_INVALID_CASES["template-brief-wrong-kind"] = ("template-brief", _invali
 _invalid_validation_evidence = deepcopy(VALID_CASES["template-validation-evidence"])
 _invalid_validation_evidence.pop("render_receipt_ref")
 SEMANTIC_INVALID_CASES["template-validation-passed-without-receipt"] = ("template-validation-evidence", _invalid_validation_evidence)
+
+_invalid_template_identity = deepcopy(VALID_CASES["template-create-request"])
+_invalid_template_identity["template_id"] = "flood-scenario"
+SEMANTIC_INVALID_CASES["template-create-request-legacy-id"] = (
+    "template-create-request", _invalid_template_identity
+)
+
+_invalid_generate_identity = deepcopy(VALID_CASES["generate-request"])
+_invalid_generate_identity["template"] = {
+    "namespace": "local",
+    "kind": "map-scenario",
+    "id": "flood-scenario",
+    "version": "1.0.0",
+    "digest": D,
+}
+SEMANTIC_INVALID_CASES["generate-request-legacy-template-id"] = (
+    "generate-request", _invalid_generate_identity
+)
+
+_invalid_delivery_manifest_time = deepcopy(VALID_CASES["delivery-manifest"])
+_invalid_delivery_manifest_time["delivered_at"] = "2026-09-21T00:00:00Z"
+SEMANTIC_INVALID_CASES["delivery-manifest-post-commit-field"] = (
+    "delivery-manifest", _invalid_delivery_manifest_time
+)
+
+_invalid_delivery_manifest_artifacts = deepcopy(VALID_CASES["delivery-manifest"])
+_invalid_delivery_manifest_artifacts["artifacts"] = [
+    item for item in _invalid_delivery_manifest_artifacts["artifacts"] if item["format"] != "png"
+]
+SEMANTIC_INVALID_CASES["delivery-manifest-missing-png"] = (
+    "delivery-manifest", _invalid_delivery_manifest_artifacts
+)
+
+_invalid_delivery_manifest_limitation = deepcopy(VALID_CASES["delivery-manifest"])
+_invalid_delivery_manifest_limitation["limitations"] = ["engineering preview only"]
+SEMANTIC_INVALID_CASES["delivery-manifest-missing-synthetic-limitation"] = (
+    "delivery-manifest", _invalid_delivery_manifest_limitation
+)
+
+_invalid_delivery_receipt_time = deepcopy(VALID_CASES["delivery-receipt"])
+_invalid_delivery_receipt_time.pop("delivered_at")
+SEMANTIC_INVALID_CASES["delivery-receipt-missing-delivered-at"] = (
+    "delivery-receipt", _invalid_delivery_receipt_time
+)
+
+_invalid_delivery_receipt_status = deepcopy(VALID_CASES["delivery-receipt"])
+_invalid_delivery_receipt_status["status"] = "pending"
+SEMANTIC_INVALID_CASES["delivery-receipt-not-committed"] = (
+    "delivery-receipt", _invalid_delivery_receipt_status
+)
+
+_invalid_succeeded_attempt = deepcopy(VALID_CASES["render-attempt"])
+_invalid_succeeded_attempt.pop("render_receipt_ref")
+SEMANTIC_INVALID_CASES["render-attempt-succeeded-without-receipt"] = (
+    "render-attempt", _invalid_succeeded_attempt
+)
+
+_invalid_failed_attempt = deepcopy(VALID_CASES["render-attempt"])
+for _field in ("renderer_execution_digest", "resource_set_digest", "output_artifacts", "render_receipt_ref"):
+    _invalid_failed_attempt.pop(_field)
+_invalid_failed_attempt["status"] = "failed"
+_invalid_failed_attempt["retryable"] = False
+SEMANTIC_INVALID_CASES["render-attempt-failed-without-error"] = (
+    "render-attempt", _invalid_failed_attempt
+)
+
+_invalid_formal_evidence_targets = deepcopy(VALID_CASES["formal-render-evidence"])
+_invalid_formal_evidence_targets["required_targets"] = ["pdf"]
+SEMANTIC_INVALID_CASES["formal-render-evidence-missing-png"] = (
+    "formal-render-evidence", _invalid_formal_evidence_targets
+)
+
+_invalid_formal_evidence_notice = deepcopy(VALID_CASES["formal-render-evidence"])
+_invalid_formal_evidence_notice["synthetic_data_notice"] = "engineering preview only"
+SEMANTIC_INVALID_CASES["formal-render-evidence-wrong-notice"] = (
+    "formal-render-evidence", _invalid_formal_evidence_notice
+)
+
+_invalid_delivery_transaction_commit = deepcopy(VALID_CASES["delivery-transaction"])
+_invalid_delivery_transaction_commit["status"] = "committed"
+_invalid_delivery_transaction_commit.pop("committed_at")
+_invalid_delivery_transaction_commit.pop("receipt_ref")
+SEMANTIC_INVALID_CASES["delivery-transaction-commit-without-time"] = (
+    "delivery-transaction", _invalid_delivery_transaction_commit
+)
+
+_invalid_delivery_transaction_phase = deepcopy(VALID_CASES["delivery-transaction"])
+_invalid_delivery_transaction_phase["phase"] = "staging"
+SEMANTIC_INVALID_CASES["delivery-transaction-receipt-in-staging"] = (
+    "delivery-transaction", _invalid_delivery_transaction_phase
+)

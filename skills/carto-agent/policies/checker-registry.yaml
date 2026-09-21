@@ -1,6 +1,6 @@
 schema_version: 1
 registry_id: carto-checkers
-version: 1.0.0
+version: 1.1.0
 unknown_checker: reject
 checks:
   - id: protocol.schema-valid
@@ -24,3 +24,80 @@ checks:
     failure_severity: blocker
     repair_owner: approval-system
     implementation: registered:approval_receipt_valid
+  - id: final.artifact-integrity
+    version: 1.0.0
+    phase: final-check
+    strength: hard_rule
+    failure_severity: blocker
+    repair_owner: renderer
+    implementation: registered:final_artifact_integrity
+  - id: final.required-targets
+    version: 1.0.0
+    phase: final-check
+    strength: hard_rule
+    failure_severity: blocker
+    repair_owner: renderer
+    implementation: registered:final_required_targets
+  - id: final.pdf-page-contract
+    version: 1.0.0
+    phase: final-check
+    strength: hard_rule
+    failure_severity: error
+    repair_owner: renderer
+    implementation: registered:final_pdf_page_contract
+  - id: final.png-raster-contract
+    version: 1.0.0
+    phase: final-check
+    strength: hard_rule
+    failure_severity: error
+    repair_owner: renderer
+    implementation: registered:final_png_raster_contract
+  - id: final.font-policy
+    version: 1.0.0
+    phase: final-check
+    strength: hard_rule
+    failure_severity: error
+    repair_owner: renderer
+    implementation: registered:final_font_policy
+  - id: final.layout-elements
+    version: 1.0.0
+    phase: final-check
+    strength: hard_rule
+    failure_severity: error
+    repair_owner: cartography
+    implementation: registered:final_layout_elements
+  - id: final.legend-semantics
+    version: 1.0.0
+    phase: final-check
+    strength: hard_rule
+    failure_severity: error
+    repair_owner: cartography
+    implementation: registered:final_legend_semantics
+  - id: final.synthetic-notice
+    version: 1.0.0
+    phase: final-check
+    strength: hard_rule
+    failure_severity: blocker
+    repair_owner: cartography
+    implementation: registered:final_synthetic_notice
+  - id: final.render-binding
+    version: 1.0.0
+    phase: final-check
+    strength: hard_rule
+    failure_severity: blocker
+    repair_owner: protocol
+    implementation: registered:final_render_binding
+  - id: final.sensitive-content
+    version: 1.0.0
+    phase: final-check
+    strength: hard_rule
+    failure_severity: blocker
+    repair_owner: security
+    implementation: registered:final_sensitive_content
+  - id: final.renderer-warnings
+    version: 1.0.0
+    phase: final-check
+    strength: hard_rule
+    failure_severity: warning
+    repair_owner: renderer
+    implementation: registered:final_renderer_warnings
