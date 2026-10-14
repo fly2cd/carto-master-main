@@ -26,3 +26,6 @@ tools/host/.scratch/
 
 # Carto project space (runtime artifacts: runs, receipts, deliverables, immutable repo)
 projects/
+
+# Doc sample assets (do not commit files under sample)
+doc/sample/
