@@ -4,9 +4,11 @@
 
 本文介绍 Carto Agent 模板体系中 MapScenario 的基本概念、作用、职责边界、六份业务契约、组件装配、匹配方式、实例编译、验证要求和发布产物。
 
-组织方式参考 [MapLayout 完整说明](map-layout.md)，并与 [MapStyle 完整说明](map-style.md) 配套。设计依据为 [模板体系补充说明](../carto-template-info-plus.md)、[模板创建 TRD](../carto-create-template-TRD.md) 和 [地图生成 TRD](../carto-generate-map-TRD.md)。本文供模板作者、业务方案设计者、编译器开发者和审核人员使用。
+组织方式参考 [MapLayout 完整说明](map-layout.md)，并与 [MapStyle 完整说明](map-style.md) 配套。设计依据为 [模板体系设计](../carto-template-dsg.md)、[模板创建 TRD](../carto-create-template-TRD.md) 和 [地图生成 TRD](../carto-generate-map-TRD.md)。本文供模板作者、业务方案设计者、编译器开发者和审核人员使用。
 
 本文是设计说明。第 18 节集中列出当前仓库状态；其余章节中的目标接口、匹配状态和扩展流程，除明确标注为现有实现外，均为建议设计。示例不能直接作为当前 CLI 的完整输入。运行时协议仍以 `skills/carto-agent/schemas/`、`policies/`、权威索引和已发布模板为准。
+
+表达目录、内置方法、通用图表和符号资源的共同边界，见[地图表达目录、内置方法与符号库设计结论](map-expression-and-symbol-design.md)。本文统一使用 Map Expression Catalog；表达定义不属于新的模板类型，也不包含任意可执行代码。
 
 ## 2. 基本介绍
 
@@ -56,10 +58,12 @@ MapScenario 回答：
 | 组件 | 拥有的内容 | 与 Scenario 的关系 |
 |---|---|---|
 | MapScenario | 业务任务、数据角色、语义绑定、空间条件、必需内容和成果要求 | 提供可复用业务合同，装配其他组件 |
-| MapStyle | 符号、色带、注记、图例外观和尺度表达行为 | 实现 Scenario 所需的表达能力 |
+| MapStyle | 符号使用配置、色带、注记、图例外观和尺度行为 | 提供满足 Scenario 与表达定义约束的视觉配置 |
 | MapLayout | 画布、Frame、空间组织、容量和溢出策略 | 承载 Scenario 提供的内容角色 |
 | MapBrand | 机构身份、Logo、字体与品牌资源 | 提供身份资源及使用约束 |
-| Map Expression / Symbol Catalog | 注册表达算法、通用符号及其语义 | 提供可引用的表达与资源能力，不是第五类模板 |
+| 地图表达目录 / Map Expression Catalog | 输入语义、适用条件、参数、编码和检查要求 | 提供精确引用的表达定义，算法仍在受信代码中 |
+| 符号库 / Symbol Catalog | 通用符号资源、锚点、可调通道和使用限制 | 提供表达与 Style 使用的图形资源，不负责业务映射 |
+| 内置表达方法与图表核心 | 受信编码计算与可复用绘图 | 按经过验证的计划执行，不由目录名称直接产生能力 |
 | 制图标准与平台策略 | 适用的强制约束、允许能力和安全边界 | 约束整个组合，不能由模板自行降低 |
 | 数据准备服务 | 获准数据读取、处理、质量检查和快照 | 按项目批准的需求提供可验收输入 |
 | MapPlan | 本次数据绑定、模板选择、范围和项目决定 | 将模板规则落实为当前任务的计划 |
@@ -117,6 +121,8 @@ Scenario 可以要求数据来源获准、交付前通过审批，但不能自�
 
 可复用不要求所有值都可调。相反，业务语义需要固定的地方应固定；只把有明确适用边界的选择留给实例。
 
+例如，“展示各市 Top 3 行业并支持绝对产值比较”可以是硬要求，“优先采用柱状图”可以是允许调整的建议。沿用既有六种规则语义，不把推荐图形自动升级为固定表达；若业务或标准确实指定图形，则保留其绑定要求。
+
 ## 6. 核心结构：六份业务契约
 
 MapScenario 采用六份业务契约。它们是同一个方案的分段，不是六类模板，也不是六套独立工作流。
@@ -155,6 +161,14 @@ MapScenario 采用六份业务契约。它们是同一个方案的分段，不�
 目标设计中，portrayal 主要保留数据角色、值语义、图层与 Style Profile 的绑定，以及不能被视觉调整改变的业务约束。符号细节、注记行为和色带实现由 Style 提供。
 
 当前 v1 的 portrayal 还持有 `z_order`、`symbol`、`classification`、`scaling` 和无数据策略。向独立 Style 演进时需要明确协议升级和字段迁移，不能同时维护两套相互竞争的执行定义。
+
+Scenario 已固定表达引用时，规划解析并核对其版本、摘要、输入和执行能力，不要求每次重新发现目录。若通过 Style Profile 间接引用表达，解析后的实际表达仍须满足 Scenario 的选择和业务约束；不能用不兼容的 Profile 静默替换。
+
+未固定表达时，Scenario 可以只规定“地理分类数值图”的输入角色、目标和业务约束，由模型选择成熟预设，或在组合能力开放后生成新方案。实际数值映射、尺度、分母及地理关联必须在候选执行前明确。组合不必先注册完整名称，但所用能力及方案结构必须受正式协议支持；当前 v1 尚无通用组合链路。
+
+业务主题、地区、年份、单位、排序对象和 Top K 规则由 Scenario/任务提供，数据准备执行获准的统计处理。表达方法使用通用的要素、类别与数值语义，因此更换主题未必需要新方法，但需要重新检查单位、正负值和可加总性。
+
+例如，各市 Top 3 行业产值图由 Scenario 声明城市内排序、城市间比较和所需图例；模型可以选择共享尺度柱状图，再调用通用核心与地理放置能力。选择饼图时必须另行明确整体、分母和比较方式，不能只由 Style 改图形名称。页面辅助汇总图可以复用绘图核心并交给 Layout 放置，数据范围仍由任务明确，不能把城市 Top 3 的截取结果直接当作完整省级汇总。完整设计、执行与验证案例见[浙江示例](map-expression-and-symbol-design.md#76-从任务设计到执行验证)。
 
 ### 6.5 交付契约与质量门禁
 
@@ -458,7 +472,7 @@ T1 批准创建简报，TP 批准具体发布对象。二者都不能用作地�
 
 ### 14.2 规划、图面实现与渲染的分工
 
-MapPlanner 确认业务语义、数据与表达策略；MapComposer 在冻结前提出受约束的图面调整；compiler 解析成完整候选；Renderer 按已解析输入输出地图。
+MapPlanner 确认业务语义、数据与表达策略，选择预设或提出支持范围内的表达组合；MapComposer 在冻结前细化获准图面并依据检查反馈修订；compiler 解析成完整候选；Renderer 按已解析输入输出地图。映射、分母或比较目标变化须返回规划，不能作为普通美化调整。
 
 Scenario 为这些阶段提供规则，不替代规划器，也不自行运行工具循环。G2 后正式渲染不再选择分类、重新查找数据或自由调整版式。
 
@@ -568,19 +582,19 @@ Manifest 管理身份、文件闭包和依赖入口；依赖锁固定表达、�
 | `flood-risk-overview` 是作者 profile，不是另一套模板 ID | [template_author.py](../../skills/carto-agent/scripts/carto_core/workflow/template_author.py) |
 | 模板流程具备 analyze、brief、author、validate、publish 和独立 T1/TP | [template_workflow.py](../../skills/carto-agent/scripts/carto_core/workflow/template_workflow.py) |
 | 消费侧通过权威仓库发现并安装精确已发布版本 | [template_repository.py](../../skills/carto-agent/scripts/carto_core/repository/template_repository.py)、[template_installer.py](../../skills/carto-agent/scripts/carto_core/repository/template_installer.py) |
-| 地图规划为固定洪涝角色、分位数面分类与面积正比点表达 | [map_planning.py](../../skills/carto-agent/scripts/carto_core/workflow/map_planning.py) |
+| 地图规划限定固定洪涝角色、quantile 分类，并要求 area-proportional 缩放；这不等于实际面积编码已正确实现 | [map_planning.py](../../skills/carto-agent/scripts/carto_core/workflow/map_planning.py) |
 | portrayal v1 仍持有分类、符号、层序和无数据等具体表达规则 | [portrayal.yaml](../../skills/carto-agent/templates/map-scenario/urban-flood-risk/1.0.0/contracts/portrayal.yaml) |
 | 所有权组件支持外部组件完整段替换，但独立组件业务创建与通用匹配尚未开放 | [ownership.py](../../skills/carto-agent/scripts/carto_core/compiler/ownership.py)、[SKILL.md](../../skills/carto-agent/SKILL.md) |
 | 已打通候选、预览、G2、锁驱动渲染、成品检查及 G3 本地交付 | [map_generation.py](../../skills/carto-agent/scripts/carto_core/workflow/map_generation.py) |
 | 当前为 A3 横向、144 DPI 的合成演示交付；生产任务列表为空 | [scope-baseline.yaml](../../skills/carto-agent/policies/scope-baseline.yaml) |
 
-现有三场景枚举、可替换段声明和协议骨架不等于通用场景理解、独立组件装配或生产制图已经完成。`ResolvedCartography`、`ResolvedLayout` 和本文所示的 Profile/Slot 通用绑定也仍是演进设计。
+候选编译中的点半径仍按数值线性变化，与面积比例声明有差距；通用符号加载、图表及地理放置也尚未完整贯通，见[设计结论文档的实现核对](map-expression-and-symbol-design.md#10-当前仓库状态与设计差距)。现有三场景枚举、可替换段声明和协议骨架不等于通用场景理解、独立组件装配或生产制图已经完成。`ResolvedCartography`、`ResolvedLayout` 和本文所示的 Profile/Slot 通用绑定也仍是演进设计。
 
 建议按以下顺序完善：
 
 1. 明确数据语义、空间条件、表达实现和页面条件的唯一所有者，先收敛重复字段。
 2. 扩展数据角色与值角色的绑定、单位和时点验证，使实例输入不依赖固定洪涝字段约定。
-3. 将具体视觉规则迁入完整 MapStyle，让 portrayal 聚焦业务语义与表达绑定；保留不能被外观覆盖的业务约束。
+3. 将可替换的视觉配置迁入完整 MapStyle，让 portrayal 聚焦业务语义、表达绑定与业务约束；表达定义拥有映射语义，受信方法执行算法，迁移时明确各字段的唯一来源。
 4. 增加内容角色、视图关系和 Layout Slot 对接，并将实际表达与排版结果纳入现有候选和锁。
 5. 完善独立 Brand、Style、Layout 的创建发布与组合验证，再开放通用模板匹配。
 6. 按已注册任务逐项扩展 Scenario 作者和规划策略，补齐真实数据、空间工具及生产验收证据。

@@ -29,3 +29,8 @@ projects/
 
 # Doc sample assets (do not commit files under sample)
 doc/sample/
+
+# Patent prior-art search artifacts (re-downloadable via doc/download-patent-pdfs.ps1 + patent-search/fetch_claims_text.py)
+doc/.venv-pdf/
+doc/patent-search/*.pdf
+doc/patent-search/raw/

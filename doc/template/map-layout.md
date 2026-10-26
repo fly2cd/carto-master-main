@@ -4,7 +4,7 @@
 
 本文介绍 Carto Agent 模板体系中 MapLayout 的基本概念、作用、职责边界、内容结构、组合接口、适配方式、验证要求和输出产物。
 
-组织方式参考 [MapStyle 完整说明](map-style.md)，设计依据为 [模板体系补充说明](../carto-template-info-plus.md)。两份专题文档分别说明制图表达与版面组织，供模板作者、业务方案设计者、编译器开发者和审核人员使用。
+组织方式参考 [MapStyle 完整说明](map-style.md)，设计依据为 [模板体系设计](../carto-template-dsg.md)，表达、符号与图表复用的统一边界见 [地图表达与符号设计结论](map-expression-and-symbol-design.md)。两份专题文档分别说明制图表达规范与版面组织，供模板作者、业务方案设计者、编译器开发者和审核人员使用。
 
 本文是设计说明。除第 18 节“当前仓库状态”外，新增字段、匹配状态、编译产物和处理流程均为建议设计；示例不代表当前 CLI 已支持的输入格式。运行时协议仍以 `skills/carto-agent/schemas/`、`policies/` 和已发布模板为准。
 
@@ -49,11 +49,12 @@ MapStyle 决定图例的字体、色块和符号外观；MapLayout 决定图例�
 | 组件 | 定义的内容 | 提供给 Layout 的信息 |
 |---|---|---|
 | MapScenario | 业务内容、数据角色、地图视图、必需元素、用途限制 | 需要哪些内容角色、各角色的实例内容与必需性 |
-| MapStyle | 符号、色带、注记和图例外观 | 文本样式、图例样式、符号样式及允许调整范围 |
+| MapStyle | 在表达、场景与标准约束内配置符号、色带、注记和图例外观 | 文本样式、图例样式、符号样式及允许调整范围 |
 | MapBrand | Logo、字体资源、机构名称和品牌限制 | 已解析资产、字体和 Logo 安全留白等约束 |
 | MapLayout | 画布、Frame、位置、对齐、容量和排版策略 | 可承载内容的空间以及最终排版结果 |
 | 空间规划/地图编译 | CRS、视图范围、比例尺、相机和空间适用性 | 地图视图需求、范围适配结果、比例尺与方向计算结果 |
 | Delivery Target | 输出格式、分辨率、输出处理要求 | 格式和栅格化参数，以及外部要求的页面条件 |
+| 图表绘制核心 | 根据准备好的数据与样式生成局部坐标图形 | 图表图形、测量边界与尺度信息，不决定页面或地理位置 |
 | Renderer | 文本测量、地图绘制、页面合成和导出 | 可用能力、测量结果、渲染证据 |
 
 边界容易混淆的属性应按下表分配：
@@ -66,7 +67,7 @@ MapStyle 决定图例的字体、色块和符号外观；MapLayout 决定图例�
 | 标题颜色、字号默认值 | MapStyle 定义，标准可以施加约束 |
 | 标题所用字体文件 | 通过 MapBrand 或已批准的字体角色解析 |
 | 图例项及分类断点 | 地图实例编译结果提供 |
-| 图例色块外观、符号大小 | MapStyle 定义 |
+| 图例色块外观、符号样式 | MapStyle 在表达约束内配置；数据驱动的大小与地图实例实际映射一致 |
 | 图例列数、列间距、容器内边距 | MapLayout 定义 |
 | 是否必须出现比例尺、指北针、声明 | Scenario 或适用标准提出要求 |
 | 比例尺容器、指北针位置 | MapLayout 定义 |
@@ -135,8 +136,14 @@ Frame 定义空间边界，不直接携带业务内容。常见类型包括：
 | north-arrow | 指北针 | 对应视图的方向结果 |
 | logo | 品牌标识 | Brand 资产 |
 | text | 来源、日期、声明等 | 项目内容或外部格式化结果 |
+| chart（扩展建议） | 主图区附近独立展示的柱状图、饼图、折线图等 | Scenario/任务指定的数据内容，经图表核心生成 |
+| table（扩展建议） | 统计表、指标说明表等 | Scenario/任务指定的数据内容，经表格组件生成 |
 
-`logo`、通用 `text` 等是扩展建议，当前 Schema 的 Frame 类型不全部包含这些项。
+`logo`、通用 `text`、`chart`、`table` 等是扩展建议，当前 Schema 的 Frame 类型不全部包含这些项。`chart_panel`、`table_panel` 可以作为目标设计中的内容角色名称，不代表已实现相应 Frame 枚举或运行接口。
+
+辅助图表的指标、数据范围、聚合与 Top K 规则由 Scenario/任务提供，图表核心负责局部坐标绘制和测量，Layout 负责页面容器及最终放置。独立辅助图表可以直接复用图表核心，无需先登记为地图表达。
+
+同一绘图核心也可用于地图中的小图表；此时城市代表点、地理坐标到输出坐标的转换和地图内避让由空间规划、地图编译及相应放置逻辑处理。Layout 提供主地图框，不为每个城市创建一个页面 Frame。
 
 ### 6.3 Slot：可绑定的内容接口
 
@@ -185,6 +192,7 @@ Slot 可声明内容类型与最少/最多数量。其 `min_items: 1` 表示这�
 |---|---|---|
 | 标题 | 换行 → 已声明版式变体 → 返回不适配 | 截断核心标题、无限减小字号 |
 | 图例 | 标签换行 → 已声明列数 → 其他版式 → 报告失败 | 删除类别、减少分类数、重写单位 |
+| 辅助图表 | 在可读范围内调整尺寸与标签 → 已声明版式变体 → 报告失败 | 隐藏必需类别、改变单位、破坏要求共享的数值尺度 |
 | Logo | 等比缩放到容器内并核验最小尺寸 | 拉伸、裁剪标志、忽略安全留白 |
 | 来源和强制声明 | 换行 → 扩大已授权区域 → 报告失败 | 隐藏、截断或改写必需文本 |
 | 地图内容 | 在已批准视图内裁剪渲染到地图框 | 裁掉业务要求覆盖的区域来适配页面 |
@@ -683,6 +691,7 @@ Layout 校验可以验证“必需声明被完整放置”，但声明是否法�
 |---|---|
 | Layout v1 已有画布、Frame、占位符、容量和规则 | [layout.schema.json](../../skills/carto-agent/schemas/layout.schema.json) |
 | Frame 为 page 坐标，类型含 map、title、legend、scale-bar、north-arrow、inset、marginalia | 同上 |
+| 尚无通用 chart/table Frame 接口，也未贯通通用图表载荷及两类放置链路 | 本文辅助图表部分为目标设计；现有边界见 [表达与符号设计结论第 10 节](map-expression-and-symbol-design.md#10-当前仓库状态与设计差距) |
 | Canvas 使用 mm/px；Frame bounds 为四元素数组；容量主要是图例项数和标题字符数 | 同上及 [common.schema.json](../../skills/carto-agent/schemas/common.schema.json) |
 | Scenario 必须内嵌 identity、cartography、layout，可声明可替换段 | [scenario.schema.json](../../skills/carto-agent/schemas/scenario.schema.json) |
 | 所有权组件支持外部 MapLayout 整段替换 layout | [ownership.py](../../skills/carto-agent/scripts/carto_core/compiler/ownership.py) |

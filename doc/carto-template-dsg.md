@@ -4,9 +4,15 @@
 
 不要把“地图模板”设计成一个同时包含配色、图层、版式、数据字段和业务场景的万能文件。更合理的方案是复用本项目的“分段所有权”思想，建立：
 
-> 4 类模板工作区 + 交付形态 + 地图表达/符号目录 + 数据空间契约 + 项目实例锁
+> 4 类模板工作区 + 交付形态 + 轻量地图表达目录与符号资源 + 受信内置方法 + 数据空间契约 + 项目实例锁
 
 这样既能实现复用，又不会让模板绑死具体地区、数据集或渲染引擎。
+
+本文为总体设计，已于 2026-10-21 按[地图表达目录、内置方法与符号库设计结论](template/map-expression-and-symbol-design.md)统一相关描述。地图表达目录统一称 Map Expression Catalog；Encoding 仅表示表达内部的数据到视觉变量映射。目录描述规则，受信内置方法执行算法，两者配合使用，不要求先建设独立发布或安装体系。
+
+下文的候选表达、接口和扩展路线属于目标设计，不等于当前已开放能力。当前运行实现仅位于 `skills/carto-agent/`，机器执行不读取本文；实际能力与已知差距见上述结论文档第 10 节。地图表达和符号资源均不是第五类模板。
+
+职责链统一为：**表达规则约束数据与视觉之间的含义；Scenario／任务规定目标和业务要求；模型选择、组合或生成具体方案；Style 提供兼容的视觉配置；受信代码完成计算和绘制，验证结果用于修订与确认。** 常用预设提供起点，不穷举所有合法方案；模型编写的代码仍需与其用途相称的验证和执行限制。
 
 本文统一使用以下面向中文用户的领域名称：`MapStyle` 称为“制图表达规范”，强调其同时覆盖视觉层级、符号化、标注和概化等表达规则，而不是操作步骤或单纯视觉风格；`MapScenario` 称为“制图场景方案”，表示面向一类可重复业务场景的集成方案，不再使用地图侧的 `MapDeck`、`Map Product` 或“产品族”命名。PPT Master 的 `Style`、`Deck` 仅在来源对照中保留原名。
 
@@ -18,11 +24,11 @@ PPT Master 把 Brand、Style、Layout、Deck 定义为拥有不同职责的可�
 
 | PPT Master 类型 | 地图智能体中的对应物 | 负责内容 |
 |---|---|---|
-| Brand | 地图身份模板（Identity） | 机构颜色、字体、Logo、品牌符号和署名规范 |
+| Brand | 地图身份模板（MapBrand） | 机构颜色、字体、Logo、品牌符号和署名规范 |
 | Style | 制图表达规范（MapStyle） | 信息层级、符号语言、标注原则、色彩语义和概化方法 |
-| Layout | 地图版式模板（Map Layout） | 图框、标题、图例、比例尺、指北针、插图和来源区的位置与容量 |
+| Layout | 地图版式模板（MapLayout） | 图框、标题、图例、比例尺、指北针、插图和来源区的位置与容量 |
 | Deck | 制图场景方案（MapScenario） | 面向某类可重复业务场景的集成制图方案，例如应急态势、规划专题和自然资源图集 |
-| Chart/Table Catalog | 地图表达目录（Map Encoding Catalog） | 分级设色、比例符号、流向图、点密度和等值线等具体表达方法 |
+| Chart/Table Catalog | 地图表达目录（Map Expression Catalog） | 表达的输入、适用条件、编码、参数和检查要求；算法由受信代码实现 |
 | — | 交付形态（Delivery Profile） | 报告、图册、海报、Web 和移动端的媒介约束 |
 | — | 数据空间契约（Data/Spatial Contract） | 字段、单位、几何、CRS、时间、范围和数据质量 |
 | — | 符号与标准目录 | 通用点线面文字资源，以及测绘、地质、规划等权威符号 |
@@ -53,7 +59,7 @@ PPT Master 中的图表 SVG 只是灵活参考，项目数据与当前设计规�
 对应到地图系统：
 
 - 选择 `choropleth/sequential` 不代表固定使用五级蓝色。
-- 模板定义“数值如何映射为区域颜色”。
+- 表达定义规定映射语义和约束，Scenario 绑定业务角色，Style 提供兼容的视觉配置。
 - 当前项目决定实际字段、分类断点、颜色、行政区范围和输出介质。
 - 示例数据只用于验证容量，不能成为最终业务数据。
 
@@ -83,13 +89,13 @@ PPT Master 不合并多个模板规范正文，而是在消费时确定每个分
 |---|---|
 | 数据含义、单位、时间和空间参考 | 数据契约 |
 | 业务所需图层及成果要求 | MapScenario |
-| 数值到视觉变量的映射 | Map Encoding |
+| 数据到视觉变量的映射语义与约束 | 地图表达定义；Scenario 绑定业务语义，Style 在约束内配置视觉参数 |
 | 图层视觉层级、标注和概化 | MapStyle |
-| 页面或屏幕空间结构 | Map Layout |
-| Logo、机构字体和品牌色 | Identity |
+| 页面或屏幕空间结构 | MapLayout |
+| Logo、机构字体和品牌色 | MapBrand |
 | 当前范围、时间、数据快照和分类断点 | 项目实例锁 |
 
-不要通过“平均”“混搭”处理冲突。两个模板竞争同一分段时，应根据显式优先级选择唯一决策所有者；其他分段仍可提出兼容性约束，无法兼容时直接报告冲突。
+不要通过“平均”“混搭”处理冲突。外部 Brand、Style、Layout 只有在 Scenario 允许替换对应分段时，才可按完整段替换内嵌基线；每段最终只有一个所有者。适用的业务、表达、标准与平台硬约束须同时满足，不能用模板优先级覆盖，无法兼容时报告冲突。
 
 ### 6. 使用统一生命周期管理模板
 
@@ -131,7 +137,7 @@ PPT Master 的模板生命周期是：参考材料分析、基于事实的方案
 - 缺失值、不确定性、预测值和敏感数据的表达方式。
 - 色盲安全、灰度打印和对比度策略。
 - 图例组织、数值格式、单位和来源表达。
-- 推荐表达及明确的禁用条件。
+- 对已注册表达的兼容引用、参数默认及视觉限制；不在 Style 中另写算法或扩大表达的适用范围。
 
 它不应包含固定地区、固定字段名或固定纸张布局。
 
@@ -150,6 +156,8 @@ PPT Master 的模板生命周期是：参考材料分析、基于事实的方案
 - `projection_note`
 - `disclaimer`
 - `chart_panel`、`table_panel`
+
+这些是内容角色与容器的设计示例，不是当前 Schema 已支持类型的完整清单。辅助图表的数据和目的由 Scenario/项目提供，通用图表核心负责绘图，Layout 只负责容器与页面放置；地图内图表另由空间编译负责地理锚定。两种放置可以复用同一绘图核心。
 
 每个槽位应声明：
 
@@ -189,92 +197,64 @@ MapScenario 可以像 PPT Master 的 Deck 一样成为集成式工作区，拥�
 
 ### 5. 地图表达目录
 
-地图表达目录最接近 PPT Master 的 Chart/Table Catalog。每一种表达应按信息关系注册，而不是按颜色或视觉外观命名。
+地图表达目录管理可复用的表达定义。定义按信息关系和数据语义组织，避免按颜色、业务主题或视觉外观重复命名。它与内置方法配合：目录说明“适用什么、允许什么、如何验证”，受信代码完成计算与绘制。
 
-| 编码模板 | 适用场景 | 禁止或谨慎使用 |
+| 表达标识 | 适用任务与约束 | 状态 |
 |---|---|---|
-| `choropleth/sequential` | 行政区比率、密度和标准化指标 | 未标准化的绝对数量 |
-| `graduated-symbol/count` | 点或区域上的绝对数量 | 符号重叠严重且无法聚合 |
-| `dot-density/distribution` | 展示空间分布密度 | 点位置可能被误解为真实个体位置 |
-| `flow/od-weighted` | 起讫关系和流量 | 无方向或无权重的关系 |
-| `surface/isoline` | 连续空间场 | 离散类别数据 |
-| `change/diverging` | 具有明确零点的增减变化 | 没有语义中点的数据 |
-| `uncertainty/bivariate` | 同时表达数值和可信度 | 面向低认知容量的公众快速阅读 |
-| `network/route` | 道路、管线和路径连通性 | 普通空间邻近关系 |
+| `choropleth/sequential` | 可比较区域指标的顺序分级设色；绝对量须额外判断适用性 | 当前目录已登记，实际规划仅支持 quantile |
+| `proportional-symbol/count` | 非负数量映射为同形符号面积；须明确零值、最小尺寸与截断 | 当前目录已登记，实际半径计算与面积比例声明尚有差距 |
+| `graduated-symbol/count` | 数量先分级，再映射为有限档符号尺寸 | 扩展候选，与连续比例符号不同 |
+| `dot-density/distribution` | 数量映射为点数；须说明点不代表实际个体位置 | 扩展候选 |
+| `flow/od-weighted` | 已知起讫关系、方向和权重的表达 | 扩展候选 |
+| `surface/isoline` | 连续空间场的等值线，依赖相应计算能力 | 扩展候选 |
+| `change/diverging` | 有明确语义中点的增减变化 | 扩展候选 |
+| `uncertainty/bivariate` | 指标与可信度联合表达，须验证可读性 | 扩展候选 |
+| `network/route` | 连通关系或路径，不能将普通邻近关系当作拓扑连接 | 扩展候选 |
 
-每个目录项至少需要：
+这里的状态用于说明文档中的实现边界，不是新增目录字段或状态枚举。增加候选名称不产生执行能力。
 
-- `best_for` 和 `skip_if`。
-- 所需的数据角色和字段类型。
-- 数据到视觉变量的映射。
-- 图例、单位、缺失值和异常值规则。
-- 小型合成示例数据。
-- 不带项目品牌的中性预览。
-- 可自动执行的语义与渲染测试。
+一个可执行表达应明确输入语义与几何、适用和禁用条件、参数约束、编码规则、图例、缺失与异常值处理、所需受信能力及验证依据。合成 Fixture 和中性预览用于验收，不是业务数据或运行权威。
 
-## 三、推荐的目录组织
+已有 Scenario 固定表达时，解析并核对精确引用；未选定表达的任务才需要发现候选并进行确定性适用性检查。当前保留项目内轻量目录，在独立版本演进、跨项目分发等需求明确后，再评估独立资源发布。
+
+## 三、目录组织与实现位置
+
+运行实现沿用仓库唯一入口，表达和符号复用不增加第二套运行目录：
 
 ```text
-map-template-library/
-├─ identities/
-│  └─ <identity_id>/
-│     ├─ manifest.yaml
-│     ├─ identity.yaml
-│     └─ assets/
-├─ styles/
-│  └─ <style_id>/
-│     ├─ manifest.yaml
-│     └─ cartography.yaml
-├─ layouts/
-│  └─ <layout_id>/
-│     ├─ manifest.yaml
-│     ├─ layout.yaml
-│     ├─ prototypes/
-│     └─ previews/
-├─ scenarios/
-│  └─ <scenario_id>/
-│     ├─ manifest.yaml
-│     ├─ scenario.yaml
-│     ├─ bindings/
-│     │  ├─ data.schema.yaml
-│     │  └─ layer-graph.yaml
-│     ├─ prototypes/
-│     └─ assets/
-├─ visualizations/
-│  ├─ index.json
-│  └─ <family>/<key>/
-│     ├─ encoding.yaml
-│     ├─ fixture.geojson
-│     ├─ neutral-preview.svg
-│     └─ tests.yaml
+skills/carto-agent/
+├─ SKILL.md
+├─ policies/
+│  └─ map-expression-catalog.yaml
 ├─ schemas/
-└─ adapters/
-   ├─ mapbox/
-   ├─ qgis/
-   └─ arcgis/
+├─ scripts/
+│  ├─ carto.py
+│  ├─ carto_core/               # 工作流、表达计算、资源解析、编译与渲染
+│  └─ tests/                    # 开发测试与合成 Fixture
+└─ templates/                  # 内置 draft 示例，不是权威发布仓库
 ```
 
-每种模板维护唯一索引。智能体只从索引发现模板，不通过扫描目录或模糊名称猜测模板路径。这与 PPT Master 的索引设计一致，参见 [模板工具说明](../../skills/ppt-master/scripts/docs/template-tools.md#register_templatepy)。
+当前只有两项表达定义。通用符号资源实例化、图表核心和地理放置仍需在上述代码根目录内逐步补齐。正式模板包通过现有发布仓库和权威索引管理；符号通过模板资源包与精确资源引用解析，不因本设计自动增加独立符号服务。
 
-单个模板工作区可采用以下内部结构：
+下列为单个模板包的概念组织，不是全部模板的固定必选文件，也不是现有 Schema 的完整输入样例；各类模板的契约及包结构以对应[专题说明](template/map-scenario.md)和[模板创建 TRD](carto-create-template-TRD.md)为准。说明文档及资源的实际路径由 Manifest 声明，不根据下图猜测必选路径：
 
 ```text
-<template_workspace>/
-├─ manifest.yaml              # ID、类型、版本、摘要、标签和兼容性
-├─ spec/                      # 人类可读的可复用规则
-├─ contracts/                 # 数据、图层、比例尺和标注机器契约
-├─ prototypes/                # 可执行地图原型
-├─ assets/                    # 符号、纹理、字体声明和精灵图
-├─ fixtures/                  # 小型合成测试数据
-├─ previews/                  # 派生预览，不作为生成输入
-└─ tests/                     # 语义、空间、视觉和性能测试
+<template-package>/
+├─ manifest.yaml
+├─ templates/design_spec.md    # 供人阅读
+├─ contracts/                 # 该类模板实际拥有的机器契约
+├─ prototypes/                # 按模板类型提供的原型
+├─ assets/                    # 实际使用且获准发布的资源
+├─ fixtures/                  # 合成验收样例
+├─ previews/                  # 派生预览，不作为业务生成输入
+└─ dependencies.lock.yaml     # 精确依赖
 ```
 
-可选目录只在确实存在资产时创建，预览文件不能成为模板运行时输入。
+四类模板各有内容所有权；表达定义与符号资源是其引用能力，不是额外模板类型。规划通过权威索引发现模板，不扫描文件夹或按模糊名称猜测安装路径。运行时不把说明文档、预览或开发测试目录作为机器协议读取。
 
-## 四、地图模板必须增加的专有契约
+## 四、地图模板必须覆盖的专有约束
 
-PPT 模板体系没有覆盖、但地图模板必须拥有以下契约。
+以下按制图问题分组说明必需约束，不是另一套契约文件清单。MapScenario 仍采用六份业务契约，身份、视觉与版式由各自分段拥有；具体归属见 MapScenario 专题说明。
 
 ### 1. 数据契约
 
@@ -360,38 +340,18 @@ roles:
 - 不同渲染引擎之间的输出一致性。
 - 大数据量、瓦片和交互性能。
 
-## 五、增加项目实例锁
+## 五、项目实例锁
 
-模板只表达可复用规则。每次制图应生成一份 `map_lock.yaml`，冻结本次项目的具体决定：
+模板保存可复用规则；本次数据、模板选择、表达参数、图面结果与执行证据，在候选计算和预览验证后由精确 G2 冻结为 `MapSpecLock`。当前产物文件名为 `map-spec-lock.yaml`，结构以 [map-spec-lock.schema.json](../skills/carto-agent/schemas/map-spec-lock.schema.json) 和地图生成流程为准，不另建旧稿的 `map_lock.yaml` 协议。
 
-```yaml
-crs: EPSG:4490
-extent: [xmin, ymin, xmax, ymax]
-output: a3-landscape
-data_snapshot: 2026-09-10
-scenario: emergency-situation
-style: operational-clear
-layout: print-map-a3
-encoding: choropleth/sequential
-value_field: risk_rate
-normalization: population
-classification:
-  method: jenks
-  classes: 5
-layer_order: []
-label_policy: {}
-resolved_assets: []
-```
+锁定内容需要能追溯到：
 
-实例锁还应保存：
+- 所选模板、表达定义、受信方法及符号资源的版本或摘要；
+- 数据快照、字段绑定、单位与已执行处理；
+- 实际范围、投影、数值映射、图例与页面结果；
+- 预览证据、运行环境、批准对象与执行摘要。
 
-- 所选模板的 ID 和版本。
-- 数据源版本、时间戳和文件哈希。
-- 解析后的优先级和冲突处理结果。
-- 最终范围、投影、分级断点、调色板和图层顺序。
-- 渲染目标及其适配器版本。
-
-这样模板更新不会悄悄改变已经生成的地图，也能够完整复现一次制图决策。
+以上是信息类别说明，不是新的字段清单。现有字段、可锁定资源类型及未来扩展均须遵循正式 Schema；不能只在文档中增加字段就认为已纳入锁。模板更新不应改变已冻结运行，输入或方案变化需要重新生成候选并验证。
 
 ## 六、建议的运行流程
 
@@ -412,21 +372,18 @@ resolved_assets: []
 
 关键确认项应包括地图目的、受众、输出媒介、地理范围、数据时间、投影策略、核心指标和表达方式。能够从数据可靠推导的值不必让用户选择，但必须记录为推导结果。
 
-## 七、最小可行落地顺序
+## 七、阶段性落地顺序
 
-第一阶段不宜追求海量模板，建议依次完成：
+以现有固定洪涝合成演示为起点，先贯通并验证可复用能力，不预设首期必须实现某个数量的表达：
 
-1. 建立统一的 `manifest.yaml`、Schema、索引和实例锁格式。
-2. 实现 8～10 个地图表达模板。
-3. 实现两个 Layout：A4/A3 打印地图和 Web Dashboard。
-4. 实现一个通用分析制图 Style。
-5. 实现一个真实业务 MapScenario，例如“城市统计专题图”。
-6. 建立数据、空间、制图语义和视觉回归校验器。
-7. 先实现 MapLibre GL JS + SVG overlay 编译适配器和受控浏览器导出，再按明确场景扩展其他引擎。
+1. 对齐已有目录声明、规划限制、实际编码和图例，优先修正面积比例符号的数值语义。
+2. 贯通一个类别符号案例，明确符号资源、映射规则和实例绘制的边界。
+3. 以“城市 Top 3 分类数值图”为例，先用柱状图贯通地理与页面放置复用，再验证兼容的线段、圆点和标签组合。
+4. 随新增方法同步演进 Schema、目录引用、受信代码和检查器，保留版本、摘要与锁定机制。
+5. 在四类模板的职责明确后，按需求扩展独立模板创建、匹配和组合；真实业务须另行满足数据、空间与交付验收要求。
+6. 只有出现独立生命周期、跨项目分发等实际需求时，再增加表达资源的独立发布和安装机制。
 
-最关键的设计原则是：
-
-> 模板保存稳定的制图判断，实例锁保存当前项目决定；渲染适配器不得改变制图语义，但必须报告能力差异，并按显式降级策略实现等价或近似输出。
+地图表达定义保存稳定规则，受信代码执行算法，实例锁保存本次选择和计算结果。渲染适配器不能改变数值或业务语义；不支持所需能力时，应报告缺口或采用已明确验证的等价处理。
 
 ## 八、外部方案比较与吸收结论
 
@@ -458,7 +415,7 @@ resolved_assets: []
 MapBrand + MapStyle + MapLayout + MapScenario
       │             │
       │             ├─ Delivery Profile
-      │             ├─ Map Encoding Catalog
+      │             ├─ Map Expression Catalog
       │             ├─ Symbol Catalog / Standard Profile
       │             └─ Data / Spatial Contract
       ▼
@@ -476,8 +433,8 @@ MapLibre Web 主适配器 / 其他受控渲染适配器
 | 制图表达规范 | 显式 MapStyle，否则 MapScenario 内置表达规范 |
 | 版面结构 | 显式 MapLayout，否则 MapScenario 内置结构 |
 | 交付约束 | Delivery Profile；可以限制版面和字号，但不改写数据语义 |
-| 数据编码 | Map Encoding 与当前数据共同决定 |
-| 法定符号 | Standard Profile，优先于 Brand 和 Style |
+| 数据编码 | 表达定义约束语义，Scenario 绑定数据，Style 提供兼容配置，受信方法计算实例结果 |
+| 法定符号 | 经验证适用的 Standard Profile 施加强制约束；Brand 与 Style 必须同时满足 |
 | 最终实例值 | MapSpecLock |
 
 覆盖以完整分段为单位。外部 MapLayout 覆盖 MapScenario 结构时，不能保留一半内部图例区再混入一半外部地图框。
@@ -490,10 +447,10 @@ MapLibre Web 主适配器 / 其他受控渲染适配器
 |---|---|
 | 拥有 | 组织色板、字体身份、Logo、机构署名、版权与保密标识、品牌自有资产 |
 | 不拥有 | 地图版面结构、地图类型、数据符号化、CRS、范围和行业标准符号 |
-| 文件 | `templates/design_spec.md`，以及可选 `assets/logos/`、`assets/fonts/`、`assets/icons/` |
+| 文件 | `templates/design_spec.md`、`contracts/identity.yaml`，以及获准随包提供的 Logo、字体和品牌资产 |
 | 原型 roster | 无 |
 
-建议六节结构：
+下列六项归纳 Brand 的核心内容，不规定另一套章节格式；完整十部分说明见 [MapBrand 文档](template/map-brand.md)：
 
 ```text
 I. Brand Overview
@@ -504,7 +461,7 @@ V. Attribution and Legal Identity
 VI. Brand Assets and Usage Constraints
 ```
 
-MapBrand 的颜色只定义身份 token，例如 Primary、Secondary、Accent、Surface、Ink。水体、陆地、行政边界、风险等级等颜色属于 MapStyle、Map Encoding 或行业标准。颜色必须记录 `official / approximate / inferred` 来源，并声明是否允许参与数据编码。
+MapBrand 的颜色只定义身份 token，例如 Primary、Secondary、Accent、Surface、Ink。水体、陆地、行政边界和专题色带由 MapStyle 在表达与适用标准约束下提供；风险等级含义由 Scenario/数据合同及适用标准确定。颜色必须记录 `official / approximate / inferred` 来源，并声明是否允许参与数据编码。
 
 Logo 规格拥有文件、变体、净空、最小尺寸、禁用方式和允许锚区；具体页面坐标由 MapLayout 决定。数据来源引用格式通常属于制图或合规合同，MapBrand 只拥有机构署名和法定身份字符串。
 
@@ -512,11 +469,11 @@ Logo 规格拥有文件、变体、净空、最小尺寸、禁用方式和允许
 
 | 项目 | 合同 |
 |---|---|
-| 拥有 | 可复用的制图表达原则、视觉层级、标注与综合化原则、非约束视觉默认 |
+| 拥有 | 可复用的视觉层级、符号与注记配置、表达 Profile 引用、参数默认和允许范围 |
 | 不拥有 | 当前项目合同、组织身份、地图版面几何、具体数据与最终分类断点 |
-| 文件 | `templates/design_spec.md`；不携带资产和 SVG roster |
+| 文件 | `templates/design_spec.md`、`contracts/cartography.yaml`；按需引用或携带获准的符号、精灵图与色板，通常引用 Brand 字体角色 |
 
-建议七节结构：
+下列七项归纳 Style 的核心内容，不规定另一套章节格式；完整十部分说明见 [MapStyle 文档](template/map-style.md)：
 
 ```text
 I. Style Overview
@@ -535,7 +492,7 @@ communication_method: explanatory | exploratory | operational | navigational | n
 spatial_emphasis: context | distribution | topology | movement | comparison | change
 ```
 
-Map Role Vocabulary 描述一张地图承担的任务，如 context、thematic-evidence、comparison、route、suitability；正式的 choropleth、flow 等编码仍由 Map Encoding Catalog 拥有。Style 可以规定分类选择逻辑，但最终方法、级数和断点由数据分析确定并写入 MapSpecLock。
+Map Role Vocabulary 描述地图承担的任务，如 context、thematic-evidence、comparison、route、suitability。地图表达目录描述 choropleth、flow 等方法的适用条件、映射语义和参数约束，受信代码执行算法。Style 的 Profile 引用表达定义并提供兼容的符号、色带与参数默认，不能扩大表达的适用范围；Scenario/任务提出业务条件，规划确定最终参数并由程序计算断点，结果写入 MapSpecLock。
 
 Style 的 Review Focus 只承载风格性复查。CRS、Join、分类正确性、图例一致性和敏感信息检查属于始终运行的质量门禁。
 
@@ -545,9 +502,9 @@ Style 的 Review Focus 只承载风格性复查。CRS、Join、分类正确性�
 |---|---|
 | 拥有 | 画布、地图框、标题块、图例区、比例尺槽、指北针槽、inset 槽、页边信息区及其空间约束 |
 | 不拥有 | 组织身份、制图表达规范、业务应用、实际数据、CRS、地理范围和专题符号 |
-| 文件 | `templates/design_spec.md` + 完整 SVG 原型；交互布局另带机器状态合同 |
+| 文件 | `templates/design_spec.md`、`contracts/layout.yaml`，以及按能力需要提供的原型或预览；交互状态通过受支持机器契约表达 |
 
-MapLayout 拥有输出画布，不拥有地理范围。印刷画布必须分离物理尺寸与 SVG 逻辑坐标：
+MapLayout 拥有输出画布，不拥有地理范围。印刷画布必须明确物理尺寸与输出逻辑坐标的换算。下面保留的是原型设计元数据示意，便于说明版式家族；不是运行 Schema，也不把 Markdown front matter 作为执行入口。运行规则写入 `contracts/layout.yaml`，字段设计与完整示例见 [MapLayout 文档](template/map-layout.md)。
 
 ```yaml
 ---
@@ -575,7 +532,7 @@ layout_types:
 ---
 ```
 
-`prototype_count` 只表示可用原型数量，不限制最终地图页数。每个 SVG 必须是包含完整结构上下文的版面原型；Legend、Inset、Scale Bar 等可复用碎片若要单独维护，应进入 `components/`。
+若提供原型，`prototype_count` 只描述原型数量，不限制最终地图页数。SVG 原型用于展示完整结构、接口和容量，不能替代 `layout.yaml` 成为第二套运行规则。图例、插图和比例尺等组件由受信代码及受支持资源机制复用，不要求额外建立一个可执行组件目录。
 
 槽位不能只是可见 `{{...}}` 文本，还应具有机器类型、边界、容量和条件：
 
@@ -619,45 +576,44 @@ MapScenario 是面向一类可重复制图场景的集成方案，拥有场景�
 |---|---|
 | 拥有 | 循环应用、受众与结果、数据角色、图层角色、集成身份、集成结构、原型和质量要求 |
 | 不拥有 | 当前数据路径、实际范围、时间快照、最终分类断点和渲染器运行状态 |
-| 文件 | `templates/design_spec.md` + 完整 SVG/交互原型 + 实际使用的资产与数据角色 Schema |
+| 文件 | `templates/design_spec.md`、六份业务契约、实际使用的原型与获准资产；具体结构见 MapScenario 专题说明 |
 
-建议章节为 Template Overview、Color Scheme、Typography、Signature Design Elements、Page/Map Roster、Assets、Placeholder Overrides。其 `page_count` 同样应改为 `prototype_count`。例如：
+建议按场景目的、数据角色、空间行为、表达绑定、内容与组件装配、交付要求、质量门禁和原型组织章节，与 `scenario`、`data.schema`、`spatial-behavior`、`portrayal`、`delivery`、`quality-gates` 六份契约对应。身份、视觉与版式作为可替换内嵌分段，避免把场景说明写成另一份配色或版式规范。原型数量使用 `prototype_count`，不作为实际成果页数。例如：
 
 - `monthly-territory-map`：月度销售区域分析制图场景方案。
 - `annual-urban-atlas`：年度城市规划图册制图场景方案。
 
 ## 十、地图表达与符号目录
 
-### 1. Map Encoding Catalog
+### 1. 地图表达目录（Map Expression Catalog）
 
-地图类型目录应按信息关系注册，并使用唯一索引与规划词汇表：
+当前使用 `skills/carto-agent/policies/map-expression-catalog.yaml` 保存轻量定义，由 `map-expression.schema.json` 校验。保持已有表达标识、版本、摘要及锁定检查，不另建 `visualizations/`、`map_types/` 两套平行注册入口。
 
-```text
-map_types/
-├─ map_types_index.json
-├─ map_type_vocabulary.md
-└─ <key>/
-   ├─ encoding.yaml
-   ├─ fixture.geojson
-   ├─ neutral-preview.svg
-   └─ tests.yaml
-```
+每项定义描述输入语义、适用条件、参数、视觉映射、图例和验证要求，引用获准算法；算法实现仍在受信代码中。目录、Schema、代码的约束需要一致性检查。目录不能嵌入任意脚本，也不能把预览图或测试数据当作运行权威。
 
-外部方案提出的 key 可以吸收，但应进一步分类：
+下列分类可作为设计导航，不能据此声明已经实现全部方法：
 
-| 家族 | key | 说明 |
+| 分类维度 | 示例 | 组织原则 |
 |---|---|---|
-| 区域编码 | `choropleth` | 标准化区域指标的分级或连续着色 |
-| 点与数量 | `dot_density`、`proportional_symbol` | 密度分布或数量大小映射 |
-| 运动与关系 | `flow_map` | 起讫方向与流量宽度编码 |
-| 连续表面 | `isarithmic`、`heatmap` | 等值线或连续密度表面 |
-| 变形表达 | `cartogram` | 面积变形编码非空间变量 |
-| 分析结果 | `buffer_zone`、`suitability_overlay` | 距离或多因子分析产物，不只是视觉样式 |
-| 系列协调 | `time_series_map` | 多时相地图的范围、分类和图例一致性合同 |
+| 输入与输出几何 | 点、线、面、栅格 | 用于检索和兼容性判断，分别描述输入和结果 |
+| 数据语义 | 类别、顺序、数量、方向、时间 | 决定表达适用性和可用视觉变量 |
+| 表达机制 | 分级设色、比例符号、类别映射、地理锚定图表 | 方法由受信代码实现，主题和地区由 Scenario/任务绑定 |
+| 数据或空间推导 | 点密度、核密度、等值线、缓冲区、几何变形 | 显式声明计算依赖，不把分析产物都当作符号样式 |
+| 组合要求 | 时序比较、多视图、图表尺度一致 | 由 Scenario 和实例计划组织，表达与 Layout 分别提供所需能力 |
 
-每个 key 的索引摘要采用 `Pick for ... Skip if ...` 诊断句式。选择一个 key 不锁死最终几何，但必须保留其数据角色、视觉变量和单调映射。例如 flow map 可以调整线宽范围，却不能把权重关系改成无权线网。
+已有 Scenario 固定表达时直接核对引用与适用性；未固定表达时，模型优先使用成熟预设，也可在已支持的组合能力内生成新方案。新主题如果只改变角色绑定、单位和标签，可以复用同一方法；数据语义变化仍需检查，必要时扩展算法。
 
-地图表达不应只保存一张 SVG。SVG 是中性预览；真正的执行权威应是 `encoding.yaml` 和测试数据，因为地图几何来自地理数据、投影和当前范围。
+需要独立发布时，再设计表达资源包、依赖和兼容性管理。独立管理可以继续调用同一套内置方法，不要求复制执行代码。
+
+#### 表达设计空间与执行边界
+
+表达规则规定映射成立的条件；表达设计决定本次使用什么映射、图形和组织方式；可复用定义沉淀成熟机制及其约束。本次方案不必预先拥有独立目录名，但必须有正式计划结构承载，所用规则与能力可解析，候选执行前无未决映射和参数。详细术语见[表达规则与设计的关系](template/map-expression-and-symbol-design.md#23-表达规则设计活动与可复用定义)。
+
+“地理分类数值图”可以是公共概念，柱状图、饼图只是候选预设。具体方案须明确尺度、分母和比较方式；切换这些含义要返回规划与验证，不能作为 Style 的纯外观调整。业务硬要求与默认建议沿用既有六种规则语义，避免把“推荐柱状图”写成所有任务必须采用的形式。
+
+执行能力按“成熟方法 → 基础能力组合 → 缺少能力时开发新实现”逐步扩展，不按地区、主题或组合穷举完整绘图函数。代码可由模型辅助编写；输入输出结构之外，还需语义、特殊情况、执行范围、独立验证和复现条件。一次验证不代表对任意数据适用，只有值得复用时才沉淀公共定义。
+
+当前仍是固定表达基线，通用组合及每次制图动态生成代码均未贯通。动态代码执行须另行建设隔离与验收能力，不通过在模板或目录中嵌入脚本启用，也不作为当前演进的前置条件。详见[实现路径](template/map-expression-and-symbol-design.md#46-预设基础能力与模型编写实现)。
 
 ### 2. Symbol Catalog 与 Standard Profile
 
@@ -671,31 +627,20 @@ map_types/
 
 项目只同步实际选中的符号资源，但索引不是执行白名单。法定或行业标准符号不得被 Brand 任意重着色，也不得用外观相似的普通图标替换。
 
+符号库提供图形、锚点、固有比例、允许的尺寸/颜色/方向通道及资源约束；内置表达方法根据数据选择资源并计算参数；Renderer 加载实际资源、绘制每个要素的实例。类别图标不自动获得分类能力，固定饼图图标也不等于数据驱动饼图。
+
+数据驱动的柱状图、饼图和折线图复用通用图表核心；地理放置补充锚点、视图转换、尺度协调和避让，页面放置使用 Layout Frame。独立辅助图表无需强制经过地图表达目录，也无需新增一类图表模板。当前通用图表与符号资源绘制尚未完整贯通。
+
 ## 十一、工作区、索引与渐进式读取
 
-推荐在现有通用目录上增加明确 kind 目录与唯一索引：
+模板的 kind、ID、版本和摘要通过现有 Manifest、权威仓库和索引确定，运行代码位置沿用第三节。已安装包和内置 draft 示例不自动成为权威发现来源，不按目录名称猜测发布状态。
 
-```text
-map-templates/
-├─ brands/<id>/templates/design_spec.md
-├─ styles/<id>/templates/design_spec.md
-├─ layouts/<id>/templates/{design_spec.md, *.svg}
-├─ scenarios/<id>/templates/{design_spec.md, *.svg}
-├─ delivery-profiles/
-├─ map_types/
-├─ symbols/
-├─ standards/
-├─ schemas/
-├─ scaffolds/
-└─ adapters/
-```
-
-库内通过 `<kind>/<id>/` 容器确定类型和 ID，统一使用 `templates/design_spec.md`；项目内安装后使用 `design_spec.<kind>.<id>.md`，从而允许不同 kind 共存。每类模板只从自己的 `*_index.json` 发现，不扫描目录补全注册表，也不根据裸名称猜测路径。
+表达定义继续使用当前轻量目录，符号按实际引用解析；它们不因可复用就需要独立模板索引或单独服务。模板的精确版本与资源依赖按现有机制固定；表达规模扩大时，再演进当前固定目录集合的校验限制。
 
 模板读取分两级：
 
-1. 合同确认前只读取索引和 Manifest，包括 ID、摘要、数据前提、输出媒介、CRS/比例尺适用范围、引擎兼容性、依赖、冲突和许可。
-2. 合同确认并选定模板后，才读取完整 Design Spec、原型、符号和绑定合同，并安装到项目本地；大型底图可使用版本化 URI 与内容哈希，不强制复制。
+1. 合同确认前按允许范围读取索引和 Manifest，包括标识、摘要、数据前提、输出条件、兼容性、依赖和许可。
+2. 选定并安装模板后，解析其小型机器契约，按需解析原型和资源。Design Spec 供作者与审阅者理解设计，不作为机器协议；大型资源可使用版本化 URI 与内容摘要，不强制复制全部目录。
 
 创建策略只记录模板来源：
 
@@ -730,61 +675,19 @@ MapPlan 是可以修改的执行计划，记录模板选择、数据角色绑定
 
 ### 3. MapSpecLock
 
-MapSpecLock 使用有 Schema 的 YAML，而不是 Markdown 中的半结构化键值行。它在数据绑定、预览和能力协商完成后冻结，至少包含：
+MapSpecLock 是已验证候选的不可变执行快照。正式结构由 `map-spec-lock` Schema 及其引用的执行快照定义，具体冻结与消费流程由地图生成 TRD 和运行实现规定；详见本文第五节。这里不再维护一份并行 YAML 字段清单。
 
-```yaml
-templates:
-  brand: {id: null, version: null}
-  style: {id: null, version: null}
-  layout: {id: null, version: null}
-  scenario: {id: null, version: null}
-
-spatial:
-  source_crs: null
-  working_crs: null
-  display_crs: null
-  measurement_crs: null
-  extent: null
-  scale_or_zoom: null
-
-data:
-  sources: []
-  hashes: []
-  joins: []
-  transformations: []
-
-encoding:
-  map_type: null
-  field: null
-  normalization: null
-  classification_method: null
-  breaks: []
-  palette: []
-  null_symbol: null
-
-layers: []
-labels: []
-pages_or_views: []
-resolved_assets: []
-forbidden_rules: []
-
-renderer:
-  adapter: null
-  version: null
-  capability_fallbacks: []
-```
-
-MapSpecLock 中不使用 PPT 特有的 `masters`、`layouts`、`page_layouts` 映射。地图组合模式可以另行声明为 `static`、`responsive`、`atlas-series` 或其他地图原生模式。
+MapDesignSpec 解释设计，MapPlan 承载可修订决定，MapSpecLock 固定已验证的执行输入和证据；三者不能互相替代。图集、响应式或其他组合模式只有在相应协议、编译与渲染能力贯通后才可锁定，不能仅靠声明模式名启用。
 
 ## 十三、补充质量门禁
 
 除本文前述质量检查外，模板系统还应验证：
 
-- MapBrand 不得包含 Water、Land、Border 等底图语义 token，除非它本身是 MapScenario 的集成身份/表达规范分段。
+- Water、Land、Border 等底图语义 token 属于 cartography 分段；即使 Brand 内嵌于 Scenario，identity 也不取得这些属性的所有权。
 - MapStyle 不得包含固定画布、Logo、具体数据路径或最终断点。
-- MapLayout 的物理尺寸、viewBox、槽位和 roster 必须相互一致。
-- MapScenario 内部各分段必须完整；外部同 kind 覆盖时必须整段替换。
-- MapType 的索引、词汇表、执行合同和 fixture 数据集合必须一致。
+- MapLayout 的画布、坐标单位、Frame 与内容绑定必须一致；若提供原型，其边界也须与机器契约一致。
+- MapScenario 内部各分段必须完整；外部同 kind 替换须先满足可替换声明，再进行完整段替换与约束校验。
+- 地图表达定义、Schema、受信实现与合成验收样例必须一致；名称、状态或预览图不能代替实际能力验证。
 - 中性预览不得抹掉风险色、行业标准色、顺序关系或不确定性编码。
 - 地理概化允许改变节点和位置，但必须满足拓扑、最大位移、最小保留面积及比例尺误差约束。
 - Web/Mobile 原型必须具有响应式、交互和性能合同，不能仅以固定 SVG 通过验证。
@@ -793,96 +696,28 @@ MapSpecLock 中不使用 PPT 特有的 `masters`、`layouts`、`page_layouts` �
 
 ## 常见问题
 
-### Q1: 什么叫分段所有权，如何执行？
+### Q1：分段所有权与表达目录是什么关系？
 
-**分段所有权**是指：把一份完整的地图设计拆成几段（身份、方法、版面、产品、数据→符号映射），每段只有一个模板说了算，不能两个模板同时拥有同一段。
+分段所有权明确四类模板分别拥有身份、视觉配置、版面和场景合同。表达定义、符号资源和数据合同提供可引用的规则或输入，不因参与组合就成为额外模板类型。
 
-用装修房子打比方：
-
-| 段 | 谁说了算 | 举个例子 |
+| 对象 | 负责内容 | 示例 |
 |---|---|---|
-| 户型怎么改 | 结构设计师 | 这面墙能不能拆 |
-| 风格长什么样 | 业主 | 要北欧风还是中式 |
-| 水电怎么走 | 水电工程师 | 管线走顶还是走地 |
-| 预算花多少 | 业主 | 总共花 20 万还是 50 万 |
+| MapBrand | 机构身份与获准品牌资源 | Logo、机构字体和身份色 |
+| MapStyle | 在表达和标准约束内提供视觉配置 | 专题色带、符号引用、注记、参数默认 |
+| MapLayout | 页面容器与容量 | A3 画布、主图框和侧栏位置 |
+| MapScenario | 业务目的、数据角色和必需表达 | 要展示哪些指标，是否需要城市间数量比较 |
+| 地图表达定义 | 输入要求、有条件的编码规则、常用预设和检查条件 | 声明按面积表达时验证实际面积 |
+| 模型的规划与图面设计 | 在任务和规则内选择、组合方案，依据预览修订 | 选择共享尺度，组合图形，调整兼容布局 |
+| 受信方法与实例编译 | 计算并固定当前参数和绘图结果 | 实际分类断点、符号面积、图例项 |
 
-结构设计师只管户型，不插手业主选什么颜色的墙；水电工程师只管管线，不管最终摆什么家具。如果出现冲突（业主要好看、水电工程师要方便维修），不是两个人投票"平均一下"，而是按优先级规则判定谁说了算，判定不了就直接报告冲突让业主拍板。
+Brand 不自动拥有底图和专题图的所有颜色。若 Style 要求灰色底图，而 Brand 只定义白色身份背景，两者应分别用于各自角色；不能据此覆盖底图。只有显式允许消费某个品牌颜色角色时，Style 才能在表达和标准约束内采用它。约束无法同时满足时报告冲突。
 
-映射到地图模板系统：
+选择外部 Brand、Style、Layout 时，先验证 Scenario 对应分段允许替换，再以完整分段替换内嵌基线，不逐字段拼接。未选择外部模板时可以使用 Scenario 内嵌分段；自由设计也必须提供完整且可验证的规则。
 
-| 段 | 谁拥有 | 举个例子 |
-|---|---|---|
-| 机构身份 | Identity | 测绘局的蓝色、黑体字、机构 Logo |
-| 制图表达规范 | MapStyle | 极简表达、标注避让规则、概化策略 |
-| 版面骨架 | Map Layout | A3 横版、图框在左、图例在右 |
-| 制图场景方案 | MapScenario | 应急态势图的图层组合和业务场景 |
-| 数据→符号映射 | Map Encoding | 行政区按风险率着色、五级蓝色渐变 |
+### Q2：用户是否需要逐个选择目录、符号和绘图函数？
 
-Identity 不插手地图框放哪里；MapStyle 不插手用什么品牌色；MapLayout 不插手图层顺序怎么排。如果 MapStyle 说"底图用灰色"而 Identity 说"底图用白色"——Identity 赢，因为颜色身份归 Identity，MapStyle 的颜色只是"没选 Identity 时的默认回退"。
+用户先明确目标、数据和输出条件，再选择或确认可用方案。系统解析模板分段、表达引用和符号资源，检查适用性与执行能力。已有方案固定表达时，无需再次搜索目录。
 
-核心三条规矩：
+典型流程是：确认制图需求 → 选择兼容模板与表达 → 绑定数据并计算候选 → 预览及验证 → 通过对应确认后冻结 MapSpecLock → 按锁渲染和交付。具体状态和审批由工作流协议拥有，目录本身不增加一次审批或安装步骤。
 
-1. **每段只有一个说了算的人**——不能两个人同时拥有同一段
-2. **冲突不混搭，按优先级判定**——判不了就报冲突，不能各退一步搞折中
-3. **没选模板的段，用自由设计**——不是每段都必须选模板，可以什么都不选自己做
-
-#### 决策流程
-
-分段所有权**不是每一段依次决策**的。很多人会以为流程是"先选品牌 → 再选风格 → 再选版面 → 最后选产品"，像流水线一样一段一段来。实际不是这样。
-
-用装修继续打比方，装修的真实流程是：
-
-1. 业主跟设计师坐下来聊——"我要装修一套房，给三口人住，预算 30 万，喜欢北欧风"。这是定"做什么"，不是定"每段谁来做"。
-2. 设计师拿出几个方案：北欧风全包 / 极简半包 / 自由发挥。业主选一个，或说"我都不选，自己来"。
-3. 选了"北欧风全包"后自动带入了风格方案、施工队、材料供应商。此时"水电归水电工程师""风格归业主"这些分段所有权是在安装时自动生效的，不是业主逐个去指定。
-4. 施工时按规则执行——水电工程师看自己的合同做水电，设计师看自己的合同做设计，业主看自己的合同做风格决策。如果冲突，按优先级判，判不了就报回来问业主。
-
-关键点：**业主不需要走完"水电选择""瓦工选择""木工选择"的逐项菜单。业主只说"我要什么"，系统自动把对应的分段所有权安装到位。**
-
-映射到模板系统的真实决策流程：
-
-**第一步：确认制图合同（定"做什么"）**
-→ 地图主题是什么、给谁看、输出什么媒介、核心信息是什么
-→ 此时还没有选任何模板
-
-**第二步：选择模板（定"用不用预制方案"）**
-→ 系统从索引中展示候选模板
-→ 用户可以选一个或多个，也可以选"自由设计"（什么都不选）
-→ 所有分段的选择是同时确认的，不是依次的
-
-**第三步：安装 + 所有权自动解析**
-→ 系统把选中的模板安装到项目本地
-→ 安装时自动确定每段的所有者
-→ 如果两个模板竞争同一段，按优先级判；判不了报冲突
-
-**第四步：生成实例锁（冻结决策快照）**
-→ 把"这次制图用了哪些模板、数据源是什么、CRS 是什么、分级方法是什么"全部冻结成一份锁文件
-
-**第五步：制图执行**
-→ 执行器读实例锁，按锁定的规则制图
-→ 每段读对应所有者的规则，不越界
-
-#### 一个具体例子
-
-假设要制一张"城市洪涝风险研判图"：
-
-| 步骤 | 发生了什么 | 用户做了什么 |
-|---|---|---|
-| 第一步 | 确认制图合同：面向应急指挥中心、A3 印刷、核心信息是高风险区域分布 | 用户回答几个问题 |
-| 第二步 | 系统展示候选：有 `emergency-situation` 产品模板、`operational-clear` 风格、`print-map-a3` 版面 | 用户说"用这套" |
-| 第三步 | 系统自动安装三个模板，解析出：颜色归 Identity、制图表达规范归 MapStyle、版面归 MapLayout、图层组合归 MapScenario | 用户什么都不用做 |
-| 第四步 | 生成实例锁：CRS=EPSG:4490、encoding=choropleth/sequential、classification=jenks/5 | 用户确认数据源和关键参数 |
-| 第五步 | 执行器按锁制图 | 自动完成 |
-
-用户从头到尾没有逐个"选品牌 → 选风格 → 选版面 → 选产品"。用户只做了两件事：说清楚要做什么 + 选一套预制方案（或自由设计）。后面全是系统自动解析的。
-
-核心理解：
-
-| 误区 | 实际 |
-|---|---|
-| 每段依次决策，像点菜单一样逐项选 | 先定整体需求，再一次性选模板包，系统自动分配所有权 |
-| 用户需要理解"分段"概念 | 用户不需要理解分段，分段是系统内部的冲突解决机制 |
-| 每段都要选一个模板 | 可以全选、可以部分选、可以都不选（自由设计） |
-| 所有权是用户指定的 | 所有权是安装时根据优先级规则自动解析的 |
-
-> 一句话总结：**用户只管"我要什么"和"用不用预制方案"，分段所有权是系统在安装时自动解析的内部机制，对用户透明。**
+以城市统计图为例，Scenario 决定各市展示哪些指标，表达方法决定数值如何变成柱高或面积，Style 提供配色与标签，Layout 提供页面容器，空间编译完成地理放置。各方形成一致的实例结果后再冻结。当前合成演示之外的能力需先落实实现与验证，不能由模板名称直接推定。
