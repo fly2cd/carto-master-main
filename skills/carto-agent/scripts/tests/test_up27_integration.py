@@ -8,12 +8,10 @@ import time
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
-from dataclasses import asdict, replace
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
-
-import yaml
 
 SCRIPTS_ROOT = Path(__file__).resolve().parents[1]
 TESTS_ROOT = Path(__file__).resolve().parent
@@ -21,7 +19,6 @@ for root in (SCRIPTS_ROOT, TESTS_ROOT):
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
 
-import test_up2_template as up2
 from carto_core.canonical import sha256_digest
 from carto_core.cli import build_parser, main as cli_main
 from carto_core.errors import ProtocolError, SecurityError
@@ -92,14 +89,23 @@ class StateRecoveryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             store = WorkflowStateStore(Path(temp) / "run")
             state = store.initialize("run-one", {"request": "map"})
-            time.sleep(0.02)
-            advanced, receipt = store.complete_step(
-                state,
-                status="waiting_approval",
-                prerequisites={},
-                output_refs=[],
-                next_step="compile",
-            )
+            # The operation starts inside complete_step, not at initialize().
+            # A sleep before that call cannot guarantee distinct millisecond ticks.
+            started = "2026-11-05T09:00:00.000Z"
+            completed = "2026-11-05T09:00:00.020Z"
+            with patch(
+                "carto_core.workflow.state_machine.utc_now",
+                side_effect=[started, completed],
+            ):
+                advanced, receipt = store.complete_step(
+                    state,
+                    status="waiting_approval",
+                    prerequisites={},
+                    output_refs=[],
+                    next_step="compile",
+                )
+            self.assertEqual(receipt.started_at, started)
+            self.assertEqual(receipt.completed_at, completed)
             self.assertEqual(advanced.status, "waiting_approval")
             self.assertEqual(advanced.revision, 2)
             self.assertLess(receipt.started_at, receipt.completed_at)
@@ -113,6 +119,24 @@ class StateRecoveryTests(unittest.TestCase):
                 )
             self.assertEqual(raised.exception.code, "JOB_STATE_STALE")
 
+    def test_operation_can_complete_within_one_clock_tick(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            store = WorkflowStateStore(Path(temp) / "run")
+            state = store.initialize("run-one", {"request": "map"})
+            instant = "2026-11-05T09:00:00.000Z"
+            with patch("carto_core.workflow.state_machine.utc_now", return_value=instant):
+                advanced, receipt = store.complete_step(
+                    state,
+                    status="waiting_approval",
+                    prerequisites={},
+                    output_refs=[],
+                    next_step="compile",
+                )
+            self.assertEqual(receipt.started_at, instant)
+            self.assertEqual(receipt.completed_at, instant)
+            self.assertEqual(advanced.revision, 2)
+            self.assertEqual(advanced.status, "waiting_approval")
+
     def test_retry_only_advances_failed_attempt(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             store = WorkflowStateStore(Path(temp) / "run")
@@ -122,7 +146,7 @@ class StateRecoveryTests(unittest.TestCase):
                 status="failed",
                 prerequisites={},
                 output_refs=[],
-                error={"code": "TEST_FAILURE", "message": "synthetic failure"},
+                error={"code": "TEST_FAILURE", "message": "injected failure"},
             )
             retried = store.retry(failed)
             self.assertEqual((retried.status, retried.attempt, retried.revision), ("pending", 2, 3))
@@ -172,83 +196,6 @@ class StateRecoveryTests(unittest.TestCase):
 
 
 class RouteClosureTests(unittest.TestCase):
-    def test_template_validation_retry_preserves_attempt_evidence_and_can_publish(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            helper = up2.TemplateWorkflowTests(methodName="runTest")
-            project, request, workdir, workflow, brief = helper._ready(root)
-            workflow.author(
-                request,
-                helper._approval(project, brief),
-                approval_key=up2.KEY,
-                nonce_db="author-nonces.sqlite3",
-                policy_id="carto-security",
-                issuer="trusted-local",
-            )
-
-            with patch(
-                "carto_core.workflow.template_validation.discover_browser",
-                side_effect=ProtocolError("RENDER_BROWSER_UNAVAILABLE", "synthetic transient failure"),
-            ):
-                failed = workflow.validate(request, attestation_key=KEY)
-            self.assertEqual("failed", failed["state"]["status"])
-            first_path = workdir / "validation/template-validation-evidence.yaml"
-            first_bytes = first_path.read_bytes()
-
-            retried = workflow.retry()
-            self.assertEqual(("pending", 2), (retried["state"]["status"], retried["state"]["attempt"]))
-            passed = workflow.validate(request, attestation_key=KEY)
-            self.assertEqual("passed", passed["evidence"]["status"])
-            self.assertEqual(first_bytes, first_path.read_bytes())
-            retry_path = workdir / "validation/attempt-2/template-validation-evidence.yaml"
-            self.assertTrue(retry_path.is_file())
-            self.assertEqual(
-                "validation/attempt-2/template-validation-evidence.yaml",
-                passed["receipt"]["output_refs"][0]["uri"],
-            )
-
-            scope = "local:templates"
-            publication_object = {
-                "package_digest": passed["evidence"]["package_ref"]["digest"],
-                "evidence_digest": passed["evidence"]["evidence_digest"],
-                "repository_scope": scope,
-            }
-            now = datetime.now(UTC)
-            approval = sign_receipt(ApprovalReceipt(
-                1,
-                "publication-approval-retry",
-                "trusted-local",
-                "reviewer-one",
-                "tenant-one",
-                "approve-template-publish",
-                "template-publication",
-                sha256_digest(publication_object),
-                scope,
-                "carto-security",
-                "local",
-                (now - timedelta(minutes=1)).isoformat(),
-                (now + timedelta(minutes=10)).isoformat(),
-                "publication-nonce-retry-00000001",
-            ), up2.KEY)
-            approval_path = project / "publication-approval-retry.yaml"
-            approval_path.write_text(yaml.safe_dump(asdict(approval), sort_keys=False), encoding="utf-8")
-            published = workflow.publish(
-                request,
-                approval_path,
-                repository_root="template-repository",
-                repository_scope=scope,
-                idempotency_key="publish-retry-0001",
-                approval_key=up2.KEY,
-                renderer_attestation_key=KEY,
-                nonce_db="publication-nonces.sqlite3",
-                policy_id="carto-security",
-                issuer="trusted-local",
-            )
-            self.assertEqual("succeeded", published["state"]["status"])
-            self.assertEqual(
-                passed["evidence"]["evidence_digest"],
-                published["publication"]["evidence_ref"]["digest"],
-            )
 
     def test_cli_exposes_status_retry_and_receipts_for_both_routes(self) -> None:
         parser = build_parser()
@@ -275,7 +222,7 @@ class RouteClosureTests(unittest.TestCase):
                     status="failed",
                     prerequisites={},
                     output_refs=[],
-                    error={"code": "TEST_FAILURE", "message": "synthetic failure"},
+                    error={"code": "TEST_FAILURE", "message": "injected failure"},
                 )
                 common = [
                     "--project-root", str(project),

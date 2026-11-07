@@ -1,6 +1,6 @@
 schema_version: 1
 registry_id: carto-tool-bindings
-version: 1.0.0
+version: 1.1.0
 default: deny
 bindings:
   - capability_id: local-file-read
@@ -48,6 +48,30 @@ bindings:
     adapter: local
     effect: write-project
     authorization_policy: svg-composition
+    path_guard_required: true
+    credential_mode: none
+    snapshot_policy: required
+  - capability_id: gis-raster-info
+    version: 1.0.0
+    adapter: mcp
+    effect: read
+    authorization_policy: project-gis-info
+    path_guard_required: true
+    credential_mode: none
+    snapshot_policy: required
+  - capability_id: gis-raster-statistics
+    version: 1.0.0
+    adapter: mcp
+    effect: read
+    authorization_policy: project-gis-statistics
+    path_guard_required: true
+    credential_mode: none
+    snapshot_policy: required
+  - capability_id: gis-raster-reproject
+    version: 1.0.0
+    adapter: mcp
+    effect: write-project
+    authorization_policy: project-gis-reproject
     path_guard_required: true
     credential_mode: none
     snapshot_policy: required

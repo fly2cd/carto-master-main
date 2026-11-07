@@ -27,9 +27,10 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "type", "coordinate_space", "bounds", "overflow_policy"],
+        "required": ["id", "content_id", "type", "coordinate_space", "bounds", "overflow_policy"],
         "properties": {
           "id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+          "content_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier", "description": "Explicit binding to one view or overlay id."},
           "type": {"enum": ["map", "title", "legend", "scale-bar", "north-arrow", "inset", "marginalia"]},
           "coordinate_space": {"const": "page"},
           "bounds": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/pageBox"},

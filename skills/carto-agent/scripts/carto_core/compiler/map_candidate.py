@@ -1,21 +1,17 @@
 from __future__ import annotations
 
-import math
-from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
-from ..adapters.controlled_renderer import FRONTEND_BUILD, MAPLIBRE_VERSION, OVERLAY_ENGINE_VERSION, RANDOM_SEED, RENDERER_VERSION, sha256_file
-from ..adapters.webmap_renderer import WebMapRendererAdapter
 from ..canonical import sha256_digest
+from ..scenario_registry import ScenarioRegistry
 from ..errors import ProtocolError
-from ..repository.template_repository import _file_digest
+from ..repository.map_expression_catalog import MapExpressionCatalog
+from ..artifacts import file_digest
 from ..schema_registry import SchemaRegistry, load_document
 from ..security.paths import PathGuard
+from ..validation.map_checks import MapQualityChecks
 from .dependencies import DependencyResolver
-
-
-PALETTE = ["#FFF7BC", "#FEE391", "#FEC44F", "#FE9929", "#EC7014", "#CC4C02", "#993404", "#7F0000", "#67000D", "#49000A", "#310006", "#1A0003"]
 
 
 class MapCandidateCompiler:
@@ -26,8 +22,10 @@ class MapCandidateCompiler:
         "portrayal": "portrayal", "delivery": "delivery", "quality_gates": "quality-gates",
     }
 
-    def __init__(self, path_guard: PathGuard, registry: SchemaRegistry | None = None) -> None:
+    def __init__(self, path_guard: PathGuard, registry: SchemaRegistry | None = None,
+                 *, project_root: Path | None = None, context=None) -> None:
         self.path_guard = path_guard
+        self.project_root, self.context = project_root, context
         self.registry = registry or SchemaRegistry()
         self.dependencies = DependencyResolver()
 
@@ -52,9 +50,9 @@ class MapCandidateCompiler:
         )
         if expected_identity != actual_identity:
             raise ProtocolError("TEMPLATE_INSTALL_IDENTITY_MISMATCH", str(root))
-        if _file_digest(manifest_path) != installation.get("manifest_digest"):
+        if file_digest(manifest_path) != installation.get("manifest_digest"):
             raise ProtocolError("TEMPLATE_INSTALL_MANIFEST_DRIFT", str(root))
-        if _file_digest(checksum_path) != template_ref.get("digest"):
+        if file_digest(checksum_path) != template_ref.get("digest"):
             raise ProtocolError("TEMPLATE_INSTALL_PACKAGE_DRIFT", str(root))
         tree = list(root.rglob("*"))
         linked = [item.relative_to(root).as_posix() for item in tree if item.is_symlink()]
@@ -66,7 +64,7 @@ class MapCandidateCompiler:
             raise ProtocolError("TEMPLATE_INSTALL_FILE_SET_DRIFT", str(root))
         for relative, digest in manifest["checksums"].items():
             target = self.path_guard.resolve(root / relative, must_exist=True)
-            if not target.is_file() or _file_digest(target) != digest:
+            if not target.is_file() or file_digest(target) != digest:
                 raise ProtocolError("TEMPLATE_INSTALL_FILE_DRIFT", relative)
         expected_contract_digest = sha256_digest({
             name: manifest["checksums"][relative]
@@ -79,6 +77,7 @@ class MapCandidateCompiler:
             value = load_document(root / manifest["business_contracts"][key])
             self.registry.validate(schema, value)
             contracts[key] = value
+        MapQualityChecks(self.registry).selection(contracts["quality_gates"])
         lock = load_document(root / manifest["dependency_lock"])
         self.registry.validate("dependency-lock", lock)
         self.dependencies.validate_lock(lock)
@@ -86,168 +85,9 @@ class MapCandidateCompiler:
         self._validate_rules(contracts)
         return {"root": root, "manifest": manifest, "lock": lock, **contracts}
 
-    def compile(self, request: dict[str, Any], intent: dict[str, Any], plan: dict[str, Any],
-                bundle: dict[str, Any], installation: dict[str, Any], contracts: dict[str, Any],
-                font_path: Path) -> dict[str, Any]:
-        if plan["open_issues"] or bundle["open_issues"]:
-            raise ProtocolError("CANDIDATE_INPUT_UNRESOLVED", request["run_id"])
-        font_path = self.path_guard.resolve(font_path, must_exist=True)
-        role_bindings = {item["role"]: item for item in bundle["role_bindings"]}
-        risk = load_document(self.path_guard.resolve(role_bindings["risk-area"]["prepared_ref"]["uri"], must_exist=True))
-        shelters = load_document(self.path_guard.resolve(role_bindings["shelter-point"]["prepared_ref"]["uri"], must_exist=True))
-        values = sorted(float(item["properties"]["risk_value"]) for item in risk["features"])
-        counts = sorted(float(item["properties"]["count_value"]) for item in shelters["features"])
-        breaks = self._quantile_breaks(values, plan["decisions"]["class_count"])
-        colors = PALETTE[:max(1, len(breaks) - 1)]
-        legend = [
-            *self._legend(breaks, colors),
-            {"label": "无数据", "color": "#D1D5DB", "symbol": "fill"},
-        ]
-        scene = self._scene(request, plan, bundle, installation, contracts, font_path, breaks, colors, counts, legend)
-        scene = WebMapRendererAdapter().compile_scene(scene)
-
-        template_ref = installation["template_ref"]
-        target_contracts = {item["format"]: item for item in contracts["delivery"]["targets"]}
-        targets = {}
-        for target in sorted(request["requested_outputs"]):
-            if target not in target_contracts:
-                raise ProtocolError("TEMPLATE_TARGET_UNSUPPORTED", target)
-            spec = target_contracts[target]
-            targets[spec["id"]] = {"format": target, "display_crs": contracts["spatial_behavior"]["display_crs"],
-                                   "dpi": spec["page"]["dpi"], "width_mm": spec["page"]["width_mm"],
-                                   "height_mm": spec["page"]["height_mm"]}
-        expression_refs = sorted(contracts["lock"]["resources"], key=lambda item: item["id"])
-        environment = {
-            "renderer_id": "maplibre-web", "renderer_version": RENDERER_VERSION,
-            "frontend_build": FRONTEND_BUILD, "maplibre_version": MAPLIBRE_VERSION,
-            "overlay_engine_version": OVERLAY_ENGINE_VERSION,
-            "fingerprint": sha256_digest({"renderer_id": "maplibre-web", "renderer_version": RENDERER_VERSION,
-                                          "frontend_build": FRONTEND_BUILD, "maplibre_version": MAPLIBRE_VERSION,
-                                          "overlay_engine_version": OVERLAY_ENGINE_VERSION}),
-        }
-        scene_ref = {"id": scene["scene_id"], "version": "1.0.0", "digest": sha256_digest(scene)}
-        execution = {
-            "intent_ref": plan["intent_ref"], "profile_refs": [], "business_scene": plan["business_scene"],
-            "map_tasks": plan["tasks"], "template_refs": [template_ref],
-            "dependency_refs": expression_refs, "policy_refs": [contracts["quality_gates"]["baseline"]],
-            "dataset_refs": [item["dataset_ref"] for item in bundle["role_bindings"]],
-            "prepared_data_refs": [item["prepared_ref"] for item in bundle["role_bindings"]],
-            "knowledge_evidence_refs": [], "tool_binding_refs": [], "transformation_refs": bundle["transformations"],
-            "ownership": {"scenario": "map-scenario", "identity": "map-scenario", "cartography": "map-scenario",
-                          "layout": "map-scenario", "data": "project"},
-            "shared_semantics": {"theme": "flood-risk", "data_nature": "synthetic", "classification": "quantile",
-                                 "class_breaks": breaks, "legend_items": legend,
-                                 "field_bindings": {item["role"]: item["semantic_fields"] for item in bundle["role_bindings"]}},
-            "views": [{"id": "main-view", "extent": plan["decisions"]["extent"],
-                       "layer_ids": [item["id"] for item in contracts["portrayal"]["layers"]],
-                       "target_ids": sorted(targets)}],
-            "targets": targets, "resolved_assets": [*expression_refs, {
-                "id": "map-font", "version": request["font"]["version"], "digest": sha256_file(font_path), "uri": str(font_path)}],
-            "render_scene_ref": scene_ref, "camera": deepcopy(scene["camera"]),
-            "overlay_coordinate_policy": "page", "interaction_policy": "preview", "environment": environment,
-        }
-        candidate = {"schema_version": 1, "candidate_id": f"candidate-{request['run_id']}",
-                     "project_id": request["project_id"], "run_id": request["run_id"],
-                     "execution_digest": sha256_digest(execution), "execution": execution,
-                     "open_issues": [], "created_at": request["requested_at"]}
-        self.registry.validate("resolved-map", candidate)
-        if candidate["execution_digest"] != sha256_digest(candidate["execution"]):
-            raise ProtocolError("CANDIDATE_EXECUTION_DIGEST_MISMATCH", candidate["candidate_id"])
-        report = self._preflight(request, plan, bundle, installation, contracts, scene, candidate)
-        return {"candidate": candidate, "scene": scene, "preflight": report,
-                "class_breaks": breaks, "legend_items": legend}
-
-    def _scene(self, request: dict[str, Any], plan: dict[str, Any], bundle: dict[str, Any],
-               installation: dict[str, Any], contracts: dict[str, Any], font: Path,
-               breaks: list[float], colors: list[str], counts: list[float],
-               legend: list[dict[str, Any]]) -> dict[str, Any]:
-        roles = {item["role"]: item for item in bundle["role_bindings"]}
-        extent = self._padded_extent(plan["decisions"]["extent"])
-        fill_color: Any = colors[0]
-        if len(colors) > 1:
-            fill_color = ["step", ["get", "risk_value"], colors[0]]
-            for threshold, color in zip(breaks[1:-1], colors[1:]):
-                fill_color.extend([threshold, color])
-        max_count = max(counts) if counts else 1.0
-        resources = []
-        sources = []
-        for role in ("risk-area", "shelter-point"):
-            ref = roles[role]["prepared_ref"]
-            resource_id = f"prepared-{role}"
-            resources.append({"id": resource_id, "kind": "geojson", "ref": ref, "required": True})
-            sources.append({"id": f"source-{role}", "type": "geojson", "resource_id": resource_id})
-        resources.append({"id": "map-font", "kind": "font", "font_family": request["font"]["family"],
-                          "ref": {"id": "map-font", "version": request["font"]["version"],
-                                  "digest": sha256_file(font), "uri": str(font)}, "required": True})
-        opacity = contracts["scenario"]["embedded"]["cartography"]["symbolization"]["default_opacity"]
-        return {
-            "schema_version": 1, "scene_id": f"scene-{request['run_id']}", "revision": 1,
-            "renderer_id": "maplibre-web",
-            "spatial_context": {"display_crs": {"authority": "EPSG", "code": "4326"},
-                                "axis_order": "longitude-latitude", "coordinate_units": "degrees"},
-            "renderer_requirements": {"renderer_id": "maplibre-web", "require_webgl": True,
-                "require_offline_rendering": True, "required_capabilities": ["svg-overlay", "headless-export"],
-                "required_fonts": [request["font"]["family"]], "minimum_device_pixel_ratio": 1},
-            "viewport": {"width_px": 2381, "height_px": 1684, "device_pixel_ratio": 1, "background": "#F8FAFC"},
-            "camera": {"bounds": extent, "bearing": 0, "pitch": 0,
-                       "padding": {"top": 153, "right": 532, "bottom": 153, "left": 153}},
-            "map": {"style_ref": {"id": "compiled-style", "version": installation["template_ref"]["version"],
-                                    "digest": sha256_digest(contracts["scenario"]["embedded"]["cartography"])},
-                    "sources": sources,
-                    "layers": [
-                        {"id": "risk-layer", "source_id": "source-risk-area", "type": "fill",
-                         "paint": {"fill-color": fill_color, "fill-opacity": opacity}, "z_index": 10},
-                        {"id": "shelter-layer", "source_id": "source-shelter-point", "type": "circle",
-                         "paint": {"circle-color": "#087E8B", "circle-radius": ["interpolate", ["linear"],
-                                   ["get", "count_value"], 0, 5, max(max_count, 1), 16],
-                                   "circle-stroke-color": "#FFFFFF", "circle-stroke-width": 2}, "z_index": 20},
-                    ]},
-            "overlays": [
-                {"id": "title", "type": "text", "coordinate_space": "page",
-                 "position": {"x": 102, "y": 89, "unit": "pixel"}, "content": plan["decisions"]["title"],
-                 "style_role": "map-title"},
-                {"id": "legend", "type": "legend", "coordinate_space": "page",
-                 "position": {"x": 1892, "y": 234, "unit": "pixel"},
-                 "legend_items": [*legend, {"label": "避难场所（容纳人数）", "color": "#087E8B", "symbol": "circle"}]},
-                {"id": "north", "type": "north-arrow", "coordinate_space": "page",
-                 "position": {"x": 2190, "y": 117, "unit": "pixel"}},
-                {"id": "scale", "type": "scale-bar", "coordinate_space": "page",
-                 "position": {"x": 153, "y": 1565, "unit": "pixel"},
-                 "length_px": 298, "distance_label": "合成比例尺"},
-                {"id": "source", "type": "attribution", "coordinate_space": "page",
-                 "position": {"x": 1616, "y": 1615, "unit": "pixel"},
-                 "content": "数据来源：纯合成数据", "style_role": "source-note"},
-                {"id": "synthetic-data-notice", "type": "text", "coordinate_space": "page",
-                 "position": {"x": 102, "y": 1615, "unit": "pixel"},
-                 "content": "合成数据演示，非真实风险研判", "style_role": "synthetic-data-notice"},
-            ],
-            "resources": resources, "export": {"targets": sorted(request["requested_outputs"]), "dpi": 144},
-            "random_seed": RANDOM_SEED,
-            "provenance": [{"source_type": "derived", "source_ref": f"map-plan:{plan['plan_id']}",
-                            "version": "1.0.0", "retrieved_at": request["requested_at"],
-                            "classification": "internal"}],
-        }
-
-    def _preflight(self, request: dict[str, Any], plan: dict[str, Any], bundle: dict[str, Any],
-                   installation: dict[str, Any], contracts: dict[str, Any], scene: dict[str, Any],
-                   candidate: dict[str, Any]) -> dict[str, Any]:
-        checks = [
-            {"check_id": "template.exact-version", "owner": "template", "status": "passed", "severity": "blocker"},
-            {"check_id": "template.contracts-valid", "owner": "template", "status": "passed", "severity": "blocker"},
-            {"check_id": "data.roles-valid", "owner": "data", "status": "passed", "severity": "blocker"},
-            {"check_id": "data.synthetic-only", "owner": "data", "status": "passed", "severity": "blocker"},
-            {"check_id": "plan.resolved", "owner": "plan", "status": "passed", "severity": "blocker"},
-            {"check_id": "adapter.scene-valid", "owner": "adapter", "status": "passed", "severity": "blocker"},
-        ]
-        body = {"schema_version": 1, "report_id": f"preflight-{request['run_id']}",
-                "phase": "plan", "subject_digest": sha256_digest(candidate), "status": "passed",
-                "results": [{"check_id": item["check_id"], "version": "1.0.0",
-                             "status": item["status"], "severity": item["severity"], "details": {}}
-                            for item in checks], "created_at": request["requested_at"]}
-        self.registry.validate("validation-report", body)
-        return body
 
     def _validate_expression_bindings(self, portrayal: dict[str, Any], lock: dict[str, Any]) -> None:
+        MapExpressionCatalog(self.registry).validate_portrayal(portrayal)
         locked = {(item["id"], item["version"], item["digest"]) for item in lock["resources"]}
         refs = {(item["map_expression_ref"]["id"], item["map_expression_ref"]["version"],
                  item["map_expression_ref"]["digest"]) for item in portrayal["layers"]}
@@ -263,27 +103,60 @@ class MapCandidateCompiler:
                 if rule["strength"] in {"hard_rule", "forbidden", "mandatory", "binding"} and "value" not in rule:
                     raise ProtocolError("TEMPLATE_RULE_UNRESOLVED", f"{name}:{rule['id']}")
 
-    @staticmethod
-    def _quantile_breaks(values: list[float], classes: int) -> list[float]:
-        if not values:
-            raise ProtocolError("CLASSIFICATION_DATA_EMPTY", "risk-value")
-        result = [values[0]]
-        for index in range(1, classes):
-            position = math.ceil(index * len(values) / classes) - 1
-            result.append(values[max(0, min(position, len(values) - 1))])
-        result.append(values[-1])
-        return sorted(set(result))
+
+    def compile(self, request: dict[str, Any], intent: dict[str, Any], plan: dict[str, Any],
+                bundle: dict[str, Any], installation: dict[str, Any], contracts: dict[str, Any],
+                font_path: Path) -> dict[str, Any]:
+        profile = ScenarioRegistry(self.registry).require_request_intent(request, intent)
+        profile.require_contract(contracts["scenario"])
+        self.registry.validate("map-plan", plan)
+        profile.require_intent_projection(plan, intent, kind="PLAN")
+        compiled = profile.component("candidate_compiler")(
+            self.path_guard, self.registry, project_root=self.project_root, context=self.context,
+        ).compile(
+            request, intent, plan, bundle, installation, contracts, font_path)
+        self.require_execution_intent(compiled["candidate"]["execution"], intent)
+        candidate = compiled["candidate"]
+        reference = MapQualityChecks(self.registry).reference(contracts["quality_gates"], compiled["scene"])
+        candidate["execution"]["policy_refs"] = [
+            ref for ref in candidate["execution"].get("policy_refs", []) if ref["id"] != reference["id"]
+        ] + [reference]
+        candidate["execution_digest"] = sha256_digest(candidate["execution"])
+        compiled["preflight"] = self.check_candidate(
+            request, compiled["candidate"], compiled["scene"], contracts, bundle=bundle)
+        return compiled
+
+    def check_candidate(self, request, candidate, scene, contracts, *, bundle=None):
+        """Recompute the preflight so G2/replay bind actual gates, policy and inputs."""
+        profile = ScenarioRegistry(self.registry).for_execution(candidate["execution"])
+        profile.require_contract(contracts["scenario"])
+        profile.require_scene(scene)
+        self.registry.validate("resolved-map", candidate)
+        self.registry.validate("render-scene", scene)
+        if candidate["execution_digest"] != sha256_digest(candidate["execution"]):
+            raise ProtocolError("CANDIDATE_EXECUTION_DIGEST_MISMATCH", candidate["candidate_id"])
+        if candidate["execution"].get("render_scene_ref", {}).get("digest") != sha256_digest(scene):
+            raise ProtocolError("CANDIDATE_SCENE_DIGEST_MISMATCH", candidate["candidate_id"])
+        inputs = None
+        if scene["renderer_id"] == "rasterio-matplotlib-page":
+            if self.project_root is None or self.context is None:
+                raise ProtocolError("RASTER_EXECUTION_CONTEXT_REQUIRED", "Raster candidates require trusted project context")
+            from .raster_scene import RasterSceneCompiler
+            from ..workflow.raster_preparation import RasterPreparationService
+            preparation = RasterPreparationService(project_root=self.project_root,
+                allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
+            inputs = RasterSceneCompiler(preparation).validate_generation(
+                scene, candidate["execution"], request, self.context)
+            if bundle is not None and inputs["bundle"] != bundle:
+                raise ProtocolError("RASTER_CANDIDATE_BUNDLE_MISMATCH", "Candidate must preserve the prepared bundle")
+        return MapQualityChecks(self.registry).inspect(
+            candidate, scene, contracts["quality_gates"], profile=profile, raster=inputs)
 
     @staticmethod
-    def _legend(breaks: list[float], colors: list[str]) -> list[dict[str, Any]]:
-        if len(breaks) == 1:
-            return [{"label": f"{breaks[0]:g}%", "color": colors[0], "symbol": "fill"}]
-        return [{"label": f"{low:g}% ～ {high:g}%", "color": colors[index], "symbol": "fill"}
-                for index, (low, high) in enumerate(zip(breaks[:-1], breaks[1:]))]
-
-    @staticmethod
-    def _padded_extent(bbox: list[float]) -> list[float]:
-        dx = max(bbox[2] - bbox[0], 0.01) * 0.08
-        dy = max(bbox[3] - bbox[1], 0.01) * 0.08
-        return [bbox[0] - dx, bbox[1] - dy, bbox[2] + dx, bbox[3] + dy]
-
+    def require_execution_intent(execution: dict[str, Any], intent: dict[str, Any]) -> None:
+        if (execution.get("business_scene") != intent["business_scene"]
+                or execution.get("map_tasks") != intent["tasks"]
+                or execution.get("shared_semantics", {}).get("theme_tags") != intent["theme_tags"]
+                or execution.get("intent_ref", {}).get("digest") != sha256_digest(intent)
+                or execution.get("profile_refs") != [intent["evidence_refs"][0], intent["evidence_refs"][-1]]):
+            raise ProtocolError("CANDIDATE_INTENT_MISMATCH", "Execution must preserve the resolved user intent")

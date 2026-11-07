@@ -6,9 +6,32 @@ Carto Agent 是一个**协议先行**的地图制图智能体。它不是"一个
 
 ## 这是什么
 
-用一句话说：**给 Agent 一份制图意图 + 一份合成 GeoJSON 数据，它走完"规划 → 编译 → 预览 → 冻结 → 正式渲染 → 成品检查 → 原子交付"全链路，产出一套带审计回执的 A3 横版地图成果包。**
+这是一个保留了模板创建发布、地图编译预览、锁驱动渲染和受控交付流程的制图框架。
 
-目前已用"城市洪涝风险研判图"（合成数据）打通了完整闭环——从模板创建到最终交付，每一步都有不可变回执、可恢复、可审计。
+**当前没有启用业务场景，也不附带业务示例数据或模板。** 场景策略和代码实现白名单均为空；真实数据需配套实现、注册及验收对应场景后才能进入工作流，未注册请求返回 `CAPABILITY_NOT_AVAILABLE`。
+
+## 基础 GIS 数据接入
+
+新增 Carto 侧可选 MCP stdio 适配器和分类栅格输入契约，对接独立 `geospatial-mcp 0.3.0`：
+
+- `carto data inspect-raster`：显式项目配置下读取 GeoTIFF 元数据和精确类别计数，输出摘要绑定的 ToolResult。
+- 重投影：已实现 ToolGateway 适配能力及任务/二进制校验，仅 nearest；未开放变换 CLI 或业务场景。
+- MCP 不推断类别名或生成地图，排版和渲染仍在 Carto。
+- Carto 第二批新增 `data analyze-classification` / `data clarify-classification`、不可变 TIFF/CSV 快照、类别名称/颜色合同，以及可选 Rasterio + Matplotlib 静态图体与共享 SVG 图例。
+- 第三批 A 的内部 `RasterPageRenderer` 已支持 A4 横版等毫米布局的 PDF/整页 PNG/SVG、固定物理字号、中文字体/图例溢出检查，以及显式投影距离比例尺和格网北；已做合成 PDF 整页视觉检查。
+- 第三批 B1 接入共享 `raster/categorical` 表达及 `resolved-raster-portrayal` 冻结合同；图体/整页共用 `portrayal_ref`，显式区分数据类型、表达、后端与业务用途。显示编译模块更名为 `compiler/raster_portrayal.py`，不做 GIS 重分类。
+- 第三批 C 已接入共享 PreparedDataBundle / MapSpecLock / RenderScene、闭合后端分派和真实栅格 RenderReceipt，复用 G2、锁驱动渲染、11 项终检、G3 和原子本地交付；临时合成数据已覆盖工作流及中断恢复。
+- 未知像元值动态澄清，不默认隐藏 0/255。**业务场景/模板准入与真实用户地图验收仍未完成**；策略与实现白名单仍为空。内部页面报告不是 RenderReceipt，没有新增绕过审批的地图导出 CLI；静态后端是进程内实现，不提供 OS/网络沙箱。
+
+配置、输入合同、命令和边界见 `skills/carto-agent/workflows/geospatial-data.md`、`skills/carto-agent/workflows/raster-classification.md`。基础安装不强制引入 MCP/GIS 依赖，不自动安装独立服务。
+
+## 业务场景与主题
+
+只使用 `business_scene` 作为业务用途分类，不新增业务域。内容主题使用 `theme_tags`（机器 ID 列表），显示名由版本化意图目录维护；MapScenario 是模板方案，RenderScene 是渲染实例，不是额外的业务分类。
+
+独立意图解析与地图生成复用同一个解析器：`intent resolve` 输入 `text + selection`，生成请求输入 `goal + intent`。先明确实际用户意图，再检查所选模板兼容性；不从模板反填场景或默认任务，也不把主题词等同于业务场景。详见 `skills/carto-agent/workflows/intent-contract.md`。
+
+目录可识别业务用途，不表示具有执行能力。当前能力注册仍为空；意图缺项/歧义先拒绝，就绪但无注册能力才返回 `CAPABILITY_NOT_AVAILABLE`。
 
 ## 核心设计思想
 
@@ -16,8 +39,8 @@ Carto Agent 是一个**协议先行**的地图制图智能体。它不是"一个
 |---|---|
 | **协议先行，代码后行** | 先用 JSON Schema 把每种文档的格式定死，再写代码。所有人（agent、CLI、测试、人）对"什么算合格"没有歧义 |
 | **模型建议，程序执行** | 模型只能提交"类型化候选"，数值计算和门禁由确定性程序控制。模型不能直接执行 SQL、Shell 或动态代码 |
-| **纵向打通优先** | 先用一种场景（洪涝）走通从创建到交付的完整链路，再扩展场景宽度 |
-| **演示证据与生产证据分离** | 合成数据负责可重复边界测试，不据此宣称生产适用性已通过 |
+| **通用内核与场景分离** | 内核负责协议、安全和编排，场景负责数据语义、表达和布局构建 |
+| **结构有效不等于能力开放** | 注册、实际实现、真实场景验收和精确审批缺一不可 |
 | **共享内核，独立路由** | 两条路由（创建模板 / 生成地图）共享五模块内核，各有独立的作业、审批和产物生命周期 |
 | **默认拒绝** | 未知字段拒、未注册能力拒、越权调用拒、路径越根拒——宁可阻断，不可放行 |
 
@@ -28,11 +51,11 @@ carto-master-main/
 ├── skills/carto-agent/              ← 唯一运行实现根
 │   ├── SKILL.md                      智能体入口文档（Agent 先读这个）
 │   ├── workflows/                    路由 + 工作流文档（routing / create-template / generate-map）
-│   ├── schemas/                      47 份 JSON Schema（Draft 2020-12，机器协议）
-│   ├── policies/                     9 份策略文件（工具绑定 / 安全 / 检查器 / 范围基线）
+│   ├── schemas/                      JSON Schema（Draft 2020-12，机器协议）
+│   ├── policies/                     策略文件（工具绑定 / 安全 / 检查器 / 范围基线）
 │   ├── scripts/
 │   │   ├── carto.py                   CLI 入口（安装后命令名 carto）
-│   │   ├── carto_core/                核心代码（55 个 Python 模块，~9200 行）
+│   │   ├── carto_core/                核心代码
 │   │   │   ├── canonical.py           摘要 / 规范化
 │   │   │   ├── errors.py              错误类型与码
 │   │   │   ├── schema_registry.py     Schema 加载与校验
@@ -42,7 +65,7 @@ carto-master-main/
 │   │   │   ├── adapters/              受控浏览器 / 工具网关 / MCP
 │   │   │   ├── repository/            不可变存储 / 模板仓库 / 交付仓库
 │   │   │   └── security/              路径安全 / 审批验签 / 授权 / 脱敏
-│   │   └── tests/                     11 个测试文件，137 个用例
+│   │   └── tests/                     通用协议、安全与组件测试
 │   └── requirements.txt              jsonschema + PyYAML（仅 2 个直接依赖）
 ├── tools/host/                       宿主环境工具集（PowerShell）
 │   ├── Bootstrap-CartoHost.ps1       一键入口
@@ -76,7 +99,7 @@ analyze → brief → author(T1) → validate → publish(TP) → 不可变模�
 intake → brief → compile(G1) → preview → freeze(G2) → render → check → deliver(G3) → succeeded
 ```
 
-从已发布模板 + 合成数据生成地图成果。G1（制图合同）、G2（实例冻结）、G3（成果交付）三道审批门，每道都绑定身份、动作、对象摘要、作用域和一次性 nonce。最终通过 `os.replace` 原子提交产出一个含 PDF/PNG + README + 清单 + 校验和的成果包。
+场景启用后，从已发布模板与授权数据生成地图成果。G1（制图合同）、G2（实例冻结）、G3（成果交付）三道审批门，每道都绑定身份、动作、对象摘要、作用域和一次性 nonce。最终通过 `os.replace` 原子提交产出一个含 PDF/PNG + README + 清单 + 校验和的成果包。
 
 > **U-P3 新增的 `render → check → deliver` 三步**：锁驱动正式渲染（不重新推理）→ 11 项成品确定性检查 → G3 + 原子目录提交。每步都有不可变回执和故障注入恢复窗口。
 
@@ -93,14 +116,14 @@ intake → brief → compile(G1) → preview → freeze(G2) → render → check
 
 ## 协议层（schemas + policies）
 
-`schemas/` 下 47 份 JSON Schema 是这套系统的**机器可读法律**：
+`schemas/` 下 JSON Schema 是这套系统的**机器可读法律**：
 
 - 每一份文档（请求、回执、模板包、审批单、渲染产物、交付包……）都有对应 Schema 规定字段、类型、枚举值
 - `additionalProperties: false`——未知字段默认拒绝，不能偷偷加东西
 - CLI 每接收输入/产出回执前都拿 Schema 校验，不过就报 `SCHEMA_VALIDATION_FAILED`、退出码 2
 - 每份 Schema 配合法、非法、语义非法三种 Fixture，保证校验逻辑没退化
 
-`policies/` 下 9 份策略文件是**声明式规则**：工具绑定（哪些能力允许调用）、安全策略、检查器注册表、范围基线等——被代码读取执行，不是建议。
+`policies/` 下 策略文件是**声明式规则**：工具绑定（哪些能力允许调用）、安全策略、检查器注册表、范围基线等——被代码读取执行，不是建议。
 
 > Tests 是开发/验收阶段的产物，不是运行时协议。SKILL.md 已标注："scripts/tests/ 仅供开发与验收阶段使用，正式发布阶段不依赖。"
 
@@ -120,7 +143,7 @@ intake → brief → compile(G1) → preview → freeze(G2) → render → check
 
 | 依赖 | 要求 |
 |---|---|
-| Python | ≥ 3.11（实测 3.14.7） |
+| Python | ≥ 3.11 |
 | 直接依赖 | `jsonschema[format]>=4.23,<5` · `PyYAML>=6.0.2,<7`（仅 2 个） |
 | 浏览器 | Chromium / Chrome / Edge（渲染步骤需要，缺失则相关用例 skip） |
 | Node.js | 渲染步骤需要（MapLibre GL 3.6.0 已内置在仓库中，离线） |
@@ -130,36 +153,36 @@ intake → brief → compile(G1) → preview → freeze(G2) → render → check
 
 ## 运行方式
 
+### VS Code + Codex / Claude Code（最小接入）
+
+从 VS Code 打开**仓库根目录**，安装 Python 扩展并选择 Python 3.11+ 解释器，按需选择 Codex 或 Claude Code 扩展。确认该解释器已具备项目依赖后，执行 **Terminal → Run Task → `Carto: Check schemas`**；也可先运行 `Carto: CLI help`。
+
+仓库共享任务不写死 Python 路径，不自动选择业务场景，也不自动审批。Codex 使用根目录 `AGENTS.md`；现有 `CLAUDE.md` 引用同一指令入口，两者均读取 `skills/carto-agent/SKILL.md` 并调用相同 CLI。此最小入口不要求先运行下方 Hermes bootstrap，也未注册宿主原生技能命令。
+
+详细步骤、依赖安装、首条对话提示和验收边界见 [IDE 最小接入](doc/ide-minimal-integration.md)。
+
 ### CLI
 
 ```powershell
 # 帮助
 python skills/carto-agent/scripts/carto.py --help
 
-# Schema 自检（47 个）
+# Schema 自检
 python skills/carto-agent/scripts/carto.py schema check
 
 # 渲染能力探测
 python skills/carto-agent/scripts/carto.py environment probe-renderer
 ```
 
-### 项目空间（真实 CLI 运行）
+### 项目空间
 
-carto CLI 不像单元测试用临时目录自动清理——`intake` 起就要求显式指定 `--project-root`、`--workdir`、`--repository-root`，所有产物落在你指定的位置：
+项目路径由用户明确指定，脚手架不生成输入数据、不选择场景、不创建审批回执。可按需显式执行：
 
 ```powershell
-# 生成项目空间脚手架
-powershell -ExecutionPolicy Bypass -File tools/host/New-CartoProjectSpace.ps1
-
-# 生成合成洪涝样例数据
-& "D:\ProgramData\miniconda3\python.exe" tools/host/generate_flood_sample.py "projects/carto-flood-a3/project"
-
-# 跑模板创建前两步（不需审批）
-python skills/carto-agent/scripts/carto.py create-template analyze <request> --project-root <project> --workdir <runs> --allowed-root <root>
-python skills/carto-agent/scripts/carto.py create-template brief <request> --project-root <project> --workdir <runs> --allowed-root <root>
+powershell -ExecutionPolicy Bypass -File tools/host/New-CartoProjectSpace.ps1 -ProjectName <项目名>
 ```
 
-到 `author` 需要审批回执——这是设计如此，不是 bug。
+当前没有可运行的默认业务请求。接入真实数据前，按 `skills/carto-agent/scripts/carto_core/scenarios/README.md` 实现场景；不要仅为了使请求通过而修改注册策略或审批设置。
 
 ### 一键装载与配置（宿主工具集）
 
@@ -171,20 +194,11 @@ powershell -ExecutionPolicy Bypass -File tools/host/Bootstrap-CartoHost.ps1
 powershell -ExecutionPolicy Bypass -File tools/host/Invoke-CartoHostCases.ps1
 ```
 
-## 测试
+## 开发测试
 
-```powershell
-# 全量回归（137 用例，约 264 秒）
-python -m unittest discover -s skills/carto-agent/scripts/tests -v
+保留通用 Schema、安全、状态恢复、渲染器、宿主预检和布局契约测试；不附带业务示例端到端测试。`scripts/tests/fixtures/` 仅是隔离的协议/组件断言输入，不是运行时业务场景或用户数据。
 
-# 单个测试文件
-python -m unittest skills/carto-agent/scripts/tests/test_up33_delivery.py -v
-
-# 宿主 CLI 契约用例（26 条，PowerShell）
-powershell -ExecutionPolicy Bypass -File tools/host/Invoke-CartoHostCases.ps1
-```
-
-测试覆盖：Schema 结构校验、安全底座、五模块内核、模板创建发布闭环、地图生成预览冻结闭环、正式渲染、成品检查、原子交付、集成恢复、宿主 CLI 契约。唯一 skip 为 Windows 符号链接权限用例（需开发者模式）。
+只有在用户允许测试时才执行开发测试。
 
 ## 宿主 Agent 集成
 
@@ -212,7 +226,7 @@ powershell -ExecutionPolicy Bypass -File tools/host/Install-CartoSkill.ps1 -Herm
 | U-P5 | 复杂数据、连接器与共享部署 | ⬜ 条件触发 |
 | U-P6 | 新媒介与新路由 | ⬜ 待启动 |
 
-当前能力边界：**本地允许根内的合成数据工程演示闭环**。`scope-baseline.yaml` 版本 0.3.3，`production_tasks` 为空。
+当前能力边界：**通用框架保留、业务场景注册为空**。`scope-baseline.yaml` 版本 0.4.0，`production_tasks` 为空。上表记录历史阶段进度，不表示当前有默认场景可运行。
 
 ## 明确未实现
 
@@ -222,28 +236,17 @@ powershell -ExecutionPolicy Bypass -File tools/host/Install-CartoSkill.ps1 -Herm
 - 生产 SLA、备份、运维指标与多主机事务
 - `map-brand`、`map-style`、`map-layout` 的业务创建路由
 
-> U-P3 的完成只表示合成数据工程演示闭环成立，**不构成生产能力声明**。所有输出物全程携带"合成数据演示，非真实风险研判"标识。
+## 开始接入真实场景
 
-## 快速开始
-
-```powershell
-# 1. 环境配置 + 装载 + 就绪门（一条命令搞定）
-powershell -ExecutionPolicy Bypass -File tools/host/Bootstrap-CartoHost.ps1
-
-# 2. 跑测试用例
-powershell -ExecutionPolicy Bypass -File tools/host/Invoke-CartoHostCases.ps1
-
-# 3. 生成项目空间 + 样例数据，跑 analyze
-powershell -ExecutionPolicy Bypass -File tools/host/New-CartoProjectSpace.ps1
-& "D:\ProgramData\miniconda3\python.exe" tools/host/generate_flood_sample.py "projects/carto-flood-a3/project"
-python skills/carto-agent/scripts/carto.py create-template analyze "projects/carto-flood-a3/project/request-template.yaml" --project-root "projects/carto-flood-a3/project" --workdir "projects/carto-flood-a3/runs/template-one" --allowed-root "projects"
-```
+1. 读取 `AGENTS.md` 与 Skill，确认真实解释器、依赖及允许根。
+2. 明确用户数据的格式、CRS、许可、敏感性、字段语义和输出要求，不生成替代业务数据。
+3. 实现场景组件及严格协议，再注册能力，补充自动测试并用获准的真实场景验收。
+4. 沿现有 CLI 工作流执行；审批、模板发布、冻结、检查和交付规则不变。
 
 ## 相关文档
 
 - [实施计划](doc/implement-plan.md) — 分阶段实施路线（U-P0~U-P6）
 - [U-P3 说明文档](doc/impl-log/U-P3说明文档.md) — 首个纵向闭环总结
-- [宿主 Agent 形态一测试清单](doc/dev-log/0920宿主Agent形态一测试清单.md) — CLI 契约 26 条用例 + 5 条漂移
 - [AGENTS.md](AGENTS.md) — 通用智能体入口约束
 - [SKILL.md](skills/carto-agent/SKILL.md) — Skill 入口文档
 

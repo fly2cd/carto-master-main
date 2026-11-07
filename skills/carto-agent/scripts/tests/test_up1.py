@@ -138,7 +138,7 @@ class IntentAndRuntimeTests(unittest.TestCase):
     @staticmethod
     def fields(scene: str) -> dict[str, str]:
         if scene == "government_thematic":
-            return {"theme": "经济发展", "geography": "示例市", "time": "2026", "source": "统计数据", "output": "A3 PDF"}
+            return {"geography": "示例市", "time": "2026", "source": "统计数据", "output": "A3 PDF"}
         if scene == "emergency_mapping":
             return {"hazard": "flood", "event-phase": "response", "data-nature": "observed", "observation-time": "2026-09-15", "geography": "示例市", "source": "应急数据", "output": "A3 PDF"}
         return {"itinerary": "甲地至乙地", "visit-order": "1,2", "route-mode": "road", "geography": "示例市", "confidentiality": "internal", "output": "A3 PDF"}
@@ -147,19 +147,21 @@ class IntentAndRuntimeTests(unittest.TestCase):
         texts = {"government_thematic": "制作经济发展政务专题图", "emergency_mapping": "制作洪涝应急灾情图", "leadership_visit": "制作领导调研行程路线图"}
         for scene, text in texts.items():
             with self.subTest(scene=scene):
-                intent = self.resolver.resolve({"intent_id": f"intent-{scene.replace('_', '-')}", "text": text, "fields": self.fields(scene)})
+                tasks = {"government_thematic": "indicator-map", "emergency_mapping": "hazard-result-map", "leadership_visit": "visit-route-map"}
+                intent = self.resolver.resolve({"schema_version": 1, "intent_id": f"intent-{scene.replace('_', '-')}",
+                    "text": text, "selection": {"fields": self.fields(scene), "tasks": [tasks[scene]]}})
                 self.assertEqual(intent["business_scene"], scene)
                 self.assertEqual(intent["readiness_status"], "ready")
                 self.assertTrue(TaskDispatcher().dispatch(intent))
 
     def test_ambiguity_missing_information_capability_and_rejection_are_distinct(self) -> None:
-        ambiguous = self.resolver.resolve({"text": "政务专题与洪涝应急地图", "fields": {}})
+        ambiguous = self.resolver.resolve({"schema_version": 1, "text": "政务专题与洪涝应急地图", "selection": {"fields": {}}})
         self.assertEqual(ambiguous["intent_status"], "ambiguous")
-        missing = self.resolver.resolve({"text": "洪涝应急图", "fields": {}})
+        missing = self.resolver.resolve({"schema_version": 1, "text": "洪涝应急图", "selection": {"fields": {}}})
         self.assertEqual(missing["readiness_status"], "missing_information")
-        capability = self.resolver.resolve({"text": "洪涝应急图", "fields": self.fields("emergency_mapping"), "required_capabilities": ["web-map-export"], "available_capabilities": []})
+        capability = self.resolver.resolve({"schema_version": 1, "text": "洪涝应急图", "selection": {"fields": self.fields("emergency_mapping"), "tasks": ["hazard-result-map"], "required_capabilities": ["web-map-export"]}})
         self.assertEqual(capability["readiness_status"], "missing_capability")
-        rejected = self.resolver.resolve({"text": "写一首诗", "fields": {}})
+        rejected = self.resolver.resolve({"schema_version": 1, "text": "写一首诗", "selection": {"fields": {}}})
         self.assertEqual(rejected["intent_status"], "unsupported")
 
     def test_agent_runtime_accepts_only_typed_non_executable_candidates(self) -> None:
@@ -455,7 +457,7 @@ class SvgCompositorTests(unittest.TestCase):
             screenshot.write_bytes(b"\xff\xd8\xff\xe0")
             overlays = [
                 {"id": "symbol-one", "type": "symbol", "coordinate_space": "geographic", "screen_position": {"x": 20, "y": 30, "unit": "pixel"}, "symbol_ref": "icon-one", "label": "Point"},
-                {"id": "legend-one", "type": "legend", "coordinate_space": "page", "position": {"x": 10, "y": 50, "unit": "pixel"}, "legend_items": [{"label": "Risk", "color": "#FF0000"}]},
+                {"id": "legend-one", "type": "legend", "coordinate_space": "page", "position": {"x": 10, "y": 50, "unit": "pixel"}, "legend_items": [{"label": "Category", "color": "#FF0000"}]},
                 {"id": "north-one", "type": "north-arrow", "coordinate_space": "page", "position": {"x": 760, "y": 40, "unit": "pixel"}},
                 {"id": "scale-one", "type": "scale-bar", "coordinate_space": "page", "position": {"x": 20, "y": 570, "unit": "pixel"}, "length_px": 100, "distance_label": "10 km"},
             ]

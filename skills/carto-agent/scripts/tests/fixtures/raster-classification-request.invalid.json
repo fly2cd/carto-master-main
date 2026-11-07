@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "source": {
+    "schema_version": 1,
+    "role": "classified-surface",
+    "source_ref": {
+      "id": "raster-source",
+      "version": "1.0.0",
+      "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "path": "inputs/classified.tif",
+    "format": "geotiff",
+    "dataset_id": "classified",
+    "size_bytes": 1024,
+    "crs": {
+      "authority": "EPSG",
+      "code": "26911"
+    },
+    "band": 1,
+    "value_semantics": "categorical-integer",
+    "mask_policy": "embedded",
+    "license": "project-approved",
+    "data_nature": "synthetic",
+    "contains_sensitive_coordinates": false
+  },
+  "legend": {
+    "path": "inputs/legend.csv",
+    "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "size_bytes": 100,
+    "encoding": "utf-8-sig",
+    "value_column": "value",
+    "label_column": "label",
+    "color_column": "color"
+  },
+  "palette": null,
+  "legend_policy": "observed",
+  "automatic_zero_nodata": true
+}

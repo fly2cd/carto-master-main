@@ -16,20 +16,21 @@ import time
 import urllib.error
 import urllib.request
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+from ..artifacts import file_digest, utc_now
 from ..canonical import sha256_digest
 from ..errors import ConfigurationError, ProtocolError, SecurityError
 from ..security.paths import PathGuard
 from .svg_compositor import SvgCompositor
+from ..compiler.layout import LayoutResolver, raster_size
 
-FRONTEND_BUILD = "2026.09.18"
-RENDERER_VERSION = "1.0.0"
+FRONTEND_BUILD = "2026.11.04-layout1"
+RENDERER_VERSION = "1.1.0"
 MAPLIBRE_VERSION = "3.6.0"
-OVERLAY_ENGINE_VERSION = "1.0.0"
+OVERLAY_ENGINE_VERSION = "1.1.0"
 RANDOM_SEED = 20260918
 _ASSET_ROOT = Path(__file__).with_name("web_assets")
 _MAPLIBRE_JS = _ASSET_ROOT / f"maplibre-gl-{MAPLIBRE_VERSION}.js"
@@ -92,18 +93,6 @@ class _VS_FIXEDFILEINFO(ctypes.Structure):
         ("dwFileDateMS", ctypes.c_uint32),
         ("dwFileDateLS", ctypes.c_uint32),
     ]
-
-
-def _utc_now() -> str:
-    return datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
-
-
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return "sha256:" + digest.hexdigest()
 
 
 def discover_browser() -> Path | None:
@@ -275,10 +264,10 @@ class ControlledBrowserRenderer:
         self.browser_engine = browser_version(self.browser)
         self.environment_fingerprint = sha256_digest({
             "browser": self.browser_engine,
-            "browser_binary": sha256_file(self.browser),
+            "browser_binary": file_digest(self.browser),
             "frontend_build": FRONTEND_BUILD,
-            "maplibre": sha256_file(_MAPLIBRE_JS),
-            "maplibre_css": sha256_file(_MAPLIBRE_CSS),
+            "maplibre": file_digest(_MAPLIBRE_JS),
+            "maplibre_css": file_digest(_MAPLIBRE_CSS),
             "platform": platform.platform(),
             "limits": asdict(self.limits),
             "browser_launch_policy": {
@@ -316,7 +305,9 @@ class ControlledBrowserRenderer:
 
     def render(self, session: dict[str, Any], profile: Any) -> dict[str, Any]:
         scene = session["scene"]
-        started_at = _utc_now()
+        if "resolved_layout" in scene:
+            LayoutResolver().validate_scene(scene)
+        started_at = utc_now()
         session_root = self.path_guard.resolve(self.output_root / session["session_id"])
         if session_root.exists():
             raise SecurityError("RENDER_OUTPUT_EXISTS", str(session_root))
@@ -338,11 +329,18 @@ class ControlledBrowserRenderer:
             html_path = work_root / "scene.html"
             html_path.write_text(self._build_html(scene, resources), encoding="utf-8", newline="\n")
             map_png = work_root / "map.png"
+            map_size = (scene["viewport"]["width_px"], scene["viewport"]["height_px"])
+            if "resolved_layout" in scene:
+                frame = LayoutResolver.map_frame(scene["resolved_layout"])
+                map_size = tuple(raster_size(value) for value in frame["bounds_px"][2:])
             with self._open_browser(work_root, scene) as browser_session:
+                # Fit geography in the map's own viewport, not a padded page.
+                if "resolved_layout" in scene:
+                    browser_session.set_viewport(*map_size)
                 browser_session.navigate(self._file_url(html_path))
                 browser_session.wait_for_map_ready()
                 map_png.write_bytes(browser_session.capture_png())
-                self._assert_png(map_png, scene)
+                self._assert_png(map_png, scene, expected_size=map_size)
 
                 svg_path = session_root / "map.svg"
                 inline_fonts = [
@@ -352,13 +350,16 @@ class ControlledBrowserRenderer:
                 SvgCompositor(
                     scene["viewport"]["width_px"], scene["viewport"]["height_px"],
                     self.path_guard, scene["viewport"]["background"],
-                ).compose(map_png, scene["overlays"], svg_path, inline_fonts=inline_fonts)
+                ).compose(map_png, scene["overlays"], svg_path, inline_fonts=inline_fonts,
+                          resolved_layout=scene.get("resolved_layout"))
 
                 requested = set(scene["export"]["targets"])
                 artifacts: list[dict[str, Any]] = []
                 if "svg" in requested:
                     artifacts.append(self._artifact("svg", svg_path, "image/svg+xml", "mixed"))
                 if "png" in requested or "pdf" in requested:
+                    if "resolved_layout" in scene:
+                        browser_session.set_viewport(scene["viewport"]["width_px"], scene["viewport"]["height_px"])
                     browser_session.navigate(self._file_url(svg_path))
                     browser_session.wait_for_document_ready()
                 if "png" in requested:
@@ -372,7 +373,7 @@ class ControlledBrowserRenderer:
                     self._assert_pdf(pdf_path)
                     artifacts.append(self._artifact("pdf", pdf_path, "application/pdf", "mixed"))
 
-            completed_at = _utc_now()
+            completed_at = utc_now()
             receipt: dict[str, Any] = {
                 "schema_version": 1,
                 "receipt_id": f"render-{execution_digest[7:31]}",
@@ -435,7 +436,7 @@ class ControlledBrowserRenderer:
                         "RENDER_FONT_UNAVAILABLE", resource.get("font_family", resource["id"])
                     ) from exc
                 raise
-            actual_digest = sha256_file(path)
+            actual_digest = file_digest(path)
             if actual_digest != ref["digest"]:
                 raise SecurityError("RENDER_RESOURCE_DIGEST_MISMATCH", resource["id"])
             data = path.read_bytes()
@@ -515,14 +516,14 @@ setTimeout(()=>{{if(document.documentElement.dataset.cartoStatus==='starting')do
         return total
 
     @staticmethod
-    def _assert_png(path: Path, scene: dict[str, Any]) -> None:
+    def _assert_png(path: Path, scene: dict[str, Any], *, expected_size: tuple[int, int] | None = None) -> None:
         if not path.is_file():
             raise ProtocolError("RENDER_PNG_INVALID", str(path))
         header = path.read_bytes()[:24]
         if len(header) < 24 or header[:8] != b"\x89PNG\r\n\x1a\n" or header[12:16] != b"IHDR":
             raise ProtocolError("RENDER_PNG_INVALID", str(path))
         actual = struct.unpack("!II", header[16:24])
-        expected = (scene["viewport"]["width_px"], scene["viewport"]["height_px"])
+        expected = expected_size or (scene["viewport"]["width_px"], scene["viewport"]["height_px"])
         if actual != expected:
             raise ProtocolError("RENDER_VIEWPORT_MISMATCH", f"{actual} != {expected}")
 
@@ -540,7 +541,7 @@ setTimeout(()=>{{if(document.documentElement.dataset.cartoStatus==='starting')do
             "composition": composition,
             "artifact_ref": {
                 "id": f"render-{target}", "version": "1.0.0",
-                "digest": sha256_file(path), "uri": str(path),
+                "digest": file_digest(path), "uri": str(path),
             },
         }
 
@@ -830,17 +831,25 @@ class _ChromeCdpSession:
             time.sleep(0.05)
         raise ProtocolError("RENDER_TIMEOUT", "MapLibre readiness")
 
+    def set_viewport(self, width: int, height: int) -> None:
+        self.call("Emulation.setDeviceMetricsOverride", {
+            "width": width, "height": height, "deviceScaleFactor": 1, "mobile": False,
+        })
+
     def capture_png(self) -> bytes:
         result = self.call("Page.captureScreenshot", {"format": "png", "fromSurface": True, "captureBeyondViewport": False})
         return base64.b64decode(result["data"], validate=True)
 
     def print_pdf(self) -> bytes:
+        page = self.scene.get("resolved_layout", {}).get("page")
+        width_in = page["width_mm"] / 25.4 if page else self.scene["viewport"]["width_px"] / self.scene["export"]["dpi"]
+        height_in = page["height_mm"] / 25.4 if page else self.scene["viewport"]["height_px"] / self.scene["export"]["dpi"]
         result = self.call("Page.printToPDF", {
             "printBackground": True,
             "preferCSSPageSize": True,
             "displayHeaderFooter": False,
-            "paperWidth": 16.5354,
-            "paperHeight": 11.6929,
+            "paperWidth": width_in,
+            "paperHeight": height_in,
             "marginTop": 0,
             "marginBottom": 0,
             "marginLeft": 0,

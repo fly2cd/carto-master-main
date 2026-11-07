@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "based_on_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "entries": [
+    {
+      "value": 0,
+      "semantic": "background",
+      "display": "hidden",
+      "label": null,
+      "color": null,
+      "order": 1,
+      "include_in_legend": false
+    }
+  ]
+}

@@ -185,9 +185,6 @@
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
-      "contains": {
-        "const": "合成数据演示，非真实风险研判"
-      },
       "items": {
         "type": "string",
         "minLength": 1,

@@ -1,0 +1,394 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/host-preflight.schema.json",
+  "title": "Hermes installation inspection, not session approval or production evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "host",
+    "probed_at",
+    "status",
+    "project_root",
+    "host_home",
+    "installation",
+    "skill",
+    "configuration",
+    "local_probe",
+    "resource",
+    "capabilities",
+    "active_session_verified",
+    "stage_passed",
+    "production_ready",
+    "next_actions"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "host": {
+      "const": "hermes"
+    },
+    "probed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "enum": [
+        "needs-session-verification",
+        "attention-required"
+      ]
+    },
+    "project_root": {
+      "type": "string",
+      "minLength": 1
+    },
+    "host_home": {
+      "type": "string",
+      "minLength": 1
+    },
+    "installation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "executable_present",
+        "source_version"
+      ],
+      "properties": {
+        "executable_present": {
+          "type": "boolean"
+        },
+        "source_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "skill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "document_digest",
+        "registrations"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "document_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "registrations": {
+          "type": "array",
+          "maxItems": 258,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "kind",
+              "matches_workspace"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "enum": [
+                  "link",
+                  "directory"
+                ]
+              },
+              "matches_workspace": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    },
+    "configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "terminal_backend",
+        "mcp_servers"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "missing",
+            "read",
+            "invalid",
+            "unreadable"
+          ]
+        },
+        "terminal_backend": {
+          "enum": [
+            "unspecified",
+            "local",
+            "ssh",
+            "docker",
+            "wsl",
+            "other"
+          ]
+        },
+        "mcp_servers": {
+          "type": "array",
+          "maxItems": 128,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "ordinal",
+              "transport",
+              "verification"
+            ],
+            "properties": {
+              "ordinal": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 128
+              },
+              "transport": {
+                "enum": [
+                  "stdio",
+                  "remote",
+                  "unspecified"
+                ]
+              },
+              "verification": {
+                "const": "not-connected"
+              }
+            }
+          }
+        }
+      }
+    },
+    "local_probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "scope",
+        "skill_document_read",
+        "resource_read",
+        "tool_names",
+        "code"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not-run",
+            "passed",
+            "failed",
+            "timeout"
+          ]
+        },
+        "scope": {
+          "const": "isolated-skill-resource-read"
+        },
+        "skill_document_read": {
+          "type": "boolean"
+        },
+        "resource_read": {
+          "type": "boolean"
+        },
+        "tool_names": {
+          "type": "array",
+          "items": {
+            "const": "skill_view"
+          },
+          "uniqueItems": true,
+          "maxItems": 1
+        },
+        "code": {
+          "enum": [
+            "LOCAL_PROBE_NOT_REQUESTED",
+            "LOCAL_RESOURCE_READ_VERIFIED",
+            "HOST_TOOL_READ_FAILED",
+            "HOST_RUNTIME_INTERFACE_UNAVAILABLE",
+            "HOST_PROBE_TIMEOUT",
+            "HOST_RUNTIME_START_FAILED",
+            "HOST_RUNTIME_FAILED",
+            "HOST_RUNTIME_OUTPUT_INVALID",
+            "HOST_PROBE_INPUT_CHANGED"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "passed"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "skill_document_read": {
+                "const": true
+              },
+              "resource_read": {
+                "const": true
+              },
+              "tool_names": {
+                "const": [
+                  "skill_view"
+                ]
+              },
+              "code": {
+                "const": "LOCAL_RESOURCE_READ_VERIFIED"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "not-run"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "skill_document_read": {
+                "const": false
+              },
+              "resource_read": {
+                "const": false
+              },
+              "tool_names": {
+                "const": []
+              },
+              "code": {
+                "const": "LOCAL_PROBE_NOT_REQUESTED"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "timeout"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "skill_document_read": {
+                "const": false
+              },
+              "resource_read": {
+                "const": false
+              },
+              "tool_names": {
+                "const": []
+              },
+              "code": {
+                "const": "HOST_PROBE_TIMEOUT"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "failed"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "code": {
+                "enum": [
+                  "HOST_TOOL_READ_FAILED",
+                  "HOST_RUNTIME_INTERFACE_UNAVAILABLE",
+                  "HOST_RUNTIME_START_FAILED",
+                  "HOST_RUNTIME_FAILED",
+                  "HOST_RUNTIME_OUTPUT_INVALID",
+                  "HOST_PROBE_INPUT_CHANGED"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "digest"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "file_read",
+        "gis_read",
+        "spatial_analysis",
+        "map_render",
+        "map_export"
+      ],
+      "properties": {
+        "file_read": {
+          "const": "unverified"
+        },
+        "gis_read": {
+          "const": "unverified"
+        },
+        "spatial_analysis": {
+          "const": "unverified"
+        },
+        "map_render": {
+          "const": "unverified"
+        },
+        "map_export": {
+          "const": "unverified"
+        }
+      }
+    },
+    "active_session_verified": {
+      "const": false
+    },
+    "stage_passed": {
+      "const": false
+    },
+    "production_ready": {
+      "const": false
+    },
+    "next_actions": {
+      "const": [
+        "VERIFY_ACTIVE_SESSION",
+        "TEST_FILE_READ",
+        "TEST_GIS_READ",
+        "TEST_SPATIAL_ANALYSIS",
+        "TEST_RENDER_EXPORT"
+      ]
+    }
+  }
+}

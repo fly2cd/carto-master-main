@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "kind": "raster-page-output",
+  "renderer_id": "rasterio-matplotlib-page",
+  "renderer_version": "1.0.0",
+  "renderer_code_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "request_ref": {
+    "id": "raster-page-request",
+    "version": "1.0.0",
+    "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "uri": "projects/synthetic/.carto/raster/raster-page-request/example.json"
+  },
+  "body_ref": {
+    "id": "raster-map-body",
+    "version": "1.0.0",
+    "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "uri": "projects/synthetic/.carto/raster/raster-map-body/example.json"
+  },
+  "font_snapshot": {
+    "artifact_ref": {
+      "id": "font",
+      "version": "1.0.0",
+      "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "uri": "projects/synthetic/.carto/raster/font/example.json"
+    },
+    "size_bytes": 1024
+  },
+  "font_family": "Synthetic font",
+  "font_embedding_flags": 0,
+  "environment": {
+    "python": "1.0.0",
+    "rasterio": "1.0.0",
+    "gdal": "1.0.0",
+    "numpy": "1.0.0",
+    "matplotlib": "1.0.0",
+    "pillow": "1.0.0",
+    "freetype": "1.0.0",
+    "fonttools": "1.0.0",
+    "zlib": "1.0.0"
+  },
+  "outputs": {
+    "pdf": {
+      "artifact_ref": {
+        "id": "page-pdf",
+        "version": "1.0.0",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "uri": "projects/synthetic/.carto/raster/page-pdf/example.json"
+      },
+      "size_bytes": 1024
+    },
+    "png": {
+      "artifact_ref": {
+        "id": "page-png",
+        "version": "1.0.0",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "uri": "projects/synthetic/.carto/raster/page-png/example.json"
+      },
+      "size_bytes": 1024
+    },
+    "svg": {
+      "artifact_ref": {
+        "id": "page-svg",
+        "version": "1.0.0",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "uri": "projects/synthetic/.carto/raster/page-svg/example.json"
+      },
+      "size_bytes": 1024
+    }
+  },
+  "measurements": [
+    {
+      "element_id": "title",
+      "frame_id": "title",
+      "bounds_px": [
+        140,
+        140,
+        1000,
+        65
+      ]
+    }
+  ],
+  "checks": {
+    "frame-binding": "passed",
+    "glyph-coverage": "passed",
+    "font-embedding": "passed",
+    "content-fit": "passed",
+    "png-dimensions": "passed"
+  },
+  "capability_boundary": "formal-render-receipt"
+}

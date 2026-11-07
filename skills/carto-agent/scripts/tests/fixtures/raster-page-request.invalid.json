@@ -1,0 +1,187 @@
+{
+  "schema_version": 1,
+  "resolved_layout": {
+    "schema_version": 1,
+    "resolver_version": "1.0.0",
+    "contract_ref": {
+      "id": "synthetic-a4-landscape",
+      "version": "1.0.0",
+      "digest": "sha256:520ad344494f786ef28cedea74bc74ebbe5c062fca20f2b000ad4782e3ec7c14"
+    },
+    "contract": {
+      "schema_version": 1,
+      "layout_id": "synthetic-a4-landscape",
+      "version": "1.0.0",
+      "category": "report",
+      "canvas": {
+        "width": 297,
+        "height": 210,
+        "unit": "mm",
+        "orientation": "landscape",
+        "safe_margin": 10
+      },
+      "frames": [
+        {
+          "id": "map",
+          "content_id": "main-view",
+          "type": "map",
+          "bounds": [
+            10,
+            25,
+            215,
+            175
+          ],
+          "coordinate_space": "page",
+          "overflow_policy": "clip"
+        },
+        {
+          "id": "title",
+          "content_id": "title",
+          "type": "title",
+          "bounds": [
+            10,
+            10,
+            277,
+            10
+          ],
+          "coordinate_space": "page",
+          "overflow_policy": "reject"
+        },
+        {
+          "id": "legend",
+          "content_id": "legend",
+          "type": "legend",
+          "bounds": [
+            230,
+            40,
+            57,
+            130
+          ],
+          "coordinate_space": "page",
+          "overflow_policy": "reject"
+        },
+        {
+          "id": "source",
+          "content_id": "source",
+          "type": "marginalia",
+          "bounds": [
+            230,
+            180,
+            57,
+            15
+          ],
+          "coordinate_space": "page",
+          "overflow_policy": "reject"
+        }
+      ],
+      "placeholders": [
+        "{{MAP_TITLE}}",
+        "{{MAP_FRAME}}",
+        "{{LEGEND}}"
+      ],
+      "rules": [],
+      "capacity": {
+        "legend_items": 12,
+        "title_characters": 40
+      }
+    },
+    "page": {
+      "width_mm": 297,
+      "height_mm": 210,
+      "dpi": 300,
+      "width_px": 3508,
+      "height_px": 2480,
+      "device_pixel_ratio": 1,
+      "safe_margin_px": 118.110236
+    },
+    "map_frame_id": "map",
+    "frames": [
+      {
+        "id": "legend",
+        "content_id": "legend",
+        "type": "legend",
+        "bounds_px": [
+          2716.535433,
+          472.440945,
+          673.228346,
+          1535.433071
+        ],
+        "overflow_policy": "reject"
+      },
+      {
+        "id": "map",
+        "content_id": "main-view",
+        "type": "map",
+        "bounds_px": [
+          118.110236,
+          295.275591,
+          2539.370079,
+          2066.929134
+        ],
+        "overflow_policy": "clip"
+      },
+      {
+        "id": "source",
+        "content_id": "source",
+        "type": "marginalia",
+        "bounds_px": [
+          2716.535433,
+          2125.984252,
+          673.228346,
+          177.165354
+        ],
+        "overflow_policy": "reject"
+      },
+      {
+        "id": "title",
+        "content_id": "title",
+        "type": "title",
+        "bounds_px": [
+          118.110236,
+          118.110236,
+          3271.653543,
+          118.110236
+        ],
+        "overflow_policy": "reject"
+      }
+    ]
+  },
+  "font": {
+    "path": "projects/synthetic/font.ttf",
+    "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "size_bytes": 4096
+  },
+  "texts": [
+    {
+      "content_id": "title",
+      "text": "Synthetic categorical map"
+    },
+    {
+      "content_id": "source",
+      "text": "Synthetic data only"
+    }
+  ],
+  "legend": {
+    "content_id": "legend",
+    "title": "Legend"
+  },
+  "typography": {
+    "title_pt": 18,
+    "body_pt": 9,
+    "legend_pt": 10,
+    "legend_heading_pt": 11,
+    "padding_mm": 2,
+    "line_spacing": 1.25
+  },
+  "scale_bar": null,
+  "grid_north": {
+    "content_id": "north",
+    "label": "True north"
+  },
+  "portrayal_ref": {
+    "id": "resolved-raster-portrayal",
+    "version": "1.0.0",
+    "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "uri": "/synthetic/.carto/raster/resolved-raster-portrayal/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.json"
+  }
+}

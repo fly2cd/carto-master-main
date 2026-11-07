@@ -13,13 +13,16 @@ build/
 
 # IDE
 .idea/
-.vscode/
+.vscode/*
+!.vscode/tasks.json
+!.vscode/extensions.json
 *.swp
 
 # Host bootstrap artifacts (machine-specific, never commit)
 tools/host/carto-host.env.json
 tools/host/reports/
 tools/host/.scratch/
+debug.log
 
 # Hermes project-local skill registration (junction created by Install-CartoSkill.ps1 -HermesProjectLocal)
 .hermes/

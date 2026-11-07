@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "host": "hermes",
+  "probed_at": "2026-10-29T00:00:00Z",
+  "status": "needs-session-verification",
+  "project_root": "/unit-test/project",
+  "host_home": "/unit-test/hermes",
+  "installation": {
+    "executable_present": true,
+    "source_version": "0.21.1"
+  },
+  "skill": {
+    "path": "/unit-test/project/skills/carto-agent",
+    "document_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "registrations": []
+  },
+  "configuration": {
+    "state": "read",
+    "terminal_backend": "local",
+    "mcp_servers": []
+  },
+  "local_probe": {
+    "status": "not-run",
+    "scope": "isolated-skill-resource-read",
+    "skill_document_read": false,
+    "resource_read": false,
+    "tool_names": [],
+    "code": "LOCAL_PROBE_NOT_REQUESTED"
+  },
+  "resource": {
+    "path": "/unit-test/project/skills/carto-agent/schemas/layout.schema.json",
+    "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "capabilities": {
+    "file_read": "unverified",
+    "gis_read": "unverified",
+    "spatial_analysis": "unverified",
+    "map_render": "unverified",
+    "map_export": "unverified"
+  },
+  "active_session_verified": true,
+  "stage_passed": false,
+  "production_ready": false,
+  "next_actions": [
+    "VERIFY_ACTIVE_SESSION",
+    "TEST_FILE_READ",
+    "TEST_GIS_READ",
+    "TEST_SPATIAL_ANALYSIS",
+    "TEST_RENDER_EXPORT"
+  ],
+  "unexpected": "not allowed"
+}

@@ -7,8 +7,10 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import Any
 
-from .controlled_renderer import RANDOM_SEED, ControlledBrowserRenderer, sha256_file
+from .controlled_renderer import RANDOM_SEED, ControlledBrowserRenderer
+from ..artifacts import file_digest
 
+from ..compiler.layout import LayoutResolver
 from ..canonical import canonical_json_bytes, sha256_digest
 from ..errors import ProtocolError, SecurityError
 from ..schema_registry import SchemaRegistry
@@ -89,6 +91,8 @@ class RenderSceneSemanticValidator:
         scene: dict[str, Any],
         profile: RendererCapabilityProfile | None = None,
     ) -> None:
+        if "resolved_layout" in scene:
+            LayoutResolver().validate_scene(scene)
         resources = self._unique(scene["resources"], "resources")
         sources = self._unique(scene["map"]["sources"], "sources")
         self._unique(scene["map"]["layers"], "layers")
@@ -189,6 +193,8 @@ class RenderSessionGateway:
         session = self._get_mutable(session_id)
         if session["status"] != "started":
             raise ProtocolError("RENDER_SESSION_STATE_INVALID", session["status"])
+        if scene.get("renderer_id") != session["renderer_id"]:
+            raise SecurityError("RENDERER_SCENE_MISMATCH", "Scene renderer differs from the started session")
         SchemaRegistry().validate("render-scene", scene)
         profile = self._registry.get(session["renderer_id"])
         self._semantic_validator.validate(scene, profile)
@@ -336,7 +342,7 @@ class RenderReceiptValidator:
                 path = path_guard.resolve(uri, must_exist=True)
                 if path.stat().st_size != artifact["size_bytes"]:
                     raise ProtocolError("RENDER_OUTPUT_SIZE_MISMATCH", target)
-                if sha256_file(path) != artifact["artifact_ref"]["digest"]:
+                if file_digest(path) != artifact["artifact_ref"]["digest"]:
                     raise ProtocolError("RENDER_OUTPUT_DIGEST_MISMATCH", target)
 
 
@@ -363,6 +369,8 @@ class WebMapRendererAdapter:
         }
 
     def compile_scene(self, request: dict[str, Any]) -> dict[str, Any]:
+        if request.get("renderer_id", self.DEFAULT_RENDERER) != self.DEFAULT_RENDERER:
+            raise ProtocolError("RENDER_BACKEND_MISMATCH", "Use the selected backend for non-browser scenes")
         scene = deepcopy(request)
         scene.setdefault("schema_version", 1)
         scene.setdefault("renderer_id", self.DEFAULT_RENDERER)

@@ -59,6 +59,18 @@ class ExecutionContext:
     environment: str = "local"
     budget: ExecutionBudget = field(default_factory=ExecutionBudget)
 
+    @classmethod
+    def from_generate_request(cls, request: dict[str, Any]) -> "ExecutionContext":
+        """Derive scope from an admitted request; does not authenticate or approve it."""
+        subject = request["subject"]
+        return cls(
+            run_id=request["run_id"], tenant_id=subject["tenant_id"],
+            project_id=request["project_id"], subject_id=subject["subject_id"],
+            roles=frozenset({"operator"}), namespaces=frozenset({request["project_id"]}),
+            authorized_capabilities=frozenset(request["allowed_capabilities"]),
+            environment=request["environment"],
+        )
+
     def require_project_scope(self) -> None:
         if self.project_id not in self.namespaces:
             raise SecurityError("PROJECT_SCOPE_DENIED", self.project_id)

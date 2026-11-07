@@ -1,0 +1,223 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/raster-map-body.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "kind",
+    "renderer_id",
+    "renderer_version",
+    "renderer_code_digest",
+    "portrayal_ref",
+    "layout_digest",
+    "image",
+    "width_px",
+    "height_px",
+    "dpi",
+    "frame_rect",
+    "image_rect",
+    "bounds",
+    "crs",
+    "ground_to_image",
+    "legend_items",
+    "environment"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "kind": {
+      "const": "raster-map-body"
+    },
+    "renderer_id": {
+      "const": "rasterio-matplotlib"
+    },
+    "renderer_version": {
+      "const": "1.0.0"
+    },
+    "renderer_code_digest": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+    },
+    "layout_digest": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+    },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_ref",
+        "size_bytes"
+      ],
+      "properties": {
+        "artifact_ref": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 268435456
+        }
+      }
+    },
+    "width_px": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4096
+    },
+    "height_px": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4096
+    },
+    "dpi": {
+      "type": "integer",
+      "minimum": 72,
+      "maximum": 1200
+    },
+    "frame_rect": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "number"
+      }
+    },
+    "image_rect": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "number"
+      }
+    },
+    "bounds": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "number"
+      }
+    },
+    "crs": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+    },
+    "ground_to_image": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "number"
+      }
+    },
+    "legend_items": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "value",
+          "label",
+          "color",
+          "order"
+        ],
+        "properties": {
+          "value": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 4294967295
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1023
+          }
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "python",
+        "rasterio",
+        "gdal",
+        "numpy",
+        "matplotlib",
+        "pillow"
+      ],
+      "properties": {
+        "python": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+        },
+        "rasterio": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+        },
+        "gdal": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+        },
+        "numpy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+        },
+        "matplotlib": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+        },
+        "pillow": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+        }
+      }
+    },
+    "portrayal_ref": {
+      "allOf": [
+        {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+        },
+        {
+          "required": [
+            "uri"
+          ],
+          "properties": {
+            "id": {
+              "const": "resolved-raster-portrayal"
+            },
+            "version": {
+              "const": "1.0.0"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

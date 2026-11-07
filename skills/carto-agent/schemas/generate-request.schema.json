@@ -11,7 +11,8 @@
     "sources",
     "requested_outputs",
     "subject",
-    "idempotency_key"
+    "idempotency_key",
+    "intent"
   ],
   "properties": {
     "schema_version": {
@@ -27,13 +28,6 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 4000
-    },
-    "scene_hint": {
-      "enum": [
-        "government_thematic",
-        "emergency_mapping",
-        "leadership_visit"
-      ]
     },
     "sources": {
       "type": "array",
@@ -123,10 +117,10 @@
           "const": "map-scenario"
         },
         "id": {
-          "const": "urban-flood-risk"
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
         },
         "version": {
-          "const": "1.0.0"
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"
         },
         "digest": {
           "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
@@ -150,163 +144,154 @@
     },
     "source_bindings": {
       "type": "array",
-      "minItems": 2,
-      "maxItems": 2,
+      "minItems": 1,
+      "maxItems": 32,
       "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "role",
-          "source_ref",
-          "path",
-          "format",
-          "crs",
-          "geometry_types",
-          "field_bindings",
-          "unit_bindings",
-          "freshness",
-          "join",
-          "synthetic"
-        ],
-        "properties": {
-          "role": {
-            "enum": [
-              "risk-area",
-              "shelter-point"
-            ]
-          },
-          "source_ref": {
-            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
-          },
-          "path": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 1024
-          },
-          "format": {
-            "const": "geojson"
-          },
-          "crs": {
-            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/crs"
-          },
-          "geometry_types": {
-            "type": "array",
-            "minItems": 1,
-            "uniqueItems": true,
-            "items": {
-              "enum": [
-                "point",
-                "multipoint",
-                "polygon",
-                "multipolygon"
-              ]
-            }
-          },
-          "field_bindings": {
-            "type": "array",
-            "minItems": 1,
-            "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "semantic_role",
-                "source_field",
-                "value_type"
-              ],
-              "properties": {
-                "semantic_role": {
-                  "enum": [
-                    "risk-value",
-                    "count-value"
-                  ]
-                },
-                "source_field": {
-                  "type": "string",
-                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
-                },
-                "value_type": {
-                  "enum": [
-                    "integer",
-                    "number"
-                  ]
-                }
-              }
-            }
-          },
-          "unit_bindings": {
-            "type": "array",
-            "minItems": 1,
-            "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "semantic_role",
-                "unit"
-              ],
-              "properties": {
-                "semantic_role": {
-                  "enum": [
-                    "risk-value",
-                    "count-value"
-                  ]
-                },
-                "unit": {
-                  "enum": [
-                    "percent",
-                    "people"
-                  ]
-                }
-              }
-            }
-          },
-          "freshness": {
+        "oneOf": [
+          {
             "type": "object",
             "additionalProperties": false,
             "required": [
-              "observed_at",
-              "max_age_days"
+              "role",
+              "source_ref",
+              "path",
+              "format",
+              "crs",
+              "geometry_types",
+              "field_bindings",
+              "unit_bindings",
+              "freshness",
+              "join"
             ],
             "properties": {
-              "observed_at": {
-                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/timestamp"
+              "role": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
               },
-              "max_age_days": {
-                "type": "integer",
-                "minimum": 0,
-                "maximum": 3650
-              }
-            }
-          },
-          "join": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "required"
-            ],
-            "properties": {
-              "required": {
-                "type": "boolean"
+              "source_ref": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
               },
-              "key": {
+              "path": {
                 "type": "string",
-                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                "minLength": 1,
+                "maxLength": 1024
               },
-              "coverage": {
-                "type": "number",
-                "minimum": 0,
-                "maximum": 1
+              "format": {
+                "const": "geojson"
               },
-              "minimum_coverage": {
-                "type": "number",
-                "minimum": 0,
-                "maximum": 1
+              "crs": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/crs"
+              },
+              "geometry_types": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "enum": [
+                    "point",
+                    "multipoint",
+                    "polygon",
+                    "multipolygon"
+                  ]
+                }
+              },
+              "field_bindings": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "semantic_role",
+                    "source_field",
+                    "value_type"
+                  ],
+                  "properties": {
+                    "semantic_role": {
+                      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+                    },
+                    "source_field": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                    },
+                    "value_type": {
+                      "enum": [
+                        "integer",
+                        "number"
+                      ]
+                    }
+                  }
+                }
+              },
+              "unit_bindings": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "semantic_role",
+                    "unit"
+                  ],
+                  "properties": {
+                    "semantic_role": {
+                      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+                    },
+                    "unit": {
+                      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+                    }
+                  }
+                }
+              },
+              "freshness": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "observed_at",
+                  "max_age_days"
+                ],
+                "properties": {
+                  "observed_at": {
+                    "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/timestamp"
+                  },
+                  "max_age_days": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 3650
+                  }
+                }
+              },
+              "join": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "required"
+                ],
+                "properties": {
+                  "required": {
+                    "type": "boolean"
+                  },
+                  "key": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "coverage": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "minimum_coverage": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
               }
             }
           },
-          "synthetic": {
-            "const": true
+          {
+            "$ref": "https://schemas.carto-agent.local/v1/raster-input.schema.json"
           }
-        }
+        ]
       }
     },
     "font": {
@@ -330,6 +315,47 @@
         },
         "version": {
           "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"
+        }
+      }
+    },
+    "intent": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/intentSelection"
+    },
+    "prepared_raster_bindings": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "prepared_ref"
+        ],
+        "properties": {
+          "role": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+          },
+          "prepared_ref": {
+            "allOf": [
+              {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+              },
+              {
+                "required": [
+                  "uri"
+                ],
+                "properties": {
+                  "id": {
+                    "const": "raster-prepared-data"
+                  },
+                  "version": {
+                    "const": "1.0.0"
+                  }
+                }
+              }
+            ]
+          }
         }
       }
     }

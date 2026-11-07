@@ -27,7 +27,7 @@ from carto_core.adapters.controlled_renderer import (  # noqa: E402
     RANDOM_SEED,
     RENDERER_VERSION,
     discover_browser,
-    sha256_file,
+    file_digest,
 )
 from carto_core.errors import ProtocolError, SecurityError  # noqa: E402
 from carto_core.schema_registry import SchemaRegistry  # noqa: E402
@@ -59,20 +59,20 @@ class DeterministicRendererTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.output = self.root / "outputs"
         self.output.mkdir()
-        self.risk = self.root / "risk.geojson"
-        self.points = self.root / "shelters.geojson"
-        self.risk.write_text(json.dumps({
+        self.areas = self.root / "areas.geojson"
+        self.points = self.root / "points.geojson"
+        self.areas.write_text(json.dumps({
             "type": "FeatureCollection",
             "features": [
-                {"type": "Feature", "id": "risk-1", "properties": {"risk": 4}, "geometry": {"type": "Polygon", "coordinates": [[[112.2, 28.2], [113.2, 28.2], [113.2, 29.2], [112.2, 29.2], [112.2, 28.2]]]}},
-                {"type": "Feature", "id": "risk-2", "properties": {"risk": 2}, "geometry": {"type": "Polygon", "coordinates": [[[113.2, 28.2], [114.1, 28.2], [114.1, 29.2], [113.2, 29.2], [113.2, 28.2]]]}},
+                {"type": "Feature", "id": "area-1", "properties": {"value": 4}, "geometry": {"type": "Polygon", "coordinates": [[[112.2, 28.2], [113.2, 28.2], [113.2, 29.2], [112.2, 29.2], [112.2, 28.2]]]}},
+                {"type": "Feature", "id": "area-2", "properties": {"value": 2}, "geometry": {"type": "Polygon", "coordinates": [[[113.2, 28.2], [114.1, 28.2], [114.1, 29.2], [113.2, 29.2], [113.2, 28.2]]]}},
             ],
         }, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
         self.points.write_text(json.dumps({
             "type": "FeatureCollection",
             "features": [
-                {"type": "Feature", "id": "shelter-1", "properties": {"capacity": 800}, "geometry": {"type": "Point", "coordinates": [112.8, 28.7]}},
-                {"type": "Feature", "id": "shelter-2", "properties": {"capacity": 1400}, "geometry": {"type": "Point", "coordinates": [113.7, 28.8]}},
+                {"type": "Feature", "id": "point-1", "properties": {"count": 800}, "geometry": {"type": "Point", "coordinates": [112.8, 28.7]}},
+                {"type": "Feature", "id": "point-2", "properties": {"count": 1400}, "geometry": {"type": "Point", "coordinates": [113.7, 28.8]}},
             ],
         }, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 
@@ -83,7 +83,7 @@ class DeterministicRendererTests(unittest.TestCase):
         artifact = {"id": "local-style", "version": "1.0.0", "digest": "sha256:" + "0" * 64}
         return {
             "schema_version": 1,
-            "scene_id": "synthetic-flood-scene",
+            "scene_id": "renderer-unit-scene",
             "revision": 1,
             "renderer_id": "maplibre-web",
             "spatial_context": {"display_crs": {"authority": "EPSG", "code": "4490"}, "axis_order": "longitude-latitude", "coordinate_units": "degrees"},
@@ -93,29 +93,29 @@ class DeterministicRendererTests(unittest.TestCase):
             "map": {
                 "style_ref": artifact,
                 "sources": [
-                    {"id": "risk-source", "type": "geojson", "resource_id": "risk-data"},
-                    {"id": "shelter-source", "type": "geojson", "resource_id": "shelter-data"},
+                    {"id": "area-source", "type": "geojson", "resource_id": "area-data"},
+                    {"id": "point-source", "type": "geojson", "resource_id": "point-data"},
                 ],
                 "layers": [
-                    {"id": "risk-fill", "source_id": "risk-source", "type": "fill", "paint": {"fill-color": ["match", ["get", "risk"], 4, "#B91C1C", "#FBBF24"], "fill-opacity": 0.78}, "z_index": 10},
-                    {"id": "shelter-points", "source_id": "shelter-source", "type": "circle", "paint": {"circle-color": "#0F766E", "circle-radius": ["interpolate", ["linear"], ["get", "capacity"], 0, 5, 1500, 14], "circle-stroke-color": "#FFFFFF", "circle-stroke-width": 2}, "z_index": 20},
+                    {"id": "area-fill", "source_id": "area-source", "type": "fill", "paint": {"fill-color": ["match", ["get", "value"], 4, "#B91C1C", "#FBBF24"], "fill-opacity": 0.78}, "z_index": 10},
+                    {"id": "point-symbols", "source_id": "point-source", "type": "circle", "paint": {"circle-color": "#0F766E", "circle-radius": ["interpolate", ["linear"], ["get", "count"], 0, 5, 1500, 14], "circle-stroke-color": "#FFFFFF", "circle-stroke-width": 2}, "z_index": 20},
                 ],
             },
             "overlays": [
-                {"id": "title", "type": "text", "coordinate_space": "page", "position": {"x": 40, "y": 38, "unit": "pixel"}, "content": "合成洪涝风险与避难场所图", "style_role": "map-title"},
-                {"id": "legend", "type": "legend", "coordinate_space": "page", "position": {"x": 630, "y": 90, "unit": "pixel"}, "legend_items": [{"label": "高风险", "color": "#B91C1C", "symbol": "fill"}, {"label": "中风险", "color": "#FBBF24", "symbol": "fill"}, {"label": "避难场所", "color": "#0F766E", "symbol": "circle"}]},
+                {"id": "title", "type": "text", "coordinate_space": "page", "position": {"x": 40, "y": 38, "unit": "pixel"}, "content": "渲染器图元测试", "style_role": "map-title"},
+                {"id": "legend", "type": "legend", "coordinate_space": "page", "position": {"x": 630, "y": 90, "unit": "pixel"}, "legend_items": [{"label": "类别一", "color": "#B91C1C", "symbol": "fill"}, {"label": "类别二", "color": "#FBBF24", "symbol": "fill"}, {"label": "点图元", "color": "#0F766E", "symbol": "circle"}]},
                 {"id": "north", "type": "north-arrow", "coordinate_space": "page", "position": {"x": 744, "y": 48, "unit": "pixel"}},
                 {"id": "scale", "type": "scale-bar", "coordinate_space": "page", "position": {"x": 64, "y": 520, "unit": "pixel"}, "length_px": 120, "distance_label": "10 km"},
-                {"id": "source", "type": "attribution", "coordinate_space": "page", "position": {"x": 500, "y": 540, "unit": "pixel"}, "content": "数据来源：纯合成测试数据", "style_role": "source-note"},
+                {"id": "source", "type": "attribution", "coordinate_space": "page", "position": {"x": 500, "y": 540, "unit": "pixel"}, "content": "数据来源：隔离的单元测试", "style_role": "source-note"},
             ],
             "resources": [
-                {"id": "risk-data", "kind": "geojson", "ref": {"id": "risk-data", "version": "1.0.0", "digest": sha256_file(self.risk), "uri": str(self.risk)}, "required": True},
-                {"id": "shelter-data", "kind": "geojson", "ref": {"id": "shelter-data", "version": "1.0.0", "digest": sha256_file(self.points), "uri": str(self.points)}, "required": True},
-                {"id": "noto-font", "kind": "font", "font_family": "Noto Sans SC", "ref": {"id": "noto-font", "version": "1.0.0", "digest": sha256_file(self.font), "uri": str(self.font)}, "required": True},
+                {"id": "area-data", "kind": "geojson", "ref": {"id": "area-data", "version": "1.0.0", "digest": file_digest(self.areas), "uri": str(self.areas)}, "required": True},
+                {"id": "point-data", "kind": "geojson", "ref": {"id": "point-data", "version": "1.0.0", "digest": file_digest(self.points), "uri": str(self.points)}, "required": True},
+                {"id": "noto-font", "kind": "font", "font_family": "Noto Sans SC", "ref": {"id": "noto-font", "version": "1.0.0", "digest": file_digest(self.font), "uri": str(self.font)}, "required": True},
             ],
             "export": {"targets": ["svg", "png", "pdf"], "dpi": 144},
             "random_seed": RANDOM_SEED,
-            "provenance": [{"source_type": "derived", "source_ref": "synthetic:test-fixture", "version": "1.0.0", "classification": "public"}],
+            "provenance": [{"source_type": "derived", "source_ref": "unit-test:test-fixture", "version": "1.0.0", "classification": "public"}],
         }
 
     def _adapter(
@@ -174,7 +174,7 @@ class DeterministicRendererTests(unittest.TestCase):
         scene = self._scene()
         scene["map"]["layers"] = list(reversed(scene["map"]["layers"]))
         compiled = adapter.compile_scene(scene)
-        self.assertEqual([item["id"] for item in compiled["map"]["layers"]], ["risk-fill", "shelter-points"])
+        self.assertEqual([item["id"] for item in compiled["map"]["layers"]], ["area-fill", "point-symbols"])
         unsupported = self._scene()
         unsupported["map"]["layers"][0]["type"] = "heatmap"
         with self.assertRaises(ProtocolError) as raised:
@@ -190,14 +190,14 @@ class DeterministicRendererTests(unittest.TestCase):
     def test_resource_drift_and_network_uri_are_rejected(self) -> None:
         adapter, _ = self._adapter()
         scene = adapter.compile_scene(self._scene())
-        self.risk.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
+        self.areas.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
         with self.assertRaises(SecurityError) as raised:
             adapter.submit_render("drift", scene, "maplibre-web", FRONTEND_BUILD)
         self.assertEqual(raised.exception.code, "RENDER_RESOURCE_DIGEST_MISMATCH")
 
         adapter, _ = self._adapter()
         network = self._scene()
-        network["resources"][0]["ref"]["uri"] = "https://example.invalid/risk.geojson"
+        network["resources"][0]["ref"]["uri"] = "https://example.invalid/areas.geojson"
         with self.assertRaises(SecurityError) as raised:
             adapter.submit_render("network", adapter.compile_scene(network), "maplibre-web", FRONTEND_BUILD)
         self.assertEqual(raised.exception.code, "RENDER_NETWORK_ACCESS_DENIED")
@@ -278,7 +278,7 @@ class DeterministicRendererTests(unittest.TestCase):
         failed = deepcopy(receipt)
         failed["status"] = "failed"
         failed["output_artifacts"] = []
-        failed["error"] = {"code": "RENDER_BROWSER_FAILED", "message": "synthetic failure"}
+        failed["error"] = {"code": "RENDER_BROWSER_FAILED", "message": "injected failure"}
         self._resign(failed)
         with self.assertRaises(ProtocolError) as raised:
             adapter.validate_receipt(failed, self.KEY)
@@ -286,7 +286,7 @@ class DeterministicRendererTests(unittest.TestCase):
 
         failed_with_output = deepcopy(receipt)
         failed_with_output["status"] = "failed"
-        failed_with_output["error"] = {"code": "RENDER_BROWSER_FAILED", "message": "synthetic failure"}
+        failed_with_output["error"] = {"code": "RENDER_BROWSER_FAILED", "message": "injected failure"}
         self._resign(failed_with_output)
         with self.assertRaises(ProtocolError) as raised:
             adapter.validate_receipt(failed_with_output, self.KEY)

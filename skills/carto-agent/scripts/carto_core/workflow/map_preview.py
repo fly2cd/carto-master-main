@@ -5,82 +5,58 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from ..adapters.controlled_renderer import (
-    FRONTEND_BUILD, MAPLIBRE_VERSION, OVERLAY_ENGINE_VERSION, RENDERER_VERSION,
-    BrowserLimits, ControlledBrowserRenderer, browser_version, discover_browser,
-)
-from ..adapters.webmap_renderer import (
-    RenderReceiptValidator, RendererCapabilityProfile, RendererCapabilityRegistry,
-    WebMapRendererAdapter,
-)
+from ..adapters.controlled_renderer import BrowserLimits
+from ..adapters.render_backend import create_render_backend
 from ..canonical import sha256_digest
+from ..compiler.layout import LayoutResolver
 from ..errors import ProtocolError
 from ..schema_registry import SchemaRegistry
 from ..security.paths import PathGuard
-from .map_data_preparation import atomic_yaml, utc_now
+from ..artifacts import atomic_yaml, utc_now
 
 
 class MapPreviewService:
     def __init__(self, *, path_guard: PathGuard, output_root: Path, attestation_key: bytes,
                  browser: str | Path | None = None, registry: SchemaRegistry | None = None,
-                 limits: BrowserLimits | None = None) -> None:
+                 limits: BrowserLimits | None = None, project_root: Path | None = None, context=None) -> None:
         self.path_guard = path_guard
         self.output_root = path_guard.resolve(output_root)
         self.output_root.mkdir(parents=True, exist_ok=True)
         self.attestation_key = attestation_key
-        self.browser = Path(browser).resolve() if browser else discover_browser()
-        if self.browser is None or not self.browser.is_file():
-            raise ProtocolError("RENDER_BROWSER_UNAVAILABLE", "A controlled Chromium browser is required")
+        self.browser = browser
         self.registry = registry or SchemaRegistry()
         self.limits = limits or BrowserLimits()
+        self.project_root, self.context = project_root, context
 
-    def render(self, request: dict[str, Any], candidate: dict[str, Any], scene: dict[str, Any]) -> dict[str, Any]:
-        renderer = ControlledBrowserRenderer(
-            allowed_roots=list(self.path_guard.allowed_roots), output_root=self.output_root,
-            attestation_key=self.attestation_key, limits=self.limits, browser=self.browser,
-        )
-        profile = self.profile()
-        adapter = WebMapRendererAdapter(RendererCapabilityRegistry([profile]), renderer)
-        compiled = adapter.compile_scene(scene)
-        if compiled != scene:
-            raise ProtocolError("RENDER_SCENE_NOT_CANONICAL", scene["scene_id"])
-        session_id = f"map-preview-{candidate['candidate_id']}"
-        receipt = adapter.submit_render(session_id, scene, "maplibre-web", FRONTEND_BUILD)
-        adapter.validate_receipt(receipt, self.attestation_key)
-        evidence = self.build_evidence(request, candidate, scene, receipt)
-        return {"receipt": receipt, "evidence": evidence, "profile": asdict(profile)}
+    def backend(self, scene):
+        return create_render_backend(scene["renderer_id"], path_guard=self.path_guard, output_root=self.output_root,
+            attestation_key=self.attestation_key, browser=self.browser, limits=self.limits, registry=self.registry,
+            project_root=self.project_root, context=self.context)
 
-    def validate_persisted(self, candidate: dict[str, Any], scene: dict[str, Any], receipt: dict[str, Any]) -> None:
-        renderer = ControlledBrowserRenderer(
-            allowed_roots=list(self.path_guard.allowed_roots), output_root=self.output_root,
-            attestation_key=self.attestation_key, limits=self.limits, browser=self.browser,
-        )
-        profile = self.profile()
-        session = {"session_id": receipt["session_id"], "scene_id": scene["scene_id"],
-                   "scene_revision": scene["revision"], "scene_digest": sha256_digest(scene),
-                   "renderer_id": "maplibre-web", "frontend_build": FRONTEND_BUILD,
-                   "profile_digest": profile.profile_digest(), "scene": deepcopy(scene), "status": "submitted"}
-        RenderReceiptValidator(self.registry).validate(
-            receipt, session, profile, self.attestation_key,
-            expected_environment_fingerprint=renderer.environment_fingerprint,
-            expected_controls=renderer.receipt_controls(), path_guard=renderer.path_guard,
-        )
+    def _validate_candidate_scene(self, candidate: dict[str, Any], scene: dict[str, Any]) -> None:
+        self.registry.validate("resolved-map", candidate)
         if candidate["execution_digest"] != sha256_digest(candidate["execution"]):
             raise ProtocolError("CANDIDATE_EXECUTION_DIGEST_MISMATCH", candidate["candidate_id"])
+        LayoutResolver(self.registry).validate_execution(scene, candidate["execution"])
 
-    def profile(self) -> RendererCapabilityProfile:
-        return RendererCapabilityProfile(
-            renderer_id="maplibre-web", frontend_build=FRONTEND_BUILD,
-            renderer_version=RENDERER_VERSION, maplibre_version=MAPLIBRE_VERSION,
-            overlay_engine_version=OVERLAY_ENGINE_VERSION, browser_engine=browser_version(self.browser),
-            webgl_available=True, supported_export_formats=("svg", "png", "pdf"),
-            max_canvas_width=4096, max_canvas_height=4096, device_pixel_ratio=2,
-            available_fonts=("Noto Sans SC", "Microsoft YaHei", "SimHei", "SimSun"),
-            offline_rendering=True,
-        )
+    def render(self, request: dict[str, Any], candidate: dict[str, Any], scene: dict[str, Any]) -> dict[str, Any]:
+        self._validate_candidate_scene(candidate, scene)
+        backend = self.backend(scene)
+        backend.validate_scene(scene, candidate["execution"])
+        receipt = backend.render(f"map-preview-{candidate['candidate_id']}", scene)
+        backend.validate_receipt(scene, receipt, expected_session_id=f"map-preview-{candidate['candidate_id']}")
+        evidence = self.build_evidence(request, candidate, scene, receipt)
+        return {"receipt": receipt, "evidence": evidence, "profile": asdict(backend.profile)}
+
+    def validate_persisted(self, candidate: dict[str, Any], scene: dict[str, Any], receipt: dict[str, Any]) -> None:
+        self._validate_candidate_scene(candidate, scene)
+        backend = self.backend(scene)
+        backend.validate_scene(scene, candidate["execution"])
+        backend.validate_receipt(scene, receipt, expected_session_id=f"map-preview-{candidate['candidate_id']}")
 
     def build_evidence(self, request: dict[str, Any], candidate: dict[str, Any],
                        scene: dict[str, Any], receipt: dict[str, Any]) -> dict[str, Any]:
+        self._validate_candidate_scene(candidate, scene)
         checks = [
             {"check_id": "template.candidate-binding", "owner": "template", "status": "passed", "severity": "blocker", "details": {}},
             {"check_id": "data.resource-digests", "owner": "data", "status": "passed", "severity": "blocker", "details": {}},

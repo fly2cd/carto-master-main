@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "expression_id": "raster/categorical",
+  "version": "1.0.0",
+  "title": "Categorical raster portrayal",
+  "status": "active",
+  "geometry_types": [
+    "raster"
+  ],
+  "field_requirements": [
+    {
+      "semantic_role": "category-value",
+      "value_type": "number",
+      "required": true,
+      "nullable": true
+    }
+  ],
+  "parameter_definitions": [],
+  "visual_variables": [
+    {
+      "variable": "fill-color",
+      "source_role": "category-value",
+      "algorithm_id": "categorical-lookup"
+    }
+  ],
+  "legend": {
+    "type": "categorical-color",
+    "show_no_data": false,
+    "label_source": "category-labels"
+  },
+  "missing_value_policy": "reject",
+  "outlier_policy": "reject",
+  "checker_refs": [
+    {
+      "id": "protocol.schema-valid",
+      "version": "1.0.0"
+    }
+  ]
+}

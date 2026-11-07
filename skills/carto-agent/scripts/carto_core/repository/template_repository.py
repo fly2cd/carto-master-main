@@ -5,12 +5,11 @@ import os
 import shutil
 import tempfile
 import time
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-import yaml
 
+from ..artifacts import atomic_yaml, file_digest, utc_now
 from ..canonical import sha256_digest
 from ..errors import ProtocolError
 from ..schema_registry import SchemaRegistry, load_document
@@ -18,34 +17,6 @@ from ..security.paths import PathGuard
 
 REPOSITORY_VERSION = "1.0.0"
 VALIDATION_VERSION = "1.0.0"
-
-
-def _now() -> str:
-    return datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
-
-
-def _file_digest(path: Path) -> str:
-    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def _atomic_yaml(path: Path, value: dict[str, Any], *, replace: bool = True) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if not replace and path.exists():
-        existing = load_document(path)
-        if existing != value:
-            raise ProtocolError("IMMUTABLE_ARTIFACT_CONFLICT", str(path))
-        return
-    fd, temporary_name = tempfile.mkstemp(prefix=f".{path.name}-", suffix=".tmp", dir=path.parent)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as stream:
-            yaml.safe_dump(value, stream, allow_unicode=True, sort_keys=False)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary_name, path)
-    finally:
-        temporary = Path(temporary_name)
-        if temporary.exists():
-            temporary.unlink()
 
 
 class _RepositoryLock:
@@ -155,10 +126,10 @@ class TemplateRepository:
             evidence_path = self.root / "evidence" / f"{evidence['evidence_digest'][7:]}.yaml"
             approval_digest = sha256_digest(approval)
             approval_path = self.root / "approvals" / f"{approval_digest[7:]}.yaml"
-            _atomic_yaml(evidence_path, evidence, replace=False)
-            _atomic_yaml(approval_path, approval, replace=False)
+            atomic_yaml(evidence_path, evidence, create_once=True)
+            atomic_yaml(approval_path, approval, create_once=True)
 
-            published_at = _now()
+            published_at = utc_now()
             receipt_path = self._transaction_path(idempotency_key)
             entry = {
                 "namespace": package["namespace"], "kind": package["kind"],
@@ -199,8 +170,8 @@ class TemplateRepository:
                 "published_at": published_at, "idempotency_key": idempotency_key,
             }
             self.registry.validate("publication-receipt", receipt)
-            _atomic_yaml(receipt_path, receipt, replace=False)
-            _atomic_yaml(self.index_path, new_index)
+            atomic_yaml(receipt_path, receipt, create_once=True)
+            atomic_yaml(self.index_path, new_index, create_once=False)
             read_back = self._load_index()
             if read_back["digest"] != new_index["digest"] or self._find_entry(read_back, identity_ref, package["namespace"]) is None:
                 raise ProtocolError("INDEX_COMMIT_VERIFICATION_FAILED", package["id"])
@@ -258,7 +229,7 @@ class TemplateRepository:
             raise ProtocolError("PACKAGE_LINK_FORBIDDEN", linked[0])
         if destination.exists():
             checksum = destination / "checksums.sha256"
-            if checksum.is_file() and _file_digest(checksum) == snapshot["package_digest"]:
+            if checksum.is_file() and file_digest(checksum) == snapshot["package_digest"]:
                 return
             raise ProtocolError("REPOSITORY_RESIDUE_CONFLICT", str(destination))
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -281,9 +252,9 @@ class TemplateRepository:
         error_code = "PUBLISHED_PACKAGE_CORRUPT" if published else "PACKAGE_READ_BACK_FAILED"
         if not checksum_path.is_file() or not manifest_path.is_file():
             raise ProtocolError(error_code, str(root))
-        if _file_digest(checksum_path) != package_digest:
+        if file_digest(checksum_path) != package_digest:
             raise ProtocolError(error_code, str(checksum_path))
-        if _file_digest(manifest_path) != manifest_digest:
+        if file_digest(manifest_path) != manifest_digest:
             code = "PUBLISHED_MANIFEST_CORRUPT" if published else error_code
             raise ProtocolError(code, str(manifest_path))
         tree_paths = list(root.rglob("*"))
@@ -305,7 +276,7 @@ class TemplateRepository:
         if actual != sorted(["checksums.sha256", *recorded]):
             raise ProtocolError(error_code, str(root))
         for relative, digest in recorded.items():
-            if _file_digest(root / relative) != digest:
+            if file_digest(root / relative) != digest:
                 raise ProtocolError(error_code, relative)
         manifest = load_document(manifest_path)
         self.registry.validate("manifest", manifest)

@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "kind": "raster-classification-preparation",
+  "algorithm_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "context": {
+    "run_id": "test-run",
+    "tenant_id": "test-tenant",
+    "project_id": "test-project",
+    "subject_id": "test-subject"
+  },
+  "request": {
+    "schema_version": 1,
+    "source": {
+      "schema_version": 1,
+      "role": "classified-surface",
+      "source_ref": {
+        "id": "raster-source",
+        "version": "1.0.0",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "path": "inputs/classified.tif",
+      "format": "geotiff",
+      "dataset_id": "classified",
+      "size_bytes": 1024,
+      "crs": {
+        "authority": "EPSG",
+        "code": "26911"
+      },
+      "band": 1,
+      "value_semantics": "categorical-integer",
+      "mask_policy": "embedded",
+      "license": "project-approved",
+      "data_nature": "synthetic",
+      "contains_sensitive_coordinates": false
+    },
+    "legend": {
+      "path": "inputs/legend.csv",
+      "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "size_bytes": 100,
+      "encoding": "utf-8-sig",
+      "value_column": "value",
+      "label_column": "label",
+      "color_column": "color"
+    },
+    "palette": null,
+    "legend_policy": "observed"
+  },
+  "request_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "source_snapshot": {
+    "artifact_ref": {
+      "id": "source",
+      "version": "1.0.0",
+      "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "uri": "artifacts/source.json"
+    },
+    "size_bytes": 100
+  },
+  "legend_snapshot": {
+    "artifact_ref": {
+      "id": "legend",
+      "version": "1.0.0",
+      "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "uri": "artifacts/legend.json"
+    },
+    "size_bytes": 100
+  },
+  "gis_result_ref": {
+    "id": "tool-gis-raster-statistics",
+    "version": "1.0.0",
+    "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "uri": "artifacts/tool-gis-raster-statistics.json"
+  },
+  "answers": null,
+  "status": "ready",
+  "rows": [
+    {
+      "value": 1,
+      "count": 6,
+      "semantic": null,
+      "display": "color",
+      "label": "Synthetic class",
+      "color": "#FF0000",
+      "order": 0,
+      "include_in_legend": true
+    }
+  ],
+  "questions": []
+}

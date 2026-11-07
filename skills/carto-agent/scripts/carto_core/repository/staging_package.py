@@ -186,5 +186,9 @@ class StagingPackageWriter:
         for key, schema_name in contract_schemas.items():
             contract = yaml.safe_load((root / manifest["business_contracts"][key]).read_text(encoding="utf-8"))
             self.registry.validate(schema_name, contract)
-        prototype = yaml.safe_load((root / "prototypes/risk-overview.yaml").read_text(encoding="utf-8"))
+        prototypes = sorted(path for path in manifest["files"]
+                            if path.startswith("prototypes/") and path.endswith((".yaml", ".yml")))
+        if len(prototypes) != 1:
+            raise ProtocolError("PROTOTYPE_SET_INVALID", str(prototypes))
+        prototype = yaml.safe_load((root / prototypes[0]).read_text(encoding="utf-8"))
         self.registry.validate("prototype-description", prototype)

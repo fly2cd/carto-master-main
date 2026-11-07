@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "request_id": "request-one",
+  "project_id": "test-project",
+  "goal": "校验制图请求结构",
+  "sources": [
+    {
+      "id": "raster-source",
+      "version": "1.0.0",
+      "digest": "sha256:d9c9c7b49d3f0de01d79774e255cd59ac510acdc3565a6a2f763b2dbe3d6a66d"
+    }
+  ],
+  "requested_outputs": [
+    "pdf",
+    "png"
+  ],
+  "subject": {
+    "tenant_id": "test-tenant",
+    "subject_id": "test-subject",
+    "approver_subject_id": "synthetic-reviewer",
+    "namespace": "test-project"
+  },
+  "idempotency_key": "request-one-00001",
+  "intent": {
+    "business_scene": "government_thematic",
+    "theme_tags": [
+      "economic-development"
+    ],
+    "tasks": [
+      "indicator-map"
+    ],
+    "fields": {
+      "geography": "unit-region",
+      "time": "2026",
+      "source": "user-supplied",
+      "output": "pdf"
+    }
+  },
+  "template": {
+    "namespace": "local",
+    "kind": "map-scenario",
+    "id": "test-scenario",
+    "version": "1.0.0"
+  },
+  "source_bindings": [
+    {
+      "schema_version": 1,
+      "role": "classified-surface",
+      "source_ref": {
+        "id": "raster-source",
+        "version": "1.0.0",
+        "digest": "sha256:d9c9c7b49d3f0de01d79774e255cd59ac510acdc3565a6a2f763b2dbe3d6a66d"
+      },
+      "path": "classified.tif",
+      "format": "geotiff",
+      "dataset_id": "classified",
+      "size_bytes": 364,
+      "crs": {
+        "authority": "EPSG",
+        "code": "26911"
+      },
+      "band": 1,
+      "value_semantics": "categorical-integer",
+      "mask_policy": "embedded",
+      "license": "project-approved",
+      "data_nature": "synthetic",
+      "contains_sensitive_coordinates": false
+    }
+  ],
+  "run_id": "test-run",
+  "scope": "project:test-project",
+  "environment": "local",
+  "allowed_capabilities": [
+    "read",
+    "classify",
+    "render-preview"
+  ],
+  "prepared_raster_bindings": [
+    {
+      "role": "classified-surface",
+      "prepared_ref": {
+        "id": "raster-prepared-data",
+        "version": "1.0.0",
+        "digest": "sha256:995574df7a10892556f30add25abbf3ea071305a061edd30dcc1848897c840d1",
+        "uri": ".carto/raster/raster-prepared-data/995574df7a10892556f30add25abbf3ea071305a061edd30dcc1848897c840d1.json"
+      },
+      "guess_nodata": true
+    }
+  ],
+  "requested_at": "2026-11-05T11:29:14.967Z",
+  "audience": "synthetic test only",
+  "font": {
+    "path": "fixture-project/selected-font.ttf",
+    "family": "DejaVu Sans",
+    "version": "1.0.0"
+  }
+}

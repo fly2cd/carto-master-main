@@ -1,14 +1,16 @@
 # create-template 工作流
 
-## 当前能力
+当前场景注册为空；以下步骤是实现边界，不是已开放业务能力。未注册场景在读取来源数据前拒绝。
 
-- 当前只开放 `map-scenario` 的 `flood-risk-overview` profile。
+## 当前编排（无启用场景）
+
+- 通过 `policies/scenario-capabilities.yaml` 选择创建策略；当前注册为空。场景启用后，请求必须同时通过通用 `template-create-request` 和该场景注册的专用约束。
+- 通用分析、简报、作者和验证入口不固定业务字段；场景组件扩展位置为 `scripts/carto_core/scenarios/`，未知场景不能回退到其他实现。
 - 工作流严格按 `analyze → brief → author → validate → publish` 推进，不能跳过步骤或以独立渲染替代验证。
 - `author` 必须验证独立审批人的 T1 `approve-template-brief` 回执，且不得复用地图生成 G1 审批。
-- `validate` 先执行模板包闭合、Schema、依赖锁、类型所有权、业务语义和目标能力校验；静态检查通过后，才使用合成 Fixture 生成 SVG、PNG、PDF 预览及带签名的 RenderReceipt。
+- `validate` 先执行模板包闭合、Schema、依赖锁、类型所有权、业务语义和目标能力校验；静态检查通过后，才使用通过场景安全检查的验证输入生成 SVG、PNG、PDF 预览及带签名的 RenderReceipt。
 - `publish` 会重新核验模板包、依赖锁、Fixture、检查器集合、RenderReceipt、预览成果和渲染器环境绑定，再验证 TP `approve-template-publish` 回执并写入不可变模板仓库及权威索引。
 - 已发布模板使用 `namespace + kind + id + version` 精确标识；同版本内容不可覆盖，发布请求必须携带幂等键。
-- Skill 内置 `local/map-scenario/urban-flood-risk/1.0.0` 的 `draft` 合成示例包，位于 `templates/`；它仅用于开发与回归验证，不属于 `TemplateRepository` 权威发布仓库，也不能绕过 `validate → TP → publish` 成为运行时模板。
 
 ## 能力边界
 

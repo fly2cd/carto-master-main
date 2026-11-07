@@ -1,16 +1,12 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from datetime import UTC, datetime
 from typing import Any
 
+from ..artifacts import utc_now
 from ..canonical import sha256_digest
 from ..errors import ProtocolError
 from ..schema_registry import SchemaRegistry
-
-
-def _utc_now() -> str:
-    return datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 class MapSpecLockCompiler:
@@ -40,7 +36,7 @@ class MapSpecLockCompiler:
                 brief_approval_ref=brief_approval_ref,
                 freeze_approval_ref=freeze_approval_ref,
             ),
-            "created_at": _utc_now(),
+            "created_at": utc_now(),
         }
         self.registry.validate("map-spec-lock", lock)
         return lock

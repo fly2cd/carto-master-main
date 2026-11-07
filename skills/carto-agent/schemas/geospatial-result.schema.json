@@ -1,0 +1,222 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/geospatial-result.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "operation",
+    "source_ref",
+    "dataset_id",
+    "source_size_bytes",
+    "server",
+    "raster_info",
+    "warnings"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "operation": {
+      "enum": [
+        "info",
+        "statistics",
+        "reproject"
+      ]
+    },
+    "source_ref": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+    },
+    "dataset_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+    },
+    "source_size_bytes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 268435456
+    },
+    "server": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version",
+        "config_digest",
+        "catalog_digest",
+        "tool_catalog_digest"
+      ],
+      "properties": {
+        "id": {
+          "const": "geospatial-mcp"
+        },
+        "version": {
+          "const": "0.3.0"
+        },
+        "config_digest": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+        },
+        "catalog_digest": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+        },
+        "tool_catalog_digest": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+        }
+      }
+    },
+    "raster_info": {
+      "$ref": "https://schemas.carto-agent.local/v1/geospatial-wire.schema.json#/$defs/metadata"
+    },
+    "statistics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total_pixels",
+        "valid_pixels",
+        "masked_pixels",
+        "classes"
+      ],
+      "properties": {
+        "total_pixels": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16000000
+        },
+        "valid_pixels": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16000000
+        },
+        "masked_pixels": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16000000
+        },
+        "classes": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 256,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "value",
+              "count"
+            ],
+            "properties": {
+              "value": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 4294967295
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 16000000
+              }
+            }
+          }
+        }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_ref",
+        "remote_artifact_id",
+        "remote_task_id",
+        "mime_type",
+        "size_bytes",
+        "task_digest",
+        "task_ref"
+      ],
+      "properties": {
+        "artifact_ref": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+        },
+        "remote_artifact_id": {
+          "type": "string",
+          "pattern": "^art_[a-f0-9]{32}$"
+        },
+        "remote_task_id": {
+          "type": "string",
+          "pattern": "^task_[a-f0-9]{32}$"
+        },
+        "mime_type": {
+          "const": "image/tiff"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 8,
+          "maximum": 16777216
+        },
+        "task_digest": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+        },
+        "task_ref": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 128,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2048
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "operation": {
+            "const": "statistics"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "statistics"
+        ],
+        "not": {
+          "required": [
+            "artifact"
+          ]
+        }
+      },
+      "else": {
+        "not": {
+          "required": [
+            "statistics"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "operation": {
+            "const": "reproject"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "artifact"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "artifact"
+          ]
+        }
+      }
+    }
+  ]
+}

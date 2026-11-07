@@ -24,8 +24,8 @@
             "additionalProperties": false,
             "required": ["width_mm", "height_mm", "orientation", "dpi", "safe_margin_mm"],
             "properties": {
-              "width_mm": {"const": 420},
-              "height_mm": {"const": 297},
+              "width_mm": {"type": "integer", "minimum": 50, "maximum": 1200},
+              "height_mm": {"type": "integer", "minimum": 50, "maximum": 1200},
               "orientation": {"const": "landscape"},
               "dpi": {"type": "integer", "minimum": 72, "maximum": 600},
               "safe_margin_mm": {"type": "number", "minimum": 0, "maximum": 50}

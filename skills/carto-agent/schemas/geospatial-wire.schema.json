@@ -1,0 +1,730 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/geospatial-wire.schema.json",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "payload"
+      ],
+      "properties": {
+        "kind": {
+          "const": "metadata"
+        },
+        "payload": {
+          "$ref": "#/$defs/metadata"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "payload"
+      ],
+      "properties": {
+        "kind": {
+          "const": "statistics"
+        },
+        "payload": {
+          "$ref": "#/$defs/statistics"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "payload"
+      ],
+      "properties": {
+        "kind": {
+          "const": "task-result"
+        },
+        "payload": {
+          "$ref": "#/$defs/task-result"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "payload"
+      ],
+      "properties": {
+        "kind": {
+          "const": "task-info"
+        },
+        "payload": {
+          "$ref": "#/$defs/task-info"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "payload"
+      ],
+      "properties": {
+        "kind": {
+          "const": "artifact-info"
+        },
+        "payload": {
+          "$ref": "#/$defs/artifact-info"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "payload"
+      ],
+      "properties": {
+        "kind": {
+          "const": "catalog"
+        },
+        "payload": {
+          "$ref": "#/$defs/catalog"
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "driver",
+        "width",
+        "height",
+        "band_count",
+        "crs",
+        "crs_type",
+        "coordinate_units",
+        "bounds",
+        "transform",
+        "pixel_size",
+        "pixel_size_meters",
+        "bands",
+        "warnings"
+      ],
+      "properties": {
+        "kind": {
+          "const": "raster"
+        },
+        "driver": {
+          "const": "GTiff"
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16000000
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16000000
+        },
+        "band_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "crs": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 8192
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "crs_type": {
+          "enum": [
+            "geographic",
+            "projected",
+            "other",
+            "undefined"
+          ]
+        },
+        "coordinate_units": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 4,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "bounds": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "number"
+          }
+        },
+        "transform": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "type": "number"
+          }
+        },
+        "pixel_size": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "pixel_size_meters": {
+          "anyOf": [
+            {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "bands": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 65535,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "band",
+              "dtype",
+              "nodata",
+              "description",
+              "unit"
+            ],
+            "properties": {
+              "band": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              "dtype": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 32
+              },
+              "nodata": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "enum": [
+                      "NaN",
+                      "+Infinity",
+                      "-Infinity",
+                      null
+                    ]
+                  }
+                ]
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "unit": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 128,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          }
+        }
+      }
+    },
+    "statistics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "sha256",
+        "size_bytes",
+        "raster_info",
+        "total_pixels",
+        "valid_pixels",
+        "masked_pixels",
+        "classes",
+        "warnings"
+      ],
+      "properties": {
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "dataset_id"
+          ],
+          "properties": {
+            "dataset_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+            },
+            "artifact_id": {
+              "type": "null"
+            }
+          }
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 268435456
+        },
+        "raster_info": {
+          "$ref": "#/$defs/metadata"
+        },
+        "total_pixels": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16000000
+        },
+        "valid_pixels": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16000000
+        },
+        "masked_pixels": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16000000
+        },
+        "classes": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 256,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "value",
+              "count"
+            ],
+            "properties": {
+              "value": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 4294967295
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 16000000
+              }
+            }
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 128,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          }
+        }
+      }
+    },
+    "task-result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "artifacts",
+        "summary",
+        "warnings"
+      ],
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "pattern": "^task_[a-f0-9]{32}$"
+        },
+        "artifacts": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "items": {
+            "$ref": "#/$defs/artifact-info"
+          }
+        },
+        "summary": {
+          "$ref": "#/$defs/reprojection-summary"
+        },
+        "warnings": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 128,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          }
+        }
+      }
+    },
+    "task-info": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "tool",
+        "version",
+        "status",
+        "started_at",
+        "finished_at",
+        "parameters",
+        "inputs",
+        "artifacts",
+        "summary",
+        "warnings",
+        "error_code"
+      ],
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "pattern": "^task_[a-f0-9]{32}$"
+        },
+        "tool": {
+          "const": "geo_raster_reproject"
+        },
+        "version": {
+          "const": "0.3.0"
+        },
+        "status": {
+          "const": "succeeded"
+        },
+        "started_at": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/timestamp"
+        },
+        "finished_at": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/timestamp"
+        },
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source",
+            "target_crs",
+            "resolution",
+            "resampling"
+          ],
+          "properties": {
+            "source": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "dataset_id"
+              ],
+              "properties": {
+                "dataset_id": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+                },
+                "artifact_id": {
+                  "type": "null"
+                }
+              }
+            },
+            "target_crs": {
+              "type": "string",
+              "pattern": "^EPSG:[1-9][0-9]{2,5}$"
+            },
+            "resolution": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "resampling": {
+              "const": "nearest"
+            }
+          }
+        },
+        "inputs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source",
+              "sha256",
+              "size_bytes"
+            ],
+            "properties": {
+              "source": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "dataset_id"
+                ],
+                "properties": {
+                  "dataset_id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+                  },
+                  "artifact_id": {
+                    "type": "null"
+                  },
+                  "layer": {
+                    "type": "null"
+                  }
+                }
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "size_bytes": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 268435456
+              }
+            }
+          }
+        },
+        "artifacts": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "items": {
+            "$ref": "#/$defs/artifact-info"
+          }
+        },
+        "summary": {
+          "$ref": "#/$defs/reprojection-summary"
+        },
+        "warnings": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 128,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          }
+        },
+        "error_code": {
+          "type": "null"
+        }
+      }
+    },
+    "artifact-info": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_id",
+        "task_id",
+        "kind",
+        "format",
+        "mime_type",
+        "uri",
+        "size_bytes",
+        "sha256",
+        "crs",
+        "layer",
+        "feature_count",
+        "raster_info"
+      ],
+      "properties": {
+        "artifact_id": {
+          "type": "string",
+          "pattern": "^art_[a-f0-9]{32}$"
+        },
+        "task_id": {
+          "type": "string",
+          "pattern": "^task_[a-f0-9]{32}$"
+        },
+        "kind": {
+          "const": "raster"
+        },
+        "format": {
+          "const": "tif"
+        },
+        "mime_type": {
+          "const": "image/tiff"
+        },
+        "uri": {
+          "type": "string",
+          "pattern": "^artifact://art_[a-f0-9]{32}$"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 8,
+          "maximum": 16777216
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "crs": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 8192
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "layer": {
+          "type": "null"
+        },
+        "feature_count": {
+          "type": "null"
+        },
+        "raster_info": {
+          "$ref": "#/$defs/metadata"
+        }
+      }
+    },
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "datasets"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "datasets": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 64,
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "kind"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024
+              },
+              "kind": {
+                "const": "raster"
+              }
+            }
+          }
+        }
+      }
+    },
+    "reprojection-summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "crs",
+        "width",
+        "height",
+        "resampling",
+        "resolution"
+      ],
+      "properties": {
+        "crs": {
+          "type": "string",
+          "pattern": "^EPSG:[1-9][0-9]{2,5}$"
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16000000
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16000000
+        },
+        "resampling": {
+          "const": "nearest"
+        },
+        "resolution": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        }
+      }
+    }
+  }
+}

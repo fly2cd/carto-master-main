@@ -1,0 +1,309 @@
+{
+  "schema_version": 1,
+  "lock_id": "lock-test-run",
+  "project_id": "test-project",
+  "run_id": "test-run",
+  "candidate_ref": {
+    "id": "candidate-one",
+    "version": "1.0.0",
+    "digest": "sha256:b54ef17c18e5badd938a30fb187990f0f2aa1bcf77259fe8bb783e37307dd408"
+  },
+  "execution_digest": "sha256:cd8c34ba7054424745c0face1982e6977cb2f2943b6f0fab63559504e46e2d4e",
+  "execution": {
+    "intent_ref": {
+      "id": "artifact",
+      "version": "1.0.0",
+      "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "profile_refs": [],
+    "business_scene": "emergency_mapping",
+    "map_tasks": [
+      "hazard-result-map"
+    ],
+    "template_refs": [
+      {
+        "kind": "map-scenario",
+        "id": "test-scenario",
+        "version": "1.0.0",
+        "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    ],
+    "dependency_refs": [
+      {
+        "id": "choropleth/sequential",
+        "version": "1.0.0",
+        "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    ],
+    "policy_refs": [],
+    "dataset_refs": [
+      {
+        "digest": "sha256:d9c9c7b49d3f0de01d79774e255cd59ac510acdc3565a6a2f763b2dbe3d6a66d",
+        "id": "source",
+        "uri": ".carto/raster/source/d9c9c7b49d3f0de01d79774e255cd59ac510acdc3565a6a2f763b2dbe3d6a66d.tif",
+        "version": "1.0.0"
+      }
+    ],
+    "prepared_data_refs": [
+      {
+        "id": "prepared-data-bundle",
+        "version": "1.0.0",
+        "digest": "sha256:c5339d3356fa9a730488129a1e9d8e3a0ef52c83f479f929fefc27b77127648d",
+        "uri": ".carto/raster/prepared-data-bundle/c5339d3356fa9a730488129a1e9d8e3a0ef52c83f479f929fefc27b77127648d.json"
+      }
+    ],
+    "knowledge_evidence_refs": [],
+    "tool_binding_refs": [],
+    "transformation_refs": [],
+    "ownership": {
+      "scenario": "map-scenario"
+    },
+    "shared_semantics": {
+      "theme_tags": [
+        "unit-theme"
+      ],
+      "data_nature": "synthetic"
+    },
+    "views": [
+      {
+        "id": "main-view",
+        "extent": [
+          500000.0,
+          3999940.0,
+          500090.0,
+          4000000.0
+        ],
+        "layer_ids": [
+          "raster-layer"
+        ],
+        "target_ids": [
+          "pdf",
+          "png"
+        ]
+      }
+    ],
+    "targets": {
+      "pdf": {
+        "format": "pdf",
+        "display_crs": {
+          "authority": "EPSG",
+          "code": "26911"
+        },
+        "width_mm": 297,
+        "height_mm": 210,
+        "dpi": 72
+      },
+      "png": {
+        "format": "png",
+        "display_crs": {
+          "authority": "EPSG",
+          "code": "26911"
+        },
+        "width_mm": 297,
+        "height_mm": 210,
+        "dpi": 72
+      }
+    },
+    "resolved_assets": [
+      {
+        "id": "font",
+        "version": "1.0.0",
+        "digest": "sha256:3fdf69cabf06049ea70a00b5919340e2ce1e6d02b0cc3c4b44fb6801bd1e0d22",
+        "uri": ".carto/raster/font/3fdf69cabf06049ea70a00b5919340e2ce1e6d02b0cc3c4b44fb6801bd1e0d22.ttf"
+      }
+    ],
+    "resolved_layout": {
+      "contract": {
+        "canvas": {
+          "height": 210,
+          "orientation": "landscape",
+          "safe_margin": 10,
+          "unit": "mm",
+          "width": 297
+        },
+        "capacity": {
+          "legend_items": 12,
+          "title_characters": 40
+        },
+        "category": "report",
+        "frames": [
+          {
+            "bounds": [
+              10,
+              25,
+              215,
+              175
+            ],
+            "content_id": "main-view",
+            "coordinate_space": "page",
+            "id": "map",
+            "overflow_policy": "clip",
+            "type": "map"
+          },
+          {
+            "bounds": [
+              10,
+              10,
+              277,
+              10
+            ],
+            "content_id": "title",
+            "coordinate_space": "page",
+            "id": "title",
+            "overflow_policy": "reject",
+            "type": "title"
+          },
+          {
+            "bounds": [
+              230,
+              40,
+              57,
+              130
+            ],
+            "content_id": "legend",
+            "coordinate_space": "page",
+            "id": "legend",
+            "overflow_policy": "reject",
+            "type": "legend"
+          },
+          {
+            "bounds": [
+              230,
+              180,
+              57,
+              15
+            ],
+            "content_id": "source",
+            "coordinate_space": "page",
+            "id": "source",
+            "overflow_policy": "reject",
+            "type": "marginalia"
+          }
+        ],
+        "layout_id": "synthetic-a4-landscape",
+        "placeholders": [
+          "{{MAP_TITLE}}",
+          "{{MAP_FRAME}}",
+          "{{LEGEND}}"
+        ],
+        "rules": [],
+        "schema_version": 1,
+        "version": "1.0.0"
+      },
+      "contract_ref": {
+        "digest": "sha256:520ad344494f786ef28cedea74bc74ebbe5c062fca20f2b000ad4782e3ec7c14",
+        "id": "synthetic-a4-landscape",
+        "version": "1.0.0"
+      },
+      "frames": [
+        {
+          "bounds_px": [
+            651.968504,
+            113.385827,
+            161.574803,
+            368.503937
+          ],
+          "content_id": "legend",
+          "id": "legend",
+          "overflow_policy": "reject",
+          "type": "legend"
+        },
+        {
+          "bounds_px": [
+            28.346457,
+            70.866142,
+            609.448819,
+            496.062992
+          ],
+          "content_id": "main-view",
+          "id": "map",
+          "overflow_policy": "clip",
+          "type": "map"
+        },
+        {
+          "bounds_px": [
+            651.968504,
+            510.23622,
+            161.574803,
+            42.519685
+          ],
+          "content_id": "source",
+          "id": "source",
+          "overflow_policy": "reject",
+          "type": "marginalia"
+        },
+        {
+          "bounds_px": [
+            28.346457,
+            28.346457,
+            785.19685,
+            28.346457
+          ],
+          "content_id": "title",
+          "id": "title",
+          "overflow_policy": "reject",
+          "type": "title"
+        }
+      ],
+      "map_frame_id": "map",
+      "page": {
+        "device_pixel_ratio": 1,
+        "dpi": 72,
+        "height_mm": 210,
+        "height_px": 595,
+        "safe_margin_px": 28.346457,
+        "width_mm": 297,
+        "width_px": 842
+      },
+      "resolver_version": "1.0.0",
+      "schema_version": 1
+    },
+    "environment": {
+      "renderer_id": "rasterio-matplotlib-page",
+      "renderer_version": "1.0.0",
+      "renderer_code_digest": "sha256:5df78630d32950f5ca9f4cf6a4eb42e96327d56e92bbf2b7df425ed00d78e101",
+      "runtime": {
+        "python": "3.12.14",
+        "rasterio": "1.5.2",
+        "gdal": "3.12.2",
+        "numpy": "2.5.4",
+        "matplotlib": "3.11.2",
+        "pillow": "12.3.0",
+        "freetype": "2.14.3",
+        "fonttools": "4.68.0",
+        "zlib": "1.3.2"
+      },
+      "fingerprint": "sha256:4f75f08544321a41877b2d959d6849db334c76ba792346528ef89bf6e933bd43"
+    },
+    "render_scene_ref": {
+      "id": "synthetic-raster-scene",
+      "version": "1.0.0",
+      "digest": "sha256:d655a559eeb89880e2b045ab03f534a1eec2e0eedf2c40d44d7292b349a23459"
+    }
+  },
+  "evidence": {
+    "preflight_ref": {
+      "id": "report-one",
+      "version": "1.0.0",
+      "digest": "sha256:85a28f8819a7bbebc44df47958d3b8de09116f2dc92c4c72567c6a93a1b81ee1"
+    },
+    "preview_ref": {
+      "id": "preview-test-run",
+      "version": "1.0.0",
+      "digest": "sha256:253bce2d895becd9ae21c6bf07ac92e6f4efeee6a60ba3c7d667632d33332ec5"
+    }
+  },
+  "approvals": {
+    "brief_ref": "synthetic-g1-test-boundary",
+    "freeze_ref": "synthetic-g2"
+  },
+  "candidate_digest": "sha256:b54ef17c18e5badd938a30fb187990f0f2aa1bcf77259fe8bb783e37307dd408",
+  "preview_evidence_digest": "sha256:253bce2d895becd9ae21c6bf07ac92e6f4efeee6a60ba3c7d667632d33332ec5",
+  "render_receipt_ref": {
+    "id": "receipt-map-preview-candidate-one",
+    "version": "1.0.0",
+    "digest": "sha256:4fce5732b5c0e1ddaec8e90b9bbea358439227610c72fe582ad4402037b05a8f"
+  },
+  "environment_fingerprint": "sha256:4f75f08544321a41877b2d959d6849db334c76ba792346528ef89bf6e933bd43",
+  "created_at": "2026-11-05T11:29:12.443Z"
+}

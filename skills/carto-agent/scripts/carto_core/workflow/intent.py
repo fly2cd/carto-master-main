@@ -1,85 +1,126 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 from ..canonical import sha256_digest
 from ..errors import ProtocolError
 from ..schema_registry import SchemaRegistry, load_document
 
 
-SCENE_TERMS = {
-    "government_thematic": ("政务", "专题", "经济发展", "科技创新", "现代产业", "对外开放", "文旅", "交通运输", "行政区划"),
-    "emergency_mapping": ("应急", "滑坡", "地质灾害", "洪涝", "洪水", "森林火灾", "灾情", "救援"),
-    "leadership_visit": ("领导调研", "调研路线", "行程", "考察点", "调研点"),
-}
+def default_profiles_path() -> Path:
+    return Path(__file__).resolve().parents[3] / "policies/intent-profiles.yaml"
 
 
 class IntentResolver:
-    def __init__(self, profiles_path: Path, registry: SchemaRegistry | None = None) -> None:
-        policy = load_document(profiles_path)
-        self.profile_version = str(policy["catalog_version"])
-        self._profiles = {item["scene_id"]: item for item in policy["profiles"]}
+    """Resolve business purpose and topic IDs independently of template capabilities."""
+
+    def __init__(self, profiles_path: Path | None = None, registry: SchemaRegistry | None = None) -> None:
         self._registry = registry or SchemaRegistry()
+        policy = load_document(profiles_path or default_profiles_path())
+        self._registry.validate("intent-profiles", policy)
+        self.profile_version = policy["catalog_version"]
+        self._policy = deepcopy(policy)
+        self._profiles = {item["business_scene"]: item for item in policy["profiles"]}
+        self._themes = {item["id"]: item for item in policy["themes"]}
+        if len(self._profiles) != len(policy["profiles"]) or len(self._themes) != len(policy["themes"]):
+            raise ProtocolError("INTENT_CATALOG_DUPLICATE", "Business-scene and topic IDs must be unique")
 
-    def resolve(self, request: dict[str, Any]) -> dict[str, Any]:
-        text = str(request.get("text", ""))
-        fields = dict(request.get("fields", {}))
-        explicit_scene = request.get("business_scene")
-        matches = [scene for scene, terms in SCENE_TERMS.items() if any(term in text for term in terms)]
-        if explicit_scene:
-            if explicit_scene not in self._profiles:
-                return self._result(request, "government_thematic", [], "unsupported", "missing_information", ["supported_business_scene"])
-            if matches and explicit_scene not in matches:
-                return self._result(request, explicit_scene, [], "ambiguous", "missing_information", ["business_scene_confirmation"])
-            matches = [explicit_scene]
-        matches = list(dict.fromkeys(matches))
-        if not matches:
-            return self._result(request, "government_thematic", [], "unsupported", "missing_information", ["business_scene"])
-        if len(matches) > 1:
-            return self._result(request, matches[0], [], "ambiguous", "missing_information", ["business_scene_confirmation"])
-        scene = matches[0]
-        profile = self._profiles[scene]
-        unsupported = [action for action in profile.get("unsupported_actions", []) if action in request.get("requested_actions", [])]
-        if unsupported:
-            return self._result(request, scene, [], "unsupported", "missing_information", unsupported)
-        missing = [name for name in profile["required_information"] if not fields.get(name)]
-        missing_capabilities = [name for name in request.get("required_capabilities", []) if name not in request.get("available_capabilities", [])]
-        if missing_capabilities:
-            readiness = "missing_capability"
-            missing.extend(f"capability:{name}" for name in missing_capabilities)
+    @property
+    def catalog_ref(self) -> dict[str, str]:
+        return {"id": "intent-catalog", "version": self.profile_version,
+                "digest": sha256_digest(self._policy)}
+
+    def validate_selection(self, business_scene: str, tasks: list[str], theme_tags: list[str]) -> None:
+        profile = self._profiles.get(business_scene)
+        if profile is None:
+            raise ProtocolError("BUSINESS_SCENE_UNKNOWN", str(business_scene))
+        if not tasks or set(tasks) - set(profile["task_ids"]):
+            raise ProtocolError("INTENT_TASK_UNSUPPORTED", "Tasks are not registered for this business scene")
+        if set(theme_tags) - self._themes.keys():
+            raise ProtocolError("INTENT_THEME_UNKNOWN", "Topic IDs must belong to the intent catalog")
+        if "theme_tags" in profile["required_information"] and not theme_tags:
+            raise ProtocolError("INTENT_THEME_REQUIRED", "This business scene requires content topic IDs")
+
+    def require_current_intent(self, intent: dict[str, Any]) -> None:
+        self._registry.validate("map-intent", intent)
+        if intent["intent_status"] != "resolved":
+            raise ProtocolError("INTENT_NOT_RESOLVED", intent["intent_status"])
+        if intent["readiness_status"] != "ready":
+            raise ProtocolError("INTENT_NOT_READY", intent["readiness_status"])
+        if (intent["profile_version"] != self.profile_version
+                or intent["evidence_refs"][:1] != [self.catalog_ref]):
+            raise ProtocolError("INTENT_CATALOG_DRIFT", "Intent must be resolved against the current catalog")
+        self.validate_selection(intent["business_scene"], intent["tasks"], intent["theme_tags"])
+
+    def resolve(self, request: dict[str, Any], *, available_capabilities: Iterable[str] = ()) -> dict[str, Any]:
+        self._registry.validate("intent-request", request)
+        selection = request["selection"]
+        text = request["text"]
+        fields = selection["fields"]
+        tags = sorted(selection.get("theme_tags", [
+            key for key, topic in self._themes.items() if any(term in text for term in topic["terms"])
+        ]))
+        explicit = selection.get("business_scene")
+        matches = [key for key, profile in self._profiles.items()
+                   if any(term in text for term in profile["purpose_terms"])]
+        if explicit is not None and explicit not in self._profiles:
+            return self._result(request, None, [], tags, "unsupported", "missing_information", ["business_scene"])
+        if explicit is not None:
+            if matches and explicit not in matches:
+                return self._result(request, explicit, [], tags, "ambiguous", "missing_information",
+                                    ["business_scene_confirmation"])
+            scene = explicit
+        elif len(matches) != 1:
+            status = "ambiguous" if matches else "unsupported"
+            return self._result(request, None, [], tags, status, "missing_information", ["business_scene"])
         else:
-            readiness = "missing_information" if missing else "ready"
-        tasks = list(request.get("tasks") or profile["task_ids"][:1])
-        unknown_tasks = sorted(set(tasks) - set(profile["task_ids"]))
-        if unknown_tasks:
-            return self._result(request, scene, [], "unsupported", "missing_information", [f"task:{item}" for item in unknown_tasks])
-        return self._result(request, scene, tasks, "resolved", readiness, missing)
+            scene = matches[0]
+        profile = self._profiles[scene]
+        unknown_fields = set(fields) - (set(profile["required_information"]) - {"theme_tags"})
+        if unknown_fields:
+            raise ProtocolError("INTENT_FIELD_UNKNOWN", "Context fields do not belong to the selected business scene")
+        tasks = list(selection.get("tasks", []))
+        unsupported = ([f"task:{item}" for item in sorted(set(tasks) - set(profile["task_ids"]))]
+                       + [f"theme:{item}" for item in sorted(set(tags) - self._themes.keys())]
+                       + [action for action in profile["unsupported_actions"]
+                          if action in selection.get("requested_actions", [])])
+        if unsupported:
+            return self._result(request, scene, tasks, tags, "unsupported", "missing_information", unsupported)
+        missing = [name for name in profile["required_information"]
+                   if not (tags if name == "theme_tags" else fields.get(name))]
+        if not tasks:
+            missing.append("tasks")
+        missing_capabilities = sorted(set(selection.get("required_capabilities", [])) - set(available_capabilities))
+        missing.extend(f"capability:{name}" for name in missing_capabilities)
+        readiness = "missing_capability" if missing_capabilities else ("missing_information" if missing else "ready")
+        return self._result(request, scene, tasks, tags, "resolved" if tasks else "ambiguous", readiness, missing)
 
-    def _result(self, request: dict[str, Any], scene: str, tasks: list[str], intent_status: str, readiness_status: str, missing: list[str]) -> dict[str, Any]:
-        evidence_value = {"profile_version": self.profile_version, "scene": scene}
+    def _result(self, request: dict[str, Any], scene: str | None, tasks: list[str], tags: list[str],
+                status: str, readiness: str, missing: list[str]) -> dict[str, Any]:
         result = {
             "schema_version": 1,
-            "intent_id": str(request.get("intent_id", "resolved-intent")),
-            "revision": int(request.get("revision", 1)),
+            "intent_id": request.get("intent_id", "resolved-intent"),
+            "revision": request.get("revision", 1),
             "profile_version": self.profile_version,
             "business_scene": scene,
-            "tasks": tasks or [self._profiles[scene]["task_ids"][0]],
-            "intent_status": intent_status,
-            "readiness_status": readiness_status,
+            "theme_tags": tags,
+            "tasks": tasks,
+            "intent_status": status,
+            "readiness_status": readiness,
             "missing_items": missing,
-            "evidence_refs": [{"id": "intent-profile", "version": self.profile_version, "digest": sha256_digest(evidence_value)}],
+            "evidence_refs": [self.catalog_ref, {"id": "intent-input", "version": "1.0.0",
+                                                "digest": sha256_digest(request)}],
         }
-        if request.get("theme"):
-            result["theme"] = str(request["theme"])
         self._registry.validate("map-intent", result)
         return result
 
 
 class TaskDispatcher:
+    """Return trusted logical task keys; this does not authorize executable components."""
+
     def dispatch(self, intent: dict[str, Any]) -> list[dict[str, str]]:
-        if intent["intent_status"] != "resolved":
-            raise ProtocolError("INTENT_NOT_RESOLVED", intent["intent_status"])
-        if intent["readiness_status"] != "ready":
-            raise ProtocolError("INTENT_NOT_READY", intent["readiness_status"])
-        return [{"scene_id": intent["business_scene"], "task_id": task, "handler": f"scene:{intent['business_scene']}:{task}"} for task in intent["tasks"]]
+        IntentResolver().require_current_intent(intent)
+        return [{"business_scene": intent["business_scene"], "task_id": task,
+                 "handler": f"business-scene:{intent['business_scene']}:{task}"} for task in intent["tasks"]]

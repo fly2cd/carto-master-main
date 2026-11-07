@@ -1,0 +1,124 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Carto: CLI help",
+      "type": "process",
+      "command": "${command:python.interpreterPath}",
+      "args": [
+        "${workspaceFolder}/skills/carto-agent/scripts/carto.py",
+        "--help"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "PYTHONUTF8": "1"
+        }
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "detail": "显示唯一 CLI 入口；不创建项目、不运行示例。"
+    },
+    {
+      "label": "Carto: Check schemas",
+      "type": "process",
+      "command": "${command:python.interpreterPath}",
+      "args": [
+        "${workspaceFolder}/skills/carto-agent/scripts/carto.py",
+        "schema",
+        "check"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "PYTHONUTF8": "1"
+        }
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "detail": "校验 Skill 内全部 Schema；不等于地图或生产能力验收。"
+    },
+    {
+      "label": "Carto: Probe renderer",
+      "type": "process",
+      "command": "${command:python.interpreterPath}",
+      "args": [
+        "${workspaceFolder}/skills/carto-agent/scripts/carto.py",
+        "environment",
+        "probe-renderer"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "PYTHONUTF8": "1"
+        }
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "detail": "显式运行本机无头浏览器探测；需检查报告中的 status，不仅看退出码。"
+    },
+    {
+      "label": "Carto: Test IDE integration",
+      "type": "process",
+      "command": "${command:python.interpreterPath}",
+      "args": [
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "${workspaceFolder}/skills/carto-agent/scripts/tests",
+        "-p",
+        "test_ide_integration.py",
+        "-v"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "PYTHONUTF8": "1"
+        }
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "detail": "验证 IDE 配置与真实 CLI 的最小接入契约。",
+      "group": "test"
+    },
+    {
+      "label": "Carto: Run tests",
+      "type": "process",
+      "command": "${command:python.interpreterPath}",
+      "args": [
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "${workspaceFolder}/skills/carto-agent/scripts/tests",
+        "-v"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "PYTHONUTF8": "1"
+        }
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "detail": "完整开发回归；渲染用例可能启动无头浏览器并创建临时产物。",
+      "group": "test"
+    }
+  ]
+}

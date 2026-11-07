@@ -15,7 +15,8 @@
     "template_refs",
     "data_bindings",
     "decisions",
-    "open_issues"
+    "open_issues",
+    "theme_tags"
   ],
   "properties": {
     "schema_version": {
@@ -38,11 +39,7 @@
       "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
     },
     "business_scene": {
-      "enum": [
-        "government_thematic",
-        "emergency_mapping",
-        "leadership_visit"
-      ]
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/businessSceneId"
     },
     "tasks": {
       "type": "array",
@@ -91,12 +88,12 @@
       ],
       "properties": {
         "classification": {
-          "const": "quantile"
+          "enum": ["quantile", "unique-values"]
         },
         "class_count": {
           "type": "integer",
           "minimum": 2,
-          "maximum": 12
+          "maximum": 256
         },
         "extent": {
           "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/bbox"
@@ -110,7 +107,7 @@
           "const": "actual-encoding"
         },
         "renderer_id": {
-          "const": "maplibre-web"
+          "enum": ["maplibre-web", "rasterio-matplotlib-page"]
         },
         "point_scaling": {
           "const": "area-proportional"
@@ -122,6 +119,9 @@
       "items": {
         "type": "string"
       }
+    },
+    "theme_tags": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/themeTags"
     }
   }
 }

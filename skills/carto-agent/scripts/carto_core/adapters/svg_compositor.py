@@ -4,9 +4,11 @@ import base64
 import html
 import math
 import re
+import struct
 from pathlib import Path
 from typing import Any
 
+from ..compiler.layout import FONT_SIZE_PX, LayoutResolver
 from ..errors import ProtocolError, SecurityError
 from ..security.paths import PathGuard
 
@@ -52,6 +54,8 @@ class SvgCompositor:
         output_path: Path,
         *,
         inline_fonts: list[tuple[str, bytes]] | None = None,
+        resolved_layout: dict[str, Any] | None = None,
+        map_image_rect: list[float] | None = None,
     ) -> Path:
         screenshot = self.path_guard.resolve(map_screenshot_path, must_exist=True)
         output = self.path_guard.resolve(output_path)
@@ -62,13 +66,45 @@ class SvgCompositor:
         if not output.parent.is_dir():
             raise SecurityError("COMPOSITE_OUTPUT_PARENT_MISSING", str(output.parent))
 
+        map_bounds = [0, 0, self.width_px, self.height_px]
+        print_style = ""
+        if resolved_layout is not None:
+            resolver = LayoutResolver()
+            resolver.validate(resolved_layout)
+            page = resolved_layout["page"]
+            if (self.width_px, self.height_px) != (page["width_px"], page["height_px"]):
+                raise ProtocolError("LAYOUT_PAGE_MISMATCH", "compositor")
+            if sorted(overlays, key=lambda item: item["id"]) != resolver.place_overlays(resolved_layout, overlays):
+                raise ProtocolError("LAYOUT_ANCHOR_MISMATCH", "compositor")
+            map_bounds = resolver.map_frame(resolved_layout)["bounds_px"]
+            # Screen units remain logical output pixels. Print uses physical mm,
+            # avoiding CSS's 96dpi interpretation of an export's 144dpi pixels.
+            w, h = page["width_mm"], page["height_mm"]
+            print_style = f'<style>@page{{size:{w:g}mm {h:g}mm;margin:0}}@media print{{svg{{width:{w:g}mm;height:{h:g}mm}}}}</style>'
+        if map_image_rect is not None:
+            if resolved_layout is None or not isinstance(map_image_rect, list) or len(map_image_rect) != 4:
+                raise ProtocolError("COMPOSITE_IMAGE_RECT_INVALID", "Explicit image placement requires a resolved frame")
+            rx, ry, rw, rh = [self._number(v, "image_rect") for v in map_image_rect]
+            fx, fy, fw, fh = map_bounds
+            if (min(rw, rh) <= 0 or rx < fx or ry < fy or rx + rw > fx + fw + 1e-6 or ry + rh > fy + fh + 1e-6):
+                raise ProtocolError("COMPOSITE_IMAGE_RECT_INVALID", "Image must be wholly inside the map frame")
+            # Static raster placement is pixel-exact; reject stretched or mismatched PNG dimensions.
+            with screenshot.open("rb") as stream:
+                header = stream.read(24)
+            if (len(header) != 24 or header[:8] != b"\x89PNG\r\n\x1a\n" or header[12:16] != b"IHDR"
+                    or struct.unpack(">II", header[16:24]) != (rw, rh)):
+                raise ProtocolError("COMPOSITE_IMAGE_RECT_INVALID", "PNG dimensions must match its explicit image rectangle")
+            map_bounds = map_image_rect
+        x, y, width, height = map_bounds
         font_styles = [self._inline_font(family, data) for family, data in (inline_fonts or [])]
         parts: list[str] = [
             '<?xml version="1.0" encoding="UTF-8"?>',
             f'<svg xmlns="http://www.w3.org/2000/svg" width="{self.width_px}" height="{self.height_px}" viewBox="0 0 {self.width_px} {self.height_px}">',
             *font_styles,
+            f'<style>text{{font-size:{FONT_SIZE_PX}px}}</style>',
+            print_style,
             f'<rect width="100%" height="100%" fill="{self.background}"/>',
-            f'<image href="{self._encode_image(screenshot)}" width="{self.width_px}" height="{self.height_px}"/>',
+            f'<image href="{self._encode_image(screenshot)}" x="{x:g}" y="{y:g}" width="{width:g}" height="{height:g}" preserveAspectRatio="none"/>',
         ]
         for overlay in overlays:
             parts.append(self._render_overlay(overlay))

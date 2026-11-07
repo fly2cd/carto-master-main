@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 import csv
-import hashlib
 import io
 import json
 import math
 from pathlib import Path
 from typing import Any
 
+from ..artifacts import file_digest
 from ..canonical import sha256_digest
 from ..errors import ProtocolError, SecurityError
+from ..scenario_registry import ScenarioRegistry
 from ..schema_registry import MAX_DOCUMENT_BYTES, SchemaRegistry, load_document
 from ..security.paths import PathGuard
 
@@ -25,12 +26,8 @@ _ALLOWED_GEOMETRIES = {
 }
 
 
-def file_digest(path: Path) -> str:
-    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
-
-
 class ControlledSourceAnalyzer:
-    """Analyze bounded synthetic GeoJSON/CSV sources without retaining business rows."""
+    """Analyze bounded declared GeoJSON/CSV sources without retaining business rows."""
 
     def __init__(self, path_guard: PathGuard, project_root: Path, registry: SchemaRegistry | None = None) -> None:
         self.path_guard = path_guard
@@ -44,6 +41,7 @@ class ControlledSourceAnalyzer:
             raise ProtocolError("TEMPLATE_REQUEST_INVALID", "Template request must be an object")
         self.registry.validate("template-create-request", request)
         self._require_open_kind(request["kind"])
+        capability = ScenarioRegistry(self.registry).for_create(request)
         if request["scope"] != f"project:{request['subject']['project_id']}":
             raise SecurityError("PROJECT_SCOPE_DENIED", request["scope"])
 
@@ -54,7 +52,7 @@ class ControlledSourceAnalyzer:
         if not isinstance(manifest, dict):
             raise ProtocolError("SOURCE_MANIFEST_INVALID", "Source manifest must be an object")
         self.registry.validate("source-manifest", manifest)
-        summaries = self._analyze_sources(manifest)
+        summaries = self._analyze_sources(manifest, request, capability.component("source_contract"))
         self._validate_role_bindings(request, summaries)
         return request, manifest, summaries
 
@@ -66,6 +64,7 @@ class ControlledSourceAnalyzer:
         }
 
     def analyze(self, request: dict[str, Any], manifest: dict[str, Any], summaries: list[dict[str, Any]]) -> dict[str, Any]:
+        profile = ScenarioRegistry(self.registry).for_create(request)
         evidence: list[dict[str, Any]] = []
         for summary in summaries:
             source_ref = f"source:{summary['source_id']}@{summary['digest']}"
@@ -99,19 +98,7 @@ class ControlledSourceAnalyzer:
                     "value": request["targets"],
                     "source_ref": f"request:{request['request_id']}",
                 },
-                {
-                    "path": "/portrayal/map-expressions",
-                    "value_origin": "system_suggestion",
-                    "value": ["choropleth/sequential@1.0.0", "proportional-symbol/count@1.0.0"],
-                    "rationale": "The U-P2 flood profile binds polygon risk values and point capacities to the registered expression slice.",
-                },
-                {
-                    "path": "/layout/canvas",
-                    "value_origin": "derived",
-                    "value": "A3 landscape 420x297mm",
-                    "source_ref": "profile:flood-risk-overview@1.0.0",
-                    "rationale": "Derived from the frozen engineering-preview target profile.",
-                },
+                *profile.component("source_contract").suggestions(profile.definition),
             ]
         )
         for decision in request["decisions"]:
@@ -143,7 +130,11 @@ class ControlledSourceAnalyzer:
                 f"U-P2.2 authoring is not open for template kind: {kind}",
             )
 
-    def _analyze_sources(self, manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    def _analyze_sources(self, manifest: dict[str, Any], request: dict[str, Any],
+                         source_contract: Any) -> list[dict[str, Any]]:
+        validate_profile = getattr(source_contract, "validate_source_profile", None)
+        if not callable(validate_profile):
+            raise ProtocolError("CAPABILITY_NOT_AVAILABLE", "Scenario source-profile validation is not implemented")
         seen: set[str] = set()
         summaries: list[dict[str, Any]] = []
         for source in manifest["sources"]:
@@ -157,7 +148,11 @@ class ControlledSourceAnalyzer:
                 raise SecurityError("SOURCE_LICENSE_RESTRICTED", source_id)
             profile = source.get("data_profile")
             if not isinstance(profile, dict):
-                raise SecurityError("SYNTHETIC_SOURCE_ATTESTATION_REQUIRED", source_id)
+                raise SecurityError("SOURCE_PROFILE_REQUIRED", source_id)
+            # A declaration is not approval: the trusted scenario must admit it before data is read.
+            validate_profile(source, request)
+            if source["kind"] == "geojson" and profile["source_crs"] != {"authority": "EPSG", "code": "4326"}:
+                raise ProtocolError("SOURCE_CRS_UNSUPPORTED", "The bounded GeoJSON reader requires EPSG:4326")
             path = self.path_guard.resolve(
                 source["location_ref"], base_root=self.project_root, must_exist=True
             )
@@ -176,7 +171,7 @@ class ControlledSourceAnalyzer:
                     "kind": source["kind"],
                     "digest": actual_digest,
                     "license": source["license"],
-                    "data_nature": "synthetic",
+                    "data_nature": profile["data_nature"],
                     **summary,
                 }
             )
@@ -198,15 +193,6 @@ class ControlledSourceAnalyzer:
             raise ProtocolError("GEOJSON_PARSE_FAILED", str(exc)) from exc
         if not isinstance(value, dict) or value.get("type") != "FeatureCollection":
             raise ProtocolError("GEOJSON_TYPE_INVALID", "Expected FeatureCollection")
-        metadata = value.get("carto_metadata")
-        expected_metadata = {
-            "data_nature": "synthetic",
-            "contains_production_data": False,
-            "contains_sensitive_coordinates": False,
-            "source_crs": "EPSG:4326",
-        }
-        if metadata != expected_metadata:
-            raise SecurityError("SYNTHETIC_SOURCE_ATTESTATION_INVALID", path.name)
         features = value.get("features")
         if not isinstance(features, list) or len(features) > MAX_SOURCE_RECORDS:
             raise SecurityError("SOURCE_RECORD_LIMIT_EXCEEDED", path.name)
@@ -299,19 +285,6 @@ class ControlledSourceAnalyzer:
         if not -180 <= longitude <= 180 or not -90 <= latitude <= 90:
             raise ProtocolError("GEOJSON_COORDINATES_INVALID", "EPSG:4326 position is outside valid bounds")
 
-    @staticmethod
-    def _validate_role_bindings(request: dict[str, Any], summaries: list[dict[str, Any]]) -> None:
-        by_id = {item["source_id"]: item for item in summaries}
-        risk_id = request["role_bindings"]["risk_area_source"]
-        shelter_id = request["role_bindings"]["shelter_source"]
-        if risk_id == shelter_id:
-            raise ProtocolError("ROLE_BINDING_DUPLICATE", risk_id)
-        try:
-            risk = by_id[risk_id]
-            shelter = by_id[shelter_id]
-        except KeyError as exc:
-            raise ProtocolError("ROLE_SOURCE_NOT_FOUND", str(exc.args[0])) from exc
-        if not set(risk["geometry_types"]).intersection({"polygon", "multipolygon"}) or "risk_pct" not in risk["field_names"]:
-            raise ProtocolError("RISK_AREA_SOURCE_INCOMPATIBLE", risk_id)
-        if "point" not in shelter["geometry_types"] or "capacity" not in shelter["field_names"]:
-            raise ProtocolError("SHELTER_SOURCE_INCOMPATIBLE", shelter_id)
+    def _validate_role_bindings(self, request: dict[str, Any], summaries: list[dict[str, Any]]) -> None:
+        profile = ScenarioRegistry(self.registry).for_create(request)
+        profile.component("source_contract").validate_role_bindings(request, summaries)

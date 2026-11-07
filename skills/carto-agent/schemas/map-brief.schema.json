@@ -14,7 +14,10 @@
     "targets",
     "template_candidates",
     "delegation",
-    "approval_required"
+    "approval_required",
+    "business_scene",
+    "theme_tags",
+    "tasks"
   ],
   "properties": {
     "schema_version": {
@@ -139,7 +142,7 @@
       "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
     },
     "business_scene": {
-      "const": "emergency_mapping"
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/businessSceneId"
     },
     "scope": {
       "type": "string",
@@ -154,6 +157,17 @@
       "uniqueItems": true,
       "items": {
         "type": "string"
+      }
+    },
+    "theme_tags": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/themeTags"
+    },
+    "tasks": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
       }
     }
   }

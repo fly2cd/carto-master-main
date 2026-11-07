@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/resolved-layout.schema.json",
+  "title": "Deterministic page layout snapshot, not an independent lock",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "resolver_version",
+    "contract_ref",
+    "contract",
+    "page",
+    "map_frame_id",
+    "frames"
+  ],
+  "properties": {
+    "schema_version": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"
+    },
+    "resolver_version": {
+      "const": "1.0.0"
+    },
+    "contract_ref": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+    },
+    "contract": {
+      "$ref": "https://schemas.carto-agent.local/v1/layout.schema.json"
+    },
+    "page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "width_mm",
+        "height_mm",
+        "dpi",
+        "width_px",
+        "height_px",
+        "device_pixel_ratio",
+        "safe_margin_px"
+      ],
+      "properties": {
+        "width_mm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "height_mm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "dpi": {
+          "type": "integer",
+          "minimum": 72,
+          "maximum": 1200
+        },
+        "width_px": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "height_px": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "device_pixel_ratio": {
+          "const": 1
+        },
+        "safe_margin_px": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "map_frame_id": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+    },
+    "frames": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "content_id",
+          "type",
+          "bounds_px",
+          "overflow_policy"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+          },
+          "content_id": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+          },
+          "type": {
+            "enum": [
+              "map",
+              "title",
+              "legend",
+              "scale-bar",
+              "north-arrow",
+              "marginalia"
+            ]
+          },
+          "bounds_px": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/pageBox"
+          },
+          "overflow_policy": {
+            "enum": [
+              "clip",
+              "reject"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

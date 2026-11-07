@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "receipt_id": "receipt-render-attempt-test-run-1",
+  "session_id": "render-attempt-test-run-1",
+  "scene_id": "synthetic-raster-scene",
+  "scene_revision": 1,
+  "scene_digest": "sha256:d655a559eeb89880e2b045ab03f534a1eec2e0eedf2c40d44d7292b349a23459",
+  "random_seed": 0,
+  "environment_fingerprint": "sha256:4f75f08544321a41877b2d959d6849db334c76ba792346528ef89bf6e933bd43",
+  "resource_set_digest": "sha256:57f9abc5b9b8481f8a91ff3df21a9a0be74437b5b0f344fec910975a45cddac7",
+  "execution_digest": "sha256:a0e1c35f865bfa434aaa03c3f89f05f68b5c10f689f9ad0bd80b5b9678957fc2",
+  "renderer_id": "rasterio-matplotlib-page",
+  "renderer_profile_digest": "sha256:b1b127a1c2ec2d05e9e13c3b397a3c660e6aa6577460cfa54b31c7b0f2272400",
+  "renderer_version": "1.0.0",
+  "renderer_code_digest": "sha256:5df78630d32950f5ca9f4cf6a4eb42e96327d56e92bbf2b7df425ed00d78e101",
+  "runtime": {
+    "python": "3.12.14",
+    "rasterio": "1.5.2",
+    "gdal": "3.12.2",
+    "numpy": "2.5.4",
+    "matplotlib": "3.11.2",
+    "pillow": "12.3.0",
+    "freetype": "2.14.3",
+    "fonttools": "4.68.0",
+    "zlib": "1.3.2"
+  },
+  "page_output_ref": {
+    "id": "raster-page-output",
+    "version": "1.0.0",
+    "digest": "sha256:1ffc2e61d07bb546871d3e8a1abbf081c9b3b49b5ce3e620cb171ff160f3d67e",
+    "uri": ".carto/raster/raster-page-output/1ffc2e61d07bb546871d3e8a1abbf081c9b3b49b5ce3e620cb171ff160f3d67e.json"
+  },
+  "status": "succeeded",
+  "viewport": {
+    "width_px": 842,
+    "height_px": 595,
+    "device_pixel_ratio": 1
+  },
+  "resource_evidence": [
+    {
+      "resource_id": "font",
+      "digest": "sha256:3fdf69cabf06049ea70a00b5919340e2ce1e6d02b0cc3c4b44fb6801bd1e0d22",
+      "status": "loaded"
+    },
+    {
+      "resource_id": "legend",
+      "digest": "sha256:b87562c75026c8cf507be15faefa798366a1c701529e41a7efef119b1d6a470f",
+      "status": "loaded"
+    },
+    {
+      "resource_id": "prepared-data-bundle",
+      "digest": "sha256:c5339d3356fa9a730488129a1e9d8e3a0ef52c83f479f929fefc27b77127648d",
+      "status": "loaded"
+    },
+    {
+      "resource_id": "raster-classification-request",
+      "digest": "sha256:65bc7173b2cbd0b222f76139f263a833a4002be39d7ee6ef5d7f010c873610e1",
+      "status": "loaded"
+    },
+    {
+      "resource_id": "raster-page-request",
+      "digest": "sha256:78b0de8d080b96b75c8331aa13f7438be0eb550067f4ddb34fd8233a960386cb",
+      "status": "loaded"
+    },
+    {
+      "resource_id": "raster-prepared-data",
+      "digest": "sha256:995574df7a10892556f30add25abbf3ea071305a061edd30dcc1848897c840d1",
+      "status": "loaded"
+    },
+    {
+      "resource_id": "resolved-raster-portrayal",
+      "digest": "sha256:3dee6c48660ad15578f1219eb84be8459c968b8afe4d362edb8c22560dda5a16",
+      "status": "loaded"
+    },
+    {
+      "resource_id": "source",
+      "digest": "sha256:d9c9c7b49d3f0de01d79774e255cd59ac510acdc3565a6a2f763b2dbe3d6a66d",
+      "status": "loaded"
+    },
+    {
+      "resource_id": "tool-gis-raster-statistics",
+      "digest": "sha256:065040cbad8e5c4737be2566c3b6f4c40dfa58f799b7198c1879ac316f1751de",
+      "status": "loaded"
+    }
+  ],
+  "output_artifacts": [
+    {
+      "target": "pdf",
+      "media_type": "application/pdf",
+      "size_bytes": 11251,
+      "composition": "mixed",
+      "artifact_ref": {
+        "id": "map-pdf",
+        "version": "1.0.0",
+        "digest": "sha256:6fda0f6c8ee54d998f4a580f11fab75599e815a8113f79666ec2935c714bb0e0",
+        "uri": "fixture-project/work/output/lock-test-run/formal-map/render-attempt-test-run-1/map.pdf"
+      }
+    },
+    {
+      "target": "png",
+      "media_type": "image/png",
+      "size_bytes": 13851,
+      "composition": "raster",
+      "artifact_ref": {
+        "id": "map-png",
+        "version": "1.0.0",
+        "digest": "sha256:dacc1b4d669b63a6cfb550c94f97097d9a28ae3d0a740f377f0019fed678d73b",
+        "uri": "fixture-project/work/output/lock-test-run/formal-map/render-attempt-test-run-1/map.png"
+      }
+    }
+  ],
+  "controls": {
+    "input_policy": "frozen-project-local",
+    "network_isolation": "not-provided",
+    "process_isolation": "in-process",
+    "max_source_pixels": 16000000,
+    "max_page_pixels": 16000000
+  },
+  "composition": {
+    "map_body": "rasterio-categorical-rgba",
+    "overlays": "matplotlib-vector",
+    "svg": "raster-map-with-glyph-paths",
+    "png": "rasterized-composite",
+    "pdf": "raster-map-with-embedded-truetype"
+  },
+  "warnings": [],
+  "render_started_at": "2026-11-05T11:29:13.460Z",
+  "render_completed_at": "2026-11-05T11:29:13.941Z",
+  "attestation_algorithm": "hmac-sha256",
+  "renderer_attestation": "0000000000000000000000000000000000000000000000000000000000000000"
+}

@@ -9,11 +9,13 @@ from ..compiler.map_lock import MapSpecLockCompiler
 from ..errors import CartoError, ProtocolError, SecurityError
 from ..repository.template_installer import ProjectTemplateInstaller
 from ..repository.template_repository import TemplateRepository
+from ..scenario_registry import ScenarioRegistry
 from ..schema_registry import SchemaRegistry, load_document
 from ..security.approval import ApprovalReceipt, SqliteNonceStore
 from ..security.paths import PathGuard
 from .approvals import ApprovalGateCoordinator
-from .map_data_preparation import FloodDataPreparer, artifact_ref, atomic_json, atomic_yaml, file_digest, utc_now
+from ..artifacts import artifact_ref, atomic_json, atomic_yaml, file_digest, utc_now
+from .map_data_preparation import MapDataPreparer
 from .map_delivery import MapDeliveryService
 from .map_final_check import FinalMapCheckService
 from .map_planning import MapPlanner
@@ -22,15 +24,15 @@ from .map_render import FormalMapRenderService, is_transient_render_error
 from .models import ExecutionContext
 from .state_machine import WorkflowStateStore, serialized_workflow_step
 
-TOOL_VERSION = "0.3.3"
+TOOL_VERSION = "0.4.0"
 
 
 class MapGenerationWorkflow:
-    """Map generation through final checks and the pre-G3 delivery safe stop."""
+    """Map generation through exact approvals, final checks and recoverable local delivery."""
 
     REQUIRED_REQUEST_FIELDS = {
         "run_id", "audience", "scope", "environment", "requested_at", "template",
-        "allowed_capabilities", "source_bindings", "font",
+        "allowed_capabilities", "source_bindings", "font", "intent",
     }
 
     def __init__(self, *, allowed_roots: list[str | Path], project_root: str | Path,
@@ -60,8 +62,8 @@ class MapGenerationWorkflow:
         atomic_yaml(intent_target, intent)
         state, receipt = self.state_store.complete_step(
             state, status="succeeded", prerequisites={},
-            output_refs=[self._ref("generate-request", request, request_target),
-                         self._ref("map-intent", intent, intent_target)],
+            output_refs=[artifact_ref("generate-request", request, request_target),
+                         artifact_ref("map-intent", intent, intent_target)],
             tool_versions={"map-intake": TOOL_VERSION}, next_step="brief",
         )
         return {"state": state.to_dict(), "receipt": receipt.to_dict(), "intent": intent}
@@ -70,6 +72,7 @@ class MapGenerationWorkflow:
     def brief(self, request_path: str | Path) -> dict[str, Any]:
         request, state = self._resume(request_path, "brief")
         intent = self._load("intent/map-intent.yaml", "map-intent")
+        ScenarioRegistry(self.registry).require_request_intent(request, intent)
         template_ref = {key: request["template"][key] for key in ("kind", "id", "version", "digest")
                         if key in request["template"]}
         if "digest" not in template_ref:
@@ -89,14 +92,15 @@ class MapGenerationWorkflow:
                                     self.path_guard.resolve(binding["path"], base_root=self.project_root, must_exist=True)),
                                 "field_bindings": [{"semantic_role": item["semantic_role"],
                                                     "source_field": item["source_field"]}
-                                                   for item in binding["field_bindings"]]})
+                                                   for item in binding.get("field_bindings", [])]})
         brief = {
             "schema_version": 1, "brief_id": f"brief-{request['run_id']}", "revision": 1,
             "intent_ref": artifact_ref("map-intent", intent), "purpose": request["goal"],
             "audience": request["audience"], "source_plan": source_plan,
             "targets": sorted(request["requested_outputs"]), "template_candidates": [template_ref],
             "delegation": {"allow_data_agent": False, "max_tool_calls": 0}, "approval_required": True,
-            "project_id": request["project_id"], "business_scene": "emergency_mapping",
+            "project_id": request["project_id"], "business_scene": intent["business_scene"],
+            "theme_tags": intent["theme_tags"], "tasks": intent["tasks"],
             "scope": request["scope"], "environment": request["environment"],
             "allowed_capabilities": sorted(request["allowed_capabilities"]),
         }
@@ -105,7 +109,7 @@ class MapGenerationWorkflow:
         atomic_yaml(target, brief)
         state, receipt = self.state_store.complete_step(
             state, status="waiting_approval", prerequisites={"intent": intent},
-            output_refs=[self._ref("map-brief", brief, target)],
+            output_refs=[artifact_ref("map-brief", brief, target)],
             tool_versions={"map-brief-builder": TOOL_VERSION}, next_step="compile",
         )
         return {"state": state.to_dict(), "receipt": receipt.to_dict(), "brief": brief,
@@ -116,8 +120,10 @@ class MapGenerationWorkflow:
                 nonce_db: str | Path, policy_id: str, issuer: str) -> dict[str, Any]:
         request, state = self._resume(request_path, "compile")
         intent = self._load("intent/map-intent.yaml", "map-intent")
+        profile = ScenarioRegistry(self.registry).require_request_intent(request, intent)
         brief = self._load("brief/map-brief.yaml", "map-brief")
-        context = self._context(request)
+        profile.require_intent_projection(brief, intent, kind="BRIEF")
+        context = ExecutionContext.from_generate_request(request)
         approval_file = self._resolve_project_path(approval_path, must_exist=True)
         approval_value = load_document(approval_file)
         if not isinstance(approval_value, dict):
@@ -155,6 +161,13 @@ class MapGenerationWorkflow:
                 expected_scope=request["scope"],
             )
         compiled, outputs = self._compile_approved_candidate(request, intent, brief)
+        if compiled["preflight"]["status"] != "passed":
+            self.state_store.complete_step(
+                state, status="failed", prerequisites={"brief": brief, "approval": approval_value},
+                output_refs=outputs, tool_versions={"map-candidate-compiler": TOOL_VERSION},
+                error={"code": "CANDIDATE_QUALITY_FAILED", "message": compiled["preflight"]["report_id"]},
+            )
+            raise ProtocolError("CANDIDATE_QUALITY_FAILED", compiled["preflight"]["report_id"])
         state, receipt = self.state_store.complete_step(
             state, status="succeeded", prerequisites={"brief": brief, "approval": approval_value},
             output_refs=outputs, tool_versions={"map-candidate-compiler": TOOL_VERSION}, next_step="preview",
@@ -183,7 +196,7 @@ class MapGenerationWorkflow:
         self._verify_installed_template(installation)
         installed_target = self.path_guard.resolve(self.work_root / "templates/installed-template.yaml")
         atomic_yaml(installed_target, installation)
-        preparer = FloodDataPreparer(
+        preparer = MapDataPreparer(
             self.path_guard,
             self.project_root,
             self.path_guard.resolve(self.work_root / "data"),
@@ -193,7 +206,8 @@ class MapGenerationWorkflow:
         bundle = prepared["bundle"]
         bundle_target = self.path_guard.resolve(self.work_root / "data/prepared-data-bundle.yaml")
         atomic_yaml(bundle_target, bundle)
-        compiler = MapCandidateCompiler(self.path_guard, self.registry)
+        compiler = MapCandidateCompiler(self.path_guard, self.registry,
+                                        project_root=self.project_root, context=ExecutionContext.from_generate_request(request))
         contracts = compiler.load_contracts(installation)
         plan = MapPlanner(self.registry).build(request, intent, brief, bundle, installation, contracts)
         plan_target = self.path_guard.resolve(self.work_root / "plan/map-plan.yaml")
@@ -207,12 +221,12 @@ class MapGenerationWorkflow:
         atomic_yaml(scene_target, compiled["scene"])
         atomic_yaml(report_target, compiled["preflight"])
         outputs = [
-            self._ref("installed-template", installation, installed_target),
-            self._ref("prepared-data-bundle", bundle, bundle_target),
-            self._ref("map-plan", plan, plan_target),
-            self._ref("resolved-map", compiled["candidate"], candidate_target),
-            self._ref("render-scene", compiled["scene"], scene_target),
-            self._ref("preflight-report", compiled["preflight"], report_target),
+            artifact_ref("installed-template", installation, installed_target),
+            artifact_ref("prepared-data-bundle", bundle, bundle_target),
+            artifact_ref("map-plan", plan, plan_target),
+            artifact_ref("resolved-map", compiled["candidate"], candidate_target),
+            artifact_ref("render-scene", compiled["scene"], scene_target),
+            artifact_ref("preflight-report", compiled["preflight"], report_target),
         ]
         return compiled, outputs
 
@@ -225,11 +239,12 @@ class MapGenerationWorkflow:
         preflight = self._load("candidates/preflight-report.yaml", "validation-report")
         installation = self._load("templates/installed-template.yaml")
         self._verify_installed_template(installation)
-        MapCandidateCompiler(self.path_guard, self.registry).load_contracts(installation)
-        self._verify_candidate_inputs(candidate, scene)
+        contracts = MapCandidateCompiler(self.path_guard, self.registry).load_contracts(installation)
+        self._verify_candidate_inputs(candidate, scene, contracts, preflight)
         service = MapPreviewService(path_guard=self.path_guard,
                                     output_root=self.path_guard.resolve(self.work_root / "previews"),
-                                    attestation_key=attestation_key, browser=browser, registry=self.registry)
+                                    attestation_key=attestation_key, browser=browser, registry=self.registry,
+                                    project_root=self.project_root, context=ExecutionContext.from_generate_request(request))
         rendered = service.render(request, candidate, scene)
         receipt_target = self.path_guard.resolve(self.work_root / "candidates/render-receipt.yaml")
         evidence_target = self.path_guard.resolve(self.work_root / "candidates/preview-evidence.yaml")
@@ -237,8 +252,8 @@ class MapGenerationWorkflow:
         atomic_yaml(evidence_target, rendered["evidence"])
         state, receipt = self.state_store.complete_step(
             state, status="waiting_approval", prerequisites={"candidate": candidate, "scene": scene, "preflight": preflight},
-            output_refs=[self._ref("render-receipt", rendered["receipt"], receipt_target),
-                         self._ref("map-preview-evidence", rendered["evidence"], evidence_target)],
+            output_refs=[artifact_ref("render-receipt", rendered["receipt"], receipt_target),
+                         artifact_ref("map-preview-evidence", rendered["evidence"], evidence_target)],
             tool_versions={"controlled-map-preview": TOOL_VERSION}, next_step="freeze",
         )
         return {"state": state.to_dict(), "receipt": receipt.to_dict(), **rendered,
@@ -264,11 +279,12 @@ class MapGenerationWorkflow:
         evidence = self._load("candidates/preview-evidence.yaml", "map-preview-evidence")
         installation = self._load("templates/installed-template.yaml")
         self._verify_installed_template(installation)
-        MapCandidateCompiler(self.path_guard, self.registry).load_contracts(installation)
-        self._verify_candidate_inputs(candidate, scene)
+        contracts = MapCandidateCompiler(self.path_guard, self.registry).load_contracts(installation)
+        self._verify_candidate_inputs(candidate, scene, contracts, preflight)
         service = MapPreviewService(path_guard=self.path_guard,
                                     output_root=self.path_guard.resolve(self.work_root / "previews", must_exist=True),
-                                    attestation_key=attestation_key, browser=browser, registry=self.registry)
+                                    attestation_key=attestation_key, browser=browser, registry=self.registry,
+                                    project_root=self.project_root, context=ExecutionContext.from_generate_request(request))
         service.validate_persisted(candidate, scene, receipt)
         service.validate_evidence(evidence, candidate, scene, receipt, self.registry)
         approval_file = self._resolve_project_path(approval_path, must_exist=True)
@@ -302,7 +318,7 @@ class MapGenerationWorkflow:
                 if state.status != "pending":
                     raise ProtocolError("JOB_RECOVERY_NOT_ALLOWED", f"status={state.status}; step={state.step}")
                 coordinator.require_consumed(
-                    "G2", approval_receipt, approval_digest, self._context(request),
+                    "G2", approval_receipt, approval_digest, ExecutionContext.from_generate_request(request),
                     approver_subject_id=request["subject"]["approver_subject_id"],
                     expected_scope=request["scope"],
                 )
@@ -312,7 +328,7 @@ class MapGenerationWorkflow:
             if state.status not in {"pending", "waiting_approval"}:
                 raise ProtocolError("JOB_RECOVERY_NOT_ALLOWED", f"status={state.status}; step={state.step}")
             coordinator.require_consumed(
-                "G2", approval_receipt, approval_digest, self._context(request),
+                "G2", approval_receipt, approval_digest, ExecutionContext.from_generate_request(request),
                 approver_subject_id=request["subject"]["approver_subject_id"],
                 expected_scope=request["scope"],
             )
@@ -320,7 +336,7 @@ class MapGenerationWorkflow:
                 state, status="succeeded",
                 prerequisites={"candidate": candidate, "preview": evidence,
                                "freeze_approval": approval_value},
-                output_refs=[self._ref("map-spec-lock", existing, target)],
+                output_refs=[artifact_ref("map-spec-lock", existing, target)],
                 tool_versions={"map-spec-freezer": TOOL_VERSION}, next_step="render",
             )
             return {"state": state.to_dict(), "receipt": step_receipt.to_dict(),
@@ -328,7 +344,7 @@ class MapGenerationWorkflow:
         if state.step == "render":
             raise ProtocolError("JOB_PREREQUISITE_DRIFT", "map-spec-lock")
         coordinator.require(
-            "G2", approval_receipt, approval_digest, self._context(request),
+            "G2", approval_receipt, approval_digest, ExecutionContext.from_generate_request(request),
             approver_subject_id=request["subject"]["approver_subject_id"],
             expected_scope=request["scope"],
         )
@@ -340,7 +356,7 @@ class MapGenerationWorkflow:
         state, step_receipt = self.state_store.complete_step(
             state, status="succeeded", prerequisites={"candidate": candidate, "preview": evidence,
                                                        "freeze_approval": approval_value},
-            output_refs=[self._ref("map-spec-lock", lock, target)],
+            output_refs=[artifact_ref("map-spec-lock", lock, target)],
             tool_versions={"map-spec-freezer": TOOL_VERSION}, next_step="render",
         )
         return {"state": state.to_dict(), "receipt": step_receipt.to_dict(),
@@ -357,15 +373,17 @@ class MapGenerationWorkflow:
         if stored != request:
             raise ProtocolError("JOB_INPUT_DRIFT", state.run_id)
         if state.step == "check" and state.status == "pending":
-            service = FormalMapRenderService(
-                path_guard=self.path_guard, work_root=self.work_root,
-                attestation_key=attestation_key, browser=browser, registry=self.registry,
-            )
             lock, lock_ref, scene, preview_receipt = self._locked_render_inputs(
                 request, attestation_key=attestation_key, browser=browser
             )
+            service = FormalMapRenderService(
+                path_guard=self.path_guard, work_root=self.work_root,
+                attestation_key=attestation_key, browser=browser, registry=self.registry,
+                project_root=self.project_root, context=ExecutionContext.from_generate_request(request),
+                renderer_id=scene["renderer_id"],
+            )
             service.validate_environment(lock, preview_receipt)
-            service.validate_scene(scene)
+            service.validate_scene(scene, lock["execution"])
             evidence_ref = self.state_store.find_output_ref("formal-render-evidence")
             evidence_path = self.path_guard.resolve(evidence_ref["uri"], must_exist=True)
             evidence = load_document(evidence_path)
@@ -396,10 +414,7 @@ class MapGenerationWorkflow:
             raise ProtocolError("WORKFLOW_STATUS_INVALID", f"expected=pending; actual={state.status}")
 
         started_at = utc_now()
-        service = FormalMapRenderService(
-            path_guard=self.path_guard, work_root=self.work_root,
-            attestation_key=attestation_key, browser=browser, registry=self.registry,
-        )
+        service = None
         lock: dict[str, Any]
         lock_ref: dict[str, str]
         scene: dict[str, Any]
@@ -407,8 +422,14 @@ class MapGenerationWorkflow:
             lock, lock_ref, scene, preview_receipt = self._locked_render_inputs(
                 request, attestation_key=attestation_key, browser=browser
             )
+            service = FormalMapRenderService(
+                path_guard=self.path_guard, work_root=self.work_root,
+                attestation_key=attestation_key, browser=browser, registry=self.registry,
+                project_root=self.project_root, context=ExecutionContext.from_generate_request(request),
+                renderer_id=scene["renderer_id"],
+            )
             service.validate_environment(lock, preview_receipt)
-            service.validate_scene(scene)
+            service.validate_scene(scene, lock["execution"])
         except CartoError as exc:
             normalized = exc if exc.code in {"LOCK_INPUT_DRIFT", "RENDER_ENVIRONMENT_DRIFT",
                                               "ENCODING_SEMANTICS_INVALID"} else ProtocolError(
@@ -417,7 +438,7 @@ class MapGenerationWorkflow:
             context = getattr(exc, "render_context", None)
             if context is None and "lock" in locals() and "lock_ref" in locals() and "scene" in locals():
                 context = (lock, lock_ref, scene)
-            if context is not None:
+            if context is not None and service is not None:
                 lock, lock_ref, scene = context
                 attempt, attempt_path = service.record_failure(
                     request=request, lock=lock, lock_ref=lock_ref, scene=scene,
@@ -425,7 +446,7 @@ class MapGenerationWorkflow:
                     error=normalized, retryable=False,
                 )
                 prerequisites = {"lock": lock, "scene": scene}
-                output_refs = [self._ref("render-attempt", attempt, attempt_path)]
+                output_refs = [artifact_ref("render-attempt", attempt, attempt_path)]
             else:
                 prerequisites = {"request": request}
                 output_refs = []
@@ -445,7 +466,7 @@ class MapGenerationWorkflow:
                 error = existing["attempt"]["error"]
                 self.state_store.complete_step(
                     state, status="failed", prerequisites={"lock": lock, "scene": scene},
-                    output_refs=[self._ref("render-attempt", existing["attempt"], existing["attempt_path"])],
+                    output_refs=[artifact_ref("render-attempt", existing["attempt"], existing["attempt_path"])],
                     tool_versions={"formal-map-render": TOOL_VERSION}, error=error,
                 )
                 raise ProtocolError(error["code"], error["message"])
@@ -461,7 +482,7 @@ class MapGenerationWorkflow:
             )
             self.state_store.complete_step(
                 state, status="failed", prerequisites={"lock": lock, "scene": scene},
-                output_refs=[self._ref("render-attempt", attempt, attempt_path)],
+                output_refs=[artifact_ref("render-attempt", attempt, attempt_path)],
                 tool_versions={"formal-map-render": TOOL_VERSION},
                 error={"code": orphan.code, "message": orphan.message},
             )
@@ -480,7 +501,7 @@ class MapGenerationWorkflow:
             )
             self.state_store.complete_step(
                 state, status="failed", prerequisites={"lock": lock, "scene": scene},
-                output_refs=[self._ref("render-attempt", attempt, attempt_path)],
+                output_refs=[artifact_ref("render-attempt", attempt, attempt_path)],
                 tool_versions={"formal-map-render": TOOL_VERSION},
                 error={"code": exc.code, "message": exc.message},
             )
@@ -492,9 +513,9 @@ class MapGenerationWorkflow:
         state, step_receipt = self.state_store.complete_step(
             state, status="succeeded", prerequisites={"lock": lock, "scene": scene},
             output_refs=[
-                self._ref("render-attempt", rendered["attempt"], rendered["attempt_path"]),
-                self._ref("formal-render-receipt", rendered["receipt"], rendered["receipt_path"]),
-                self._ref("formal-render-evidence", rendered["evidence"], rendered["evidence_path"]),
+                artifact_ref("render-attempt", rendered["attempt"], rendered["attempt_path"]),
+                artifact_ref("formal-render-receipt", rendered["receipt"], rendered["receipt_path"]),
+                artifact_ref("formal-render-evidence", rendered["evidence"], rendered["evidence_path"]),
             ],
             tool_versions={"formal-map-render": TOOL_VERSION}, next_step="check",
         )
@@ -536,9 +557,11 @@ class MapGenerationWorkflow:
             service = FormalMapRenderService(
                 path_guard=self.path_guard, work_root=self.work_root,
                 attestation_key=attestation_key, browser=browser, registry=self.registry,
+                project_root=self.project_root, context=ExecutionContext.from_generate_request(request),
+                renderer_id=scene["renderer_id"],
             )
             service.validate_environment(lock, preview_receipt)
-            service.validate_scene(scene)
+            service.validate_scene(scene, lock["execution"])
             attempt_number = int(manifest["render_attempt_ref"]["id"].rsplit("-", 1)[1])
             existing = service.load_existing(
                 request=request, lock=lock, lock_ref=lock_ref, scene=scene,
@@ -548,7 +571,7 @@ class MapGenerationWorkflow:
                 raise ProtocolError("FINAL_CHECK_RENDER_INVALID", manifest["manifest_id"])
             checker = FinalMapCheckService(
                 path_guard=self.path_guard, project_root=self.project_root,
-                work_root=self.work_root, registry=self.registry,
+                work_root=self.work_root, registry=self.registry, execution_context=ExecutionContext.from_generate_request(request),
             )
             recomputed = checker.inspect(
                 lock=lock, lock_ref=lock_ref, scene=scene,
@@ -583,9 +606,10 @@ class MapGenerationWorkflow:
         render_service = FormalMapRenderService(
             path_guard=self.path_guard, work_root=self.work_root,
             attestation_key=attestation_key, browser=browser, registry=self.registry,
+            project_root=self.project_root, context=ExecutionContext.from_generate_request(request), renderer_id=scene["renderer_id"],
         )
         render_service.validate_environment(lock, preview_receipt)
-        render_service.validate_scene(scene)
+        render_service.validate_scene(scene, lock["execution"])
         evidence_ref = self.state_store.find_output_ref("formal-render-evidence")
         evidence = self._load_ref(evidence_ref, "formal-render-evidence")
         attempt_number = int(evidence["attempt_ref"]["id"].rsplit("-", 1)[1])
@@ -597,7 +621,7 @@ class MapGenerationWorkflow:
             raise ProtocolError("FINAL_CHECK_RENDER_INVALID", evidence["evidence_id"])
         checker = FinalMapCheckService(
             path_guard=self.path_guard, project_root=self.project_root,
-            work_root=self.work_root, registry=self.registry,
+            work_root=self.work_root, registry=self.registry, execution_context=ExecutionContext.from_generate_request(request),
         )
         report = checker.inspect(
             lock=lock, lock_ref=lock_ref, scene=scene,
@@ -606,7 +630,7 @@ class MapGenerationWorkflow:
             evidence_path=existing["evidence_path"],
         )
         report_path = checker.write_report(report, existing["attempt"]["attempt_id"])
-        report_ref = self._ref("final-validation-report", report, report_path)
+        report_ref = artifact_ref("final-validation-report", report, report_path)
         if report["status"] != "passed":
             self.state_store.complete_step(
                 state, status="failed",
@@ -627,7 +651,7 @@ class MapGenerationWorkflow:
         state, step_receipt = self.state_store.complete_step(
             state, status="waiting_approval",
             prerequisites={"lock": lock, "attempt": existing["attempt"], "evidence": existing["evidence"]},
-            output_refs=[report_ref, self._ref("delivery-manifest", manifest, manifest_path)],
+            output_refs=[report_ref, artifact_ref("delivery-manifest", manifest, manifest_path)],
             tool_versions={"final-map-check": TOOL_VERSION}, next_step="deliver",
         )
         return {
@@ -675,10 +699,10 @@ class MapGenerationWorkflow:
         )
         transaction = delivered["transaction"]
         delivery_receipt = delivered["receipt"]
-        transaction_ref = self._ref(
+        transaction_ref = artifact_ref(
             transaction["transaction_id"], transaction, delivered["transaction_path"]
         )
-        receipt_ref = self._ref(
+        receipt_ref = artifact_ref(
             delivery_receipt["receipt_id"], delivery_receipt, delivered["receipt_path"]
         )
         if state.status == "succeeded":
@@ -787,12 +811,13 @@ class MapGenerationWorkflow:
             if sha256_digest(preview_receipt) != lock["render_receipt_ref"]["digest"]:
                 raise ProtocolError("MAP_SPEC_LOCK_PREVIEW_RECEIPT_DRIFT", lock["lock_id"])
             self._verify_installed_template(installation)
-            MapCandidateCompiler(self.path_guard, self.registry).load_contracts(installation)
-            self._verify_candidate_inputs(candidate, scene)
+            contracts = MapCandidateCompiler(self.path_guard, self.registry).load_contracts(installation)
+            self._verify_candidate_inputs(candidate, scene, contracts, preflight)
             preview_service = MapPreviewService(
                 path_guard=self.path_guard,
                 output_root=self.path_guard.resolve(self.work_root / "previews", must_exist=True),
                 attestation_key=attestation_key, browser=browser, registry=self.registry,
+                project_root=self.project_root, context=ExecutionContext.from_generate_request(request),
             )
             preview_service.validate_persisted(candidate, scene, preview_receipt)
             preview_service.validate_evidence(evidence, candidate, scene, preview_receipt, self.registry)
@@ -801,6 +826,9 @@ class MapGenerationWorkflow:
                 brief_approval_ref=lock["approvals"]["brief_ref"],
                 freeze_approval_ref=lock["approvals"]["freeze_ref"],
             )
+            if scene["renderer_id"] == "rasterio-matplotlib-page":
+                self._verify_raster_inputs(lock["execution"], scene, request)
+                return lock, lock_ref, scene, preview_receipt
             refs = [
                 *lock["execution"].get("dataset_refs", []),
                 *lock["execution"].get("prepared_data_refs", []),
@@ -861,6 +889,7 @@ class MapGenerationWorkflow:
         if not isinstance(value, dict):
             raise ProtocolError("GENERATE_REQUEST_INVALID", "request must be an object")
         self.registry.validate("generate-request", value)
+        ScenarioRegistry(self.registry).for_generate(value)
         return value
 
     def _resume(self, request_path: str | Path, expected_step: str) -> tuple[dict[str, Any], Any]:
@@ -876,11 +905,10 @@ class MapGenerationWorkflow:
         return request, state
 
     def _validate_runtime_request(self, request: dict[str, Any]) -> None:
+        ScenarioRegistry(self.registry).for_generate(request)
         missing = sorted(self.REQUIRED_REQUEST_FIELDS - set(request))
         if missing:
             raise ProtocolError("GENERATE_REQUEST_INCOMPLETE", ",".join(missing))
-        if request.get("scene_hint") not in {None, "emergency_mapping"}:
-            raise ProtocolError("GENERATE_SCENE_UNSUPPORTED", str(request.get("scene_hint")))
         if request["template"]["kind"] != "map-scenario":
             raise ProtocolError("GENERATE_TEMPLATE_KIND_UNSUPPORTED", request["template"]["kind"])
         if request["scope"] != f"project:{request['project_id']}":
@@ -902,20 +930,9 @@ class MapGenerationWorkflow:
             raise ProtocolError("SOURCE_REFERENCE_SET_MISMATCH", request["request_id"])
 
     def _intent(self, request: dict[str, Any]) -> dict[str, Any]:
-        profile = {"profile_version": "1.0.0", "scene": "emergency_mapping", "task": "hazard-result-map"}
-        value = {"schema_version": 1, "intent_id": f"intent-{request['run_id']}", "revision": 1,
-                 "profile_version": "1.0.0", "business_scene": "emergency_mapping", "theme": "flood-risk",
-                 "tasks": ["hazard-result-map"], "intent_status": "resolved", "readiness_status": "ready",
-                 "missing_items": [], "evidence_refs": [artifact_ref("intent-profile", profile)]}
+        value = ScenarioRegistry(self.registry).generate_intent(request)
         self.registry.validate("map-intent", value)
         return value
-
-    def _context(self, request: dict[str, Any]) -> ExecutionContext:
-        return ExecutionContext(run_id=request["run_id"], tenant_id=request["subject"]["tenant_id"],
-                                project_id=request["project_id"], subject_id=request["subject"]["subject_id"],
-                                roles=frozenset({"operator"}), namespaces=frozenset({request["project_id"]}),
-                                authorized_capabilities=frozenset(request["allowed_capabilities"]),
-                                environment=request["environment"])
 
     def _repository(self) -> TemplateRepository:
         if self.repository_root is None or not self.repository_scope:
@@ -939,16 +956,33 @@ class MapGenerationWorkflow:
         if entry["manifest_digest"] != installation.get("manifest_digest"):
             raise ProtocolError("TEMPLATE_INSTALL_MANIFEST_DRIFT", template_ref["id"])
 
-    def _verify_candidate_inputs(self, candidate: dict[str, Any], scene: dict[str, Any]) -> None:
-        if candidate["execution_digest"] != sha256_digest(candidate["execution"]):
-            raise ProtocolError("CANDIDATE_EXECUTION_DIGEST_MISMATCH", candidate["candidate_id"])
-        if candidate["execution"].get("render_scene_ref", {}).get("digest") != sha256_digest(scene):
-            raise ProtocolError("CANDIDATE_SCENE_DIGEST_MISMATCH", candidate["candidate_id"])
+    def _verify_candidate_inputs(self, candidate: dict[str, Any], scene: dict[str, Any],
+                                 contracts: dict[str, Any], preflight: dict[str, Any]) -> None:
+        registry = ScenarioRegistry(self.registry)
+        registry.for_execution(candidate["execution"]).require_scene(scene)
+        request = self._load("request/generate-request.yaml", "generate-request")
+        intent = self._load("intent/map-intent.yaml", "map-intent")
+        registry.require_request_intent(request, intent)
+        MapCandidateCompiler.require_execution_intent(candidate["execution"], intent)
+        compiler = MapCandidateCompiler(self.path_guard, self.registry,
+            project_root=self.project_root, context=ExecutionContext.from_generate_request(request))
+        current = compiler.check_candidate(request, candidate, scene, contracts)
+        if current != preflight or current["status"] != "passed":
+            raise ProtocolError("CANDIDATE_PREFLIGHT_DRIFT", "Quality gates or their evidence changed; recompile before G2")
+        if scene["renderer_id"] == "rasterio-matplotlib-page":
+            return
         for ref in [*candidate["execution"]["dataset_refs"], *candidate["execution"].get("prepared_data_refs", []),
                     *candidate["execution"].get("resolved_assets", [])]:
             uri = ref.get("uri")
             if uri and file_digest(self.path_guard.resolve(uri, must_exist=True)) != ref["digest"]:
                 raise ProtocolError("CANDIDATE_RESOURCE_DRIFT", ref["id"])
+
+    def _verify_raster_inputs(self, execution, scene, request):
+        from ..compiler.raster_scene import RasterSceneCompiler
+        from .raster_preparation import RasterPreparationService
+        preparation = RasterPreparationService(project_root=self.project_root,
+            allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
+        RasterSceneCompiler(preparation).validate_generation(scene, execution, request, ExecutionContext.from_generate_request(request))
 
     def _resolve_project_path(self, value: str | Path, *, must_exist: bool = False) -> Path:
         return self.path_guard.resolve(value, base_root=self.project_root, must_exist=must_exist)
@@ -961,7 +995,3 @@ class MapGenerationWorkflow:
         if schema:
             self.registry.validate(schema, value)
         return value
-
-    @staticmethod
-    def _ref(identifier: str, value: Any, path: Path) -> dict[str, str]:
-        return {"id": identifier, "version": "1.0.0", "digest": sha256_digest(value), "uri": str(path)}

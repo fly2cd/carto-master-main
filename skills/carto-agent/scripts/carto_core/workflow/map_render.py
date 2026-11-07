@@ -1,35 +1,18 @@
 from __future__ import annotations
 
-from copy import deepcopy
-from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from ..adapters.controlled_renderer import (
-    FRONTEND_BUILD,
-    MAPLIBRE_VERSION,
-    OVERLAY_ENGINE_VERSION,
-    RENDERER_VERSION,
-    BrowserLimits,
-    ControlledBrowserRenderer,
-    browser_version,
-    discover_browser,
-    sha256_file,
-)
-from ..adapters.webmap_renderer import (
-    RenderReceiptValidator,
-    RendererCapabilityProfile,
-    RendererCapabilityRegistry,
-    WebMapRendererAdapter,
-)
+from ..adapters.controlled_renderer import BrowserLimits
+from ..adapters.render_backend import create_render_backend
 from ..canonical import sha256_digest
 from ..errors import CartoError, ProtocolError
+from ..scenario_registry import ScenarioRegistry
 from ..schema_registry import SchemaRegistry, load_document
 from ..security.paths import PathGuard
-from .map_data_preparation import atomic_yaml, utc_now
+from ..artifacts import atomic_yaml, file_digest, utc_now
 
 
-SYNTHETIC_DATA_NOTICE = "合成数据演示，非真实风险研判"
 FORMAL_TARGET_ID = "formal-map"
 REQUIRED_TARGETS = frozenset({"pdf", "png"})
 TRANSIENT_RENDER_ERRORS = frozenset({
@@ -54,40 +37,24 @@ class FormalMapRenderService:
         browser: str | Path | None = None,
         registry: SchemaRegistry | None = None,
         limits: BrowserLimits | None = None,
+        renderer_id: str = "maplibre-web",
+        project_root: Path | None = None,
+        context=None,
     ) -> None:
         self.path_guard = path_guard
         self.work_root = path_guard.resolve(work_root, must_exist=True)
         self.registry = registry or SchemaRegistry()
         self.attestation_key = attestation_key
         self.limits = limits or BrowserLimits()
-        selected = Path(browser).resolve() if browser else discover_browser()
-        if selected is None or not selected.is_file():
-            raise ProtocolError("RENDER_BROWSER_UNAVAILABLE", "A controlled Chromium browser is required")
-        self.browser = selected
-        self.profile = RendererCapabilityProfile(
-            renderer_id="maplibre-web",
-            frontend_build=FRONTEND_BUILD,
-            renderer_version=RENDERER_VERSION,
-            maplibre_version=MAPLIBRE_VERSION,
-            overlay_engine_version=OVERLAY_ENGINE_VERSION,
-            browser_engine=browser_version(self.browser),
-            webgl_available=True,
-            supported_export_formats=("svg", "png", "pdf"),
-            max_canvas_width=4096,
-            max_canvas_height=4096,
-            device_pixel_ratio=2,
-            available_fonts=("Noto Sans SC", "Microsoft YaHei", "SimHei", "SimSun"),
-            offline_rendering=True,
-        )
-        probe_root = self.path_guard.resolve(self.work_root / "output")
-        probe_root.mkdir(parents=True, exist_ok=True)
-        self._environment_probe = ControlledBrowserRenderer(
-            allowed_roots=list(self.path_guard.allowed_roots),
-            output_root=probe_root,
-            attestation_key=self.attestation_key,
-            limits=self.limits,
-            browser=self.browser,
-        )
+        self.browser = browser
+        self.renderer_id, self.project_root, self.context = renderer_id, project_root, context
+        self.backend = self._backend(self.work_root / "output")
+        self.profile = self.backend.profile
+
+    def _backend(self, output_root):
+        return create_render_backend(self.renderer_id, path_guard=self.path_guard, output_root=output_root,
+            attestation_key=self.attestation_key, browser=self.browser, limits=self.limits, registry=self.registry,
+            project_root=self.project_root, context=self.context)
 
     @property
     def profile_digest(self) -> str:
@@ -95,44 +62,23 @@ class FormalMapRenderService:
 
     @property
     def environment_fingerprint(self) -> str:
-        return self._environment_probe.environment_fingerprint
+        return self.backend.environment_fingerprint
 
     def validate_environment(self, lock: dict[str, Any], preview_receipt: dict[str, Any]) -> None:
-        if preview_receipt["renderer_profile_digest"] != self.profile_digest:
-            raise ProtocolError("RENDER_ENVIRONMENT_DRIFT", "renderer profile differs from the G2-bound preview")
-        if lock["environment_fingerprint"] != self.environment_fingerprint:
-            raise ProtocolError("RENDER_ENVIRONMENT_DRIFT", "renderer environment differs from MapSpecLock")
-        execution_environment = lock["execution"]["environment"]
-        expected = {
-            "renderer_id": self.profile.renderer_id,
-            "renderer_version": self.profile.renderer_version,
-            "frontend_build": self.profile.frontend_build,
-            "maplibre_version": self.profile.maplibre_version,
-            "overlay_engine_version": self.profile.overlay_engine_version,
-        }
-        if any(execution_environment.get(key) != value for key, value in expected.items()):
-            raise ProtocolError("RENDER_ENVIRONMENT_DRIFT", "renderer versions differ from locked execution")
+        if (preview_receipt["renderer_profile_digest"] != self.profile_digest
+                or preview_receipt["renderer_id"] != self.renderer_id
+                or lock["environment_fingerprint"] != self.environment_fingerprint
+                or lock["execution"]["environment"] != self.backend.environment_snapshot()):
+            raise ProtocolError("RENDER_ENVIRONMENT_DRIFT", "Renderer differs from the G2-bound preview and lock")
 
-    def validate_scene(self, scene: dict[str, Any]) -> None:
-        try:
-            compiled = WebMapRendererAdapter(
-                RendererCapabilityRegistry([self.profile])
-            ).compile_scene(scene)
-        except CartoError as exc:
-            raise ProtocolError("ENCODING_SEMANTICS_INVALID", f"{exc.code}: {exc.message}") from exc
-        if compiled != scene:
-            raise ProtocolError("ENCODING_SEMANTICS_INVALID", "locked RenderScene is not canonical")
-        targets = set(scene["export"]["targets"])
-        if not REQUIRED_TARGETS.issubset(targets):
-            raise ProtocolError("ENCODING_SEMANTICS_INVALID", "formal rendering requires locked PDF and PNG targets")
-        notices = [
-            overlay for overlay in scene["overlays"]
-            if overlay.get("type") in {"text", "attribution"}
-            and overlay.get("content") == SYNTHETIC_DATA_NOTICE
-            and overlay.get("coordinate_space") == "page"
-        ]
-        if len(notices) != 1:
-            raise ProtocolError("ENCODING_SEMANTICS_INVALID", "locked scene must contain the synthetic-data notice exactly once")
+    def validate_scene(self, scene: dict[str, Any], execution: dict[str, Any]) -> None:
+        profile = ScenarioRegistry(self.registry).for_execution(execution)
+        profile.require_scene(scene)
+        self.backend.validate_scene(scene, execution)
+        if not REQUIRED_TARGETS.issubset(scene["export"]["targets"]):
+            raise ProtocolError("ENCODING_SEMANTICS_INVALID", "Formal rendering requires locked PDF and PNG targets")
+        if self.backend.scene_texts(scene).count(profile.notice) != 1:
+            raise ProtocolError("ENCODING_SEMANTICS_INVALID", "Locked scene must contain the scenario disclosure exactly once")
 
     def attempt_id(self, run_id: str, attempt_number: int) -> str:
         return f"render-attempt-{run_id}-{attempt_number}"
@@ -174,6 +120,7 @@ class FormalMapRenderService:
         attempt_number: int,
         started_at: str,
     ) -> dict[str, Any]:
+        self.validate_scene(scene, lock["execution"])
         attempt_id = self.attempt_id(request["run_id"], attempt_number)
         target_root = self.path_guard.resolve(
             self.work_root / "output" / lock["lock_id"] / FORMAL_TARGET_ID
@@ -182,16 +129,9 @@ class FormalMapRenderService:
         output_directory = self.output_directory(lock["lock_id"], attempt_id)
         if output_directory.exists():
             raise ProtocolError("RENDER_ATTEMPT_INCOMPLETE", str(output_directory))
-        renderer = ControlledBrowserRenderer(
-            allowed_roots=list(self.path_guard.allowed_roots),
-            output_root=target_root,
-            attestation_key=self.attestation_key,
-            limits=self.limits,
-            browser=self.browser,
-        )
-        adapter = WebMapRendererAdapter(RendererCapabilityRegistry([self.profile]), renderer)
-        receipt = adapter.submit_render(attempt_id, scene, self.profile.renderer_id, FRONTEND_BUILD)
-        adapter.validate_receipt(receipt, self.attestation_key)
+        backend = self._backend(target_root)
+        receipt = backend.render(attempt_id, scene)
+        backend.validate_receipt(scene, receipt, expected_session_id=attempt_id)
         receipt_path = self.path_guard.resolve(output_directory / "render-receipt.yaml")
         atomic_yaml(receipt_path, receipt)
         completed_at = receipt["render_completed_at"]
@@ -326,7 +266,7 @@ class FormalMapRenderService:
                 for item in receipt["output_artifacts"]
             ],
             "required_targets": ["pdf", "png"],
-            "synthetic_data_notice": SYNTHETIC_DATA_NOTICE,
+            "scenario_notice": ScenarioRegistry(self.registry).for_execution(lock["execution"]).notice,
             "quality_status": "not-checked",
             "created_at": created_at,
         }
@@ -373,7 +313,8 @@ class FormalMapRenderService:
         receipt = load_document(receipt_path)
         if not isinstance(receipt, dict) or sha256_digest(receipt) != attempt["render_receipt_ref"]["digest"]:
             raise ProtocolError("RENDER_ATTEMPT_RECEIPT_DRIFT", attempt_id)
-        self._validate_receipt(scene, receipt, verify_outputs=verify_outputs)
+        backend = self._backend(self.work_root / "output" / lock["lock_id"] / FORMAL_TARGET_ID)
+        backend.validate_receipt(scene, receipt, verify_outputs=verify_outputs, expected_session_id=attempt_id)
         if receipt["execution_digest"] != attempt["renderer_execution_digest"]:
             raise ProtocolError("RENDER_ATTEMPT_RECEIPT_DRIFT", attempt_id)
         evidence_path = self.evidence_path(request["run_id"], attempt_number)
@@ -397,35 +338,6 @@ class FormalMapRenderService:
             "evidence": evidence,
             "evidence_path": evidence_path,
         }
-
-    def _validate_receipt(self, scene: dict[str, Any], receipt: dict[str, Any], *, verify_outputs: bool = True) -> None:
-        renderer = ControlledBrowserRenderer(
-            allowed_roots=list(self.path_guard.allowed_roots),
-            output_root=self.path_guard.resolve(self.work_root / "output", must_exist=True),
-            attestation_key=self.attestation_key,
-            limits=self.limits,
-            browser=self.browser,
-        )
-        session = {
-            "session_id": receipt["session_id"],
-            "scene_id": scene["scene_id"],
-            "scene_revision": scene["revision"],
-            "scene_digest": sha256_digest(scene),
-            "renderer_id": self.profile.renderer_id,
-            "frontend_build": FRONTEND_BUILD,
-            "profile_digest": self.profile_digest,
-            "scene": deepcopy(scene),
-            "status": "submitted",
-        }
-        RenderReceiptValidator(self.registry).validate(
-            receipt,
-            session,
-            self.profile,
-            self.attestation_key,
-            expected_environment_fingerprint=renderer.environment_fingerprint,
-            expected_controls=renderer.receipt_controls(),
-            path_guard=renderer.path_guard if verify_outputs else None,
-        )
 
     def validate_evidence(
         self,
@@ -460,7 +372,7 @@ class FormalMapRenderService:
         if verify_outputs:
             for item in receipt["output_artifacts"]:
                 path = self.path_guard.resolve(item["artifact_ref"]["uri"], must_exist=True)
-                if path.stat().st_size != item["size_bytes"] or sha256_file(path) != item["artifact_ref"]["digest"]:
+                if path.stat().st_size != item["size_bytes"] or file_digest(path) != item["artifact_ref"]["digest"]:
                     raise ProtocolError("FORMAL_RENDER_OUTPUT_DRIFT", item["target"])
 
 

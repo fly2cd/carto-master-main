@@ -1,0 +1,48 @@
+{
+  "kind": "metadata",
+  "payload": {
+    "kind": "raster",
+    "driver": "GTiff",
+    "width": 3,
+    "height": 2,
+    "band_count": 1,
+    "crs": "EPSG:26911",
+    "crs_type": "projected",
+    "coordinate_units": [
+      "metre",
+      "metre"
+    ],
+    "bounds": [
+      500000,
+      3999940,
+      500090,
+      4000000
+    ],
+    "transform": [
+      30,
+      0,
+      500000,
+      0,
+      -30,
+      4000000
+    ],
+    "pixel_size": [
+      30,
+      30
+    ],
+    "pixel_size_meters": [
+      30,
+      30
+    ],
+    "bands": [
+      {
+        "band": 1,
+        "dtype": "uint8",
+        "nodata": null,
+        "description": null,
+        "unit": null
+      }
+    ],
+    "warnings": []
+  }
+}

@@ -1,14 +1,114 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://schemas.carto-agent.local/v1/intent-profiles.schema.json",
-  "type": "object", "additionalProperties": false, "required": ["schema_version", "catalog_version", "profiles"],
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/intent-profiles.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "catalog_version",
+    "profiles",
+    "themes"
+  ],
   "properties": {
-    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
-    "catalog_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"},
-    "profiles": {"type": "array", "minItems": 3, "items": {"type": "object", "additionalProperties": false, "required": ["scene_id", "task_ids", "required_information", "unsupported_actions"], "properties": {
-      "scene_id": {"enum": ["government_thematic", "emergency_mapping", "leadership_visit"]},
-      "task_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"}},
-      "required_information": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
-      "unsupported_actions": {"type": "array", "items": {"type": "string", "minLength": 1}}
-    }}}
+    "schema_version": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"
+    },
+    "catalog_version": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"
+    },
+    "profiles": {
+      "type": "array",
+      "minItems": 0,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "business_scene",
+          "purpose_terms",
+          "task_ids",
+          "required_information",
+          "unsupported_actions"
+        ],
+        "properties": {
+          "task_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+            }
+          },
+          "required_information": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^(?:theme_tags|[a-z][a-z0-9]*(?:-[a-z0-9]+)*)$",
+              "not": {
+                "enum": [
+                  "theme",
+                  "theme-tags",
+                  "business-scene",
+                  "tasks",
+                  "business-domain"
+                ]
+              }
+            }
+          },
+          "unsupported_actions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "business_scene": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/businessSceneId"
+          },
+          "purpose_terms": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          }
+        }
+      }
+    },
+    "themes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "label",
+          "terms"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "terms": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          }
+        }
+      }
+    }
   }
 }

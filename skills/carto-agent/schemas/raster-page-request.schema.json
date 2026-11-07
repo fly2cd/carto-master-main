@@ -1,0 +1,214 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/raster-page-request.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "portrayal_ref",
+    "resolved_layout",
+    "font",
+    "texts",
+    "legend",
+    "typography",
+    "scale_bar",
+    "grid_north"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "resolved_layout": {
+      "$ref": "https://schemas.carto-agent.local/v1/resolved-layout.schema.json"
+    },
+    "font": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "digest",
+        "size_bytes"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "digest": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 33554432
+        }
+      }
+    },
+    "texts": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "content_id",
+          "text"
+        ],
+        "properties": {
+          "content_id": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048,
+            "pattern": "^[^\\x00-\\x09\\x0b-\\x1f\\x7f]+$"
+          }
+        }
+      }
+    },
+    "legend": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "content_id",
+        "title"
+      ],
+      "properties": {
+        "content_id": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+        }
+      }
+    },
+    "typography": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title_pt",
+        "body_pt",
+        "legend_pt",
+        "legend_heading_pt",
+        "padding_mm",
+        "line_spacing"
+      ],
+      "properties": {
+        "title_pt": {
+          "type": "number",
+          "minimum": 10,
+          "maximum": 40
+        },
+        "body_pt": {
+          "type": "number",
+          "minimum": 8,
+          "maximum": 18
+        },
+        "legend_pt": {
+          "type": "number",
+          "minimum": 8,
+          "maximum": 18
+        },
+        "legend_heading_pt": {
+          "type": "number",
+          "minimum": 8,
+          "maximum": 20
+        },
+        "padding_mm": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 8
+        },
+        "line_spacing": {
+          "type": "number",
+          "minimum": 1.1,
+          "maximum": 2
+        }
+      }
+    },
+    "scale_bar": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "content_id",
+            "distance_m",
+            "label_language"
+          ],
+          "properties": {
+            "content_id": {
+              "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+            },
+            "distance_m": {
+              "type": "number",
+              "minimum": 0.001,
+              "maximum": 40000000
+            },
+            "label_language": {
+              "enum": [
+                "en",
+                "zh"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "grid_north": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "content_id",
+            "label"
+          ],
+          "properties": {
+            "content_id": {
+              "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+            },
+            "label": {
+              "enum": [
+                "Grid north",
+                "格网北"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "portrayal_ref": {
+      "allOf": [
+        {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+        },
+        {
+          "required": [
+            "uri"
+          ],
+          "properties": {
+            "id": {
+              "const": "resolved-raster-portrayal"
+            },
+            "version": {
+              "const": "1.0.0"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

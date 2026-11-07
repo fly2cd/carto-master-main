@@ -5,13 +5,16 @@ import struct
 from pathlib import Path
 from typing import Any, Callable
 
-from ..adapters.controlled_renderer import sha256_file
+from ..artifacts import atomic_yaml, file_digest
 from ..canonical import sha256_digest
+from ..compiler.layout import LayoutResolver, overlay_bounds
 from ..errors import ProtocolError, SecurityError
+from ..scenario_registry import ScenarioRegistry
 from ..schema_registry import SchemaRegistry, load_document
 from ..security.paths import PathGuard
-from .map_data_preparation import atomic_yaml
-from .map_render import REQUIRED_TARGETS, SYNTHETIC_DATA_NOTICE
+from ..validation.registry import CheckerRegistry
+from ..validation.map_checks import legend_consistency
+from .map_render import REQUIRED_TARGETS
 
 
 Checker = Callable[[dict[str, Any]], tuple[bool, dict[str, Any], str | None]]
@@ -35,19 +38,17 @@ class FinalMapCheckService:
         work_root: Path,
         registry: SchemaRegistry | None = None,
         policy_path: Path | None = None,
+        execution_context=None,
     ) -> None:
+        self.execution_context = execution_context
         self.path_guard = path_guard
         self.project_root = path_guard.resolve(project_root, must_exist=True)
         self.work_root = path_guard.resolve(work_root, must_exist=True)
         self.registry = registry or SchemaRegistry()
-        self.policy_path = policy_path or Path(__file__).resolve().parents[3] / "policies" / "checker-registry.yaml"
-        policy = load_document(self.policy_path.resolve(strict=True))
-        if not isinstance(policy, dict):
-            raise ProtocolError("CHECKER_REGISTRY_INVALID", str(self.policy_path))
-        self.policy = policy
-        self.checker_set_digest = sha256_digest(policy)
-        self.definitions = [item for item in policy.get("checks", []) if item.get("phase") == "final-check"]
-        self.handlers: dict[str, Checker] = {
+        self.checkers = CheckerRegistry(policy_path, self.registry)
+        self.checker_set_digest = self.checkers.policy_digest
+        self.definitions = self.checkers.definitions("final-check")
+        handlers: dict[str, Checker] = {
             "final.artifact-integrity": self._artifact_integrity,
             "final.required-targets": self._required_targets,
             "final.pdf-page-contract": self._pdf_page_contract,
@@ -55,16 +56,18 @@ class FinalMapCheckService:
             "final.font-policy": self._font_policy,
             "final.layout-elements": self._layout_elements,
             "final.legend-semantics": self._legend_semantics,
-            "final.synthetic-notice": self._synthetic_notice,
+            "final.scenario-notice": self._scenario_notice,
             "final.render-binding": self._render_binding,
             "final.sensitive-content": self._sensitive_content,
             "final.renderer-warnings": self._renderer_warnings,
         }
-        if not self.definitions:
-            raise ProtocolError("FINAL_CHECKERS_MISSING", str(self.policy_path))
-        missing = [item["id"] for item in self.definitions if item["id"] not in self.handlers]
+        check_ids = tuple(item["id"] for item in self.definitions)
+        missing = set(handlers) - set(check_ids)
         if missing:
-            raise ProtocolError("CHECKER_NOT_AVAILABLE", ",".join(missing))
+            raise ProtocolError("FINAL_CHECKERS_MISSING", ",".join(sorted(missing)))
+        for check_id, handler in handlers.items():
+            self.checkers.register(check_id, lambda _, ctx, operation=handler: operation(ctx))
+        self.checkers.require_handlers(check_ids)
 
     def inspect(
         self,
@@ -83,6 +86,7 @@ class FinalMapCheckService:
             key=lambda item: item["target"],
         )
         context = {
+            "scenario_profile": ScenarioRegistry(self.registry).for_execution(lock["execution"]),
             "lock": lock,
             "lock_ref": lock_ref,
             "scene": scene,
@@ -93,19 +97,10 @@ class FinalMapCheckService:
             "evidence_path": evidence_path,
             "artifacts": selected,
         }
-        results: list[dict[str, Any]] = []
-        for definition in self.definitions:
-            passed, details, disposition = self.handlers[definition["id"]](context)
-            item: dict[str, Any] = {
-                "check_id": definition["id"],
-                "version": str(definition["version"]),
-                "status": "passed" if passed else "failed",
-                "severity": definition["failure_severity"],
-                "details": details,
-            }
-            if definition["failure_severity"] == "warning":
-                item["disposition"] = disposition or ("accepted" if passed else "blocked")
-            results.append(item)
+        if scene.get("renderer_id") == "rasterio-matplotlib-page":
+            context["raster"] = self._raster_context(scene, lock, receipt)
+        results = [self.checkers.evaluate(item["id"], lock, context).to_dict()
+                   for item in self.definitions]
         counts = {
             severity: sum(item["severity"] == severity for item in results)
             for severity in ("blocker", "error", "warning", "info")
@@ -115,11 +110,7 @@ class FinalMapCheckService:
             "failed_error": sum(item["status"] == "failed" and item["severity"] == "error" for item in results),
             "failed_warning": sum(item["status"] == "failed" and item["severity"] == "warning" for item in results),
         })
-        warning_blocked = any(
-            item["severity"] == "warning" and item.get("disposition") != "accepted"
-            for item in results
-        )
-        status = "failed" if counts["failed_blocker"] or counts["failed_error"] or warning_blocked else "passed"
+        status = "failed" if self.checkers.has_blocking_failure(results) else "passed"
         subject = self._subject(lock, attempt, evidence, selected)
         report = {
             "schema_version": 1,
@@ -141,6 +132,28 @@ class FinalMapCheckService:
         }
         self.registry.validate("validation-report", report)
         return report
+
+    def _raster_context(self, scene, lock, receipt):
+        from ..adapters.raster_page_renderer import RasterPageRenderer
+        from ..compiler.raster_scene import RasterSceneCompiler
+        from .raster_preparation import RasterPreparationService
+        if self.execution_context is None:
+            raise SecurityError("RASTER_EXECUTION_CONTEXT_REQUIRED", "Final checks require the trusted execution context")
+        preparation = RasterPreparationService(project_root=self.project_root,
+            allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
+        inputs = RasterSceneCompiler(preparation).validate_execution(scene, lock["execution"], self.execution_context)
+        page = RasterPageRenderer(preparation).load_verified(receipt["page_output_ref"], self.execution_context)
+        if (page["request_ref"] != scene["page_request_ref"]
+                or receipt["renderer_id"] != scene["renderer_id"]
+                or page["environment"] != receipt["runtime"]
+                or page["environment"] != lock["execution"]["environment"]["runtime"]):
+            raise ProtocolError("FINAL_CHECK_RASTER_BINDING", "Page, scene, receipt and locked runtime must agree")
+        for item in receipt["output_artifacts"]:
+            asset = page["outputs"][item["target"]]
+            if (item["artifact_ref"]["digest"] != asset["artifact_ref"]["digest"]
+                    or item["size_bytes"] != asset["size_bytes"]):
+                raise ProtocolError("FINAL_CHECK_RASTER_BINDING", "Attested outputs differ from the verified page")
+        return {**inputs, "output": page, "body": preparation._json_ref(page["body_ref"], "raster-map-body")}
 
     def report_path(self, attempt_id: str) -> Path:
         return self.path_guard.resolve(
@@ -182,6 +195,7 @@ class FinalMapCheckService:
     ) -> dict[str, Any]:
         if report["status"] != "passed":
             raise ProtocolError("FINAL_CHECK_NOT_PASSED", report["report_id"])
+        profile = ScenarioRegistry(self.registry).for_execution(lock["execution"])
         relative_destination = self.normalize_destination(destination)
         artifacts = []
         for item in sorted(report["checked_artifacts"], key=lambda value: value["target"]):
@@ -218,8 +232,8 @@ class FinalMapCheckService:
             "destination": {"kind": "local-allowed-root", "relative_path": relative_destination},
             "scope": request["scope"],
             "environment": request["environment"],
-            "licenses": ["synthetic-demo-only"],
-            "limitations": [SYNTHETIC_DATA_NOTICE],
+            "licenses": list(profile.definition["licenses"]),
+            "limitations": [profile.notice],
             "idempotency_key": idempotency_key,
             "created_at": report["created_at"],
         }
@@ -289,7 +303,7 @@ class FinalMapCheckService:
             path = self._artifact_path(item)
             signature_valid = False
             actual_size = path.stat().st_size if path else 0
-            actual_digest = sha256_file(path) if path else None
+            actual_digest = file_digest(path) if path else None
             if path is not None:
                 header = path.read_bytes()[:24]
                 signature_valid = (
@@ -337,8 +351,11 @@ class FinalMapCheckService:
         if match:
             x0, y0, x1, y1 = (float(value) for value in match.groups())
             width, height = abs(x1 - x0), abs(y1 - y0)
-        expected_width = 420 * 72 / 25.4
-        expected_height = 297 * 72 / 25.4
+        target = next((value for value in context["lock"]["execution"]["targets"].values() if value["format"] == "pdf"), None)
+        if target is None:
+            return False, {"reason": "pdf-target-not-locked"}, None
+        expected_width = target["width_mm"] * 72 / 25.4
+        expected_height = target["height_mm"] * 72 / 25.4
         size_matches = abs(width - expected_width) <= 3 and abs(height - expected_height) <= 3
         passed = payload.startswith(b"%PDF-") and b"%%EOF" in payload[-2048:] and page_count == 1 and size_matches
         return passed, {
@@ -394,6 +411,15 @@ class FinalMapCheckService:
         path = self._artifact_path(pdf) if pdf else None
         payload = path.read_bytes() if path else b""
         pdf_font_evidence = any(marker in payload for marker in (b"/FontFile", b"/CIDFontType", b"/Type3"))
+        if "raster" in context:
+            output = context["raster"]["output"]
+            font_ok = (output["font_snapshot"] == context["raster"]["font"]
+                       and output["checks"]["glyph-coverage"] == "passed"
+                       and not output["font_embedding_flags"] & (0x0002 | 0x0100 | 0x0200))
+            return resource_ok and pdf_font_evidence and font_ok, {
+                "font_family": output["font_family"], "resource_binding_valid": resource_ok,
+                "pdf_font_evidence": pdf_font_evidence, "glyph_and_embedding_policy_valid": font_ok,
+                "policy": "embed-approved-frozen-truetype"}, None
         passed = resource_ok and pdf_font_evidence
         return passed, {
             "font_resources": [item.get("font_family") for item in fonts],
@@ -404,69 +430,56 @@ class FinalMapCheckService:
 
     def _layout_elements(self, context: dict[str, Any]) -> tuple[bool, dict[str, Any], None]:
         scene = context["scene"]
-        overlays = scene["overlays"]
+        if "raster" in context:
+            LayoutResolver(self.registry).validate_execution(scene, context["lock"]["execution"])
+            frames = {f["id"]: f for f in scene["resolved_layout"]["frames"] if f["type"] != "map"}
+            measurements = context["raster"]["output"]["measurements"]
+            valid = {m["frame_id"] for m in measurements} == set(frames)
+            for m in measurements:
+                frame = frames.get(m["frame_id"])
+                if frame is None:
+                    valid = False
+                    continue
+                x,y,w,h = m["bounds_px"]
+                fx,fy,fw,fh = frame["bounds_px"]
+                valid = valid and (x >= fx - 1e-5 and y >= fy - 1e-5 and w > 0 and h > 0
+                                   and x+w <= fx+fw+1e-5 and y+h <= fy+fh+1e-5)
+            return valid, {"layout_contract_valid": True, "frame_coverage_valid": valid,
+                "measurements": measurements, "bounds_method": "matplotlib-measured-frozen-font",
+                "optional_adornments": {k: context["raster"]["page"][k] is not None for k in ("scale_bar", "grid_north")}}, None
         required = {"title": "text", "legend": "legend", "scale": "scale-bar", "north": "north-arrow", "source": "attribution"}
-        by_id = {item["id"]: item for item in overlays}
+        by_id = {item["id"]: item for item in scene["overlays"]}
         present = {key: by_id.get(key, {}).get("type") == value for key, value in required.items()}
-        png_target = next((item for item in context["lock"]["execution"]["targets"].values() if item["format"] == "png"), None)
-        margin = png_target["dpi"] * 10 / 25.4 if png_target else 0
-        width, height = scene["viewport"]["width_px"], scene["viewport"]["height_px"]
-        positions_valid = True
-        bounds: list[dict[str, Any]] = []
-        for item in overlays:
-            position = item.get("position")
-            if item.get("coordinate_space") == "page" and position and position.get("unit") == "pixel":
-                x, y = position["x"], position["y"]
-                left, top, right, bottom = self._overlay_bounds(item, x, y)
-                inside = margin <= left and top >= margin and right <= width - margin and bottom <= height - margin
-                positions_valid = positions_valid and inside
-                bounds.append({
-                    "id": item["id"],
-                    "bounds_px": [round(left, 3), round(top, 3), round(right, 3), round(bottom, 3)],
-                    "within_safe_margin": inside,
-                })
-        passed = all(present.values()) and positions_valid
-        return passed, {
-            "required_elements": present,
-            "safe_margin_px": round(margin, 3),
-            "overlay_bounds": bounds,
-            "positions_within_safe_margin": positions_valid,
+        try:
+            LayoutResolver(self.registry).validate_execution(scene, context["lock"]["execution"])
+        except (ProtocolError, SecurityError) as exc:
+            return False, {"required_elements": present, "layout_contract_valid": False,
+                           "error_code": exc.code, "message": exc.message}, None
+        resolved = scene["resolved_layout"]
+        bounds = []
+        for item in scene["overlays"]:
+            x, y = item["position"]["x"], item["position"]["y"]
+            bounds.append({"id": item["id"], "bounds_px": list(overlay_bounds(item, x, y))})
+        return all(present.values()), {
+            "required_elements": present, "layout_contract_valid": True,
+            "layout_ref": resolved["contract_ref"], "resolver_version": resolved["resolver_version"],
+            "safe_margin_px": resolved["page"]["safe_margin_px"],
+            "frames": resolved["frames"], "overlay_bounds": bounds,
+            "bounds_method": "conservative-fixed-primitive-envelope-not-font-measurement",
         }, None
 
-    @staticmethod
-    def _overlay_bounds(item: dict[str, Any], x: float, y: float) -> tuple[float, float, float, float]:
-        """Return deterministic conservative bounds matching the current SVG compositor."""
-        overlay_type = item.get("type")
-        if overlay_type == "legend":
-            rows = item.get("legend_items", [])
-            text_width = max((len(str(row.get("label", ""))) for row in rows), default=0) * 16
-            return x, y, x + 20 + text_width, y + max(14, (len(rows) - 1) * 22 + 14)
-        if overlay_type == "scale-bar":
-            length = float(item.get("length_px", 0))
-            return x, y - 22, x + length, y + 5
-        if overlay_type == "north-arrow":
-            return x - 10, y - 40, x + 10, y + 12
-        content = str(item.get("content", item.get("label", "")))
-        text_width = max(16, len(content) * 16)
-        return x, y - 20, x + text_width, y + 5
+    def _legend_semantics(self, context: dict[str, Any]) -> tuple[bool, dict[str, Any], str | None]:
+        return legend_consistency(context)
 
-    def _legend_semantics(self, context: dict[str, Any]) -> tuple[bool, dict[str, Any], None]:
-        legends = [item for item in context["scene"]["overlays"] if item["type"] == "legend"]
-        locked = context["lock"]["execution"]["shared_semantics"].get("legend_items", [])
-        actual = legends[0]["legend_items"] if len(legends) == 1 else []
-        locked_match = actual[:len(locked)] == locked
-        no_data = any(item.get("label") == "无数据" for item in locked)
-        proportional = any(item.get("symbol") == "circle" and "容纳人数" in item.get("label", "") for item in actual)
-        passed = len(legends) == 1 and locked_match and no_data and proportional
-        return passed, {"locked_items_match": locked_match, "no_data_present": no_data, "proportional_symbol_present": proportional}, None
-
-    def _synthetic_notice(self, context: dict[str, Any]) -> tuple[bool, dict[str, Any], None]:
-        notices = [
-            item for item in context["scene"]["overlays"]
-            if item.get("content") == SYNTHETIC_DATA_NOTICE and item.get("coordinate_space") == "page"
-        ]
+    def _scenario_notice(self, context: dict[str, Any]) -> tuple[bool, dict[str, Any], None]:
+        notice = context["scenario_profile"].notice
+        if "raster" in context:
+            notices = [item for item in context["raster"]["page"]["texts"] if item["text"] == notice]
+        else:
+            notices = [item for item in context["scene"]["overlays"]
+                       if item.get("content") == notice and item.get("coordinate_space") == "page"]
         chain = (
-            context["evidence"].get("synthetic_data_notice") == SYNTHETIC_DATA_NOTICE
+            context["evidence"].get("scenario_notice") == notice
             and context["receipt"].get("scene_digest") == sha256_digest(context["scene"])
             and all(self._artifact_path(item) is not None for item in context["artifacts"])
         )
@@ -489,18 +502,35 @@ class FinalMapCheckService:
     def _sensitive_content(self, context: dict[str, Any]) -> tuple[bool, dict[str, Any], None]:
         forbidden = (
             b"CARTO_RENDER_ATTESTATION_KEY", b"CARTO_APPROVAL_HMAC_KEY", b"BEGIN PRIVATE KEY",
-            b"DevTools", b"risk_value", b"count_value",
-        )
+            b"DevTools",
+        ) + tuple(name.encode("utf-8") for name in context["scenario_profile"].definition["internal_field_names"])
         findings: dict[str, list[str]] = {}
         for item in context["artifacts"]:
             path = self._artifact_path(item)
             payload = path.read_bytes() if path else b""
-            hits = [marker.decode("ascii") for marker in forbidden if marker in payload]
+            hits = [marker.decode("utf-8") for marker in forbidden if marker in payload]
             if hits:
                 findings[item["target"]] = hits
+        if "raster" in context:
+            # PDF streams may be compressed and SVG glyphs are paths: also inspect
+            # the verified source strings actually used to produce these bytes.
+            raster = context["raster"]
+            strings = ([item["text"] for item in raster["page"]["texts"]]
+                       + [raster["page"]["legend"]["title"]]
+                       + [row["label"] for row in raster["portrayal"]["legend_items"]])
+            if raster["page"]["grid_north"] is not None:
+                strings.append(raster["page"]["grid_north"]["label"])
+            if raster["page"]["scale_bar"] is not None:
+                from ..adapters.raster_page_renderer import RasterPageRenderer
+                strings.append(RasterPageRenderer._scale_label(raster["page"]["scale_bar"]))
+            payload = "\n".join(strings).encode("utf-8")
+            hits = [marker.decode("utf-8") for marker in forbidden if marker in payload]
+            if hits:
+                findings["frozen-rendered-text"] = hits
         return not findings, {"forbidden_markers": findings, "checked_marker_count": len(forbidden)}, None
 
     def _renderer_warnings(self, context: dict[str, Any]) -> tuple[bool, dict[str, Any], str]:
         warnings = context["receipt"].get("warnings", [])
-        unknown = sorted(set(warnings) - _ALLOWED_RENDER_WARNINGS)
+        allowed = set() if "raster" in context else _ALLOWED_RENDER_WARNINGS
+        unknown = sorted(set(warnings) - allowed)
         return not unknown, {"warnings": warnings, "unknown_warnings": unknown}, "accepted" if not unknown else "blocked"

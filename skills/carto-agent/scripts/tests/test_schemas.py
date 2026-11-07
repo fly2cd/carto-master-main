@@ -38,6 +38,26 @@ class SchemaTests(unittest.TestCase):
                 with self.assertRaises(ProtocolError):
                     self.registry.validate(name, INVALID_CASES[name])
 
+    def test_formal_raster_protocol_branches_have_valid_and_invalid_fixtures(self) -> None:
+        root = Path(__file__).parent / "fixtures" / "raster-formal"
+        names = {"prepared-data-bundle", "render-scene", "render-receipt", "resolved-map", "map-spec-lock", "generate-request"}
+        self.assertEqual(names, {p.name.removesuffix(".valid.json") for p in root.glob("*.valid.json")})
+        self.assertEqual(names, {p.name.removesuffix(".invalid.json") for p in root.glob("*.invalid.json")})
+        for path in root.glob("*.json"):
+            text = path.read_text(encoding="utf-8")
+            # Structural examples must not retain the developer's absolute/temp paths.
+            self.assertNotRegex(text, r'"[A-Za-z]:[/\\]', path.name)
+            self.assertNotRegex(text, r'"/(?:tmp|home|Users)/', path.name)
+            self.assertNotIn("AppData", text, path.name)
+        for name in sorted(names):
+            with self.subTest(schema=name):
+                value = load_document(root / f"{name}.valid.json")
+                self.registry.validate(name, value)
+                with self.assertRaises(ProtocolError):
+                    self.registry.validate(name, load_document(root / f"{name}.invalid.json"))
+                value["unknown"] = True
+                with self.assertRaises(ProtocolError): self.registry.validate(name, value)
+
     def test_semantic_invalid_fixtures_are_rejected(self) -> None:
         for fixture_name, (schema_name, instance) in SEMANTIC_INVALID_CASES.items():
             with self.subTest(fixture=fixture_name, schema=schema_name):
@@ -120,21 +140,23 @@ class SchemaTests(unittest.TestCase):
         self.assertEqual(candidate["execution_digest"], sha256_digest(candidate["execution"]))
         self.assertEqual(lock["execution_digest"], sha256_digest(lock["execution"]))
         changed = deepcopy(candidate["execution"])
-        changed["shared_semantics"]["data_nature"] = "observed"
+        changed["shared_semantics"]["data_nature"] = "derived"
         self.assertNotEqual(lock["execution_digest"], sha256_digest(changed))
 
     def test_versioned_intent_profile_policy_matches_schema(self) -> None:
         policy = self.policies_root / "intent-profiles.yaml"
         self.registry.validate("intent-profiles", load_document(policy))
 
-    def test_map_expression_catalog_contains_only_the_up2_slice(self) -> None:
+    def test_map_expression_catalog_contains_vector_and_categorical_raster_expressions(self) -> None:
         catalog = load_document(self.policies_root / "map-expression-catalog.yaml")
         self.assertEqual(catalog["schema_version"], 1)
-        self.assertEqual(catalog["version"], "1.0.0")
+        self.assertEqual(catalog["version"], "1.1.0")
+        self.registry.validate("map-expression-catalog", catalog)
         entries = catalog["entries"]
         self.assertEqual(
             {(entry["expression_id"], entry["version"]) for entry in entries},
-            {("choropleth/sequential", "1.0.0"), ("proportional-symbol/count", "1.0.0")},
+            {("choropleth/sequential", "1.0.0"), ("proportional-symbol/count", "1.0.0"),
+             ("raster/categorical", "1.0.0")},
         )
         for entry in entries:
             self.registry.validate("map-expression", entry)
@@ -204,9 +226,9 @@ class SchemaTests(unittest.TestCase):
             "segment": "cartography",
             "value": {"style_id": "replacement-only"},
             "compatibility": {
-                "scenario_ids": ["urban-flood-risk"],
+                "scenario_ids": ["test-scenario"],
                 "target_profiles": ["a3-landscape"],
-                "data_roles": ["risk-area"],
+                "data_roles": ["area-role"],
                 "placeholders": ["{{MAP_FRAME}}"],
             },
         }

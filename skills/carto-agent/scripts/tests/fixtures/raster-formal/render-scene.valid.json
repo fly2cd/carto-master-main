@@ -1,0 +1,284 @@
+{
+  "schema_version": 1,
+  "scene_id": "synthetic-raster-scene",
+  "revision": 1,
+  "renderer_id": "rasterio-matplotlib-page",
+  "context": {
+    "run_id": "test-run",
+    "tenant_id": "test-tenant",
+    "project_id": "test-project",
+    "subject_id": "test-subject"
+  },
+  "prepared_bundle_ref": {
+    "id": "prepared-data-bundle",
+    "version": "1.0.0",
+    "digest": "sha256:c5339d3356fa9a730488129a1e9d8e3a0ef52c83f479f929fefc27b77127648d",
+    "uri": ".carto/raster/prepared-data-bundle/c5339d3356fa9a730488129a1e9d8e3a0ef52c83f479f929fefc27b77127648d.json"
+  },
+  "page_request_ref": {
+    "id": "raster-page-request",
+    "version": "1.0.0",
+    "digest": "sha256:78b0de8d080b96b75c8331aa13f7438be0eb550067f4ddb34fd8233a960386cb",
+    "uri": ".carto/raster/raster-page-request/78b0de8d080b96b75c8331aa13f7438be0eb550067f4ddb34fd8233a960386cb.json"
+  },
+  "resolved_layout": {
+    "contract": {
+      "canvas": {
+        "height": 210,
+        "orientation": "landscape",
+        "safe_margin": 10,
+        "unit": "mm",
+        "width": 297
+      },
+      "capacity": {
+        "legend_items": 12,
+        "title_characters": 40
+      },
+      "category": "report",
+      "frames": [
+        {
+          "bounds": [
+            10,
+            25,
+            215,
+            175
+          ],
+          "content_id": "main-view",
+          "coordinate_space": "page",
+          "id": "map",
+          "overflow_policy": "clip",
+          "type": "map"
+        },
+        {
+          "bounds": [
+            10,
+            10,
+            277,
+            10
+          ],
+          "content_id": "title",
+          "coordinate_space": "page",
+          "id": "title",
+          "overflow_policy": "reject",
+          "type": "title"
+        },
+        {
+          "bounds": [
+            230,
+            40,
+            57,
+            130
+          ],
+          "content_id": "legend",
+          "coordinate_space": "page",
+          "id": "legend",
+          "overflow_policy": "reject",
+          "type": "legend"
+        },
+        {
+          "bounds": [
+            230,
+            180,
+            57,
+            15
+          ],
+          "content_id": "source",
+          "coordinate_space": "page",
+          "id": "source",
+          "overflow_policy": "reject",
+          "type": "marginalia"
+        }
+      ],
+      "layout_id": "synthetic-a4-landscape",
+      "placeholders": [
+        "{{MAP_TITLE}}",
+        "{{MAP_FRAME}}",
+        "{{LEGEND}}"
+      ],
+      "rules": [],
+      "schema_version": 1,
+      "version": "1.0.0"
+    },
+    "contract_ref": {
+      "digest": "sha256:520ad344494f786ef28cedea74bc74ebbe5c062fca20f2b000ad4782e3ec7c14",
+      "id": "synthetic-a4-landscape",
+      "version": "1.0.0"
+    },
+    "frames": [
+      {
+        "bounds_px": [
+          651.968504,
+          113.385827,
+          161.574803,
+          368.503937
+        ],
+        "content_id": "legend",
+        "id": "legend",
+        "overflow_policy": "reject",
+        "type": "legend"
+      },
+      {
+        "bounds_px": [
+          28.346457,
+          70.866142,
+          609.448819,
+          496.062992
+        ],
+        "content_id": "main-view",
+        "id": "map",
+        "overflow_policy": "clip",
+        "type": "map"
+      },
+      {
+        "bounds_px": [
+          651.968504,
+          510.23622,
+          161.574803,
+          42.519685
+        ],
+        "content_id": "source",
+        "id": "source",
+        "overflow_policy": "reject",
+        "type": "marginalia"
+      },
+      {
+        "bounds_px": [
+          28.346457,
+          28.346457,
+          785.19685,
+          28.346457
+        ],
+        "content_id": "title",
+        "id": "title",
+        "overflow_policy": "reject",
+        "type": "title"
+      }
+    ],
+    "map_frame_id": "map",
+    "page": {
+      "device_pixel_ratio": 1,
+      "dpi": 72,
+      "height_mm": 210,
+      "height_px": 595,
+      "safe_margin_px": 28.346457,
+      "width_mm": 297,
+      "width_px": 842
+    },
+    "resolver_version": "1.0.0",
+    "schema_version": 1
+  },
+  "viewport": {
+    "width_px": 842,
+    "height_px": 595,
+    "device_pixel_ratio": 1
+  },
+  "export": {
+    "targets": [
+      "pdf",
+      "png"
+    ],
+    "dpi": 72
+  },
+  "random_seed": 0,
+  "resources": [
+    {
+      "id": "font",
+      "kind": "font",
+      "digest_mode": "bytes",
+      "ref": {
+        "id": "font",
+        "version": "1.0.0",
+        "digest": "sha256:3fdf69cabf06049ea70a00b5919340e2ce1e6d02b0cc3c4b44fb6801bd1e0d22",
+        "uri": ".carto/raster/font/3fdf69cabf06049ea70a00b5919340e2ce1e6d02b0cc3c4b44fb6801bd1e0d22.ttf"
+      }
+    },
+    {
+      "id": "legend",
+      "kind": "data",
+      "digest_mode": "bytes",
+      "ref": {
+        "digest": "sha256:b87562c75026c8cf507be15faefa798366a1c701529e41a7efef119b1d6a470f",
+        "id": "legend",
+        "uri": ".carto/raster/legend/b87562c75026c8cf507be15faefa798366a1c701529e41a7efef119b1d6a470f.csv",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "prepared-data-bundle",
+      "kind": "contract",
+      "digest_mode": "canonical-json",
+      "ref": {
+        "id": "prepared-data-bundle",
+        "version": "1.0.0",
+        "digest": "sha256:c5339d3356fa9a730488129a1e9d8e3a0ef52c83f479f929fefc27b77127648d",
+        "uri": ".carto/raster/prepared-data-bundle/c5339d3356fa9a730488129a1e9d8e3a0ef52c83f479f929fefc27b77127648d.json"
+      }
+    },
+    {
+      "id": "raster-classification-request",
+      "kind": "contract",
+      "digest_mode": "canonical-json",
+      "ref": {
+        "digest": "sha256:65bc7173b2cbd0b222f76139f263a833a4002be39d7ee6ef5d7f010c873610e1",
+        "id": "raster-classification-request",
+        "uri": ".carto/raster/raster-classification-request/65bc7173b2cbd0b222f76139f263a833a4002be39d7ee6ef5d7f010c873610e1.json",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "raster-page-request",
+      "kind": "contract",
+      "digest_mode": "canonical-json",
+      "ref": {
+        "id": "raster-page-request",
+        "version": "1.0.0",
+        "digest": "sha256:78b0de8d080b96b75c8331aa13f7438be0eb550067f4ddb34fd8233a960386cb",
+        "uri": ".carto/raster/raster-page-request/78b0de8d080b96b75c8331aa13f7438be0eb550067f4ddb34fd8233a960386cb.json"
+      }
+    },
+    {
+      "id": "raster-prepared-data",
+      "kind": "contract",
+      "digest_mode": "canonical-json",
+      "ref": {
+        "digest": "sha256:995574df7a10892556f30add25abbf3ea071305a061edd30dcc1848897c840d1",
+        "id": "raster-prepared-data",
+        "uri": ".carto/raster/raster-prepared-data/995574df7a10892556f30add25abbf3ea071305a061edd30dcc1848897c840d1.json",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "resolved-raster-portrayal",
+      "kind": "contract",
+      "digest_mode": "canonical-json",
+      "ref": {
+        "digest": "sha256:3dee6c48660ad15578f1219eb84be8459c968b8afe4d362edb8c22560dda5a16",
+        "id": "resolved-raster-portrayal",
+        "uri": ".carto/raster/resolved-raster-portrayal/3dee6c48660ad15578f1219eb84be8459c968b8afe4d362edb8c22560dda5a16.json",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "source",
+      "kind": "data",
+      "digest_mode": "bytes",
+      "ref": {
+        "digest": "sha256:d9c9c7b49d3f0de01d79774e255cd59ac510acdc3565a6a2f763b2dbe3d6a66d",
+        "id": "source",
+        "uri": ".carto/raster/source/d9c9c7b49d3f0de01d79774e255cd59ac510acdc3565a6a2f763b2dbe3d6a66d.tif",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "tool-gis-raster-statistics",
+      "kind": "contract",
+      "digest_mode": "canonical-json",
+      "ref": {
+        "digest": "sha256:065040cbad8e5c4737be2566c3b6f4c40dfa58f799b7198c1879ac316f1751de",
+        "id": "tool-gis-raster-statistics",
+        "uri": ".carto/geospatial/evidence/tool-gis-raster-statistics/1.0.0/065040cbad8e5c4737be2566c3b6f4c40dfa58f799b7198c1879ac316f1751de.json",
+        "version": "1.0.0"
+      }
+    }
+  ]
+}

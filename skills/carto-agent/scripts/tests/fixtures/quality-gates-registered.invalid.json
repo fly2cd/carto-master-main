@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "baseline": {
+    "id": "test-quality-baseline",
+    "version": "1.0.0",
+    "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "checks": [
+    {
+      "id": "protocol.schema-valid",
+      "version": "1.0.0",
+      "params": {}
+    },
+    {
+      "id": "cartography.unregistered-check",
+      "version": "1.0.0",
+      "params": {}
+    },
+    {
+      "id": "raster.classification-clarified",
+      "version": "1.0.0",
+      "params": {}
+    }
+  ]
+}

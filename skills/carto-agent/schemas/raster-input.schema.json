@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/raster-input.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "role",
+    "source_ref",
+    "path",
+    "format",
+    "dataset_id",
+    "size_bytes",
+    "crs",
+    "band",
+    "value_semantics",
+    "mask_policy",
+    "license",
+    "data_nature",
+    "contains_sensitive_coordinates"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "role": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+    },
+    "source_ref": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "format": {
+      "const": "geotiff"
+    },
+    "dataset_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+    },
+    "size_bytes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 268435456
+    },
+    "crs": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "authority",
+            "code"
+          ],
+          "properties": {
+            "authority": {
+              "const": "EPSG"
+            },
+            "code": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{2,5}$"
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "band": {
+      "const": 1
+    },
+    "value_semantics": {
+      "const": "categorical-integer"
+    },
+    "mask_policy": {
+      "const": "embedded"
+    },
+    "license": {
+      "enum": [
+        "public",
+        "project-approved"
+      ]
+    },
+    "data_nature": {
+      "enum": [
+        "synthetic",
+        "user-provided"
+      ]
+    },
+    "contains_sensitive_coordinates": {
+      "const": false
+    }
+  }
+}

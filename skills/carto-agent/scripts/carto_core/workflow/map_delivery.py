@@ -6,11 +6,12 @@ from typing import Any, Callable
 from ..canonical import sha256_digest
 from ..errors import ProtocolError, SecurityError
 from ..repository.delivery_repository import DeliveryRepository
+from ..scenario_registry import ScenarioRegistry
 from ..schema_registry import SchemaRegistry, load_document
 from ..security.approval import ApprovalReceipt, SqliteNonceStore
 from ..security.paths import PathGuard
 from .approvals import ApprovalGateCoordinator
-from .map_data_preparation import atomic_yaml, file_digest
+from ..artifacts import atomic_yaml, file_digest
 from .models import ExecutionContext
 
 FailureHook = Callable[[str], None]
@@ -128,6 +129,8 @@ class MapDeliveryService:
             if load_document(report_path) != report:
                 raise ProtocolError("DELIVERY_VALIDATION_REPORT_DRIFT", report["report_id"])
         lock = self._load_bound_ref(manifest["lock_ref"], "map-spec-lock", "DELIVERY_LOCK_DRIFT")
+        profile = ScenarioRegistry(self.registry).for_execution(lock["execution"])
+        profile.require_manifest(manifest)
         attempt = self._load_bound_ref(
             manifest["render_attempt_ref"], "render-attempt", "DELIVERY_RENDER_ATTEMPT_DRIFT"
         )

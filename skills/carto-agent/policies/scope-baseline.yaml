@@ -1,58 +1,34 @@
 schema_version: 1
-baseline_id: first-vertical-slice-scope
-version: 0.3.3
-status: u-p3-local-synthetic-delivery-enabled
-prepared_at: 2026-09-21
+baseline_id: cartography-framework-scope
+version: 0.4.0
+status: framework-ready-no-enabled-scenarios
+prepared_at: 2026-11-04
 deployment:
   mode: controlled-single-host
   trust_boundary: authenticated-operating-system-user
   enterprise_shared_service: not-claimed
-first_vertical_slice:
-  scenario: emergency-mapping-flood
-  data_nature: simulated-only
-  request_formats: [yaml, json]
-  dataset_formats: [geojson, csv]
-  metadata_formats: [yaml, json]
-  unsupported_source_formats: [geopackage, qgis-project, shapefile, geotiff, database, live-api]
-  required_map_expressions: [choropleth/sequential, proportional-symbol/count]
-  required_symbol_resources: [point-symbol/shelter]
-  source_crs: EPSG:4326
-  display_crs: EPSG:3857
-  output_profile:
-    id: print-a3-landscape-preview
-    page_width_mm: 420
-    page_height_mm: 297
-    preview_formats: [svg, pdf, png]
-    map_content: rasterized-map-image
-    overlay_content: vector-svg-overlay
-    pdf_claim: preview-only-not-vector-pdf
-    formal_delivery: local-synthetic-demo-only
-  renderer: controlled-maplibre-web
+scenario_admission:
+  registry: scenario-capabilities.yaml
+  default: deny
+  enabled_profiles: []
+  note: 工作流实现不等于业务能力开放；真实场景须先实现、注册并验收。
 formal_render:
   enabled: true
   source_of_truth: map-spec-lock
   required_formats: [pdf, png]
   output_layout: output/<lock-id>/formal-map/<attempt-id>/
-  synthetic_data_notice: 合成数据演示，非真实风险研判
+  notice_source: frozen-scenario-profile
   next_state: pending/check
-  quality_checked: false
-  delivery_enabled: false
 final_check:
   enabled: true
-  checker_registry_version: 1.1.0
+  checker_registry_version: 1.2.0
   required_formats: [pdf, png]
-  output_profile:
-    page_width_mm: 420
-    page_height_mm: 297
-    dpi: 144
-    png_width_px: 2381
-    png_height_px: 1684
+  output_profile_source: frozen-layout-and-scenario-profile
   report_layout: final-checks/<attempt-id>/validation-report.yaml
   manifest_layout: delivery-manifests/<manifest-id>.yaml
   next_state: waiting_approval/deliver
   consumes_g3: false
   destination_side_effects: false
-  delivery_receipt_enabled: false
 delivery:
   enabled: true
   mode: local-allowed-root
@@ -63,14 +39,13 @@ delivery:
   transaction_enabled: true
   delivery_receipt_enabled: true
   status_query_by_idempotency_key: true
-  synthetic_data_only: true
   external_publish: false
 formal_capability_boundary:
-  scenes: [government_thematic, emergency_mapping, leadership_visit]
+  scenes: []
   production_tasks: []
   note: 每项生产任务须在 U-P4 的正式能力矩阵通过后加入，不能由本基线提前声明。
   unavailable: [hazard-prediction, remote-sensing-auto-extraction, command-decision, public-web-publishing, native-gis-editing, vector-pdf-export, geopackage-input, qgis-project-input]
-  note_2: U-P2 的地图主体可作为栅格图像嵌入 SVG，overlay 可保持矢量；PDF 仅为工程预览，不声明全矢量输出。
+  note_2: 地图主体作为栅格图像嵌入 SVG，overlay 可保持矢量；不声明全矢量 PDF 输出。
 model_boundary:
   host: application-managed
   public_model_sensitive_data: forbidden

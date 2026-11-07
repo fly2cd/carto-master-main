@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/general-thematic-template-create-request.schema.json",
+  "description": "Strict create-template overlay for the registered general_thematic_mapping scenario. It narrows the shared template-create-request protocol; it never relaxes it.",
+  "allOf": [
+    {
+      "$ref": "https://schemas.carto-agent.local/v1/template-create-request.schema.json"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "map-scenario"
+        },
+        "namespace": {
+          "const": "local"
+        },
+        "template_id": {
+          "const": "general-thematic-map"
+        },
+        "version": {
+          "const": "1.0.0"
+        },
+        "profile": {
+          "const": "general-thematic-authoring"
+        },
+        "authoring_mode": {
+          "const": "standard"
+        },
+        "targets": {
+          "minItems": 2,
+          "maxItems": 2,
+          "allOf": [
+            {
+              "contains": {
+                "const": "pdf"
+              }
+            },
+            {
+              "contains": {
+                "const": "png"
+              }
+            }
+          ]
+        },
+        "data_nature": {
+          "const": "user-provided"
+        },
+        "contains_production_data": {
+          "const": false
+        },
+        "contains_sensitive_coordinates": {
+          "const": false
+        },
+        "role_bindings": {
+          "minProperties": 1,
+          "maxProperties": 1,
+          "propertyNames": {
+            "const": "classified_surface"
+          }
+        }
+      }
+    }
+  ]
+}

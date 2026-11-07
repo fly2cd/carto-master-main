@@ -1,0 +1,222 @@
+{
+  "schema_version": 1,
+  "resolver_version": "1.0.0",
+  "contract_ref": {
+    "id": "a3-landscape",
+    "version": "1.0.0",
+    "digest": "sha256:8892887d7670105506aad54d0051e9974df48e65ed6c0ad50694f4d4ccfc1f1b"
+  },
+  "contract": {
+    "schema_version": 1,
+    "layout_id": "a3-landscape",
+    "version": "1.0.0",
+    "category": "report",
+    "canvas": {
+      "width": 420,
+      "height": 297,
+      "unit": "mm",
+      "orientation": "landscape",
+      "safe_margin": 10
+    },
+    "frames": [
+      {
+        "id": "main-map",
+        "content_id": "main-view",
+        "type": "map",
+        "coordinate_space": "page",
+        "bounds": [
+          15,
+          28,
+          310,
+          250
+        ],
+        "overflow_policy": "clip"
+      },
+      {
+        "id": "legend",
+        "content_id": "legend",
+        "type": "legend",
+        "coordinate_space": "page",
+        "bounds": [
+          330,
+          55,
+          75,
+          170
+        ],
+        "overflow_policy": "reject"
+      },
+      {
+        "id": "map-title",
+        "content_id": "title",
+        "type": "title",
+        "coordinate_space": "page",
+        "bounds": [
+          15,
+          10,
+          390,
+          14
+        ],
+        "overflow_policy": "reject"
+      },
+      {
+        "id": "north",
+        "content_id": "north",
+        "type": "north-arrow",
+        "coordinate_space": "page",
+        "bounds": [
+          382,
+          28,
+          12,
+          18
+        ],
+        "overflow_policy": "reject"
+      },
+      {
+        "id": "scale",
+        "content_id": "scale",
+        "type": "scale-bar",
+        "coordinate_space": "page",
+        "bounds": [
+          330,
+          247,
+          75,
+          12
+        ],
+        "overflow_policy": "reject"
+      },
+      {
+        "id": "source",
+        "content_id": "source",
+        "type": "marginalia",
+        "coordinate_space": "page",
+        "bounds": [
+          330,
+          279,
+          75,
+          8
+        ],
+        "overflow_policy": "reject"
+      },
+      {
+        "id": "scenario-notice",
+        "content_id": "scenario-notice",
+        "type": "marginalia",
+        "coordinate_space": "page",
+        "bounds": [
+          15,
+          279,
+          310,
+          8
+        ],
+        "overflow_policy": "reject"
+      }
+    ],
+    "placeholders": [
+      "{{MAP_TITLE}}",
+      "{{MAP_FRAME}}",
+      "{{LEGEND}}"
+    ],
+    "rules": [],
+    "capacity": {
+      "legend_items": 12,
+      "title_characters": 40
+    }
+  },
+  "page": {
+    "width_mm": 420,
+    "height_mm": 297,
+    "dpi": 144,
+    "width_px": 2381,
+    "height_px": 1684,
+    "device_pixel_ratio": 1,
+    "safe_margin_px": 56.692913
+  },
+  "map_frame_id": "main-map",
+  "frames": [
+    {
+      "id": "legend",
+      "content_id": "legend",
+      "type": "legend",
+      "bounds_px": [
+        1870.866142,
+        311.811024,
+        425.19685,
+        963.779528
+      ],
+      "overflow_policy": "reject",
+      "unapproved_position_override": true
+    },
+    {
+      "id": "main-map",
+      "content_id": "main-view",
+      "type": "map",
+      "bounds_px": [
+        85.03937,
+        158.740157,
+        1757.480315,
+        1417.322835
+      ],
+      "overflow_policy": "clip"
+    },
+    {
+      "id": "map-title",
+      "content_id": "title",
+      "type": "title",
+      "bounds_px": [
+        85.03937,
+        56.692913,
+        2211.023622,
+        79.370079
+      ],
+      "overflow_policy": "reject"
+    },
+    {
+      "id": "north",
+      "content_id": "north",
+      "type": "north-arrow",
+      "bounds_px": [
+        2165.669291,
+        158.740157,
+        68.031496,
+        102.047244
+      ],
+      "overflow_policy": "reject"
+    },
+    {
+      "id": "scale",
+      "content_id": "scale",
+      "type": "scale-bar",
+      "bounds_px": [
+        1870.866142,
+        1400.314961,
+        425.19685,
+        68.031496
+      ],
+      "overflow_policy": "reject"
+    },
+    {
+      "id": "source",
+      "content_id": "source",
+      "type": "marginalia",
+      "bounds_px": [
+        1870.866142,
+        1581.732283,
+        425.19685,
+        45.354331
+      ],
+      "overflow_policy": "reject"
+    },
+    {
+      "id": "scenario-notice",
+      "content_id": "scenario-notice",
+      "type": "marginalia",
+      "bounds_px": [
+        85.03937,
+        1581.732283,
+        1757.480315,
+        45.354331
+      ],
+      "overflow_policy": "reject"
+    }
+  ]
+}

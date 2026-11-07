@@ -3,46 +3,19 @@ from __future__ import annotations
 import hashlib
 import os
 import shutil
-import tempfile
 import time
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Callable
 
-import yaml
 
+from ..artifacts import atomic_yaml, file_digest, utc_now
 from ..canonical import sha256_digest
 from ..errors import ProtocolError, SecurityError
 from ..schema_registry import SchemaRegistry, load_document
 from ..security.paths import PathGuard
-from ..workflow.map_data_preparation import file_digest
 
 FailureHook = Callable[[str], None]
 _PACKAGE_FILES = {"map.pdf", "map.png", "README.md", "delivery-manifest.yaml", "checksums.sha256"}
-
-
-def _now() -> str:
-    return datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
-
-
-def _atomic_yaml(path: Path, value: dict[str, Any], *, immutable: bool = False) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if immutable and path.exists():
-        existing = load_document(path)
-        if existing != value:
-            raise ProtocolError("IMMUTABLE_ARTIFACT_CONFLICT", str(path))
-        return
-    fd, name = tempfile.mkstemp(prefix=f".{path.name}-", suffix=".tmp", dir=path.parent)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as stream:
-            yaml.safe_dump(value, stream, allow_unicode=True, sort_keys=False)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(name, path)
-    finally:
-        temporary = Path(name)
-        if temporary.exists():
-            temporary.unlink()
 
 
 class _DeliveryLock:
@@ -149,7 +122,7 @@ class DeliveryRepository:
 
             receipt = self._build_receipt(transaction, manifest, manifest_ref, approval_ref)
             self.registry.validate("delivery-receipt", receipt)
-            _atomic_yaml(receipt_path, receipt, immutable=True)
+            atomic_yaml(receipt_path, receipt, create_once=True)
             if failure_hook:
                 failure_hook("after-receipt")
             transaction = self._mark_receipt_written(transaction_path, transaction, receipt, receipt_path)
@@ -225,7 +198,7 @@ class DeliveryRepository:
         final_relative = manifest["destination"]["relative_path"]
         final = Path(final_relative)
         staging_relative = (final.parent / f".{final.name}.staging-{suffix}").as_posix()
-        now = _now()
+        now = utc_now()
         transaction = {
             "schema_version": 1,
             "transaction_id": transaction_id,
@@ -248,7 +221,7 @@ class DeliveryRepository:
             "updated_at": now,
         }
         self.registry.validate("delivery-transaction", transaction)
-        _atomic_yaml(path, transaction, immutable=True)
+        atomic_yaml(path, transaction, create_once=True)
         return transaction
 
     def _validate_destination(self, final_path: Path, staging_path: Path) -> None:
@@ -274,7 +247,7 @@ class DeliveryRepository:
                 if file_digest(source) != item["digest"] or source.stat().st_size != item["size_bytes"]:
                     raise ProtocolError("DELIVERY_ARTIFACT_DRIFT", item["path"])
                 shutil.copyfile(source, staging / f"map.{item['format']}")
-            _atomic_yaml(staging / "delivery-manifest.yaml", manifest)
+            atomic_yaml(staging / "delivery-manifest.yaml", manifest, create_once=False)
             readme = self._readme(manifest)
             (staging / "README.md").write_text(readme, encoding="utf-8", newline="\n")
             checksummed = ["README.md", "delivery-manifest.yaml", "map.pdf", "map.png"]
@@ -313,14 +286,13 @@ class DeliveryRepository:
             target = root / f"map.{item['format']}"
             if file_digest(target) != item["digest"] or target.stat().st_size != item["size_bytes"]:
                 raise ProtocolError("DELIVERY_ARTIFACT_DRIFT", item["path"])
-        notice = "合成数据演示，非真实风险研判"
         readme = (root / "README.md").read_text(encoding="utf-8")
-        if notice not in readme or any(value not in readme for value in manifest["licenses"] + manifest["limitations"]):
+        if any(value not in readme for value in manifest["licenses"] + manifest["limitations"]):
             raise ProtocolError("DELIVERY_LIMITATIONS_MISSING", str(root))
 
     def _build_receipt(self, transaction: dict[str, Any], manifest: dict[str, Any],
                        manifest_ref: dict[str, str], approval_ref: dict[str, str]) -> dict[str, Any]:
-        delivered_at = transaction.get("committed_at") or _now()
+        delivered_at = transaction.get("committed_at") or utc_now()
         return {
             "schema_version": 1,
             "receipt_id": f"delivery-receipt-{transaction['delivery_id'][9:]}",
@@ -357,7 +329,7 @@ class DeliveryRepository:
     def _mark_committed(self, path: Path, transaction: dict[str, Any]) -> dict[str, Any]:
         if transaction["status"] in {"committed", "receipt-written"}:
             return transaction
-        return self._update(path, transaction, status="committed", phase="receipt", committed_at=_now())
+        return self._update(path, transaction, status="committed", phase="receipt", committed_at=utc_now())
 
     def _mark_receipt_written(self, path: Path, transaction: dict[str, Any], receipt: dict[str, Any],
                               receipt_path: Path) -> dict[str, Any]:
@@ -374,9 +346,9 @@ class DeliveryRepository:
         )
 
     def _update(self, path: Path, transaction: dict[str, Any], **changes: Any) -> dict[str, Any]:
-        updated = {**transaction, **changes, "updated_at": _now()}
+        updated = {**transaction, **changes, "updated_at": utc_now()}
         self.registry.validate("delivery-transaction", updated)
-        _atomic_yaml(path, updated)
+        atomic_yaml(path, updated, create_once=False)
         return updated
 
     @staticmethod
@@ -393,11 +365,10 @@ class DeliveryRepository:
         limitations = "\n".join(f"- {item}" for item in manifest["limitations"])
         recipient = manifest["recipient"]
         return (
-            "# Carto Agent 本地演示交付包\n\n"
+            "# Carto Agent 本地交付包\n\n"
             f"接收方：{recipient['recipient_type']} / {recipient['recipient_id']}\n\n"
             "## 许可\n" + licenses + "\n\n"
             "## 限制\n" + limitations + "\n\n"
-            "本包仅用于合成数据工程演示，不代表生产制图或真实风险研判能力。\n"
         )
 
     @staticmethod

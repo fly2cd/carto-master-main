@@ -1,0 +1,273 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/resolved-raster-portrayal.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "kind",
+    "compiler_version",
+    "compiler_digest",
+    "portrayal",
+    "layer_id",
+    "prepared_ref",
+    "expression_ref",
+    "source_snapshot",
+    "context",
+    "lookup_table",
+    "legend_items",
+    "source_mask_policy",
+    "unknown_value_policy",
+    "resampling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "kind": {
+      "const": "resolved-raster-portrayal"
+    },
+    "compiler_version": {
+      "const": "1.0.0"
+    },
+    "compiler_digest": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+    },
+    "portrayal": {
+      "$ref": "https://schemas.carto-agent.local/v1/portrayal.schema.json"
+    },
+    "layer_id": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+    },
+    "prepared_ref": {
+      "allOf": [
+        {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+        },
+        {
+          "required": [
+            "uri"
+          ],
+          "properties": {
+            "id": {
+              "const": "raster-prepared-data"
+            },
+            "version": {
+              "const": "1.0.0"
+            }
+          }
+        }
+      ]
+    },
+    "expression_ref": {
+      "allOf": [
+        {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/mapExpressionRef"
+        },
+        {
+          "properties": {
+            "id": {
+              "const": "raster/categorical"
+            },
+            "version": {
+              "const": "1.0.0"
+            }
+          }
+        }
+      ]
+    },
+    "source_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_ref",
+        "size_bytes"
+      ],
+      "properties": {
+        "artifact_ref": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 268435456
+        }
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "tenant_id",
+        "project_id",
+        "subject_id"
+      ],
+      "properties": {
+        "run_id": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+        },
+        "tenant_id": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+        },
+        "project_id": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+        },
+        "subject_id": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+        }
+      }
+    },
+    "lookup_table": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "value",
+          "display",
+          "label",
+          "color",
+          "order",
+          "include_in_legend"
+        ],
+        "properties": {
+          "value": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 4294967295
+          },
+          "display": {
+            "enum": [
+              "color",
+              "hidden"
+            ]
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^#[0-9A-Fa-f]{6}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1023
+          },
+          "include_in_legend": {
+            "type": "boolean"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "display": {
+                  "const": "hidden"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "color": {
+                  "type": "null"
+                },
+                "include_in_legend": {
+                  "const": false
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "display": {
+                  "const": "color"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256,
+                  "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                },
+                "color": {
+                  "type": "string",
+                  "pattern": "^#[0-9A-F]{6}$"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "legend_items": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "value",
+          "label",
+          "color",
+          "order"
+        ],
+        "properties": {
+          "value": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 4294967295
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1023
+          }
+        }
+      }
+    },
+    "source_mask_policy": {
+      "const": "preserve"
+    },
+    "unknown_value_policy": {
+      "const": "reject"
+    },
+    "resampling": {
+      "const": "nearest"
+    }
+  }
+}

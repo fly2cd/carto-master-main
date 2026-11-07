@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import os
-import tempfile
 from pathlib import Path
 from typing import Any
 
-import yaml
 
+from ..artifacts import artifact_ref, atomic_yaml
 from ..canonical import sha256_digest
 from ..errors import ProtocolError, SecurityError
 from ..schema_registry import SchemaRegistry, load_document
@@ -22,25 +20,6 @@ from .template_brief import build_template_brief
 from .template_validation import TemplatePackageValidator
 
 TOOL_VERSION = "0.2.4"
-
-
-def _atomic_yaml_once(path: Path, value: dict[str, Any]) -> None:
-    if path.exists():
-        if load_document(path) == value:
-            return
-        raise ProtocolError("IMMUTABLE_ARTIFACT_CONFLICT", str(path))
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, name = tempfile.mkstemp(prefix=f".{path.name}-", suffix=".tmp", dir=path.parent)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as stream:
-            yaml.safe_dump(value, stream, allow_unicode=True, sort_keys=False)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(name, path)
-    finally:
-        temporary = Path(name)
-        if temporary.exists():
-            temporary.unlink()
 
 
 class TemplateCreationWorkflow:
@@ -74,11 +53,11 @@ class TemplateCreationWorkflow:
         analysis = self.analyzer.analyze(request, manifest, summaries)
         analysis_path = self.path_guard.resolve(self.work_root / "analysis/template-analysis.yaml")
         snapshot_path = self.path_guard.resolve(self.work_root / "sources/source-manifest.yaml")
-        _atomic_yaml_once(snapshot_path, manifest)
-        _atomic_yaml_once(analysis_path, analysis)
+        atomic_yaml(snapshot_path, manifest)
+        atomic_yaml(analysis_path, analysis)
         refs = [
-            self._artifact_ref("source-manifest-snapshot", manifest, "sources/source-manifest.yaml"),
-            self._artifact_ref("template-analysis", analysis, "analysis/template-analysis.yaml"),
+            artifact_ref("source-manifest-snapshot", manifest, "sources/source-manifest.yaml"),
+            artifact_ref("template-analysis", analysis, "analysis/template-analysis.yaml"),
         ]
         state, receipt = self.state_store.complete_step(
             state,
@@ -102,12 +81,12 @@ class TemplateCreationWorkflow:
         self._verify_last_output("template-analysis", analysis)
         brief = build_template_brief(request, analysis, self.registry)
         brief_path = self.path_guard.resolve(self.work_root / "template_brief.yaml")
-        _atomic_yaml_once(brief_path, brief)
+        atomic_yaml(brief_path, brief)
         state, receipt = self.state_store.complete_step(
             state,
             status="waiting_approval",
             prerequisites={"analysis": analysis},
-            output_refs=[self._artifact_ref("template-brief", brief, "template_brief.yaml")],
+            output_refs=[artifact_ref("template-brief", brief, "template_brief.yaml")],
             tool_versions={"template-brief-builder": TOOL_VERSION},
             next_step="author",
         )
@@ -188,7 +167,7 @@ class TemplateCreationWorkflow:
             context,
             approver_subject_id=request["subject"]["approver_subject_id"],
         )
-        _atomic_yaml_once(approval_copy, approval_value)
+        atomic_yaml(approval_copy, approval_value)
         already_consumed = nonce_store.contains(receipt.issuer, receipt.nonce)
         if already_consumed:
             if not approval_journal_exists:
@@ -474,10 +453,6 @@ class TemplateCreationWorkflow:
         state = self.state_store.load()
         if self.state_store.find_output_digest(artifact_id) != sha256_digest(value):
             raise ProtocolError("JOB_PREREQUISITE_DRIFT", state.run_id)
-
-    @staticmethod
-    def _artifact_ref(artifact_id: str, value: dict[str, Any], uri: str) -> dict[str, str]:
-        return {"id": artifact_id, "version": "1.0.0", "digest": sha256_digest(value), "uri": uri}
 
     @staticmethod
     def _require_step(actual: str, expected: str) -> None:

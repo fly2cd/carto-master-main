@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "kind": "resolved-raster-portrayal",
+  "compiler_version": "1.0.0",
+  "compiler_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+  "portrayal": {
+    "schema_version": 1,
+    "layers": [
+      {
+        "id": "raster-layer",
+        "data_role": "land-cover",
+        "geometry": "raster",
+        "z_order": 0,
+        "map_expression_ref": {
+          "id": "raster/categorical",
+          "version": "1.0.0",
+          "digest": "sha256:4541a292e44cdc48c2a543203757c723ab7d21b705900218da69e5650c675a31"
+        },
+        "value_role": "category-value",
+        "category_mapping": {
+          "method": "unique-values",
+          "definition_source": "prepared-display-contract",
+          "unknown_value_policy": "reject"
+        },
+        "source_mask_policy": "preserve",
+        "resampling": "nearest",
+        "no_data": "transparent"
+      }
+    ],
+    "legend": {
+      "generated_from_layers": true,
+      "show_no_data": false,
+      "overflow_policy": "reject"
+    },
+    "rules": []
+  },
+  "layer_id": "raster-layer",
+  "prepared_ref": {
+    "id": "raster-prepared-data",
+    "version": "1.0.0",
+    "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "uri": "/synthetic/.carto/raster/raster-prepared-data/1111111111111111111111111111111111111111111111111111111111111111.json"
+  },
+  "expression_ref": {
+    "id": "raster/categorical",
+    "version": "1.0.0",
+    "digest": "sha256:4541a292e44cdc48c2a543203757c723ab7d21b705900218da69e5650c675a31"
+  },
+  "source_snapshot": {
+    "artifact_ref": {
+      "id": "source",
+      "version": "1.0.0",
+      "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "uri": "artifacts/source.json"
+    },
+    "size_bytes": 100
+  },
+  "context": {
+    "run_id": "test-run",
+    "tenant_id": "test-tenant",
+    "project_id": "test-project",
+    "subject_id": "test-subject"
+  },
+  "lookup_table": [
+    {
+      "value": 1,
+      "display": "color",
+      "label": "Synthetic class",
+      "color": "#FF0000",
+      "order": 0,
+      "include_in_legend": true
+    }
+  ],
+  "legend_items": [
+    {
+      "value": 1,
+      "label": "Synthetic class",
+      "color": "#FF0000",
+      "order": 0
+    }
+  ],
+  "source_mask_policy": "preserve",
+  "unknown_value_policy": "reject",
+  "resampling": "nearest"
+}

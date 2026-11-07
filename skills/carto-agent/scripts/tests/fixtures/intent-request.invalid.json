@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "text": "Protocol input",
+  "selection": {
+    "business_scene": "government_thematic",
+    "theme_tags": [
+      "economic-development"
+    ],
+    "tasks": [
+      "indicator-map"
+    ],
+    "fields": {
+      "geography": "unit-region",
+      "time": "2026",
+      "source": "user-supplied",
+      "output": "pdf"
+    },
+    "theme": "Legacy free text"
+  }
+}

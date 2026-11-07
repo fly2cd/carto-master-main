@@ -1,0 +1,77 @@
+{
+  "bundle_id": "raster-bundle-995574df7a10892556f30add",
+  "datasets": [
+    {
+      "digest": "sha256:d9c9c7b49d3f0de01d79774e255cd59ac510acdc3565a6a2f763b2dbe3d6a66d",
+      "id": "source",
+      "uri": ".carto/raster/source/d9c9c7b49d3f0de01d79774e255cd59ac510acdc3565a6a2f763b2dbe3d6a66d.tif",
+      "version": "1.0.0"
+    }
+  ],
+  "digest": "sha256:b6b82382cc1ac77e72bac2b3419c0246ca6da1eb2f969492437f057f97e9e938",
+  "open_issues": [],
+  "quality_evidence": [
+    {
+      "digest": "sha256:995574df7a10892556f30add25abbf3ea071305a061edd30dcc1848897c840d1",
+      "id": "raster-prepared-data",
+      "uri": ".carto/raster/raster-prepared-data/995574df7a10892556f30add25abbf3ea071305a061edd30dcc1848897c840d1.json",
+      "version": "1.0.0"
+    }
+  ],
+  "role_bindings": [
+    {
+      "band": 1,
+      "bbox": [
+        500000.0,
+        3999940.0,
+        500090.0,
+        4000000.0
+      ],
+      "crs": {
+        "authority": "EPSG",
+        "code": "26911"
+      },
+      "data_type": "raster",
+      "dataset_ref": {
+        "digest": "sha256:d9c9c7b49d3f0de01d79774e255cd59ac510acdc3565a6a2f763b2dbe3d6a66d",
+        "id": "source",
+        "uri": ".carto/raster/source/d9c9c7b49d3f0de01d79774e255cd59ac510acdc3565a6a2f763b2dbe3d6a66d.tif",
+        "version": "1.0.0"
+      },
+      "height": 2,
+      "prepared_ref": {
+        "digest": "sha256:995574df7a10892556f30add25abbf3ea071305a061edd30dcc1848897c840d1",
+        "id": "raster-prepared-data",
+        "uri": ".carto/raster/raster-prepared-data/995574df7a10892556f30add25abbf3ea071305a061edd30dcc1848897c840d1.json",
+        "version": "1.0.0"
+      },
+      "role": "classified-surface",
+      "width": 3
+    }
+  ],
+  "schema_version": 1,
+  "summary": {
+    "combined_bbox": [
+      500000.0,
+      3999940.0,
+      500090.0,
+      4000000.0
+    ],
+    "data_nature": "synthetic"
+  },
+  "task_ref": {
+    "digest": "sha256:65bc7173b2cbd0b222f76139f263a833a4002be39d7ee6ef5d7f010c873610e1",
+    "id": "raster-classification-request",
+    "uri": ".carto/raster/raster-classification-request/65bc7173b2cbd0b222f76139f263a833a4002be39d7ee6ef5d7f010c873610e1.json",
+    "version": "1.0.0"
+  },
+  "tool_receipts": [
+    {
+      "digest": "sha256:065040cbad8e5c4737be2566c3b6f4c40dfa58f799b7198c1879ac316f1751de",
+      "id": "tool-gis-raster-statistics",
+      "uri": ".carto/geospatial/evidence/tool-gis-raster-statistics/1.0.0/065040cbad8e5c4737be2566c3b6f4c40dfa58f799b7198c1879ac316f1751de.json",
+      "version": "1.0.0"
+    }
+  ],
+  "transformations": []
+}

@@ -1,0 +1,331 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/raster-prepared-data.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "kind",
+    "algorithm_digest",
+    "context",
+    "request",
+    "request_digest",
+    "source_snapshot",
+    "legend_snapshot",
+    "gis_result_ref",
+    "answers",
+    "status",
+    "rows",
+    "questions"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "kind": {
+      "const": "raster-classification-preparation"
+    },
+    "algorithm_digest": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "tenant_id",
+        "project_id",
+        "subject_id"
+      ],
+      "properties": {
+        "run_id": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+        },
+        "tenant_id": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+        },
+        "project_id": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+        },
+        "subject_id": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+        }
+      }
+    },
+    "request": {
+      "$ref": "https://schemas.carto-agent.local/v1/raster-classification-request.schema.json"
+    },
+    "request_digest": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+    },
+    "source_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_ref",
+        "size_bytes"
+      ],
+      "properties": {
+        "artifact_ref": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 268435456
+        }
+      }
+    },
+    "legend_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_ref",
+        "size_bytes"
+      ],
+      "properties": {
+        "artifact_ref": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1048576
+        }
+      }
+    },
+    "gis_result_ref": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+    },
+    "answers": {
+      "anyOf": [
+        {
+          "$ref": "https://schemas.carto-agent.local/v1/raster-classification-answers.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "needs-clarification"
+      ]
+    },
+    "rows": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "value",
+          "count",
+          "semantic",
+          "display",
+          "label",
+          "color",
+          "order",
+          "include_in_legend"
+        ],
+        "properties": {
+          "value": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 4294967295
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 16000000
+          },
+          "semantic": {
+            "enum": [
+              null,
+              "class",
+              "background",
+              "nodata"
+            ]
+          },
+          "display": {
+            "enum": [
+              null,
+              "color",
+              "hidden"
+            ]
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^#[0-9A-Fa-f]{6}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1023
+          },
+          "include_in_legend": {
+            "type": "boolean"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "display": {
+                  "const": "hidden"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "color": {
+                  "type": "null"
+                },
+                "include_in_legend": {
+                  "const": false
+                }
+              }
+            }
+          }
+        ]
+      },
+      "minItems": 1
+    },
+    "questions": {
+      "type": "array",
+      "maxItems": 1024,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "question_id",
+          "kind",
+          "value",
+          "observed_count",
+          "message"
+        ],
+        "properties": {
+          "question_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          },
+          "kind": {
+            "enum": [
+              "unmapped-value",
+              "missing-label",
+              "missing-color"
+            ]
+          },
+          "value": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 4294967295
+          },
+          "observed_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 16000000
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "ready"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "questions": {
+            "maxItems": 0
+          },
+          "rows": {
+            "items": {
+              "properties": {
+                "semantic": {
+                  "enum": [
+                    "class",
+                    "background",
+                    "nodata"
+                  ]
+                },
+                "display": {
+                  "enum": [
+                    "color",
+                    "hidden"
+                  ]
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "display": {
+                        "const": "color"
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "color": {
+                        "type": "string",
+                        "pattern": "^#[0-9A-Fa-f]{6}$"
+                      },
+                      "label": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256,
+                        "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "questions": {
+            "minItems": 1
+          }
+        }
+      }
+    }
+  ]
+}

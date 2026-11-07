@@ -3,77 +3,26 @@
   "$id": "https://schemas.carto-agent.local/v1/portrayal.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "layers", "legend", "rules"],
+  "required": [
+    "schema_version",
+    "layers",
+    "legend",
+    "rules"
+  ],
   "properties": {
-    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
+    "schema_version": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"
+    },
     "layers": {
       "type": "array",
       "minItems": 1,
       "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["id", "data_role", "geometry", "z_order", "map_expression_ref", "value_role", "symbol", "no_data"],
-        "properties": {
-          "id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
-          "data_role": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
-          "geometry": {"enum": ["point", "polygon"]},
-          "z_order": {"type": "integer", "minimum": -1000, "maximum": 1000},
-          "map_expression_ref": {
-            "allOf": [
-              {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/mapExpressionRef"},
-              {"properties": {"id": {"enum": ["choropleth/sequential", "proportional-symbol/count"]}, "version": {"const": "1.0.0"}}}
-            ]
-          },
-          "value_role": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
-          "symbol": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["catalog_ref", "parameters"],
-            "properties": {
-              "catalog_ref": {"type": "string", "pattern": "^[a-z][a-z0-9-]*/[a-z][a-z0-9-]*@[0-9]+\\.[0-9]+\\.[0-9]+$"},
-              "parameters": {"type": "object", "maxProperties": 20, "additionalProperties": {"type": ["string", "number", "boolean"]}}
-            }
-          },
-          "classification": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["method", "classes", "field_role"],
-            "properties": {
-              "method": {"enum": ["equal-interval", "quantile", "jenks", "manual"]},
-              "classes": {"type": "integer", "minimum": 2, "maximum": 12},
-              "field_role": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"}
-            }
-          },
-          "scaling": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["method", "field_role", "minimum_size_mm", "maximum_size_mm"],
-            "properties": {
-              "method": {"const": "area-proportional"},
-              "field_role": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
-              "minimum_size_mm": {"type": "number", "exclusiveMinimum": 0},
-              "maximum_size_mm": {"type": "number", "exclusiveMinimum": 0}
-            }
-          },
-          "label": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["field_role", "priority"],
-            "properties": {
-              "field_role": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
-              "priority": {"type": "integer", "minimum": 0, "maximum": 100}
-            }
-          },
-          "no_data": {"enum": ["explicit-symbol", "transparent", "omit-with-note"]}
-        },
-        "allOf": [
+        "oneOf": [
           {
-            "if": {"properties": {"map_expression_ref": {"properties": {"id": {"const": "choropleth/sequential"}}}}},
-            "then": {"properties": {"geometry": {"const": "polygon"}}, "required": ["classification"], "not": {"required": ["scaling"]}}
+            "$ref": "#/$defs/vectorLayer"
           },
           {
-            "if": {"properties": {"map_expression_ref": {"properties": {"id": {"const": "proportional-symbol/count"}}}}},
-            "then": {"properties": {"geometry": {"const": "point"}}, "required": ["scaling"], "not": {"required": ["classification"]}}
+            "$ref": "#/$defs/rasterLayer"
           }
         ]
       }
@@ -81,13 +30,370 @@
     "legend": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["generated_from_layers", "show_no_data", "overflow_policy"],
+      "required": [
+        "generated_from_layers",
+        "show_no_data",
+        "overflow_policy"
+      ],
       "properties": {
-        "generated_from_layers": {"type": "boolean"},
-        "show_no_data": {"type": "boolean"},
-        "overflow_policy": {"enum": ["truncate-with-note", "paginate", "reject"]}
+        "generated_from_layers": {
+          "type": "boolean"
+        },
+        "show_no_data": {
+          "type": "boolean"
+        },
+        "overflow_policy": {
+          "enum": [
+            "truncate-with-note",
+            "paginate",
+            "reject"
+          ]
+        }
       }
     },
-    "rules": {"type": "array", "items": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/rule"}}
-  }
+    "rules": {
+      "type": "array",
+      "items": {
+        "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/rule"
+      }
+    }
+  },
+  "$defs": {
+    "vectorLayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "data_role",
+        "geometry",
+        "z_order",
+        "map_expression_ref",
+        "value_role",
+        "symbol",
+        "no_data"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+        },
+        "data_role": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+        },
+        "geometry": {
+          "enum": [
+            "point",
+            "polygon"
+          ]
+        },
+        "z_order": {
+          "type": "integer",
+          "minimum": -1000,
+          "maximum": 1000
+        },
+        "map_expression_ref": {
+          "allOf": [
+            {
+              "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/mapExpressionRef"
+            },
+            {
+              "properties": {
+                "id": {
+                  "enum": [
+                    "choropleth/sequential",
+                    "proportional-symbol/count"
+                  ]
+                },
+                "version": {
+                  "const": "1.0.0"
+                }
+              }
+            }
+          ]
+        },
+        "value_role": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+        },
+        "symbol": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "catalog_ref",
+            "parameters"
+          ],
+          "properties": {
+            "catalog_ref": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]*/[a-z][a-z0-9-]*@[0-9]+\\.[0-9]+\\.[0-9]+$"
+            },
+            "parameters": {
+              "type": "object",
+              "maxProperties": 20,
+              "additionalProperties": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ]
+              }
+            }
+          }
+        },
+        "classification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "method",
+            "classes",
+            "field_role"
+          ],
+          "properties": {
+            "method": {
+              "enum": [
+                "equal-interval",
+                "quantile",
+                "jenks",
+                "manual"
+              ]
+            },
+            "classes": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 12
+            },
+            "field_role": {
+              "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+            }
+          }
+        },
+        "scaling": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "method",
+            "field_role",
+            "minimum_size_mm",
+            "maximum_size_mm"
+          ],
+          "properties": {
+            "method": {
+              "const": "area-proportional"
+            },
+            "field_role": {
+              "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+            },
+            "minimum_size_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "maximum_size_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "label": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "field_role",
+            "priority"
+          ],
+          "properties": {
+            "field_role": {
+              "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+            },
+            "priority": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            }
+          }
+        },
+        "no_data": {
+          "enum": [
+            "explicit-symbol",
+            "transparent",
+            "omit-with-note"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "map_expression_ref": {
+                "properties": {
+                  "id": {
+                    "const": "choropleth/sequential"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "geometry": {
+                "const": "polygon"
+              }
+            },
+            "required": [
+              "classification"
+            ],
+            "not": {
+              "required": [
+                "scaling"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "map_expression_ref": {
+                "properties": {
+                  "id": {
+                    "const": "proportional-symbol/count"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "geometry": {
+                "const": "point"
+              }
+            },
+            "required": [
+              "scaling"
+            ],
+            "not": {
+              "required": [
+                "classification"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "rasterLayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "data_role",
+        "geometry",
+        "z_order",
+        "map_expression_ref",
+        "value_role",
+        "category_mapping",
+        "source_mask_policy",
+        "resampling",
+        "no_data"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+        },
+        "data_role": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+        },
+        "geometry": {
+          "const": "raster"
+        },
+        "z_order": {
+          "type": "integer",
+          "minimum": -1000,
+          "maximum": 1000
+        },
+        "map_expression_ref": {
+          "allOf": [
+            {
+              "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/mapExpressionRef"
+            },
+            {
+              "properties": {
+                "id": {
+                  "const": "raster/categorical"
+                },
+                "version": {
+                  "const": "1.0.0"
+                }
+              }
+            }
+          ]
+        },
+        "value_role": {
+          "const": "category-value"
+        },
+        "category_mapping": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "method",
+            "definition_source",
+            "unknown_value_policy"
+          ],
+          "properties": {
+            "method": {
+              "const": "unique-values"
+            },
+            "definition_source": {
+              "const": "prepared-display-contract"
+            },
+            "unknown_value_policy": {
+              "const": "reject"
+            }
+          }
+        },
+        "source_mask_policy": {
+          "const": "preserve"
+        },
+        "resampling": {
+          "const": "nearest"
+        },
+        "no_data": {
+          "const": "transparent"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "layers": {
+            "contains": {
+              "type": "object",
+              "required": [
+                "geometry"
+              ],
+              "properties": {
+                "geometry": {
+                  "const": "raster"
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "legend": {
+            "properties": {
+              "generated_from_layers": {
+                "const": true
+              },
+              "show_no_data": {
+                "const": false
+              },
+              "overflow_policy": {
+                "const": "reject"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

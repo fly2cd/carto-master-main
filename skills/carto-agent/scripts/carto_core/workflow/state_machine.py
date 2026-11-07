@@ -2,16 +2,15 @@ from __future__ import annotations
 
 import json
 import os
-import tempfile
 import threading
 import time
 from contextlib import contextmanager
 from dataclasses import replace
-from datetime import UTC, datetime
 from functools import wraps
 from pathlib import Path
 from typing import Any, Callable, Iterator, TypeVar
 
+from ..artifacts import atomic_json, utc_now
 from ..canonical import sha256_digest
 from ..errors import ProtocolError
 from ..schema_registry import SchemaRegistry
@@ -19,26 +18,6 @@ from .models import JobState, StepReceipt
 
 
 F = TypeVar("F", bound=Callable[..., Any])
-
-
-def _now() -> str:
-    return datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
-
-
-def _atomic_json(path: Path, value: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, name = tempfile.mkstemp(prefix=f".{path.name}-", suffix=".tmp", dir=path.parent)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as stream:
-            json.dump(value, stream, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-            stream.write("\n")
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(name, path)
-    finally:
-        temporary = Path(name)
-        if temporary.exists():
-            temporary.unlink()
 
 
 def _create_json_once(path: Path, value: dict[str, Any]) -> None:
@@ -50,7 +29,7 @@ def _create_json_once(path: Path, value: dict[str, Any]) -> None:
         if existing != value:
             raise ProtocolError("IMMUTABLE_ARTIFACT_CONFLICT", str(path))
         return
-    _atomic_json(path, value)
+    atomic_json(path, value, create_once=False)
 
 
 class _RunFileLock:
@@ -142,7 +121,7 @@ class WorkflowStateStore:
             if depth == 0:
                 lock = _RunFileLock(self.lock_path, self.lock_timeout_seconds)
                 lock.acquire()
-                self._local.started_at = _now()
+                self._local.started_at = utc_now()
                 self._local.lock = lock
             self._local.depth = depth + 1
             try:
@@ -203,7 +182,7 @@ class WorkflowStateStore:
             self._recover_unlocked()
             current = self._read_state_unlocked()
             self._require_current(state, current)
-            completed_at = _now()
+            completed_at = utc_now()
             started_at = getattr(self._local, "started_at", None) or completed_at
             body = {
                 "run_id": state.run_id,
@@ -253,7 +232,7 @@ class WorkflowStateStore:
             }
             self.registry.validate("job-state", new_state.to_dict())
             self.registry.validate("state-transition", transition)
-            _atomic_json(self.transition_path, transition)
+            atomic_json(self.transition_path, transition, create_once=False)
             _create_json_once(self.run_root / relative, receipt_value)
             self._write_state_unlocked(new_state)
             self.transition_path.unlink()
@@ -375,4 +354,4 @@ class WorkflowStateStore:
     def _write_state_unlocked(self, state: JobState) -> None:
         value = state.to_dict()
         self.registry.validate("job-state", value)
-        _atomic_json(self.state_path, value)
+        atomic_json(self.state_path, value, create_once=False)

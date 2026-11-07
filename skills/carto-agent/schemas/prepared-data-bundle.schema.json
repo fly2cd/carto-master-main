@@ -63,65 +63,132 @@
       "type": "array",
       "minItems": 1,
       "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "role",
-          "dataset_ref",
-          "prepared_ref",
-          "geometry_types",
-          "semantic_fields",
-          "feature_count",
-          "bbox",
-          "crs",
-          "observed_at",
-          "join_coverage"
-        ],
-        "properties": {
-          "role": {
-            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
-          },
-          "dataset_ref": {
-            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
-          },
-          "prepared_ref": {
-            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
-          },
-          "geometry_types": {
-            "type": "array",
-            "minItems": 1,
-            "uniqueItems": true,
-            "items": {
-              "type": "string"
-            }
-          },
-          "semantic_fields": {
+        "oneOf": [
+          {
             "type": "object",
-            "minProperties": 1,
-            "additionalProperties": {
-              "type": "string",
-              "minLength": 1
+            "additionalProperties": false,
+            "required": [
+              "role",
+              "dataset_ref",
+              "prepared_ref",
+              "geometry_types",
+              "semantic_fields",
+              "feature_count",
+              "bbox",
+              "crs",
+              "observed_at",
+              "join_coverage"
+            ],
+            "properties": {
+              "role": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+              },
+              "dataset_ref": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+              },
+              "prepared_ref": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+              },
+              "geometry_types": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string"
+                }
+              },
+              "semantic_fields": {
+                "type": "object",
+                "minProperties": 1,
+                "additionalProperties": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "feature_count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "bbox": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/bbox"
+              },
+              "crs": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/crs"
+              },
+              "observed_at": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/timestamp"
+              },
+              "join_coverage": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
             }
           },
-          "feature_count": {
-            "type": "integer",
-            "minimum": 1
-          },
-          "bbox": {
-            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/bbox"
-          },
-          "crs": {
-            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/crs"
-          },
-          "observed_at": {
-            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/timestamp"
-          },
-          "join_coverage": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 1
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "data_type",
+              "role",
+              "dataset_ref",
+              "prepared_ref",
+              "band",
+              "bbox",
+              "crs",
+              "width",
+              "height"
+            ],
+            "properties": {
+              "data_type": {
+                "const": "raster"
+              },
+              "role": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+              },
+              "dataset_ref": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+              },
+              "prepared_ref": {
+                "allOf": [
+                  {
+                    "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+                  },
+                  {
+                    "required": [
+                      "uri"
+                    ],
+                    "properties": {
+                      "id": {
+                        "const": "raster-prepared-data"
+                      },
+                      "version": {
+                        "const": "1.0.0"
+                      }
+                    }
+                  }
+                ]
+              },
+              "band": {
+                "const": 1
+              },
+              "bbox": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/bbox"
+              },
+              "crs": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/crs"
+              },
+              "width": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
           }
-        }
+        ]
       }
     },
     "summary": {
@@ -136,7 +203,8 @@
           "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/bbox"
         },
         "data_nature": {
-          "const": "synthetic"
+          "type": "string",
+          "minLength": 1
         }
       }
     }

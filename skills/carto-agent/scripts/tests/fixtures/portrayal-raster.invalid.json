@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "layers": [
+    {
+      "id": "raster-layer",
+      "data_role": "land-cover",
+      "geometry": "raster",
+      "z_order": 0,
+      "map_expression_ref": {
+        "id": "raster/categorical",
+        "version": "1.0.0",
+        "digest": "sha256:4541a292e44cdc48c2a543203757c723ab7d21b705900218da69e5650c675a31"
+      },
+      "value_role": "category-value",
+      "category_mapping": {
+        "method": "unique-values",
+        "definition_source": "prepared-display-contract",
+        "unknown_value_policy": "reject"
+      },
+      "source_mask_policy": "preserve",
+      "resampling": "nearest",
+      "no_data": "transparent",
+      "classification": {
+        "method": "jenks",
+        "classes": 5,
+        "field_role": "category-value"
+      }
+    }
+  ],
+  "legend": {
+    "generated_from_layers": true,
+    "show_no_data": false,
+    "overflow_policy": "reject"
+  },
+  "rules": []
+}

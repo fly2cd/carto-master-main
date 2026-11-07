@@ -1,2 +1,6 @@
 jsonschema[format]>=4.23,<5
 PyYAML>=6.0.2,<7
+
+# Optional MCP client: see requirements-geospatial.txt / root [geospatial] extra.
+
+# Optional static raster renderer: requirements-raster-rendering.txt / [raster-rendering].

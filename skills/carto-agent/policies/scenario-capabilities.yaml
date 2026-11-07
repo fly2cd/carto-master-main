@@ -1,0 +1,48 @@
+schema_version: 1
+version: 1.3.0
+default: deny
+# Admission is default-deny: only profiles listed here (with a whitelisted code
+# implementation) enable create-template/generate-map. Data types, expressions and
+# backends are not business scenes; this profile registers one statable purpose
+# (standard thematic mapping) at the same level as the catalogued purpose scenes.
+profiles:
+  - id: general-thematic-mapping
+    version: 1.0.0
+    implementation: general-thematic-raster
+    template:
+      kind: map-scenario
+      id: general-thematic-map
+      version: 1.0.0
+    authoring_profile: general-thematic-authoring
+    request_schemas:
+      create-template: general-thematic-template-create-request
+      generate-map: general-thematic-generate-request
+    intent_constraints:
+      business_scene: general_thematic_mapping
+      allowed_tasks:
+        - thematic-map
+      allowed_theme_tags:
+        - administrative-division
+        - economic-development
+        - technology-innovation
+        - modern-industry
+        - opening-up
+        - culture-tourism
+        - transportation
+        - landslide
+        - flood
+        - forest-fire
+        - land-cover
+      required_theme_tags: []
+    data_nature: user-provided
+    production_enabled: false
+    notice: "通用专题图：依据用户提供的数据编制，未经业务审定"
+    licenses:
+      - user-declared-source-license
+    output_profile:
+      width_mm: 297
+      height_mm: 210
+      dpi: 300
+      width_px: 3508
+      height_px: 2480
+    internal_field_names: []

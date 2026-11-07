@@ -10,7 +10,8 @@ from ..canonical import sha256_digest
 from ..errors import ProtocolError
 from ..schema_registry import SchemaRegistry, load_document
 from ..security.paths import PathGuard
-from .template_repository import TemplateRepository, _file_digest
+from ..artifacts import file_digest
+from .template_repository import TemplateRepository
 
 
 class ProjectTemplateInstaller:
@@ -77,9 +78,9 @@ class ProjectTemplateInstaller:
         checksum_path = root / "checksums.sha256"
         if not manifest_path.is_file() or not checksum_path.is_file():
             raise ProtocolError("TEMPLATE_INSTALL_INCOMPLETE", str(root))
-        if _file_digest(manifest_path) != entry["manifest_digest"]:
+        if file_digest(manifest_path) != entry["manifest_digest"]:
             raise ProtocolError("TEMPLATE_INSTALL_MANIFEST_DRIFT", str(root))
-        if _file_digest(checksum_path) != entry["digest"]:
+        if file_digest(checksum_path) != entry["digest"]:
             raise ProtocolError("TEMPLATE_INSTALL_PACKAGE_DRIFT", str(root))
         manifest = load_document(manifest_path)
         self.registry.validate("manifest", manifest)
@@ -88,5 +89,5 @@ class ProjectTemplateInstaller:
         if expected != actual:
             raise ProtocolError("TEMPLATE_INSTALL_FILE_SET_DRIFT", str(root))
         for relative, digest in manifest["checksums"].items():
-            if _file_digest(root / relative) != digest:
+            if file_digest(root / relative) != digest:
                 raise ProtocolError("TEMPLATE_INSTALL_FILE_DRIFT", relative)

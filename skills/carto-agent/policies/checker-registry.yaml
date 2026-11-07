@@ -1,6 +1,6 @@
 schema_version: 1
 registry_id: carto-checkers
-version: 1.1.0
+version: 1.3.0
 unknown_checker: reject
 checks:
   - id: protocol.schema-valid
@@ -67,19 +67,19 @@ checks:
     repair_owner: cartography
     implementation: registered:final_layout_elements
   - id: final.legend-semantics
-    version: 1.0.0
+    version: 1.1.0
     phase: final-check
     strength: hard_rule
     failure_severity: error
     repair_owner: cartography
     implementation: registered:final_legend_semantics
-  - id: final.synthetic-notice
+  - id: final.scenario-notice
     version: 1.0.0
     phase: final-check
     strength: hard_rule
     failure_severity: blocker
     repair_owner: cartography
-    implementation: registered:final_synthetic_notice
+    implementation: registered:final_scenario_notice
   - id: final.render-binding
     version: 1.0.0
     phase: final-check
@@ -101,3 +101,66 @@ checks:
     failure_severity: warning
     repair_owner: renderer
     implementation: registered:final_renderer_warnings
+  - id: cartography.legend-consistency
+    version: 1.0.0
+    phase: candidate-check
+    strength: hard_rule
+    failure_severity: error
+    repair_owner: cartography
+    implementation: registered:cartography_legend_consistency
+  - id: raster.classification-clarified
+    version: 1.0.0
+    phase: candidate-check
+    strength: hard_rule
+    failure_severity: blocker
+    repair_owner: caller
+    implementation: registered:raster_classification_clarified
+  - id: template.package-closed
+    version: 1.3.0
+    phase: template-validate
+    strength: hard_rule
+    failure_severity: blocker
+    repair_owner: template-author
+    implementation: registered:template_package_closed
+  - id: template.schema-valid
+    version: 1.3.0
+    phase: template-validate
+    strength: hard_rule
+    failure_severity: blocker
+    repair_owner: template-author
+    implementation: registered:template_schema_valid
+  - id: template.dependencies-pinned
+    version: 1.3.0
+    phase: template-validate
+    strength: hard_rule
+    failure_severity: blocker
+    repair_owner: template-author
+    implementation: registered:template_dependencies_pinned
+  - id: template.kind-ownership
+    version: 1.3.0
+    phase: template-validate
+    strength: hard_rule
+    failure_severity: error
+    repair_owner: template-author
+    implementation: registered:template_kind_ownership
+  - id: template.semantic-contracts
+    version: 1.3.0
+    phase: template-validate
+    strength: hard_rule
+    failure_severity: error
+    repair_owner: template-author
+    implementation: registered:template_semantic_contracts
+  - id: template.target-capability
+    version: 1.3.0
+    phase: template-validate
+    strength: hard_rule
+    failure_severity: error
+    repair_owner: template-author
+    implementation: registered:template_target_capability
+  - id: template.fixture-render
+    version: 1.3.0
+    phase: template-validate
+    strength: hard_rule
+    failure_severity: blocker
+    repair_owner: template-author
+    implementation: registered:template_fixture_render

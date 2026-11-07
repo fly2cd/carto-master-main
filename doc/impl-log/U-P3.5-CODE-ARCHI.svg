@@ -1,0 +1,186 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1000" viewBox="0 0 1280 1000" font-family="Segoe UI, Microsoft YaHei, Noto Sans CJK SC, sans-serif">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6472"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1280" height="1000" fill="#ffffff"/>
+  <text x="40" y="36" font-size="20" font-weight="bold" fill="#1f2328">Carto Master 代码架构:纵向能力分层 × 横向业务场景扩展</text>
+  <text x="40" y="58" font-size="11.5" fill="#555b63">依据 skills/carto-agent/ 当前实现(分支 U-P3.5,2026-11-05,含 raster-portrayal stage3b1);虚线 = 未开放 / 未注册;红字 = 当前空登记</text>
+  <text transform="rotate(-90 22 520)" x="22" y="520" font-size="11" fill="#5b6472">纵轴:能力分层(上=入口,下=底座)</text>
+
+  <!-- L1 宿主与入口层 -->
+  <rect x="40" y="80" width="1200" height="64" rx="10" fill="#f7f8fa" stroke="#d3d8e0"/>
+  <text x="56" y="116" font-size="13" font-weight="bold" fill="#1f2328">宿主与入口层</text>
+  <rect x="170" y="96" width="290" height="32" rx="6" fill="#eef4ee" stroke="#7fa37f"/>
+  <text x="315" y="116" font-size="11" text-anchor="middle" fill="#1f2328">VS Code IDE 宿主(Codex / Claude Code)</text>
+  <rect x="470" y="96" width="130" height="32" rx="6" fill="#eef4ee" stroke="#7fa37f"/>
+  <text x="535" y="116" font-size="11" text-anchor="middle" fill="#1f2328">Hermes 宿主</text>
+  <rect x="610" y="96" width="300" height="32" rx="6" fill="#eef4ee" stroke="#7fa37f"/>
+  <text x="760" y="116" font-size="11" text-anchor="middle" fill="#1f2328">唯一 CLI carto.py(安装名 carto)</text>
+  <rect x="920" y="96" width="300" height="32" rx="6" fill="#eef4ee" stroke="#7fa37f"/>
+  <text x="1070" y="116" font-size="11" text-anchor="middle" fill="#1f2328">environment probe-renderer / probe-host</text>
+
+  <line x1="640" y1="145" x2="640" y2="156" stroke="#5b6472" stroke-width="1.6" marker-end="url(#ar)"/>
+
+  <!-- L2 路由与编排层 -->
+  <rect x="40" y="158" width="1200" height="112" rx="10" fill="#f7f8fa" stroke="#d3d8e0"/>
+  <text x="56" y="182" font-size="13" font-weight="bold" fill="#1f2328">路由与编排层</text>
+  <rect x="170" y="172" width="250" height="48" rx="6" fill="#eef1fb" stroke="#7a89c9"/>
+  <text x="295" y="190" font-size="11" font-weight="bold" text-anchor="middle" fill="#1f2328">create-template</text>
+  <text x="295" y="206" font-size="9.5" text-anchor="middle" fill="#3c4350">analyze→brief→author→validate→publish(T1/TP)</text>
+  <rect x="430" y="172" width="440" height="48" rx="6" fill="#eef1fb" stroke="#7a89c9"/>
+  <text x="650" y="190" font-size="11" font-weight="bold" text-anchor="middle" fill="#1f2328">generate-map</text>
+  <text x="650" y="206" font-size="9.5" text-anchor="middle" fill="#3c4350">intake→brief→compile→preview→freeze→render→check→deliver(G1/G2/G3)</text>
+  <rect x="880" y="172" width="160" height="48" rx="6" fill="#fafbfc" stroke="#b0b7c3" stroke-dasharray="5 3"/>
+  <text x="960" y="190" font-size="11" font-weight="bold" text-anchor="middle" fill="#8a919c">edit-native-map</text>
+  <text x="960" y="206" font-size="9.5" text-anchor="middle" fill="#8a919c">未开放</text>
+  <rect x="1050" y="172" width="170" height="48" rx="6" fill="#fafbfc" stroke="#b0b7c3" stroke-dasharray="5 3"/>
+  <text x="1135" y="190" font-size="11" font-weight="bold" text-anchor="middle" fill="#8a919c">curate-catalog</text>
+  <text x="1135" y="206" font-size="9.5" text-anchor="middle" fill="#8a919c">未开放</text>
+  <rect x="170" y="228" width="1050" height="26" rx="6" fill="#ffffff" stroke="#c6ccd6"/>
+  <text x="695" y="245" font-size="10.5" text-anchor="middle" fill="#3c4350">运行闭环:运行级单写锁 · 单调 revision/CAS · 不可变步骤回执 · transition journal · status / retry / receipts / delivery-status</text>
+
+  <line x1="640" y1="271" x2="640" y2="282" stroke="#5b6472" stroke-width="1.6" marker-end="url(#ar)"/>
+
+  <!-- L3 协议与 Schema 层 -->
+  <rect x="40" y="284" width="1200" height="64" rx="10" fill="#f7f8fa" stroke="#d3d8e0"/>
+  <text x="56" y="308" font-size="13" font-weight="bold" fill="#1f2328">协议与 Schema 层</text>
+  <text x="170" y="306" font-size="11" fill="#3c4350">schemas/(Draft 2020-12,未知字段拒绝):map-intent · map-brief · map-plan · source-manifest · prepared-data-bundle · resolved-map · resolved-layout</text>
+  <text x="170" y="324" font-size="11" fill="#3c4350">layout · render-scene · map-expression · formal-render-evidence · delivery-manifest · template-brief / template-analysis · scenario … + 意图契约(evidence_refs 三段绑定)</text>
+
+  <line x1="640" y1="349" x2="640" y2="360" stroke="#5b6472" stroke-width="1.6" marker-end="url(#ar)"/>
+
+  <!-- L4 策略与准入层 -->
+  <rect x="40" y="362" width="1200" height="76" rx="10" fill="#f7f8fa" stroke="#d3d8e0"/>
+  <text x="56" y="386" font-size="13" font-weight="bold" fill="#1f2328">策略与准入层</text>
+  <rect x="170" y="374" width="200" height="26" rx="6" fill="#fff6e5" stroke="#d0a94f"/>
+  <text x="270" y="391" font-size="10.5" text-anchor="middle" fill="#3c4350">intent-profiles.yaml 意图词表</text>
+  <rect x="380" y="374" width="270" height="26" rx="6" fill="#fff6e5" stroke="#d0a94f"/>
+  <text x="515" y="391" font-size="10.5" text-anchor="middle" fill="#b4232a">scenario-capabilities.yaml profiles: [] · deny</text>
+  <rect x="660" y="374" width="230" height="26" rx="6" fill="#fff6e5" stroke="#d0a94f"/>
+  <text x="775" y="391" font-size="10.5" text-anchor="middle" fill="#3c4350">checker-registry.yaml unknown=reject</text>
+  <rect x="900" y="374" width="320" height="26" rx="6" fill="#fff6e5" stroke="#d0a94f"/>
+  <text x="1060" y="391" font-size="10.5" text-anchor="middle" fill="#3c4350">map-expression-catalog v1.1.0:面·点·raster/categorical</text>
+  <rect x="170" y="404" width="150" height="26" rx="6" fill="#fff6e5" stroke="#d0a94f"/>
+  <text x="245" y="421" font-size="10.5" text-anchor="middle" fill="#3c4350">tool-bindings.yaml</text>
+  <rect x="330" y="404" width="160" height="26" rx="6" fill="#fff6e5" stroke="#d0a94f"/>
+  <text x="410" y="421" font-size="10.5" text-anchor="middle" fill="#3c4350">scope-baseline.yaml</text>
+  <rect x="500" y="404" width="430" height="26" rx="6" fill="#fff6e5" stroke="#d0a94f"/>
+  <text x="715" y="421" font-size="10.5" text-anchor="middle" fill="#b4232a">ScenarioRegistry 代码白名单 _COMPONENTS = {} · SchemaRegistry</text>
+  <rect x="940" y="404" width="280" height="26" rx="6" fill="#fafbfc" stroke="#b0b7c3" stroke-dasharray="5 3"/>
+  <text x="1080" y="421" font-size="10.5" text-anchor="middle" fill="#b4232a">词表 / 表达已登记 ≠ 能力已开放</text>
+
+  <line x1="640" y1="439" x2="640" y2="450" stroke="#5b6472" stroke-width="1.6" marker-end="url(#ar)"/>
+
+  <!-- L5 通用内核层 -->
+  <rect x="40" y="452" width="1200" height="104" rx="10" fill="#f7f8fa" stroke="#d3d8e0"/>
+  <text x="56" y="476" font-size="13" font-weight="bold" fill="#1f2328">通用内核层</text>
+  <text x="56" y="492" font-size="10" fill="#6b7280">(共享,不嵌业务)</text>
+  <rect x="170" y="464" width="300" height="80" rx="6" fill="#e8f0fb" stroke="#6f93c4"/>
+  <text x="180" y="482" font-size="10.5" font-weight="bold" fill="#1f2328">workflow/ 编排与阶段</text>
+  <text x="180" y="498" font-size="10" fill="#3c4350">状态机 · 审批协调 · 准备/规划/预览/渲染/终检/交付</text>
+  <text x="180" y="514" font-size="10" fill="#3c4350">栅格冻结: raster_preparation · raster_bundle</text>
+  <text x="180" y="530" font-size="10" fill="#3c4350">模板线: template_* 编排</text>
+  <rect x="480" y="464" width="240" height="80" rx="6" fill="#e8f0fb" stroke="#6f93c4"/>
+  <text x="490" y="482" font-size="10.5" font-weight="bold" fill="#1f2328">compiler/ 冻结期编译</text>
+  <text x="490" y="498" font-size="10" fill="#3c4350">候选 map_candidate · 锁 map_lock</text>
+  <text x="490" y="514" font-size="10" fill="#3c4350">布局 layout(mm→px) · 场景 raster_scene</text>
+  <text x="490" y="530" font-size="10" fill="#3c4350">raster_portrayal → portrayal_ref(表达冻结)</text>
+  <rect x="730" y="464" width="280" height="80" rx="6" fill="#e8f0fb" stroke="#6f93c4"/>
+  <text x="740" y="482" font-size="10.5" font-weight="bold" fill="#1f2328">adapters/ 外部边界(唯一触外包)</text>
+  <text x="740" y="498" font-size="10" fill="#3c4350">数据: mcp_stdio ↔ geospatial-mcp 0.3.0</text>
+  <text x="740" y="514" font-size="10" fill="#3c4350">渲染后端: 受控浏览器 ‖ Rasterio+Matplotlib</text>
+  <text x="740" y="530" font-size="10" fill="#3c4350">ToolGateway · svg_compositor · 探针</text>
+  <rect x="1020" y="464" width="200" height="80" rx="6" fill="#e8f0fb" stroke="#6f93c4"/>
+  <text x="1030" y="482" font-size="10.5" font-weight="bold" fill="#1f2328">repository/ 不可变仓库</text>
+  <text x="1030" y="498" font-size="10" fill="#3c4350">模板仓库/权威索引 · 安装器</text>
+  <text x="1030" y="514" font-size="10" fill="#3c4350">immutable_store · staging/delivery</text>
+  <text x="1030" y="530" font-size="10" fill="#3c4350">受信目录: map_expression_catalog</text>
+  <text x="170" y="552" font-size="9.5" fill="#6b7280">栅格渲染链是横切流而非独立模块: workflow(raster_preparation)→compiler(raster_portrayal)→adapters(raster_*_renderer)→map_final_check</text>
+
+  <line x1="640" y1="557" x2="640" y2="568" stroke="#5b6472" stroke-width="1.6" marker-end="url(#ar)"/>
+  <text x="652" y="566" font-size="10" fill="#5b6472">组件接口仅经代码白名单(_COMPONENTS)分派</text>
+
+  <!-- L6 场景扩展层(横轴) -->
+  <rect x="40" y="570" width="1200" height="300" rx="10" fill="#f7f8fa" stroke="#d3d8e0"/>
+  <text x="56" y="594" font-size="13" font-weight="bold" fill="#1f2328">场景扩展层</text>
+  <text x="1224" y="588" font-size="9.5" text-anchor="end" fill="#6b7280">横轴 = 业务用途;分类栅格 / 表达 / 后端属共享层,不占场景列(stage3b1 四分离)</text>
+  <text x="1224" y="600" font-size="9.5" text-anchor="end" fill="#6b7280">八组件挂钩内核阶段:来源准入@intake/brief · 作者/验证@create-template · 准备/规划/编译@compile · 图例@check</text>
+
+  <!-- 列 A -->
+  <rect x="170" y="604" width="240" height="32" rx="6" fill="#f3f4f6" stroke="#9aa2ad" stroke-dasharray="5 3"/>
+  <text x="290" y="618" font-size="11" font-weight="bold" text-anchor="middle" fill="#3c4350">场景列 A:新业务用途(示例)</text>
+  <text x="290" y="630" font-size="9.5" text-anchor="middle" fill="#b4232a">未注册 · 须按业务用途准入</text>
+  <rect x="170" y="640" width="240" height="24" rx="4" fill="#fbfbfc" stroke="#b6bcc6" stroke-dasharray="4 3"/>
+  <text x="180" y="656" font-size="10.5" fill="#6b7280">source_contract · 来源准入</text>
+  <rect x="170" y="667" width="240" height="24" rx="4" fill="#fbfbfc" stroke="#b6bcc6" stroke-dasharray="4 3"/>
+  <text x="180" y="683" font-size="10.5" fill="#6b7280">author · 模板草稿生成</text>
+  <rect x="170" y="694" width="240" height="24" rx="4" fill="#fbfbfc" stroke="#b6bcc6" stroke-dasharray="4 3"/>
+  <text x="180" y="710" font-size="10.5" fill="#6b7280">validation_data_checker · 验证数据检查</text>
+  <rect x="170" y="721" width="240" height="24" rx="4" fill="#fbfbfc" stroke="#b6bcc6" stroke-dasharray="4 3"/>
+  <text x="180" y="737" font-size="10.5" fill="#6b7280">validation_scene · 验证场景</text>
+  <rect x="170" y="748" width="240" height="24" rx="4" fill="#fbfbfc" stroke="#b6bcc6" stroke-dasharray="4 3"/>
+  <text x="180" y="764" font-size="10.5" fill="#6b7280">data_preparer · 数据准备</text>
+  <rect x="170" y="775" width="240" height="24" rx="4" fill="#fbfbfc" stroke="#b6bcc6" stroke-dasharray="4 3"/>
+  <text x="180" y="791" font-size="10.5" fill="#6b7280">planner · 图面规划</text>
+  <rect x="170" y="802" width="240" height="24" rx="4" fill="#fbfbfc" stroke="#b6bcc6" stroke-dasharray="4 3"/>
+  <text x="180" y="818" font-size="10.5" fill="#6b7280">candidate_compiler · 候选编译(打样)</text>
+  <rect x="170" y="829" width="240" height="24" rx="4" fill="#fbfbfc" stroke="#b6bcc6" stroke-dasharray="4 3"/>
+  <text x="180" y="845" font-size="10.5" fill="#6b7280">legend_checker · 图例核对</text>
+
+  <!-- 列 B -->
+  <rect x="440" y="604" width="240" height="32" rx="6" fill="#f3f4f6" stroke="#9aa2ad" stroke-dasharray="5 3"/>
+  <text x="560" y="618" font-size="11" font-weight="bold" text-anchor="middle" fill="#3c4350">government_thematic</text>
+  <text x="560" y="630" font-size="9.5" text-anchor="middle" fill="#b4232a">词表已登记 · 未开放</text>
+  <rect x="440" y="640" width="240" height="213" rx="4" fill="#fbfbfc" stroke="#b6bcc6" stroke-dasharray="4 3"/>
+  <text x="560" y="750" font-size="10.5" text-anchor="middle" fill="#6b7280">同上八组件</text>
+
+  <!-- 列 C -->
+  <rect x="710" y="604" width="240" height="32" rx="6" fill="#f3f4f6" stroke="#9aa2ad" stroke-dasharray="5 3"/>
+  <text x="830" y="618" font-size="11" font-weight="bold" text-anchor="middle" fill="#3c4350">emergency_mapping</text>
+  <text x="830" y="630" font-size="9.5" text-anchor="middle" fill="#b4232a">词表已登记 · 未开放</text>
+  <rect x="710" y="640" width="240" height="213" rx="4" fill="#fbfbfc" stroke="#b6bcc6" stroke-dasharray="4 3"/>
+  <text x="830" y="750" font-size="10.5" text-anchor="middle" fill="#6b7280">同上八组件</text>
+
+  <!-- 列 D -->
+  <rect x="980" y="604" width="240" height="32" rx="6" fill="#f3f4f6" stroke="#9aa2ad" stroke-dasharray="5 3"/>
+  <text x="1100" y="618" font-size="11" font-weight="bold" text-anchor="middle" fill="#3c4350">leadership_visit</text>
+  <text x="1100" y="630" font-size="9.5" text-anchor="middle" fill="#b4232a">词表已登记 · 未开放</text>
+  <rect x="980" y="640" width="240" height="213" rx="4" fill="#fbfbfc" stroke="#b6bcc6" stroke-dasharray="4 3"/>
+  <text x="1100" y="750" font-size="10.5" text-anchor="middle" fill="#6b7280">同上八组件</text>
+
+  <text x="170" y="866" font-size="10" fill="#6b7280">“用地分类专题图”示例的四轴分解:业务用途→新场景列 · 数据类型→分类栅格输入契约 · 表达→raster/categorical@1.0.0 · 后端→Rasterio+Matplotlib;不注册“分类栅格场景”。组件完成后登记入 _COMPONENTS 与 scenario-capabilities.yaml(摘要进锁)</text>
+
+  <line x1="640" y1="871" x2="640" y2="882" stroke="#5b6472" stroke-width="1.6" marker-end="url(#ar)"/>
+
+  <!-- L7 安全与治理底座 -->
+  <rect x="40" y="884" width="1200" height="76" rx="10" fill="#fdf1e3" stroke="#c98a3b"/>
+  <text x="56" y="908" font-size="13" font-weight="bold" fill="#1f2328">安全与治理底座</text>
+  <text x="56" y="924" font-size="10" fill="#6b7280">(横切全部层)</text>
+  <rect x="170" y="894" width="200" height="56" rx="6" fill="#fff8ef" stroke="#d29a4b"/>
+  <text x="270" y="916" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#1f2328">PathGuard</text>
+  <text x="270" y="932" font-size="10" text-anchor="middle" fill="#3c4350">允许根校验 · symlink 拒绝</text>
+  <rect x="380" y="894" width="250" height="56" rx="6" fill="#fff8ef" stroke="#d29a4b"/>
+  <text x="505" y="916" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#1f2328">审批回执 T1·TP·G1·G2·G3</text>
+  <text x="505" y="932" font-size="10" text-anchor="middle" fill="#3c4350">身份/动作/摘要/作用域/时效/nonce</text>
+  <rect x="640" y="894" width="180" height="56" rx="6" fill="#fff8ef" stroke="#d29a4b"/>
+  <text x="730" y="916" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#1f2328">规范摘要</text>
+  <text x="730" y="932" font-size="10" text-anchor="middle" fill="#3c4350">SHA-256 摘要绑定</text>
+  <rect x="830" y="894" width="230" height="56" rx="6" fill="#fff8ef" stroke="#d29a4b"/>
+  <text x="945" y="916" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#1f2328">原子交付事务</text>
+  <text x="945" y="932" font-size="10" text-anchor="middle" fill="#3c4350">staging→校验→os.replace→回执</text>
+  <rect x="1070" y="894" width="150" height="56" rx="6" fill="#fff8ef" stroke="#d29a4b"/>
+  <text x="1145" y="916" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#1f2328">交付白名单</text>
+  <text x="1145" y="932" font-size="10" text-anchor="middle" fill="#3c4350">5 文件 · production_tasks=[]</text>
+
+  <!-- 图例 -->
+  <rect x="40" y="970" width="22" height="12" rx="3" fill="#fafbfc" stroke="#b0b7c3" stroke-dasharray="4 3"/>
+  <text x="70" y="980" font-size="10.5" fill="#3c4350">未开放 / 未注册</text>
+  <rect x="200" y="970" width="22" height="12" rx="3" fill="#e8f0fb" stroke="#6f93c4"/>
+  <text x="230" y="980" font-size="10.5" fill="#3c4350">已实现的共享能力</text>
+  <rect x="370" y="970" width="22" height="12" rx="3" fill="#fff8ef" stroke="#d29a4b"/>
+  <text x="400" y="980" font-size="10.5" fill="#3c4350">治理与安全底座</text>
+  <text x="540" y="980" font-size="10.5" fill="#b4232a">红字 = 当前空登记(profiles: [] / _COMPONENTS: {})</text>
+</svg>

@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/raster-classification-answers.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "based_on_digest",
+    "entries"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "based_on_digest": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+    },
+    "entries": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "value",
+          "semantic",
+          "display",
+          "label",
+          "color",
+          "order",
+          "include_in_legend"
+        ],
+        "properties": {
+          "value": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 4294967295
+          },
+          "semantic": {
+            "enum": [
+              "class",
+              "background",
+              "nodata"
+            ]
+          },
+          "display": {
+            "enum": [
+              "color",
+              "hidden"
+            ]
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^#[0-9A-Fa-f]{6}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1023
+          },
+          "include_in_legend": {
+            "type": "boolean"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "display": {
+                  "const": "hidden"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "color": {
+                  "type": "null"
+                },
+                "include_in_legend": {
+                  "const": false
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "display": {
+                  "const": "color"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "pattern": "^#[0-9A-Fa-f]{6}$"
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256,
+                  "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

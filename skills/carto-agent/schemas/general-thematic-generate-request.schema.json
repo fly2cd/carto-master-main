@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/general-thematic-generate-request.schema.json",
+  "description": "Strict generate-map overlay for the registered general_thematic_mapping scenario. It narrows the shared generate-request protocol; it never relaxes it.",
+  "allOf": [
+    {
+      "$ref": "https://schemas.carto-agent.local/v1/generate-request.schema.json"
+    },
+    {
+      "type": "object",
+      "required": [
+        "run_id",
+        "audience",
+        "scope",
+        "environment",
+        "requested_at",
+        "template",
+        "allowed_capabilities",
+        "source_bindings",
+        "font",
+        "prepared_raster_bindings"
+      ],
+      "properties": {
+        "goal": {
+          "maxLength": 60
+        },
+        "template": {
+          "type": "object",
+          "properties": {
+            "namespace": {
+              "const": "local"
+            },
+            "kind": {
+              "const": "map-scenario"
+            },
+            "id": {
+              "const": "general-thematic-map"
+            },
+            "version": {
+              "const": "1.0.0"
+            }
+          }
+        },
+        "requested_outputs": {
+          "minItems": 2,
+          "maxItems": 2,
+          "allOf": [
+            {
+              "contains": {
+                "const": "pdf"
+              }
+            },
+            {
+              "contains": {
+                "const": "png"
+              }
+            }
+          ]
+        },
+        "source_bindings": {
+          "minItems": 1,
+          "maxItems": 1,
+          "items": {
+            "allOf": [
+              {
+                "$ref": "https://schemas.carto-agent.local/v1/raster-input.schema.json"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "const": "classified-surface"
+                  },
+                  "data_nature": {
+                    "const": "user-provided"
+                  },
+                  "contains_sensitive_coordinates": {
+                    "const": false
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "prepared_raster_bindings": {
+          "minItems": 1,
+          "maxItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "role": {
+                "const": "classified-surface"
+              }
+            }
+          }
+        },
+        "font": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "pattern": "[.](ttf|TTF)$"
+            }
+          }
+        },
+        "intent": {
+          "type": "object",
+          "properties": {
+            "business_scene": {
+              "const": "general_thematic_mapping"
+            },
+            "tasks": {
+              "const": [
+                "thematic-map"
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

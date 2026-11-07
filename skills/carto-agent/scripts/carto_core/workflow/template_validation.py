@@ -1,73 +1,33 @@
 from __future__ import annotations
 
-import hashlib
-import json
 import os
-import tempfile
-from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable
 
-import yaml
 
-from ..adapters.controlled_renderer import (
-    FRONTEND_BUILD, MAPLIBRE_VERSION, OVERLAY_ENGINE_VERSION, RANDOM_SEED,
-    RENDERER_VERSION, BrowserLimits, ControlledBrowserRenderer,
-    browser_version, discover_browser, sha256_file,
-)
+from ..adapters.controlled_renderer import FRONTEND_BUILD, MAPLIBRE_VERSION, OVERLAY_ENGINE_VERSION, RENDERER_VERSION, BrowserLimits, ControlledBrowserRenderer, browser_version, discover_browser
 from ..adapters.webmap_renderer import (
     RendererCapabilityProfile, RendererCapabilityRegistry, WebMapRendererAdapter,
     compute_renderer_attestation,
 )
+from ..artifacts import atomic_yaml, file_digest, utc_now
 from ..canonical import sha256_digest
+from ..compiler.layout import LayoutResolver
 from ..compiler.dependencies import DependencyResolver
 from ..compiler.ownership import OwnershipResolver
 from ..errors import CartoError, ProtocolError, SecurityError
+from ..scenario_registry import ScenarioRegistry
 from ..schema_registry import SchemaRegistry, load_document
 from ..security.paths import PathGuard
+from ..validation.registry import CheckerRegistry
+from ..validation.map_checks import MapQualityChecks
 
-VALIDATOR_VERSION = "1.0.0"
+VALIDATOR_VERSION = "1.3.0"
 ADAPTER_VERSION = "1.0.0"
-CHECKERS = (
-    ("template.package-closed", "blocker"),
-    ("template.schema-valid", "blocker"),
-    ("template.dependencies-pinned", "blocker"),
-    ("template.kind-ownership", "error"),
-    ("template.semantic-contracts", "error"),
-    ("template.target-capability", "error"),
-    ("template.fixture-render", "blocker"),
-)
-
-
-def _now() -> str:
-    return datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
-
-
-def _file_digest(path: Path) -> str:
-    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def _atomic_yaml_once(path: Path, value: dict[str, Any]) -> None:
-    if path.exists():
-        if load_document(path) == value:
-            return
-        raise ProtocolError("IMMUTABLE_ARTIFACT_CONFLICT", str(path))
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporary_name = tempfile.mkstemp(prefix=f".{path.name}-", suffix=".tmp", dir=path.parent)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as stream:
-            yaml.safe_dump(value, stream, allow_unicode=True, sort_keys=False)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary_name, path)
-    finally:
-        temporary = Path(temporary_name)
-        if temporary.exists():
-            temporary.unlink()
 
 
 class TemplatePackageValidator:
-    """Static-first validator and synthetic-fixture render evidence builder."""
+    """Static-first validator and scenario validation render evidence builder."""
 
     CONTRACT_SCHEMAS = {
         "scenario": "scenario", "data_schema": "data-role",
@@ -87,6 +47,7 @@ class TemplatePackageValidator:
         self.evidence_root = path_guard.resolve(evidence_root)
         self.attestation_key = attestation_key
         self.registry = registry or SchemaRegistry()
+        self.checkers = CheckerRegistry(schema_registry=self.registry)
         self.browser = path_guard.resolve(browser, must_exist=True) if browser else None
         self.font_path = path_guard.resolve(font_path, must_exist=True) if font_path else None
         self.limits = limits or BrowserLimits()
@@ -96,7 +57,7 @@ class TemplatePackageValidator:
     def validate(self, expected: dict[str, Any], expected_targets: list[str]) -> dict[str, Any]:
         results: list[dict[str, Any]] = []
         snapshot = self._validate_static(expected, expected_targets, results)
-        if self._has_blocking_failure(results):
+        if self.checkers.has_blocking_failure(results):
             evidence = self._evidence(snapshot, results, renderer=None, receipt=None)
             self._write_evidence(evidence)
             return evidence
@@ -117,38 +78,40 @@ class TemplatePackageValidator:
                 "overlay_engine_version": OVERLAY_ENGINE_VERSION,
                 "environment_fingerprint": receipt["environment_fingerprint"],
             }
-            results.append(self._result("template.fixture-render", "blocker", True, {
+            results.append(self._result("template.fixture-render", True, {
                 "receipt_digest": sha256_digest(receipt),
                 "targets": sorted(item["target"] for item in receipt["output_artifacts"]),
             }))
         except (CartoError, OSError, ValueError) as exc:
-            results.append(self._result("template.fixture-render", "blocker", False, exc))
+            results.append(self._result("template.fixture-render", False, exc))
         evidence = self._evidence(snapshot, results, renderer=renderer_binding, receipt=receipt)
         self._write_evidence(evidence, receipt)
         return evidence
 
 
     def _validate_static(self, expected: dict[str, Any], expected_targets: list[str],
-                         results: list[dict[str, Any]]) -> dict[str, Any]:
+                         results: list[dict[str, Any]], *, raise_errors: bool = False) -> dict[str, Any]:
         try:
             snapshot = self._check_package_files()
-            results.append(self._result("template.package-closed", "blocker", True, {
+            results.append(self._result("template.package-closed", True, {
                 "file_count": len(snapshot["actual_files"]),
                 "package_digest": snapshot["package_digest"],
             }))
         except (CartoError, OSError, ValueError, TypeError) as exc:
-            results.append(self._result("template.package-closed", "blocker", False, exc))
+            if raise_errors:
+                raise
+            results.append(self._result("template.package-closed", False, exc))
             return self._fallback_snapshot(expected)
 
         stages = (
-            ("template.schema-valid", "blocker", lambda: self._check_schemas(snapshot),
+            ("template.schema-valid", lambda: self._check_schemas(snapshot),
              lambda value: snapshot.__setitem__("documents", value)),
-            ("template.dependencies-pinned", "blocker", lambda: self._check_dependencies(snapshot), None),
-            ("template.kind-ownership", "error", lambda: self._check_identity_and_ownership(snapshot, expected), None),
-            ("template.semantic-contracts", "error", lambda: self._check_semantics(snapshot, expected, expected_targets), None),
-            ("template.target-capability", "error", lambda: self._check_targets(snapshot, expected_targets), None),
+            ("template.dependencies-pinned", lambda: self._check_dependencies(snapshot), None),
+            ("template.kind-ownership", lambda: self._check_identity_and_ownership(snapshot, expected), None),
+            ("template.semantic-contracts", lambda: self._check_semantics(snapshot, expected, expected_targets), None),
+            ("template.target-capability", lambda: self._check_targets(snapshot, expected_targets), None),
         )
-        for check_id, severity, operation, accept in stages:
+        for check_id, operation, accept in stages:
             try:
                 value = operation()
                 if accept is not None:
@@ -164,34 +127,18 @@ class TemplatePackageValidator:
                     details["fixture_set_digest"] = snapshot["fixture_set_digest"]
                 else:
                     details.update({"targets": sorted(expected_targets), "renderer": "maplibre-web"})
-                results.append(self._result(check_id, severity, True, details))
+                results.append(self._result(check_id, True, details))
             except (CartoError, OSError, ValueError, TypeError) as exc:
-                results.append(self._result(check_id, severity, False, exc))
+                if raise_errors:
+                    raise
+                results.append(self._result(check_id, False, exc))
                 break
         return snapshot
 
     def inspect(self, expected: dict[str, Any], expected_targets: list[str],
                 results: list[dict[str, Any]] | None = None) -> dict[str, Any]:
-        output = results if results is not None else []
-        snapshot = self._check_package_files()
-        output.append(self._result("template.package-closed", "blocker", True, {
-            "file_count": len(snapshot["actual_files"]), "package_digest": snapshot["package_digest"]}))
-        snapshot["documents"] = self._check_schemas(snapshot)
-        output.append(self._result("template.schema-valid", "blocker", True, {
-            "schemas": sorted(["manifest", "dependency-lock", "prototype-description", *self.CONTRACT_SCHEMAS.values()])}))
-        self._check_dependencies(snapshot)
-        output.append(self._result("template.dependencies-pinned", "blocker", True, {
-            "dependency_lock_digest": snapshot["dependency_lock_digest"]}))
-        self._check_identity_and_ownership(snapshot, expected)
-        output.append(self._result("template.kind-ownership", "error", True, {
-            "kind": snapshot["manifest"]["package"]["kind"], "ownership": "whole-segment"}))
-        self._check_semantics(snapshot, expected, expected_targets)
-        output.append(self._result("template.semantic-contracts", "error", True, {
-            "fixture_set_digest": snapshot["fixture_set_digest"]}))
-        self._check_targets(snapshot, expected_targets)
-        output.append(self._result("template.target-capability", "error", True, {
-            "targets": sorted(expected_targets), "renderer": "maplibre-web"}))
-        return snapshot
+        return self._validate_static(expected, expected_targets,
+                                     results if results is not None else [], raise_errors=True)
 
     def verify_evidence(self, evidence: dict[str, Any], expected: dict[str, Any],
                         expected_targets: list[str]) -> dict[str, Any]:
@@ -252,7 +199,7 @@ class TemplatePackageValidator:
             raise ProtocolError("VALIDATION_PREVIEW_BINDING_MISMATCH", evidence["evidence_id"])
         for artifact in evidence["preview_artifacts"]:
             path = self.path_guard.resolve(artifact["artifact_ref"]["uri"], must_exist=True)
-            if sha256_file(path) != artifact["artifact_ref"]["digest"]:
+            if file_digest(path) != artifact["artifact_ref"]["digest"]:
                 raise ProtocolError("VALIDATION_PREVIEW_DRIFT", artifact["target"])
         return snapshot
 
@@ -283,7 +230,7 @@ class TemplatePackageValidator:
         if actual != expected_files:
             raise ProtocolError("PACKAGE_FILE_SET_MISMATCH", f"expected={expected_files}; actual={actual}")
         for relative, digest in recorded.items():
-            if _file_digest(self.package_root / relative) != digest:
+            if file_digest(self.package_root / relative) != digest:
                 raise ProtocolError("PACKAGE_CHECKSUM_MISMATCH", relative)
         manifest = load_document(manifest_path)
         if not isinstance(manifest, dict):
@@ -296,9 +243,9 @@ class TemplatePackageValidator:
         fixture_paths = sorted(path for path in manifest.get("files", []) if path.startswith("fixtures/"))
         return {
             "actual_files": actual, "recorded": recorded, "manifest": manifest,
-            "package_digest": _file_digest(checksum_path),
-            "manifest_digest": _file_digest(manifest_path),
-            "dependency_lock_digest": _file_digest(self.package_root / manifest["dependency_lock"]),
+            "package_digest": file_digest(checksum_path),
+            "manifest_digest": file_digest(manifest_path),
+            "dependency_lock_digest": file_digest(self.package_root / manifest["dependency_lock"]),
             "fixture_set_digest": sha256_digest([{"path": path, "digest": recorded[path]} for path in fixture_paths]),
             "fixture_paths": fixture_paths,
         }
@@ -306,6 +253,7 @@ class TemplatePackageValidator:
     def _check_schemas(self, snapshot: dict[str, Any]) -> dict[str, Any]:
         manifest = snapshot["manifest"]
         self.registry.validate("manifest", manifest)
+        ScenarioRegistry(self.registry).for_template(manifest["package"])
         self.resolver.validate_manifest(manifest, manifest["files"])
         documents: dict[str, Any] = {}
         lock = load_document(self.package_root / manifest["dependency_lock"])
@@ -315,23 +263,17 @@ class TemplatePackageValidator:
             value = load_document(self.package_root / manifest["business_contracts"][key])
             self.registry.validate(schema_name, value)
             documents[key] = value
+        MapQualityChecks(self.registry).selection(documents["quality_gates"])
         prototypes = sorted(path for path in manifest["files"]
                             if path.startswith("prototypes/") and path.endswith((".yaml", ".yml")))
-        if prototypes != ["prototypes/risk-overview.yaml"]:
+        if len(prototypes) != 1:
             raise ProtocolError("PROTOTYPE_SET_INVALID", str(prototypes))
         prototype = load_document(self.package_root / prototypes[0])
         self.registry.validate("prototype-description", prototype)
         documents["prototype"] = prototype
         if snapshot["fixture_paths"] != [prototype["fixture_ref"]]:
             raise ProtocolError("FIXTURE_SET_INVALID", str(snapshot["fixture_paths"]))
-        fixture_path = self.package_root / prototype["fixture_ref"]
-        try:
-            fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise ProtocolError("FIXTURE_INVALID", str(exc)) from exc
-        if not isinstance(fixture, dict):
-            raise ProtocolError("FIXTURE_INVALID", prototype["fixture_ref"])
-        documents["fixture"] = fixture
+        # Parsing and safety checks belong to the registered scenario. No assumed data format.
         return documents
 
     def _check_dependencies(self, snapshot: dict[str, Any]) -> None:
@@ -350,12 +292,11 @@ class TemplatePackageValidator:
         lock_refs = sorted(lock["resources"], key=lambda item: (item["id"], item["version"], item["digest"]))
         if portrayal_refs != lock_refs:
             raise ProtocolError("MAP_EXPRESSION_LOCK_MISMATCH", manifest["package"]["id"])
-        catalog_path = Path(__file__).resolve().parents[3] / "policies" / "map-expression-catalog.yaml"
-        catalog = load_document(catalog_path)
-        available = {(entry["expression_id"], entry["version"], sha256_digest(entry)) for entry in catalog["entries"]}
-        locked = {(item["id"], item["version"], item["digest"]) for item in lock_refs}
-        if locked != available:
-            raise ProtocolError("MAP_EXPRESSION_CATALOG_MISMATCH", str(sorted(locked)))
+        from ..repository.map_expression_catalog import MapExpressionCatalog
+        catalog = MapExpressionCatalog(self.registry)
+        catalog.validate_portrayal(docs["portrayal"])
+        for reference in lock_refs:
+            catalog.require(reference)
 
     def _check_identity_and_ownership(self, snapshot: dict[str, Any], expected: dict[str, Any]) -> None:
         package = snapshot["manifest"]["package"]
@@ -375,18 +316,11 @@ class TemplatePackageValidator:
     def _check_semantics(self, snapshot: dict[str, Any], expected: dict[str, Any],
                          expected_targets: list[str]) -> None:
         docs = snapshot["documents"]
-        fixture = docs["fixture"]
-        metadata = fixture.get("carto_metadata", {})
-        if fixture.get("type") != "FeatureCollection" or metadata != {
-            "data_nature": "synthetic", "contains_production_data": False,
-            "contains_sensitive_coordinates": False, "source_crs": "EPSG:4326",
-        }:
-            raise ProtocolError("FIXTURE_SAFETY_INVALID", "Fixture must be non-sensitive synthetic EPSG:4326 data")
-        expected_source_crs = expected.get("source_crs")
-        if expected_source_crs is not None:
-            source_crs = f"{expected_source_crs['authority']}:{expected_source_crs['code']}"
-            if metadata["source_crs"] != source_crs:
-                raise ProtocolError("FIXTURE_SOURCE_CRS_MISMATCH", source_crs)
+        profile = ScenarioRegistry(self.registry).for_template(snapshot["manifest"]["package"])
+        # Required, fail-closed component: validates content, source CRS, data roles and
+        # licensing/sensitivity before any validation input can enter a published package.
+        profile.component("validation_data_checker")(self.package_root, snapshot, expected)
+        profile.require_contract(docs["scenario"])
         expected_display_crs = expected.get("display_crs")
         if expected_display_crs is not None and docs["spatial_behavior"]["display_crs"] != expected_display_crs:
             raise ProtocolError("SPATIAL_DISPLAY_CRS_MISMATCH", str(expected_display_crs))
@@ -396,31 +330,10 @@ class TemplatePackageValidator:
         layers = {layer["data_role"]: layer for layer in docs["portrayal"]["layers"]}
         if set(layers) != set(roles):
             raise ProtocolError("PORTRAYAL_DATA_ROLE_MISMATCH", str(sorted(layers)))
-        geometry_alias = {"Polygon": "polygon", "MultiPolygon": "multipolygon", "Point": "point"}
-        seen: set[str] = set()
-        for feature in fixture.get("features", []):
-            role_id = feature.get("properties", {}).get("fixture_role")
-            if role_id not in roles:
-                raise ProtocolError("FIXTURE_ROLE_UNKNOWN", str(role_id))
-            seen.add(role_id)
-            geometry = geometry_alias.get(feature.get("geometry", {}).get("type"))
-            if geometry not in roles[role_id]["geometry_types"] or geometry != layers[role_id]["geometry"]:
-                raise ProtocolError("FIXTURE_GEOMETRY_MISMATCH", str(role_id))
-            properties = feature["properties"]
-            for field in roles[role_id]["fields"]:
-                value = properties.get(field["name"])
-                if value is None and not field["nullable"]:
-                    raise ProtocolError("FIXTURE_REQUIRED_FIELD_MISSING", f"{role_id}.{field['name']}")
-                if value is not None and field["type"] == "integer" and (not isinstance(value, int) or isinstance(value, bool)):
-                    raise ProtocolError("FIXTURE_FIELD_TYPE_MISMATCH", f"{role_id}.{field['name']}")
-                if value is not None and field["type"] == "number" and (not isinstance(value, (int, float)) or isinstance(value, bool)):
-                    raise ProtocolError("FIXTURE_FIELD_TYPE_MISMATCH", f"{role_id}.{field['name']}")
+        for role_id, layer in layers.items():
             semantic_roles = {field["semantic_role"] for field in roles[role_id]["fields"]}
-            if layers[role_id].get("value_role") not in semantic_roles:
+            if layer.get("value_role") is not None and layer["value_role"] not in semantic_roles:
                 raise ProtocolError("PORTRAYAL_VALUE_ROLE_MISMATCH", role_id)
-        required = {role_id for role_id, role in roles.items() if role["required"]}
-        if not required.issubset(seen):
-            raise ProtocolError("FIXTURE_REQUIRED_ROLE_MISSING", str(sorted(required - seen)))
         formats = {target["format"] for target in docs["delivery"]["targets"]}
         target_ids = {target["id"] for target in docs["delivery"]["targets"]}
         if formats != set(expected_targets) or set(docs["scenario"]["target_ids"]) != target_ids:
@@ -432,6 +345,13 @@ class TemplatePackageValidator:
 
     @staticmethod
     def _check_targets(snapshot: dict[str, Any], expected_targets: list[str]) -> None:
+        profile = ScenarioRegistry().for_template(snapshot["manifest"]["package"])
+        resolved = LayoutResolver().resolve(snapshot["documents"]["scenario"]["embedded"]["layout"],
+                                            profile.definition["output_profile"]["dpi"])
+        if any(resolved["page"][key] != profile.definition["output_profile"][key]
+               for key in ("width_mm", "height_mm", "dpi", "width_px", "height_px")):
+            raise ProtocolError("SCENARIO_OUTPUT_PROFILE_MISMATCH", "Layout differs from the enabled output profile")
+        LayoutResolver.validate_targets(resolved, [target["page"] for target in snapshot["documents"]["delivery"]["targets"]])
         supported = {"svg", "png", "pdf"}
         targets = set(expected_targets)
         if not targets or not targets.issubset(supported):
@@ -474,51 +394,9 @@ class TemplatePackageValidator:
         return receipt, profile
 
     def _scene(self, snapshot: dict[str, Any], targets: list[str], font: Path) -> dict[str, Any]:
-        fixture_path = self.package_root / snapshot["fixture_paths"][0]
-        fixture = snapshot["documents"]["fixture"]
-        bounds = self._bounds(fixture)
-        package = snapshot["manifest"]["package"]
-        style_ref = {"id": "validation-style", "version": "1.0.0",
-                     "digest": sha256_digest(snapshot["documents"]["scenario"]["embedded"]["cartography"])}
-        fixture_ref = {"id": "validation-fixture", "version": package["version"],
-                       "digest": _file_digest(fixture_path), "uri": str(fixture_path)}
-        return {
-            "schema_version": 1, "scene_id": f"{package['id']}-validation", "revision": 1,
-            "renderer_id": "maplibre-web",
-            "spatial_context": {"display_crs": {"authority": "EPSG", "code": "4326"},
-                                "axis_order": "longitude-latitude", "coordinate_units": "degrees"},
-            "renderer_requirements": {"renderer_id": "maplibre-web", "require_webgl": True,
-                "require_offline_rendering": True, "required_capabilities": ["svg-overlay", "headless-export"],
-                "required_fonts": ["Noto Sans SC"], "minimum_device_pixel_ratio": 1},
-            "viewport": {"width_px": 1120, "height_px": 792, "device_pixel_ratio": 1, "background": "#F8FAFC"},
-            "camera": {"bounds": bounds, "bearing": 0, "pitch": 0,
-                       "padding": {"top": 72, "right": 250, "bottom": 72, "left": 72}},
-            "map": {"style_ref": style_ref,
-                "sources": [{"id": "fixture-source", "type": "geojson", "resource_id": "validation-fixture"}],
-                "layers": [
-                    {"id": "risk-fill", "source_id": "fixture-source", "type": "fill",
-                     "filter": ["==", ["get", "fixture_role"], "risk-area"],
-                     "paint": {"fill-color": ["interpolate", ["linear"], ["get", "risk_pct"], 0, "#FFF7BC", 50, "#FC8D59", 100, "#B10026"], "fill-opacity": 0.82}, "z_index": 10},
-                    {"id": "shelter-points", "source_id": "fixture-source", "type": "circle",
-                     "filter": ["==", ["get", "fixture_role"], "shelter-point"],
-                     "paint": {"circle-color": "#087E8B", "circle-radius": ["interpolate", ["linear"], ["get", "capacity"], 0, 5, 500, 16], "circle-stroke-color": "#FFFFFF", "circle-stroke-width": 2}, "z_index": 20},
-                ]},
-            "overlays": [
-                {"id": "title", "type": "text", "coordinate_space": "page", "position": {"x": 48, "y": 42, "unit": "pixel"}, "content": "合成洪涝风险与避难场所模板验证图", "style_role": "map-title"},
-                {"id": "legend", "type": "legend", "coordinate_space": "page", "position": {"x": 890, "y": 110, "unit": "pixel"}, "legend_items": [{"label": "较低风险", "color": "#FFF7BC", "symbol": "fill"}, {"label": "较高风险", "color": "#B10026", "symbol": "fill"}, {"label": "避难场所", "color": "#087E8B", "symbol": "circle"}]},
-                {"id": "north", "type": "north-arrow", "coordinate_space": "page", "position": {"x": 1030, "y": 55, "unit": "pixel"}},
-                {"id": "scale", "type": "scale-bar", "coordinate_space": "page", "position": {"x": 72, "y": 738, "unit": "pixel"}, "length_px": 140, "distance_label": "合成比例尺"},
-                {"id": "source", "type": "attribution", "coordinate_space": "page", "position": {"x": 760, "y": 760, "unit": "pixel"}, "content": "数据来源：纯合成 Fixture", "style_role": "source-note"},
-            ],
-            "resources": [
-                {"id": "validation-fixture", "kind": "geojson", "ref": fixture_ref, "required": True},
-                {"id": "validation-font", "kind": "font", "font_family": "Noto Sans SC",
-                 "ref": {"id": "validation-font", "version": "1.0.0", "digest": sha256_file(font), "uri": str(font)}, "required": True},
-            ],
-            "export": {"targets": sorted(targets), "dpi": 144}, "random_seed": RANDOM_SEED,
-            "provenance": [{"source_type": "derived", "source_ref": "synthetic:template-validation",
-                            "version": VALIDATOR_VERSION, "classification": "internal"}],
-        }
+        profile = ScenarioRegistry(self.registry).for_template(snapshot["manifest"]["package"])
+        return profile.component("validation_scene")(
+            self.package_root, snapshot, targets, font, VALIDATOR_VERSION)
 
     def _select_font(self) -> Path:
         candidates: list[Path] = []
@@ -555,8 +433,8 @@ class TemplatePackageValidator:
             "dependency_lock_digest": snapshot["dependency_lock_digest"],
             "fixture_set_digest": snapshot["fixture_set_digest"],
             "checker_set_digest": self.checker_set_digest(),
-            "status": "failed" if counts["blocker"] or counts["error"] else "passed",
-            "counts": counts, "results": results, "created_at": _now(),
+            "status": "failed" if self.checkers.has_blocking_failure(results) else "passed",
+            "counts": counts, "results": results, "created_at": utc_now(),
         }
         if renderer is not None:
             evidence["renderer"] = renderer
@@ -577,8 +455,8 @@ class TemplatePackageValidator:
     def _write_evidence(self, evidence: dict[str, Any], receipt: dict[str, Any] | None = None) -> None:
         self.evidence_root.mkdir(parents=True, exist_ok=True)
         if receipt is not None:
-            _atomic_yaml_once(self.evidence_root / "render-receipt.yaml", receipt)
-        _atomic_yaml_once(self.evidence_root / "template-validation-evidence.yaml", evidence)
+            atomic_yaml(self.evidence_root / "render-receipt.yaml", receipt)
+        atomic_yaml(self.evidence_root / "template-validation-evidence.yaml", evidence)
 
     def _fallback_snapshot(self, expected: dict[str, Any]) -> dict[str, Any]:
         digest = sha256_digest({"package_root": str(self.package_root), "expected": expected})
@@ -588,26 +466,16 @@ class TemplatePackageValidator:
             "dependency_lock_digest": digest, "fixture_set_digest": sha256_digest([]),
         }
 
-    @staticmethod
-    def _result(check_id: str, severity: str, passed: bool, details: Any) -> dict[str, Any]:
+    def _result(self, check_id: str, passed: bool, details: Any) -> dict[str, Any]:
         if isinstance(details, Exception):
             safe_details = {"code": getattr(details, "code", type(details).__name__),
                             "message": str(details)[:500]}
         else:
             safe_details = details
-        return {"check_id": check_id, "version": VALIDATOR_VERSION,
-                "status": "passed" if passed else "failed", "severity": severity,
-                "details": safe_details}
+        return self.checkers.result(check_id, passed, safe_details).to_dict()
 
-    @staticmethod
-    def _has_blocking_failure(results: list[dict[str, Any]]) -> bool:
-        return any(item["status"] == "failed" and item["severity"] in {"blocker", "error"}
-                   for item in results)
-
-    @staticmethod
-    def checker_set_digest() -> str:
-        return sha256_digest([{"id": check_id, "version": VALIDATOR_VERSION, "severity": severity}
-                              for check_id, severity in CHECKERS])
+    def checker_set_digest(self) -> str:
+        return self.checkers.phase_digest("template-validate")
 
     @staticmethod
     def _package_ref(snapshot: dict[str, Any]) -> dict[str, str]:
@@ -622,25 +490,3 @@ class TemplatePackageValidator:
             return True
         except ValueError:
             return False
-
-    @classmethod
-    def _bounds(cls, fixture: dict[str, Any]) -> list[float]:
-        coordinates: list[tuple[float, float]] = []
-
-        def visit(value: Any) -> None:
-            if (isinstance(value, list) and len(value) >= 2
-                    and all(isinstance(item, (int, float)) for item in value[:2])):
-                coordinates.append((float(value[0]), float(value[1])))
-            elif isinstance(value, list):
-                for item in value:
-                    visit(item)
-
-        for feature in fixture.get("features", []):
-            visit(feature.get("geometry", {}).get("coordinates", []))
-        if not coordinates:
-            raise ProtocolError("FIXTURE_EXTENT_EMPTY", "Fixture has no coordinates")
-        xs = [item[0] for item in coordinates]
-        ys = [item[1] for item in coordinates]
-        dx = max(max(xs) - min(xs), 0.01) * 0.15
-        dy = max(max(ys) - min(ys), 0.01) * 0.15
-        return [min(xs) - dx, min(ys) - dy, max(xs) + dx, max(ys) + dy]

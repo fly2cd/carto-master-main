@@ -11,20 +11,20 @@
     供宿主 Agent 与人工运行复用。
 
     默认根目录在仓库内 <repo>\projects\（你指定的路径）；如想放仓库外（git 天然
-    看不到、更干净），用 -Root 指定，例如 -Root D:\IdeaProjects\github\code-reviewer\projects。
+    看不到、更干净），用 -Root 指定，例如 -Root <用户确认的项目空间绝对路径>。
 
     产物归属（对应 carto 工作流）：
       template-repository\  共享不可变模板仓库 + 权威索引（create-template publish 写入；generate-map 读取）
       <project>\project\    --project-root：source-manifest.yaml + data\*.geojson
       <project>\runs\       --workdir 基：每个 run 一个子目录（状态/回执/staging/generation）
       <project>\approvals\  T1/TP/G1/G2 审批回执 YAML + nonce sqlite
-      <project>\output\     最终成果 A3 SVG/PNG/PDF
+      <project>\output\     最终成果 SVG/PNG/PDF
 
 .PARAMETER Root
     项目空间根。缺省 <repo>\projects。
 
 .PARAMETER ProjectName
-    单个地图项目的目录名，缺省 carto-flood-a3。
+    单个地图项目的目录名，缺省 carto-project。
 
 .PARAMETER Force
     目录已存在时仍补齐缺失子目录与 README（不删除已有内容）。
@@ -33,13 +33,13 @@
     powershell -ExecutionPolicy Bypass -File tools\host\New-CartoProjectSpace.ps1
 
 .EXAMPLE
-    powershell -ExecutionPolicy Bypass -File tools\host\New-CartoProjectSpace.ps1 -Root D:\IdeaProjects\github\code-reviewer\projects
+    powershell -ExecutionPolicy Bypass -File tools\host\New-CartoProjectSpace.ps1 -Root <用户确认的项目空间绝对路径>
 #>
 
 [CmdletBinding()]
 param(
     [string]$Root = '',
-    [string]$ProjectName = 'carto-flood-a3',
+    [string]$ProjectName = 'carto-project',
     [switch]$Force
 )
 
@@ -96,10 +96,10 @@ $readmeContent = @"
 |---|---|---|
 | ``template-repository\`` | 共享不可变模板仓库 + 权威索引（``create-template publish`` 写入；``generate-map`` 读取） | ``--repository-root`` |
 | ``$ProjectName\project\`` | 项目根：``source-manifest.yaml`` + ``data\*.geojson`` | ``--project-root`` |
-| ``$ProjectName\project\data\`` | 合成/业务 GeoJSON 数据源 | 被 source-manifest 引用 |
+| ``$ProjectName\project\data\`` | 用户授权的数据 数据源 | 被 source-manifest 引用 |
 | ``$ProjectName\runs\`` | 每个 run 一个子目录：状态、回执、staging、generation 产物 | ``--workdir`` 基 |
 | ``$ProjectName\approvals\`` | T1/TP/G1/G2 审批回执 YAML + ``nonce`` sqlite 防重放库 | ``--approval`` / ``--nonce-db`` |
-| ``$ProjectName\output\`` | 最终成果 A3 横版 SVG/PNG/PDF | 渲染产物输出 |
+| ``$ProjectName\output\`` | 最终成果 横版 SVG/PNG/PDF | 渲染产物输出 |
 
 ## 规范路径变量（供宿主 Agent 与人工运行复用）
 
@@ -116,6 +116,8 @@ $readmeContent = @"
 ```
 
 ## 规范 CLI 调用（占位，审批回执需另行签发）
+
+当前框架不启用业务场景；以下命令仅说明参数位置，需先实现并注册真实场景。脚手架不会生成数据或请求。
 
 模板侧（发布到 template-repository）：
 ```
@@ -148,7 +150,7 @@ $readmeContent = @"
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools\host\New-CartoProjectSpace.ps1 -Force
 # 或换根（仓库外同级）：
-powershell -ExecutionPolicy Bypass -File tools\host\New-CartoProjectSpace.ps1 -Root D:\IdeaProjects\github\code-reviewer\projects
+powershell -ExecutionPolicy Bypass -File tools\host\New-CartoProjectSpace.ps1 -Root <用户确认的项目空间绝对路径>
 ```
 "@
 if ((-not (Test-Path -LiteralPath $readme)) -or $Force) {

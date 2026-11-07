@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "kind": "raster-map-body",
+  "renderer_id": "maplibre-web",
+  "renderer_version": "1.0.0",
+  "renderer_code_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "layout_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "image": {
+    "artifact_ref": {
+      "id": "map-body",
+      "version": "1.0.0",
+      "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "uri": "artifacts/map-body.json"
+    },
+    "size_bytes": 100
+  },
+  "width_px": 300,
+  "height_px": 200,
+  "dpi": 300,
+  "frame_rect": [
+    0,
+    0,
+    400,
+    400
+  ],
+  "image_rect": [
+    50,
+    100,
+    300,
+    200
+  ],
+  "bounds": [
+    0,
+    0,
+    30,
+    20
+  ],
+  "crs": "EPSG:26911",
+  "ground_to_image": [
+    10,
+    0,
+    0,
+    0,
+    -10,
+    200
+  ],
+  "legend_items": [
+    {
+      "value": 1,
+      "label": "Synthetic class",
+      "color": "#FF0000",
+      "order": 0
+    }
+  ],
+  "environment": {
+    "python": "1.0.0",
+    "rasterio": "1.0.0",
+    "gdal": "1.0.0",
+    "numpy": "1.0.0",
+    "matplotlib": "1.0.0",
+    "pillow": "1.0.0"
+  },
+  "portrayal_ref": {
+    "id": "resolved-raster-portrayal",
+    "version": "1.0.0",
+    "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "uri": "/synthetic/.carto/raster/resolved-raster-portrayal/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.json"
+  }
+}

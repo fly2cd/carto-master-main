@@ -11,6 +11,13 @@ class CheckResult:
     status: str
     severity: str
     details: dict[str, Any]
+    disposition: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        value = asdict(self)
+        if self.disposition is None:
+            value.pop("disposition")
+        return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,5 +32,5 @@ class ValidationReport:
 
     def to_dict(self) -> dict[str, Any]:
         value = asdict(self)
-        value["results"] = [asdict(item) for item in self.results]
+        value["results"] = [item.to_dict() for item in self.results]
         return value

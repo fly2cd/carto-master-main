@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from .adapters.renderer_probe import RendererCapabilityProbe
+from .adapters.host_probe import HermesHostProbe
 from .errors import CartoError, ProtocolError
 from .schema_registry import SchemaRegistry, load_document
 from .security.approval import ApprovalReceipt, SqliteNonceStore, verify_receipt
@@ -68,13 +69,22 @@ def build_parser() -> argparse.ArgumentParser:
 
     intent = sub.add_parser("intent", help="Resolve a typed map intent")
     intent_sub = intent.add_subparsers(dest="intent_command", required=True)
-    resolve = intent_sub.add_parser("resolve")
-    resolve.add_argument("request")
+    resolve = intent_sub.add_parser("resolve", help="Resolve business purpose and topic IDs, without enabling a capability")
+    resolve.add_argument("request", help="intent-request JSON/YAML: schema_version, text, selection (fields/tasks/business_scene/theme_tags)")
     resolve.add_argument("--allowed-root", action="append", required=True)
 
-    environment = sub.add_parser("environment", help="Probe renderer capabilities")
+    environment = sub.add_parser("environment", help="Inspect host installation or renderer capabilities")
     environment_sub = environment.add_subparsers(dest="environment_command", required=True)
     environment_sub.add_parser("probe-renderer")
+    host = environment_sub.add_parser("probe-host", help="Inspect Hermes; does not approve session tools or production maps")
+    host.add_argument("--host", choices=["hermes"], default="hermes")
+    host.add_argument("--host-home", required=True)
+    host.add_argument("--project-root", required=True)
+    host.add_argument("--allowed-root", action="append", required=True)
+    host.add_argument("--output", help="New JSON report inside project root; never overwritten")
+    host.add_argument("--verify-local-tools", action="store_true", help="Opt in to isolated installed Hermes skill_view calls")
+    host.add_argument("--host-python", help="Explicit installed Hermes Python; only used with --verify-local-tools")
+    host.add_argument("--timeout", type=float, default=30)
 
     data = sub.add_parser("data", help="Run deterministic data preparation")
     data_sub = data.add_subparsers(dest="data_command", required=True)
@@ -85,6 +95,30 @@ def build_parser() -> argparse.ArgumentParser:
     prepare.add_argument("--tenant-id", required=True)
     prepare.add_argument("--project-id", required=True)
     prepare.add_argument("--subject-id", required=True)
+
+    inspect_raster = data_sub.add_parser("inspect-raster", help="Read a registered categorical TIFF through MCP; no map or transformation")
+    inspect_raster.add_argument("request", help="geospatial-request with operation info or statistics")
+    inspect_raster.add_argument("--mcp-config", required=True, help="Explicit operator-controlled geospatial-mcp-config")
+    inspect_raster.add_argument("--project-root", required=True)
+    inspect_raster.add_argument("--allowed-root", action="append", required=True)
+    inspect_raster.add_argument("--run-id", required=True)
+    inspect_raster.add_argument("--tenant-id", required=True)
+    inspect_raster.add_argument("--project-id", required=True)
+    inspect_raster.add_argument("--subject-id", required=True)
+
+    for command in ("analyze-classification", "clarify-classification"):
+        classification = data_sub.add_parser(command, help="Prepare/clarify a frozen raster classification; no map or approval")
+        classification.add_argument("request", help="Classification request, or prepared artifact-ref JSON for clarification")
+        if command == "analyze-classification":
+            classification.add_argument("--mcp-config", required=True)
+        else:
+            classification.add_argument("--answers", required=True)
+        classification.add_argument("--project-root", required=True)
+        classification.add_argument("--allowed-root", action="append", required=True)
+        classification.add_argument("--run-id", required=True)
+        classification.add_argument("--tenant-id", required=True)
+        classification.add_argument("--project-id", required=True)
+        classification.add_argument("--subject-id", required=True)
 
     create = sub.add_parser("create-template", help="Run the U-P2 template creation workflow")
     create_sub = create.add_subparsers(dest="create_command", required=True)
@@ -99,7 +133,7 @@ def build_parser() -> argparse.ArgumentParser:
     author.add_argument("--policy-id", default="carto-security")
     author.add_argument("--issuer", required=True)
     author.add_argument("--nonce-db", required=True)
-    validate_template = create_sub.add_parser("validate", help="Validate and render the staged synthetic Fixture")
+    validate_template = create_sub.add_parser("validate", help="Validate and render the staged scenario validation input")
     _add_template_paths(validate_template)
     validate_template.add_argument("--attestation-key-env", default="CARTO_RENDER_ATTESTATION_KEY")
     validate_template.add_argument("--browser")
@@ -210,10 +244,61 @@ def main(argv: list[str] | None = None) -> int:
                 raise ValueError("Intent request must be an object")
             result = IntentResolver(_policy_path("intent-profiles.yaml")).resolve(request)
             return _success({"intent": result})
+        if args.command == "environment" and args.environment_command == "probe-host":
+            probe = HermesHostProbe(allowed_roots=args.allowed_root, project_root=args.project_root, host_home=args.host_home)
+            report = probe.run(verify_local_tools=args.verify_local_tools, host_python=args.host_python, timeout=args.timeout)
+            output = str(probe.save(report, args.output)) if args.output else None
+            return _success({"host_preflight": report, "report_path": output})
         if args.command == "environment" and args.environment_command == "probe-renderer":
             result = RendererCapabilityProbe().run()
             SchemaRegistry().validate("environment-fingerprint", result)
             return _success({"environment": result})
+        if args.command == "data" and args.data_command == "inspect-raster":
+            from .adapters.geospatial_mcp import CAPABILITIES, GeospatialMcpAdapter
+
+            guard = PathGuard(args.allowed_root)
+            project = guard.resolve(args.project_root, must_exist=True)
+            path = guard.resolve(args.request, base_root=project, must_exist=True)
+            request = load_document(path)
+            SchemaRegistry().validate("geospatial-request", request)
+            if request["operation"] not in {"info", "statistics"}:
+                raise ProtocolError("MCP_MUTATION_REQUIRES_WORKFLOW", "Read-only inspection cannot authorize a transformation")
+            adapter = GeospatialMcpAdapter(config_path=Path(args.mcp_config), project_root=project,
+                                           allowed_roots=args.allowed_root)
+            capability = CAPABILITIES[request["operation"]]
+            context = ExecutionContext(
+                run_id=args.run_id, tenant_id=args.tenant_id, project_id=args.project_id,
+                subject_id=args.subject_id, roles=frozenset({"operator"}),
+                namespaces=frozenset({args.project_id}), authorized_capabilities=frozenset({capability}),
+            )
+            receipt = adapter.make_gateway().invoke(capability, request, context)
+            # Structured details are in the project-scoped evidence artifact, not ordinary stdout logs.
+            return _success({"tool_result": receipt.to_dict()})
+        if args.command == "data" and args.data_command in {"analyze-classification", "clarify-classification"}:
+            from .workflow.raster_preparation import RasterPreparationService
+
+            service = RasterPreparationService(project_root=Path(args.project_root), allowed_roots=args.allowed_root)
+            path = service.guard.resolve(args.request, base_root=service.project, must_exist=True)
+            request = load_document(path)
+            context = ExecutionContext(
+                run_id=args.run_id, tenant_id=args.tenant_id, project_id=args.project_id,
+                subject_id=args.subject_id, roles=frozenset({"operator"}),
+                namespaces=frozenset({args.project_id}),
+                authorized_capabilities=frozenset({"gis-raster-statistics"}) if args.data_command == "analyze-classification" else frozenset(),
+            )
+            if args.data_command == "analyze-classification":
+                from .adapters.geospatial_mcp import GeospatialMcpAdapter
+                service.registry.validate("raster-classification-request", request)
+                adapter = GeospatialMcpAdapter(config_path=Path(args.mcp_config), project_root=service.project,
+                                               allowed_roots=args.allowed_root)
+                artifact = service.analyze(request, context, adapter)
+            else:
+                answer_path = service.guard.resolve(args.answers, base_root=service.project, must_exist=True)
+                artifact = service.clarify(request, load_document(answer_path), context)
+            report, _ = service.load_verified(artifact.ref())
+            # Questions and category rows live ONLY in the project-scoped artifact, not ordinary logs.
+            return _success({"prepared_ref": artifact.ref(), "status": report["status"],
+                             "class_count": len(report["rows"]), "question_count": len(report["questions"])})
         if args.command == "data" and args.data_command == "prepare":
             path = PathGuard(args.allowed_root).resolve(args.task, must_exist=True)
             task = load_document(path)

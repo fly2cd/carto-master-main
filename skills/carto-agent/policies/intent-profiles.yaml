@@ -1,15 +1,60 @@
 schema_version: 1
-catalog_version: 1.0.0
+catalog_version: 2.1.0
+# Recognition vocabulary only; these entries do not enable executable capabilities.
 profiles:
-  - scene_id: government_thematic
+  - business_scene: government_thematic
+    purpose_terms: [政务, 政府报告]
     task_ids: [administrative-map, indicator-map, facility-map]
-    required_information: [theme, geography, time, source, output]
+    required_information: [theme_tags, geography, time, source, output]
     unsupported_actions: [invent-unconfirmed-policy-theme]
-  - scene_id: emergency_mapping
+  - business_scene: emergency_mapping
+    purpose_terms: [应急, 灾情, 救援]
     task_ids: [hazard-result-map, resource-map, situation-map]
     required_information: [hazard, event-phase, data-nature, observation-time, geography, source, output]
     unsupported_actions: [hazard-prediction, remote-sensing-auto-extraction, command-decision]
-  - scene_id: leadership_visit
+  - business_scene: leadership_visit
+    purpose_terms: [领导调研, 调研路线, 行程, 考察点, 调研点]
     task_ids: [visit-route-map]
     required_information: [itinerary, visit-order, route-mode, geography, confidentiality, output]
     unsupported_actions: [reorder-visits, replace-road-route-with-straight-line]
+  # Standard thematic mapping: a statable purpose on the same level as the scenes
+  # above, not a purpose-less catch-all. Content stays bound to catalogued themes.
+  - business_scene: general_thematic_mapping
+    purpose_terms: [通用专题图, 标准专题图, 通用制图]
+    task_ids: [thematic-map]
+    required_information: [theme_tags, geography, source, output]
+    unsupported_actions: [invent-unregistered-business-purpose, alter-frozen-classification]
+themes:
+  - id: administrative-division
+    label: 行政区划
+    terms: [行政区划]
+  - id: economic-development
+    label: 经济发展
+    terms: [经济发展]
+  - id: technology-innovation
+    label: 科技创新
+    terms: [科技创新]
+  - id: modern-industry
+    label: 现代产业
+    terms: [现代产业]
+  - id: opening-up
+    label: 对外开放
+    terms: [对外开放]
+  - id: culture-tourism
+    label: 文化旅游
+    terms: [文旅, 文化旅游]
+  - id: transportation
+    label: 交通运输
+    terms: [交通运输]
+  - id: landslide
+    label: 滑坡
+    terms: [滑坡]
+  - id: flood
+    label: 洪涝
+    terms: [洪涝, 洪水]
+  - id: forest-fire
+    label: 森林火灾
+    terms: [森林火灾]
+  - id: land-cover
+    label: 土地覆盖
+    terms: [土地覆盖, 土地覆被, 地表覆盖]

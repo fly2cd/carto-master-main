@@ -67,7 +67,7 @@ class PathSecurityTests(unittest.TestCase):
 class ApprovalTests(unittest.TestCase):
     def _receipt(self) -> ApprovalReceipt:
         now = datetime.now(timezone.utc)
-        return ApprovalReceipt(1, "receipt-one", "trusted-local", "user-one", "tenant-one", "approve-freeze", "resolved-map", D, "project:flood", "carto-security", "local", (now - timedelta(minutes=1)).isoformat(), (now + timedelta(minutes=5)).isoformat(), "nonce-0000000001")
+        return ApprovalReceipt(1, "receipt-one", "trusted-local", "user-one", "tenant-one", "approve-freeze", "resolved-map", D, "project:unit", "carto-security", "local", (now - timedelta(minutes=1)).isoformat(), (now + timedelta(minutes=5)).isoformat(), "nonce-0000000001")
 
     def test_signed_receipt_verifies_once_and_replay_fails(self) -> None:
         key = b"test-only-secret-that-is-at-least-32-bytes"
@@ -147,7 +147,7 @@ class ApprovalTests(unittest.TestCase):
                 "--key-env", "CARTO_TEST_APPROVAL_KEY",
                 "--action", "approve-freeze",
                 "--object-digest", D,
-                "--scope", "project:flood",
+                "--scope", "project:unit",
                 "--policy-id", "carto-security",
                 "--tenant-id", "tenant-one",
                 "--issuer", "trusted-local",
@@ -167,7 +167,7 @@ class ApprovalTests(unittest.TestCase):
     def _verification_kwargs() -> dict[str, str]:
         return {
             "expected_action": "approve-freeze", "expected_object_digest": D,
-            "expected_scope": "project:flood", "expected_policy_id": "carto-security",
+            "expected_scope": "project:unit", "expected_policy_id": "carto-security",
             "expected_tenant_id": "tenant-one", "expected_issuer": "trusted-local",
             "expected_subject_id": "user-one", "expected_object_type": "resolved-map",
             "expected_environment": "local",

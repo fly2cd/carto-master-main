@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..scenario_registry import ScenarioRegistry
 from ..schema_registry import SchemaRegistry
 
 
@@ -11,6 +12,7 @@ def build_template_brief(
     registry: SchemaRegistry | None = None,
 ) -> dict[str, Any]:
     registry = registry or SchemaRegistry()
+    profile = ScenarioRegistry(registry).for_create(request)
     sources = [
         {
             "id": item["source_id"],
@@ -48,22 +50,7 @@ def build_template_brief(
         "source_license_summary": licenses,
         "authoring_mode": request["authoring_mode"],
         "targets": request["targets"],
-        "data_roles": [
-            {
-                "role_id": "risk-area",
-                "source_id": request["role_bindings"]["risk_area_source"],
-                "geometry_types": ["polygon", "multipolygon"],
-                "value_field": "risk_pct",
-                "semantic_role": "risk-value",
-            },
-            {
-                "role_id": "shelter-point",
-                "source_id": request["role_bindings"]["shelter_source"],
-                "geometry_types": ["point"],
-                "value_field": "capacity",
-                "semantic_role": "count-value",
-            },
-        ],
+        "data_roles": profile.component("source_contract").brief_roles(request),
         "spatial_applicability": {
             "source_crs": request["source_crs"],
             "display_crs": request["display_crs"],
