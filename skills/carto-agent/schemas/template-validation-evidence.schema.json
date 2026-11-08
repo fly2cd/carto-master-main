@@ -44,48 +44,20 @@
       "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
     },
     "renderer": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "renderer_id",
-        "renderer_profile_digest",
-        "adapter_version",
-        "frontend_build",
-        "renderer_version",
-        "maplibre_version",
-        "overlay_engine_version",
-        "environment_fingerprint"
-      ],
-      "properties": {
-        "renderer_id": {
-          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+      "oneOf": [
+        {
+          "$ref": "#/$defs/browserRendererBinding"
         },
-        "renderer_profile_digest": {
-          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
-        },
-        "adapter_version": {
-          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"
-        },
-        "frontend_build": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 64
-        },
-        "renderer_version": {
-          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"
-        },
-        "maplibre_version": {
-          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"
-        },
-        "overlay_engine_version": {
-          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"
-        },
-        "environment_fingerprint": {
-          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+        {
+          "$ref": "#/$defs/rasterRendererBinding"
         }
-      }
+      ]
     },
     "render_receipt_ref": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+    },
+    "render_scene_ref": {
+      "description": "Frozen scene of the raster fixture render; publish re-renders from it without the authoring host's font.",
       "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
     },
     "preview_artifacts": {
@@ -247,6 +219,164 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "renderer": {
+            "properties": {
+              "renderer_id": {
+                "const": "rasterio-matplotlib-page"
+              }
+            },
+            "required": [
+              "renderer_id"
+            ]
+          }
+        },
+        "required": [
+          "renderer"
+        ]
+      },
+      "then": {
+        "required": [
+          "render_scene_ref"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "render_scene_ref"
+          ]
+        }
+      }
     }
-  ]
+  ],
+  "$defs": {
+    "browserRendererBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "renderer_id",
+        "renderer_profile_digest",
+        "adapter_version",
+        "frontend_build",
+        "renderer_version",
+        "maplibre_version",
+        "overlay_engine_version",
+        "environment_fingerprint"
+      ],
+      "properties": {
+        "renderer_id": {
+          "const": "maplibre-web"
+        },
+        "renderer_profile_digest": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+        },
+        "adapter_version": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"
+        },
+        "frontend_build": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "renderer_version": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"
+        },
+        "maplibre_version": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"
+        },
+        "overlay_engine_version": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"
+        },
+        "environment_fingerprint": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+        }
+      }
+    },
+    "rasterRendererBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "renderer_id",
+        "renderer_profile_digest",
+        "adapter_version",
+        "renderer_version",
+        "renderer_code_digest",
+        "runtime",
+        "environment_fingerprint"
+      ],
+      "properties": {
+        "renderer_id": {
+          "const": "rasterio-matplotlib-page"
+        },
+        "renderer_profile_digest": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+        },
+        "adapter_version": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"
+        },
+        "renderer_version": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"
+        },
+        "renderer_code_digest": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+        },
+        "runtime": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "python",
+            "rasterio",
+            "gdal",
+            "numpy",
+            "matplotlib",
+            "pillow",
+            "freetype",
+            "fonttools",
+            "zlib"
+          ],
+          "properties": {
+            "python": {
+              "$ref": "#/$defs/runtimeVersion"
+            },
+            "rasterio": {
+              "$ref": "#/$defs/runtimeVersion"
+            },
+            "gdal": {
+              "$ref": "#/$defs/runtimeVersion"
+            },
+            "numpy": {
+              "$ref": "#/$defs/runtimeVersion"
+            },
+            "matplotlib": {
+              "$ref": "#/$defs/runtimeVersion"
+            },
+            "pillow": {
+              "$ref": "#/$defs/runtimeVersion"
+            },
+            "freetype": {
+              "$ref": "#/$defs/runtimeVersion"
+            },
+            "fonttools": {
+              "$ref": "#/$defs/runtimeVersion"
+            },
+            "zlib": {
+              "$ref": "#/$defs/runtimeVersion"
+            }
+          }
+        },
+        "environment_fingerprint": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+        }
+      }
+    },
+    "runtimeVersion": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+    }
+  }
 }

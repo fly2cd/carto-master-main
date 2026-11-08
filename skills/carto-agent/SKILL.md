@@ -19,9 +19,9 @@ version: 0.5.0
 
 - 保留通用框架：Schema 与安全底座、状态与回执、审批协调、ToolGateway、知识服务、模板创建发布编排、候选编译与冻结、锁驱动渲染、成品检查和原子本地交付。
 - **当前只注册了一个业务场景**：`general_thematic_mapping`（标准专题图编制；`policies/scenario-capabilities.yaml` v1.3.0 的 `general-thematic-mapping` 档案，代码实现白名单 `general-thematic-raster`，模板 `map-scenario/general-thematic-map@1.0.0`）。它只接受用户提供的已分类栅格（`data_nature: user-provided`、禁敏感坐标、禁生产数据），A4 横版 300dpi 输出 PDF+PNG，`production_enabled: false`，成果强制携带场景 NOTICE 与用户声明的源许可。其余一切能力仍默认拒绝：结构合法且意图就绪后，创建和生成入口对未注册能力返回 `CAPABILITY_NOT_AVAILABLE`；生成入口的缺项或歧义先返回意图错误，不能用通用 Schema 通过代替能力准入。
-- 该场景的分类栅格模板样张渲染分支尚未注册：`validate` 的 fixture-render 检查失败关闭（`RASTER_FIXTURE_RENDER_UNREGISTERED`），在框架补齐并消费精确 TP 之前不得发布该模板，也不得伪造渲染证据绕过。
+- 该场景的分类栅格模板样张渲染分支已注册：`validate` 在静态检查全部通过后，于受信验证上下文内由包内图例样本派生确定性合成栅格，经授权 MCP 网关测量统计，并用 `rasterio-matplotlib-page` 后端渲染 PDF+PNG 样张、冻结渲染场景与带签名 RenderReceipt；`publish` 按冻结场景重新核验证据（不依赖作者宿主字体）并消费精确 TP。宿主缺少栅格渲染依赖、无可嵌入字体或展示 CRS 为地理坐标系时仍失败关闭，不得伪造渲染证据绕过。
 - 仓库不附带业务示例数据、示例模板包或默认测试项目。后续由用户提供真实数据和场景需求，完成对应实现、注册和验收后才能启用。
-- 模板发布仍必须验证闭合包、依赖锁、场景验证输入、检查器集合、RenderReceipt 和环境绑定，并消费精确 TP。验证数据是否适合进入模板包由场景安全检查明确判定，不能把原始敏感业务数据打包。
+- 模板发布仍必须验证闭合包、依赖锁、场景验证输入、检查器集合、RenderReceipt、冻结样张场景（`render_scene_ref`）和环境绑定，并消费精确 TP。验证数据是否适合进入模板包由场景安全检查明确判定，不能把原始敏感业务数据打包。
 - 工作流严格保留 T1 / TP / G1 / G2 / G3、运行级单写锁、revision/CAS、不可变步骤回执、受限重试及恢复证明；不得伪造审批或放松门禁以继续。
 - `render` 只消费锁与摘要绑定输入；`check` 验证冻结的输出规格、布局、图例、场景声明链、字体、环境和敏感内容；`deliver` 重新验证全部绑定后，按精确 G3 进行同文件系统原子提交。
 - 交付包白名单为 `map.pdf`、`map.png`、`README.md`、`delivery-manifest.yaml`、`checksums.sha256`；不包含原始数据、内部锁、审批密钥或内部回执。
@@ -60,7 +60,7 @@ version: 0.5.0
 - RenderScene / RenderReceipt / execution 环境按后端严格区分。预览、G2 冻结、锁驱动正式渲染与重放只按冻结 ID 分派；保留 `maplibre-web`，未知后端拒绝，栅格不探测 Chromium、不伪造浏览器版本。
 - 正式栅格 RenderReceipt 由 `RasterFormalRenderer` 签发，包含 HMAC、代码/依赖环境、精确会话、资源集、页面报告和输出摘要；内部 `raster-page-output` 仍不是回执。当前是受项目路径约束的进程内后端，**不提供 OS/网络沙箱**，HMAC 不等于远程或硬件环境证明。
 - 复用既有 MapSpecLock、RenderAttempt、FormalRenderEvidence、11 项成品检查、精确 G3 和原子本地交付。图例共性检查不替代业务检查；篡改产物不生成 Manifest。
-- 已有从测试候选边界开始的临时合成数据 G2/G3 链路与恢复测试。**不表示 T1/TP/G1、真实模板发布或用户地图已验收**；场景组件须在独立准入后调用上述共享准备/编译器，注册策略和实现白名单仍为空，不新增审批旁路 CLI。
+- 已有从测试候选边界开始的临时合成数据 G2/G3 链路与恢复测试，以及合成数据/合成审批的模板 T1 → validate（合成样张渲染）→ TP → 发布闭环测试。均**不表示真实用户数据、真实审批身份或用户地图已验收**；注册策略和实现白名单当前仅登记 `general-thematic-mapping`（实现 `general-thematic-raster`，含模板样张渲染组件），不新增审批旁路 CLI。
 
 ## 通用内核与场景扩展
 

@@ -2,7 +2,7 @@
 
 | 路由 | 请求目标 | 当前状态 |
 |---|---|---|
-| `create-template` | 创建可复用地图模板包 | 保留 `analyze → brief → author → validate → publish` 编排；仅准入已注册的 `general_thematic_mapping` 场景（`general-thematic-map` 模板），其样张渲染分支未注册前 `validate` 失败关闭、不得发布；其余默认拒绝 |
+| `create-template` | 创建可复用地图模板包 | 保留 `analyze → brief → author → validate → publish` 编排；仅准入已注册的 `general_thematic_mapping` 场景（`general-thematic-map` 模板）。静态检查通过后 `validate` 在受信验证上下文内渲染合成样张并冻结场景/回执/预览证据，`publish` 重新核验冻结证据并消费精确 TP；缺少栅格渲染依赖、可嵌入字体或投影展示 CRS 时失败关闭；其余默认拒绝 |
 | `generate-map` | 从业务意图和数据生成地图成果 | 保留 `intake → brief → compile → preview → freeze → render → check → deliver` 编排及状态查询；仅准入已注册的 `general_thematic_mapping` 场景（用户提供已分类栅格 → A4 横版 PDF+PNG），其余默认拒绝 |
 | `edit-native-map` | 保留原生 GIS 工程并编辑 | 未开放，返回 `CAPABILITY_NOT_AVAILABLE` |
 | `curate-catalog` | 治理符号、标准和目录 | 未开放，返回 `CAPABILITY_NOT_AVAILABLE` |

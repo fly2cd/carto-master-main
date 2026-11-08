@@ -64,6 +64,41 @@ class SchemaTests(unittest.TestCase):
                 with self.assertRaises(ProtocolError):
                     self.registry.validate(schema_name, instance)
 
+    def test_validation_evidence_supports_browser_and_raster_renderer_bindings(self) -> None:
+        browser = deepcopy(VALID_CASES["template-validation-evidence"])
+        self.registry.validate("template-validation-evidence", browser)
+        raster = deepcopy(browser)
+        raster["renderer"] = {
+            "renderer_id": "rasterio-matplotlib-page",
+            "renderer_profile_digest": D,
+            "adapter_version": "1.0.0",
+            "renderer_version": "1.0.0",
+            "renderer_code_digest": D,
+            "runtime": {name: "1.0.0" for name in
+                        ("python", "rasterio", "gdal", "numpy", "matplotlib",
+                         "pillow", "freetype", "fonttools", "zlib")},
+            "environment_fingerprint": D,
+        }
+        raster["render_scene_ref"] = deepcopy(A)
+        self.registry.validate("template-validation-evidence", raster)
+        browser_with_scene = deepcopy(browser)
+        browser_with_scene["render_scene_ref"] = deepcopy(A)
+        with self.assertRaises(ProtocolError):
+            self.registry.validate("template-validation-evidence", browser_with_scene)
+        mutations = (
+            ("raster-binding-without-scene", lambda value: value.pop("render_scene_ref")),
+            ("raster-binding-without-runtime", lambda value: value["renderer"].pop("runtime")),
+            ("raster-binding-with-browser-field",
+             lambda value: value["renderer"].update(maplibre_version="3.6.0")),
+            ("runtime-without-zlib", lambda value: value["renderer"]["runtime"].pop("zlib")),
+        )
+        for name, mutate in mutations:
+            with self.subTest(mutation=name):
+                invalid = deepcopy(raster)
+                mutate(invalid)
+                with self.assertRaises(ProtocolError):
+                    self.registry.validate("template-validation-evidence", invalid)
+
     def test_final_check_report_requires_complete_frozen_evidence(self) -> None:
         report = deepcopy(VALID_CASES["validation-report"])
         report.update({

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 import os
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable
@@ -21,9 +22,17 @@ from ..schema_registry import SchemaRegistry, load_document
 from ..security.paths import PathGuard
 from ..validation.registry import CheckerRegistry
 from ..validation.map_checks import MapQualityChecks
+from .models import ExecutionContext
 
-VALIDATOR_VERSION = "1.3.0"
-ADAPTER_VERSION = "1.0.0"
+VALIDATOR_VERSION = "1.4.0"
+ADAPTER_VERSION = "1.1.0"
+
+
+def _raster_renderer_id() -> str:
+    # raster_scene imports workflow modules at import time while the workflow package
+    # imports this module, so the renderer id resolves lazily instead of at import time.
+    from ..compiler.raster_scene import RASTER_RENDERER_ID
+    return RASTER_RENDERER_ID
 
 
 class TemplatePackageValidator:
@@ -39,7 +48,8 @@ class TemplatePackageValidator:
                  attestation_key: bytes, registry: SchemaRegistry | None = None,
                  browser: str | Path | None = None, font_path: str | Path | None = None,
                  limits: BrowserLimits | None = None,
-                 render_hook: Callable[[], None] | None = None) -> None:
+                 render_hook: Callable[[], None] | None = None,
+                 context: ExecutionContext | None = None) -> None:
         if len(attestation_key) < 32:
             raise SecurityError("RENDER_ATTESTATION_KEY_WEAK", "Attestation key must be at least 32 bytes")
         self.path_guard = path_guard
@@ -53,6 +63,10 @@ class TemplatePackageValidator:
         self.limits = limits or BrowserLimits()
         self.render_hook = render_hook
         self.resolver = DependencyResolver()
+        # Raster fixture scenes are built, frozen and re-verified inside this isolated
+        # workspace; its context is the trusted validation execution scope.
+        self.context = context
+        self.fixture_workspace = self.path_guard.resolve(self.evidence_root / "fixture")
 
     def validate(self, expected: dict[str, Any], expected_targets: list[str]) -> dict[str, Any]:
         results: list[dict[str, Any]] = []
@@ -64,28 +78,40 @@ class TemplatePackageValidator:
 
         receipt: dict[str, Any] | None = None
         renderer_binding: dict[str, Any] | None = None
+        scene: dict[str, Any] | None = None
         try:
             if self.render_hook is not None:
                 self.render_hook()
-            receipt, profile = self._render_fixture(snapshot, expected_targets)
-            renderer_binding = {
-                "renderer_id": profile.renderer_id,
-                "renderer_profile_digest": profile.profile_digest(),
-                "adapter_version": ADAPTER_VERSION,
-                "frontend_build": FRONTEND_BUILD,
-                "renderer_version": RENDERER_VERSION,
-                "maplibre_version": MAPLIBRE_VERSION,
-                "overlay_engine_version": OVERLAY_ENGINE_VERSION,
-                "environment_fingerprint": receipt["environment_fingerprint"],
-            }
+            receipt, profile, scene = self._render_fixture(snapshot, expected_targets)
+            if receipt["renderer_id"] == _raster_renderer_id():
+                renderer_binding = {
+                    "renderer_id": profile.renderer_id,
+                    "renderer_profile_digest": profile.profile_digest(),
+                    "adapter_version": ADAPTER_VERSION,
+                    "renderer_version": receipt["renderer_version"],
+                    "renderer_code_digest": receipt["renderer_code_digest"],
+                    "runtime": deepcopy(receipt["runtime"]),
+                    "environment_fingerprint": receipt["environment_fingerprint"],
+                }
+            else:
+                renderer_binding = {
+                    "renderer_id": profile.renderer_id,
+                    "renderer_profile_digest": profile.profile_digest(),
+                    "adapter_version": ADAPTER_VERSION,
+                    "frontend_build": FRONTEND_BUILD,
+                    "renderer_version": RENDERER_VERSION,
+                    "maplibre_version": MAPLIBRE_VERSION,
+                    "overlay_engine_version": OVERLAY_ENGINE_VERSION,
+                    "environment_fingerprint": receipt["environment_fingerprint"],
+                }
             results.append(self._result("template.fixture-render", True, {
                 "receipt_digest": sha256_digest(receipt),
                 "targets": sorted(item["target"] for item in receipt["output_artifacts"]),
             }))
         except (CartoError, OSError, ValueError) as exc:
             results.append(self._result("template.fixture-render", False, exc))
-        evidence = self._evidence(snapshot, results, renderer=renderer_binding, receipt=receipt)
-        self._write_evidence(evidence, receipt)
+        evidence = self._evidence(snapshot, results, renderer=renderer_binding, receipt=receipt, scene=scene)
+        self._write_evidence(evidence, receipt, scene)
         return evidence
 
 
@@ -126,7 +152,7 @@ class TemplatePackageValidator:
                 elif check_id == "template.semantic-contracts":
                     details["fixture_set_digest"] = snapshot["fixture_set_digest"]
                 else:
-                    details.update({"targets": sorted(expected_targets), "renderer": "maplibre-web"})
+                    details.update({"targets": sorted(expected_targets)})
                 results.append(self._result(check_id, True, details))
             except (CartoError, OSError, ValueError, TypeError) as exc:
                 if raise_errors:
@@ -170,29 +196,32 @@ class TemplatePackageValidator:
         if receipt.get("renderer_attestation") != compute_renderer_attestation(receipt, self.attestation_key):
             raise ProtocolError("VALIDATION_RENDER_ATTESTATION_INVALID", receipt.get("receipt_id", "unknown"))
         renderer = evidence["renderer"]
-        expected_renderer = {
-            "renderer_id": receipt["renderer_id"],
-            "adapter_version": ADAPTER_VERSION,
-            "frontend_build": receipt["frontend_build_version"],
-            "renderer_version": receipt["renderer_version"],
-            "maplibre_version": receipt["maplibre_version"],
-            "overlay_engine_version": receipt["overlay_engine_version"],
-            "environment_fingerprint": receipt["environment_fingerprint"],
-        }
-        for key, value in expected_renderer.items():
-            if renderer[key] != value:
-                raise ProtocolError("VALIDATION_RENDERER_BINDING_MISMATCH", key)
-        profile = RendererCapabilityProfile(
-            renderer_id=receipt["renderer_id"], frontend_build=receipt["frontend_build_version"],
-            renderer_version=receipt["renderer_version"], maplibre_version=receipt["maplibre_version"],
-            overlay_engine_version=receipt["overlay_engine_version"],
-            browser_engine=receipt["browser_version"], webgl_available=True,
-            supported_export_formats=("svg", "png", "pdf"), max_canvas_width=4096,
-            max_canvas_height=4096, device_pixel_ratio=2,
-            available_fonts=("Noto Sans SC",), offline_rendering=True,
-        )
-        if renderer["renderer_profile_digest"] != profile.profile_digest():
-            raise ProtocolError("VALIDATION_RENDERER_PROFILE_MISMATCH", receipt["renderer_id"])
+        if receipt["renderer_id"] == _raster_renderer_id():
+            self._verify_raster_evidence(evidence, receipt)
+        else:
+            expected_renderer = {
+                "renderer_id": receipt["renderer_id"],
+                "adapter_version": ADAPTER_VERSION,
+                "frontend_build": receipt["frontend_build_version"],
+                "renderer_version": receipt["renderer_version"],
+                "maplibre_version": receipt["maplibre_version"],
+                "overlay_engine_version": receipt["overlay_engine_version"],
+                "environment_fingerprint": receipt["environment_fingerprint"],
+            }
+            for key, value in expected_renderer.items():
+                if renderer[key] != value:
+                    raise ProtocolError("VALIDATION_RENDERER_BINDING_MISMATCH", key)
+            profile = RendererCapabilityProfile(
+                renderer_id=receipt["renderer_id"], frontend_build=receipt["frontend_build_version"],
+                renderer_version=receipt["renderer_version"], maplibre_version=receipt["maplibre_version"],
+                overlay_engine_version=receipt["overlay_engine_version"],
+                browser_engine=receipt["browser_version"], webgl_available=True,
+                supported_export_formats=("svg", "png", "pdf"), max_canvas_width=4096,
+                max_canvas_height=4096, device_pixel_ratio=2,
+                available_fonts=("Noto Sans SC",), offline_rendering=True,
+            )
+            if renderer["renderer_profile_digest"] != profile.profile_digest():
+                raise ProtocolError("VALIDATION_RENDERER_PROFILE_MISMATCH", receipt["renderer_id"])
         receipt_artifacts = {item["target"]: item["artifact_ref"] for item in receipt["output_artifacts"]}
         evidence_artifacts = {item["target"]: item["artifact_ref"] for item in evidence["preview_artifacts"]}
         if receipt_artifacts != evidence_artifacts or set(receipt_artifacts) != set(expected_targets):
@@ -202,6 +231,53 @@ class TemplatePackageValidator:
             if file_digest(path) != artifact["artifact_ref"]["digest"]:
                 raise ProtocolError("VALIDATION_PREVIEW_DRIFT", artifact["target"])
         return snapshot
+
+    def _verify_raster_evidence(self, evidence: dict[str, Any], receipt: dict[str, Any]) -> None:
+        """Re-verify the frozen raster scene and re-render it through the raster backend."""
+        from ..adapters.raster_formal_renderer import RasterFormalRenderer
+        if self.context is None:
+            raise SecurityError("RASTER_EXECUTION_CONTEXT_REQUIRED",
+                                "Raster evidence verification requires the trusted validation context")
+        scene_ref = evidence.get("render_scene_ref")
+        if scene_ref is None:
+            raise ProtocolError("VALIDATION_RENDER_SCENE_MISSING", evidence["evidence_id"])
+        scene_path = self.path_guard.resolve(scene_ref["uri"], must_exist=True)
+        scene = load_document(scene_path)
+        if not isinstance(scene, dict):
+            raise ProtocolError("VALIDATION_RENDER_SCENE_INVALID", str(scene_path))
+        self.registry.validate("render-scene", scene)
+        if (sha256_digest(scene) != scene_ref["digest"]
+                or scene.get("renderer_id") != _raster_renderer_id()
+                or receipt["scene_digest"] != scene_ref["digest"]):
+            raise ProtocolError("VALIDATION_RENDER_SCENE_DRIFT", str(scene_path))
+        renderer = evidence["renderer"]
+        expected_renderer = {
+            "renderer_id": receipt["renderer_id"],
+            "adapter_version": ADAPTER_VERSION,
+            "renderer_version": receipt["renderer_version"],
+            "renderer_code_digest": receipt["renderer_code_digest"],
+            "runtime": receipt["runtime"],
+            "renderer_profile_digest": receipt["renderer_profile_digest"],
+            "environment_fingerprint": receipt["environment_fingerprint"],
+        }
+        for key, value in expected_renderer.items():
+            if renderer[key] != value:
+                raise ProtocolError("VALIDATION_RENDERER_BINDING_MISMATCH", key)
+        # Rebuilding the renderer re-reads the frozen page request from the store; the
+        # original font on the authoring host is never needed again.
+        self.fixture_workspace.mkdir(parents=True, exist_ok=True)
+        (self.fixture_workspace / "render").mkdir(parents=True, exist_ok=True)
+        verifier = RasterFormalRenderer(
+            path_guard=PathGuard([self.fixture_workspace]),
+            output_root=self.fixture_workspace / "render",
+            attestation_key=self.attestation_key,
+            project_root=self.fixture_workspace,
+            context=self.context,
+            registry=self.registry,
+        )
+        # validate_receipt re-renders the page from the frozen inputs and compares the
+        # rebuilt receipt (profile digest, code digest, runtime) plus output digests.
+        verifier.validate_receipt(scene, receipt)
 
     def _check_package_files(self) -> dict[str, Any]:
         if not self.package_root.is_dir():
@@ -362,11 +438,41 @@ class TemplatePackageValidator:
             if target["format"] == "png" and target["vector_claim"] != "none":
                 raise ProtocolError("DELIVERY_VECTOR_CLAIM_INVALID", target["id"])
 
-    def _render_fixture(self, snapshot: dict[str, Any], targets: list[str]) -> tuple[dict[str, Any], RendererCapabilityProfile]:
+    def _render_fixture(self, snapshot: dict[str, Any],
+                        targets: list[str]) -> tuple[dict[str, Any], Any, dict[str, Any] | None]:
+        font = self._select_font()
+        scene = self._scene(snapshot, targets, font)
+        if scene.get("renderer_id") == _raster_renderer_id():
+            return self._render_raster_fixture(snapshot, scene)
+        return self._render_browser_fixture(snapshot, font, scene)
+
+    def _render_raster_fixture(self, snapshot: dict[str, Any],
+                               scene: dict[str, Any]) -> tuple[dict[str, Any], Any, dict[str, Any]]:
+        from ..adapters.raster_formal_renderer import RasterFormalRenderer
+        if self.context is None:
+            raise SecurityError("RASTER_EXECUTION_CONTEXT_REQUIRED",
+                                "Raster fixture rendering requires the trusted validation context")
+        self.fixture_workspace.mkdir(parents=True, exist_ok=True)
+        render_root = self.fixture_workspace / "render"
+        render_root.mkdir(parents=True, exist_ok=True)
+        renderer = RasterFormalRenderer(
+            path_guard=PathGuard([self.fixture_workspace]),
+            output_root=render_root,
+            attestation_key=self.attestation_key,
+            project_root=self.fixture_workspace,
+            context=self.context,
+            registry=self.registry,
+        )
+        session_id = f"template-validation-{snapshot['package_digest'][7:23]}"
+        receipt = renderer.render(session_id, scene)
+        renderer.validate_receipt(scene, receipt)
+        return receipt, renderer.profile, scene
+
+    def _render_browser_fixture(self, snapshot: dict[str, Any], font: Path, scene: dict[str, Any]
+                                ) -> tuple[dict[str, Any], RendererCapabilityProfile, None]:
         browser = self.browser or discover_browser()
         if browser is None or not browser.is_file():
             raise ProtocolError("RENDER_BROWSER_UNAVAILABLE", "A controlled Chromium browser is required")
-        font = self._select_font()
         self.evidence_root.mkdir(parents=True, exist_ok=True)
         output_root = self.path_guard.resolve(self.evidence_root / "previews")
         output_root.mkdir(parents=True, exist_ok=True)
@@ -387,16 +493,17 @@ class TemplatePackageValidator:
             available_fonts=("Noto Sans SC",), offline_rendering=True,
         )
         adapter = WebMapRendererAdapter(RendererCapabilityRegistry([profile]), renderer)
-        scene = adapter.compile_scene(self._scene(snapshot, targets, font))
+        scene = adapter.compile_scene(scene)
         session_id = f"template-validation-{snapshot['package_digest'][7:23]}"
         receipt = adapter.submit_render(session_id, scene, profile.renderer_id, FRONTEND_BUILD)
         adapter.validate_receipt(receipt, self.attestation_key)
-        return receipt, profile
+        return receipt, profile, None
 
     def _scene(self, snapshot: dict[str, Any], targets: list[str], font: Path) -> dict[str, Any]:
         profile = ScenarioRegistry(self.registry).for_template(snapshot["manifest"]["package"])
         return profile.component("validation_scene")(
-            self.package_root, snapshot, targets, font, VALIDATOR_VERSION)
+            self.package_root, snapshot, targets, font, VALIDATOR_VERSION,
+            context=self.context, workspace=self.fixture_workspace, registry=self.registry)
 
     def _select_font(self) -> Path:
         candidates: list[Path] = []
@@ -420,7 +527,8 @@ class TemplatePackageValidator:
         raise ProtocolError("RENDER_FONT_UNAVAILABLE", "No approved local font was found")
 
     def _evidence(self, snapshot: dict[str, Any], results: list[dict[str, Any]], *,
-                  renderer: dict[str, Any] | None, receipt: dict[str, Any] | None) -> dict[str, Any]:
+                  renderer: dict[str, Any] | None, receipt: dict[str, Any] | None,
+                  scene: dict[str, Any] | None = None) -> dict[str, Any]:
         counts = {severity: sum(1 for item in results
                                 if item["severity"] == severity and item["status"] == "failed")
                   for severity in ("blocker", "error", "warning", "info")}
@@ -448,14 +556,23 @@ class TemplatePackageValidator:
                 {"target": item["target"], "artifact_ref": item["artifact_ref"]}
                 for item in receipt["output_artifacts"]
             ]
+            if scene is not None:
+                # The frozen scene lets publish re-verify without the authoring host's font.
+                evidence["render_scene_ref"] = {
+                    "id": "fixture-render-scene", "version": "1.0.0",
+                    "digest": sha256_digest(scene), "uri": str(self.evidence_root / "render-scene.yaml"),
+                }
         evidence["evidence_digest"] = sha256_digest(evidence)
         self.registry.validate("template-validation-evidence", evidence)
         return evidence
 
-    def _write_evidence(self, evidence: dict[str, Any], receipt: dict[str, Any] | None = None) -> None:
+    def _write_evidence(self, evidence: dict[str, Any], receipt: dict[str, Any] | None = None,
+                        scene: dict[str, Any] | None = None) -> None:
         self.evidence_root.mkdir(parents=True, exist_ok=True)
         if receipt is not None:
             atomic_yaml(self.evidence_root / "render-receipt.yaml", receipt)
+        if scene is not None:
+            atomic_yaml(self.evidence_root / "render-scene.yaml", scene)
         atomic_yaml(self.evidence_root / "template-validation-evidence.yaml", evidence)
 
     def _fallback_snapshot(self, expected: dict[str, Any]) -> dict[str, Any]:

@@ -326,6 +326,24 @@ _invalid_validation_evidence = deepcopy(VALID_CASES["template-validation-evidenc
 _invalid_validation_evidence.pop("render_receipt_ref")
 SEMANTIC_INVALID_CASES["template-validation-passed-without-receipt"] = ("template-validation-evidence", _invalid_validation_evidence)
 
+# The raster fixture-render binding requires its frozen scene reference; the
+# browser binding must stay closed (no raster-only fields may leak into it).
+_raster_binding = {
+    "renderer_id": "rasterio-matplotlib-page", "renderer_profile_digest": D,
+    "adapter_version": "1.0.0", "renderer_version": "1.0.0", "renderer_code_digest": D,
+    "runtime": {name: "1.0.0" for name in ("python", "rasterio", "gdal", "numpy",
+                                             "matplotlib", "pillow", "freetype", "fonttools", "zlib")},
+    "environment_fingerprint": D,
+}
+_invalid_raster_evidence = deepcopy(VALID_CASES["template-validation-evidence"])
+_invalid_raster_evidence["renderer"] = deepcopy(_raster_binding)
+SEMANTIC_INVALID_CASES["template-validation-raster-without-scene"] = ("template-validation-evidence", _invalid_raster_evidence)
+
+_invalid_mixed_evidence = deepcopy(VALID_CASES["template-validation-evidence"])
+_invalid_mixed_evidence["renderer"] = {**deepcopy(_raster_binding), "maplibre_version": "3.6.0"}
+_invalid_mixed_evidence["render_scene_ref"] = deepcopy(A)
+SEMANTIC_INVALID_CASES["template-validation-mixed-renderer-binding"] = ("template-validation-evidence", _invalid_mixed_evidence)
+
 _invalid_delivery_manifest_time = deepcopy(VALID_CASES["delivery-manifest"])
 _invalid_delivery_manifest_time["delivered_at"] = "2026-09-21T00:00:00Z"
 SEMANTIC_INVALID_CASES["delivery-manifest-post-commit-field"] = (

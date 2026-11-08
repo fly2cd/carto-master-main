@@ -1,10 +1,10 @@
 """Tests for the registered general_thematic_mapping scenario (general-thematic-raster).
 
 Synthetic data, synthetic approval keys and TemporaryDirectory roots only. These tests
-never create or consume a real user approval, and they assert that the unregistered
-raster fixture-render branch fails closed instead of working around it. Publishing the
-template and delivering a real map therefore stay out of reach until that framework
-evolution lands — exactly what the scenario admission README requires.
+never create or consume a real user approval. The create line exercises the registered
+raster fixture-render branch end to end: validate freezes a synthetic fixture scene,
+publish re-verifies the frozen evidence without the authoring host's font, and
+tampering with any frozen artifact fails closed.
 """
 from __future__ import annotations
 
@@ -58,26 +58,37 @@ TEMPLATE = {"namespace": "local", "kind": "map-scenario",
 BRIEF_STUB = {"kind": "map-scenario", "namespace": "local",
               "template_id": "general-thematic-map", "version": "1.0.0"}
 SCENE_TEXT = NOTICE + GOAL + LEGEND_TITLE
+# Every string the frozen validation page may draw: sample title, notice, legend, labels.
+VALIDATION_TEXT = "分类栅格模板样张" + NOTICE + LEGEND_TITLE + "示例类别一二三"
 LEGEND_CSV = "category_value,category_label\n1,示例类别一\n2,示例类别二\n3,示例类别三\n"
 CRS_26911 = {"authority": "EPSG", "code": "26911"}
 CRS_4326 = {"authority": "EPSG", "code": "4326"}
-# Fail-closed codes the fixture-render blocker may carry: the scenario component itself
-# (RASTER_FIXTURE_RENDER_UNREGISTERED) or a host without a controlled browser/font.
-FIXTURE_RENDER_BLOCKED = {"RASTER_FIXTURE_RENDER_UNREGISTERED",
-                          "RENDER_BROWSER_UNAVAILABLE", "RENDER_FONT_UNAVAILABLE"}
+# Fail-closed codes the fixture-render check may carry on a host without the raster
+# rendering extra, an embeddable font, or a projectable display CRS: the 4326 request
+# below stays on the fail-closed path by construction (geographic CRS).
+FIXTURE_RENDER_BLOCKED = {"RASTER_RENDER_DEPENDENCY_MISSING", "RASTER_FIXTURE_PROFILE_UNSUPPORTED",
+                          "RASTER_RENDER_PROFILE_UNSUPPORTED", "RASTER_FONT_GLYPH_MISSING",
+                          "RASTER_FONT_FORMAT_UNSUPPORTED", "RASTER_FONT_EMBEDDING_FORBIDDEN",
+                          "RENDER_FONT_UNAVAILABLE"}
 
 
 def find_cjk_font(required_text: str) -> Path | None:
-    """First embeddable single-face Windows TTF that covers every scenario string."""
+    """First embeddable single-face TTF (env override, Windows, macOS) covering the text."""
+    candidates: list[Path] = []
+    override = os.environ.get("CARTO_TEST_CJK_FONT")
+    if override:
+        candidates.append(Path(override))
     fonts = Path(os.environ.get("SystemRoot", os.environ.get("WINDIR", r"C:\Windows"))) / "Fonts"
-    for name in ("simhei.ttf", "simkai.ttf", "simfang.ttf", "Deng.ttf", "msyh.ttf"):
-        candidate = fonts / name
+    candidates.extend(fonts / name for name in
+                      ("simhei.ttf", "simkai.ttf", "simfang.ttf", "Deng.ttf", "msyh.ttf"))
+    candidates.append(Path("/System/Library/Fonts/Supplemental/Arial Unicode.ttf"))
+    for candidate in candidates:
         try:
             if not candidate.is_file():
                 continue
             with open(candidate, "rb") as stream:
                 if stream.read(4) != b"\x00\x01\x00\x00":
-                    continue
+                    continue  # single-face TTF only; collections cannot be embedded as-is
             from fontTools.ttLib import TTFont
             font = TTFont(str(candidate), lazy=True)
             try:
@@ -394,7 +405,9 @@ class CreateLineTests(unittest.TestCase):
                     validation_data_checker(package_root, snapshot, expected)
         finally:
             fixture.write_bytes(original)
-        with self.assertRaisesRegex(ProtocolError, "RASTER_FIXTURE_RENDER_UNREGISTERED"):
+        # The registered fixture render is trusted-scope-only: without the validation
+        # context and workspace it refuses to build a scene.
+        with self.assertRaisesRegex(SecurityError, "RASTER_EXECUTION_CONTEXT_REQUIRED"):
             validation_scene(package_root, snapshot, ["pdf", "png"], Path("unused.ttf"), "1.2.0")
 
     def test_source_contract_admission_is_bounded(self):
@@ -431,6 +444,174 @@ class CreateLineTests(unittest.TestCase):
         extra["role_bindings"]["area_source"] = "areas"
         with self.assertRaisesRegex(ProtocolError, "ROLE_BINDING_UNSUPPORTED"):
             SOURCE_CONTRACT.validate_role_bindings(extra, [summary])
+
+
+class PublishLineTests(unittest.TestCase):
+    """author -> validate (raster fixture render) -> tamper -> publish -> replay."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name).resolve()
+        self.registry = SchemaRegistry()
+        try:
+            from carto_core.adapters.raster_renderer import _dependencies
+            _dependencies()
+            import fontTools  # noqa: F401
+        except (CartoError, ImportError) as exc:
+            self.skipTest(str(exc))
+        self.addCleanup(release_test_font_handles)
+        font_source = find_cjk_font(VALIDATION_TEXT)
+        if font_source is None:
+            self.skipTest("No embeddable single-face CJK TTF is available on this machine")
+        self.font_path = self.root / "fonts/selected-cjk.ttf"
+        self.font_path.parent.mkdir()
+        self.font_path.write_bytes(font_source.read_bytes())
+        (self.root / "sources").mkdir()
+        self.csv_path = self.root / "sources/legend-sample.csv"
+        self.csv_path.write_bytes(LEGEND_CSV.encode("utf-8"))
+        manifest = {
+            "schema_version": 1,
+            "manifest_id": "general-sources",
+            "sources": [{
+                "source_id": "legend-sample", "kind": "csv",
+                "location_ref": "sources/legend-sample.csv",
+                "digest": file_digest(self.csv_path),
+                "provenance": {"source_type": "user", "source_ref": "user-upload:legend-sample",
+                               "version": "1", "retrieved_at": "2026-11-01T00:00:00Z",
+                               "classification": "internal"},
+                "license": "project-approved", "captured_at": "2026-11-01T00:00:00Z",
+                "data_profile": {"data_nature": "user-provided", "contains_production_data": False,
+                                 "contains_sensitive_coordinates": False,
+                                 "source_crs": deepcopy(CRS_26911)},
+            }],
+        }
+        atomic_yaml(self.root / "source-manifest.yaml", manifest)
+        self.request = deepcopy(VALID_CASES["general-thematic-template-create-request"])
+        self.request["source_crs"] = deepcopy(CRS_26911)
+        self.request["display_crs"] = deepcopy(CRS_26911)
+        self.request_path = self.root / "create-request.json"
+        self.request_path.write_text(json.dumps(self.request, ensure_ascii=False), encoding="utf-8")
+        self.workflow = TemplateCreationWorkflow(allowed_roots=[self.root], project_root=self.root,
+                                                 workdir=self.root / "work", registry=self.registry)
+        self.author_kwargs = dict(approval_key=APPROVAL_KEY, nonce_db=self.root / "nonces.sqlite",
+                                  policy_id="synthetic-policy", issuer="synthetic-issuer")
+        self.publish_kwargs = dict(repository_root=self.root / "repo",
+                                   repository_scope="local:templates",
+                                   idempotency_key="publish-general-00000001",
+                                   approval_key=APPROVAL_KEY, renderer_attestation_key=KEY,
+                                   nonce_db=self.root / "nonces.sqlite",
+                                   policy_id="synthetic-policy", issuer="synthetic-issuer")
+
+    def t1(self, digest: str) -> ApprovalReceipt:
+        return sign("T1", "approve-template-brief", "template-brief", digest,
+                    tenant_id="tenant-one", approver="reviewer-one", scope="project:project-one")
+
+    def run_to_validated(self) -> dict:
+        self.workflow.analyze(self.request_path)
+        briefed = self.workflow.brief(self.request_path)
+        atomic_yaml(self.root / "t1.yaml", asdict(self.t1(sha256_digest(briefed["brief"]))))
+        self.workflow.author(self.request_path, self.root / "t1.yaml", **self.author_kwargs)
+        return self.workflow.validate(self.request_path, attestation_key=KEY,
+                                      font_path=self.font_path)
+
+    def test_validate_freezes_a_raster_scene_and_publish_reverifies_it(self):
+        validated = self.run_to_validated()
+        evidence = validated["evidence"]
+        self.assertEqual("passed", evidence["status"])
+        self.assertEqual(RASTER_RENDERER_ID, evidence["renderer"]["renderer_id"])
+        self.assertIn("render_scene_ref", evidence)
+        self.assertEqual({"pdf", "png"},
+                         {item["target"] for item in evidence["preview_artifacts"]})
+        self.assertEqual(("pending", "publish"),
+                         (validated["state"]["status"], validated["state"]["step"]))
+        # The frozen scene carries its own font copy from the immutable store, so the
+        # published package never depends on the authoring host's font file.
+        scene_path = Path(evidence["render_scene_ref"]["uri"])
+        scene = load_document(scene_path)
+        frozen_font = next(item for item in scene["resources"] if item["kind"] == "font")
+        self.assertNotEqual(self.font_path.as_posix(), frozen_font["ref"]["uri"])
+        self.assertTrue(Path(frozen_font["ref"]["uri"]).is_file())
+
+        # Tampering with the frozen scene fails closed at publish re-verification.
+        original_scene = scene_path.read_bytes()
+        try:
+            tampered = load_document(scene_path)
+            tampered["random_seed"] += 1
+            atomic_yaml(scene_path, tampered, create_once=False)
+            with self.assertRaisesRegex(ProtocolError, "VALIDATION_RENDER_SCENE_DRIFT"):
+                self.workflow.publish(self.request_path, None, **self.publish_kwargs)
+        finally:
+            scene_path.write_bytes(original_scene)
+        # Tampering with a rendered preview fails closed as well.
+        preview = next(item for item in evidence["preview_artifacts"] if item["target"] == "png")
+        preview_path = Path(preview["artifact_ref"]["uri"])
+        original_preview = preview_path.read_bytes()
+        try:
+            preview_path.write_bytes(original_preview + b"tampered")
+            with self.assertRaisesRegex(ProtocolError, "FORMAL_RENDER_OUTPUT_DRIFT"):
+                self.workflow.publish(self.request_path, None, **self.publish_kwargs)
+        finally:
+            preview_path.write_bytes(original_preview)
+
+        # Untampered evidence publishes exactly once and replays idempotently.
+        publication_digest = sha256_digest({
+            "package_digest": evidence["package_ref"]["digest"],
+            "evidence_digest": evidence["evidence_digest"],
+            "repository_scope": "local:templates",
+        })
+        atomic_yaml(self.root / "tp.yaml", asdict(sign(
+            "TP", "approve-template-publish", "template-publication", publication_digest,
+            tenant_id="tenant-one", approver="reviewer-one", scope="local:templates")))
+        published = self.workflow.publish(self.request_path, self.root / "tp.yaml",
+                                          **self.publish_kwargs)
+        self.assertFalse(published["idempotent_replay"])
+        self.assertEqual(evidence["evidence_digest"],
+                         published["publication"]["evidence_ref"]["digest"])
+        index = load_document(self.root / "repo/template-index.yaml")
+        self.assertEqual(1, len(index["entries"]))
+        replay = self.workflow.publish(self.request_path, self.root / "tp.yaml",
+                                       **self.publish_kwargs)
+        self.assertTrue(replay["idempotent_replay"])
+        self.assertEqual(published["publication"], replay["publication"])
+
+    def test_validation_scene_is_deterministic(self):
+        guard = PathGuard([self.root])
+        work = self.root / "author-work"
+        work.mkdir()
+        author = GeneralThematicAuthor(guard, work, self.registry)
+        package = author.author(self.request, BRIEF_STUB)
+        package_root = Path(package["package_path"])
+        manifest = load_document(package_root / "manifest.yaml")
+        documents = {key: load_document(package_root / manifest["business_contracts"][key])
+                     for key in ("scenario", "spatial_behavior", "portrayal")}
+        snapshot = {
+            "manifest": manifest, "documents": documents,
+            "fixture_paths": ["fixtures/validation-input.csv"],
+            "package_digest": package["package_digest"],
+            "fixture_set_digest": sha256_digest(
+                [{"path": "fixtures/validation-input.csv",
+                  "digest": manifest["checksums"]["fixtures/validation-input.csv"]}]),
+        }
+        context = ExecutionContext(
+            run_id="run-validation-scene", tenant_id="tenant-one", project_id="project-one",
+            subject_id="operator-one", roles=frozenset({"template-validator"}),
+            namespaces=frozenset({"project-one"}),
+            authorized_capabilities=frozenset({"gis-raster-statistics"}))
+        workspace = self.root / "scene-determinism"
+        first = validation_scene(package_root, snapshot, ["pdf", "png"], self.font_path,
+                                 "1.4.0", context=context, workspace=workspace,
+                                 registry=self.registry)
+        second = validation_scene(package_root, snapshot, ["pdf", "png"], self.font_path,
+                                  "1.4.0", context=context, workspace=workspace,
+                                  registry=self.registry)
+        self.assertEqual(first, second)
+        # The frozen scene identity also binds the validator version that produced it.
+        other_version = validation_scene(package_root, snapshot, ["pdf", "png"], self.font_path,
+                                         "9.9.9", context=context, workspace=workspace,
+                                         registry=self.registry)
+        self.assertNotEqual(first["scene_id"], other_version["scene_id"])
+        self.assertEqual(first["resources"], other_version["resources"])
 
 
 class GenerationTests(PreparationFixture, unittest.TestCase):
@@ -633,11 +814,11 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
                                          workdir=self.work, registry=self.registry,
                                          repository_root=repository_root,
                                          repository_scope="local:templates")
-        # Only seams: the package is authored but NOT published (the fixture-render branch
-        # fails closed), so repository discovery/installation is stubbed with the exact
-        # authored package metadata, and browser discovery must never be reached by the
-        # raster backend. Everything else — intent resolution, G1/G2/G3 receipt validation,
-        # contracts, compilation, rendering, checks, delivery — stays real.
+        # Only seams: repository discovery/installation is stubbed with the exact authored
+        # package metadata (publication is exercised by the template workflow's own line),
+        # and browser discovery must never be reached by the raster backend. Everything
+        # else — intent resolution, G1/G2/G3 receipt validation, contracts, compilation,
+        # rendering, checks, delivery — stays real.
         seams = [patch.object(workflow, "_verify_installed_template"),
                  patch.object(ProjectTemplateInstaller, "install",
                               return_value=deepcopy(self.installation)),

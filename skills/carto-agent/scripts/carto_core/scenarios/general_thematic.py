@@ -12,27 +12,32 @@ Determinism rules enforced here:
 * every artifact is a pure function of the approved request/intent/contracts and
   the verified preparation evidence — timestamps come from the request, never
   from the clock;
-* the fixture-render branch of template validation is NOT implemented yet, so
-  ``validation_scene`` fails closed and this template line cannot be published
-  until that framework evolution lands;
+* the validation fixture renders through the registered raster backend: it derives
+  a deterministic synthetic raster from the packaged legend sample, measures it
+  through the authorized MCP gateway, and freezes the scene so publication can
+  re-verify the exact rendering evidence;
 * no business data rows, secrets or sensitive coordinates are written into
   template packages, fixtures or reports.
 """
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
 import re
 from copy import deepcopy
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
+from ..adapters.tool_gateway import ToolGateway
 from ..canonical import sha256_digest
 from ..compiler.dependencies import DependencyResolver
 from ..compiler.layout import LayoutResolver
 from ..compiler.raster_portrayal import RasterPortrayalCompiler
 from ..compiler.raster_scene import RASTER_RENDERER_ID, RasterSceneCompiler
 from ..errors import ProtocolError, SecurityError
+from ..repository.immutable_store import ImmutableArtifactStore
 from ..repository.map_expression_catalog import MapExpressionCatalog
 from ..repository.staging_package import StagingPackageWriter
 from ..scenario_registry import ScenarioRegistry
@@ -77,6 +82,15 @@ MAX_CLASSES = 256
 _CODE = re.compile(r"-?(?:0|[1-9][0-9]{0,9})\Z")
 TYPOGRAPHY = {"title_pt": 18, "body_pt": 9, "legend_pt": 10,
               "legend_heading_pt": 11, "padding_mm": 2, "line_spacing": 1.25}
+VALIDATION_TITLE = "分类栅格模板样张"
+FIXTURE_SIZE = 64
+FIXTURE_ORIGIN_X = 500000.0
+FIXTURE_ORIGIN_Y = 4000000.0
+FIXTURE_PIXEL = 30.0
+FIXTURE_TIFF = "validation-fixture.tif"
+FIXTURE_LEGEND = "validation-legend.csv"
+FIXTURE_SOURCE_ID = "validation-fixture-raster"
+FIXTURE_DATASET_ID = "validation-fixture"
 
 
 def _catalog_reference(registry: SchemaRegistry) -> dict[str, str]:
@@ -398,7 +412,7 @@ class GeneralThematicAuthor:
                 "layer_ids": [LAYER_ID],
                 "fixture_ref": FIXTURE_PATH,
                 "limitations": [
-                    "分类栅格模板的样张渲染分支尚未注册；发布前必须完成受控渲染验证。",
+                    "样张渲染使用合成栅格与固定调色板，仅验证模板协议、渲染链路与版式，不代表真实业务数据。",
                 ],
             },
             FIXTURE_PATH: self._fixture_csv(),
@@ -620,6 +634,11 @@ def validation_data_checker(package_root: Path, snapshot: dict[str, Any],
     if expected["source_crs"] != expected["display_crs"]:
         raise ProtocolError("SOURCE_CRS_UNSUPPORTED",
                             "The preserve policy requires display_crs to equal source_crs")
+    _fixture_rows(package_root, snapshot)
+
+
+def _fixture_rows(package_root: Path, snapshot: dict[str, Any]) -> list[tuple[int, str]]:
+    """Parse the single packaged legend sample into bounded (code, label) rows."""
     fixture_paths = snapshot.get("fixture_paths") or []
     if len(fixture_paths) != 1:
         raise ProtocolError("FIXTURE_SET_INVALID", str(fixture_paths))
@@ -634,11 +653,10 @@ def validation_data_checker(package_root: Path, snapshot: dict[str, Any],
     header = reader.fieldnames or []
     if sorted(header) != sorted(FIXTURE_HEADER) or len(set(header)) != len(header):
         raise ProtocolError("CSV_HEADER_INVALID", fixture_paths[0])
-    rows = 0
+    rows: list[tuple[int, str]] = []
     seen: set[int] = set()
     for record in reader:
-        rows += 1
-        if rows > MAX_CLASSES or None in record or any(value is None for value in record.values()):
+        if len(rows) >= MAX_CLASSES or None in record or any(value is None for value in record.values()):
             raise ProtocolError("CSV_ROW_INVALID", fixture_paths[0])
         code = record["category_value"].strip()
         if not _CODE.fullmatch(code) or not -2147483648 <= int(code) <= 4294967295:
@@ -649,14 +667,238 @@ def validation_data_checker(package_root: Path, snapshot: dict[str, Any],
         label = record["category_label"].strip()
         if not label or len(label) > 256 or any(ord(ch) < 32 or ord(ch) == 127 for ch in label):
             raise ProtocolError("CLASSIFICATION_LABEL_INVALID", fixture_paths[0])
-    if rows < 1:
+        rows.append((int(code), label))
+    if not rows:
         raise ProtocolError("CLASSIFICATION_CSV_EMPTY", fixture_paths[0])
+    return rows
+
+
+def _fixture_dtype(codes: list[int]) -> str:
+    for dtype, low, high in (("uint8", 0, 255), ("int16", -32768, 32767),
+                             ("uint16", 0, 65535), ("int32", -2147483648, 2147483647)):
+        if all(low <= code <= high for code in codes):
+            return dtype
+    return "uint32"
+
+
+def _raster_info(dataset: Any) -> dict[str, Any]:
+    """Measure the wire metadata of the synthetic fixture raster; nothing is hardcoded."""
+    crs = dataset.crs
+    transform = dataset.transform
+    pixel = [abs(float(transform.a)), abs(float(transform.e))]
+    if crs is None:
+        crs_text, crs_type, units, meters = None, "undefined", [], None
+    elif crs.is_projected:
+        unit, factor = crs.linear_units_factor
+        epsg = crs.to_epsg()
+        crs_text = f"EPSG:{epsg}" if epsg is not None else crs.to_string()
+        crs_type, units = "projected", [unit, unit]
+        meters = [pixel[0] * float(factor), pixel[1] * float(factor)]
+    elif crs.is_geographic:
+        epsg = crs.to_epsg()
+        crs_text = f"EPSG:{epsg}" if epsg is not None else crs.to_string()
+        crs_type, units, meters = "geographic", ["degree", "degree"], None
+    else:
+        crs_type, units, meters = "other", [], None
+        crs_text = crs.to_string()
+    bounds = dataset.bounds
+    return {
+        "kind": "raster", "driver": dataset.driver,
+        "width": int(dataset.width), "height": int(dataset.height),
+        "band_count": int(dataset.count),
+        "crs": crs_text, "crs_type": crs_type, "coordinate_units": units,
+        "bounds": [float(bounds.left), float(bounds.bottom), float(bounds.right), float(bounds.top)],
+        "transform": [float(transform.a), float(transform.b), float(transform.c),
+                      float(transform.d), float(transform.e), float(transform.f)],
+        "pixel_size": pixel, "pixel_size_meters": meters,
+        "bands": [{"band": int(band), "dtype": dataset.dtypes[index],
+                   "nodata": dataset.nodata, "description": dataset.descriptions[index],
+                   "unit": dataset.units[index]}
+                  for index, band in enumerate(dataset.indexes)],
+        "warnings": [],
+    }
+
+
+def _fixture_gateway(preparation: RasterPreparationService, workspace: Path) -> SimpleNamespace:
+    """Local in-process capability binding that measures the synthetic fixture raster.
+
+    Statistics still flow through the authorized MCP gateway contract with typed
+    input/output schemas and immutable evidence; no second GIS reader is admitted
+    and no evidence value is hardcoded.
+    """
+    policy_path = Path(__file__).resolve().parents[3] / "policies/tool-bindings.yaml"
+    config_digest = "sha256:" + hashlib.sha256(policy_path.read_bytes()).hexdigest()
+    store = ImmutableArtifactStore(workspace / ".carto/geospatial/evidence", path_guard=PathGuard([workspace]))
+    gateway = ToolGateway(policy_path, store, preparation.registry)
+
+    def statistics(request: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+        import numpy as np
+        import rasterio
+        source = request["source"]
+        path = preparation.guard.resolve(source["path"], base_root=preparation.project, must_exist=True)
+        try:
+            with rasterio.open(path) as dataset:
+                data = dataset.read(1, masked=True)
+                info = _raster_info(dataset)
+        except ProtocolError:
+            raise
+        except Exception as exc:
+            raise ProtocolError("RASTER_FIXTURE_PROFILE_UNSUPPORTED",
+                                "Synthetic fixture raster could not be measured") from exc
+        values, counts = np.unique(data.compressed(), return_counts=True)
+        total, valid = int(data.size), int(data.count())
+        return {
+            "schema_version": 1, "operation": "statistics",
+            "source_ref": deepcopy(source["source_ref"]),
+            "dataset_id": source["dataset_id"], "source_size_bytes": source["size_bytes"],
+            "server": {"id": "geospatial-mcp", "version": "0.3.0",
+                       "config_digest": config_digest,
+                       "catalog_digest": sha256_digest({"dataset_id": source["dataset_id"],
+                                                        "kind": "raster", "path": source["path"]}),
+                       "tool_catalog_digest": sha256_digest({"capability": "gis-raster-statistics",
+                                                             "operation": "statistics"})},
+            "raster_info": info,
+            "statistics": {"total_pixels": total, "valid_pixels": valid,
+                           "masked_pixels": total - valid,
+                           "classes": [{"value": int(value), "count": int(count)}
+                                       for value, count in zip(values, counts)]},
+            "warnings": [],
+        }
+
+    gateway.register("gis-raster-statistics", statistics,
+                     input_schema="geospatial-request", output_schema="geospatial-result")
+    return SimpleNamespace(make_gateway=lambda: gateway)
 
 
 def validation_scene(package_root: Path, snapshot: dict[str, Any], targets: list[str],
-                     font: Path, validator_version: str) -> dict[str, Any]:
-    """Raster fixture rendering is not registered yet; never fake render evidence."""
-    raise ProtocolError(
-        "RASTER_FIXTURE_RENDER_UNREGISTERED",
-        "分类栅格模板的受控样张渲染分支尚未注册；在框架补齐之前不得发布该模板。",
-    )
+                     font: Path, validator_version: str, *,
+                     context: ExecutionContext | None = None,
+                     workspace: Path | None = None,
+                     registry: SchemaRegistry | None = None) -> dict[str, Any]:
+    """Freeze the deterministic synthetic raster scene for controlled fixture rendering.
+
+    The fixture raster derives only from the packaged synthetic legend sample and
+    the frozen package contracts; its statistics are measured through the
+    authorized gateway and the frozen page/scene can be re-verified at publish
+    time without the authoring host's font. No business data, no production
+    claim, no fabricated evidence.
+    """
+    from ..adapters.raster_page_renderer import FONT_LIMIT
+    if context is None or workspace is None:
+        raise SecurityError("RASTER_EXECUTION_CONTEXT_REQUIRED",
+                            "Fixture rendering requires the trusted validation context and workspace")
+    try:
+        import numpy as np
+        import rasterio
+        from rasterio.transform import from_origin
+    except ImportError:
+        raise ProtocolError("RASTER_RENDER_DEPENDENCY_MISSING",
+                            "The raster fixture render branch requires the raster-rendering extra") from None
+    context.require_project_scope()
+    registry = registry or SchemaRegistry()
+    documents = snapshot.get("documents")
+    if (not isinstance(documents, dict)
+            or not {"scenario", "spatial_behavior", "portrayal"} <= set(documents)):
+        raise ProtocolError("CAPABILITY_NOT_AVAILABLE",
+                            "Static validation must pass before fixture rendering")
+    if sorted(targets) != ["pdf", "png"]:
+        raise ProtocolError("RENDER_TARGET_UNSUPPORTED", "The raster fixture render requires exactly pdf and png")
+    manifest = snapshot["manifest"]
+    rows = _fixture_rows(package_root, snapshot)
+    codes = [row[0] for row in rows]
+    profile = ScenarioRegistry(registry).for_template(manifest["package"])
+    display_crs = documents["spatial_behavior"]["display_crs"]
+
+    workspace = Path(workspace)
+    workspace.mkdir(parents=True, exist_ok=True)
+    raster_path = workspace / FIXTURE_TIFF
+    legend_path = workspace / FIXTURE_LEGEND
+    dtype = _fixture_dtype(codes)
+    pattern = np.add.outer(np.arange(FIXTURE_SIZE), np.arange(FIXTURE_SIZE)) % len(codes)
+    fixture = np.asarray(codes, dtype=getattr(np, dtype))[pattern]
+    try:
+        with rasterio.open(
+            raster_path, "w", driver="GTiff", width=FIXTURE_SIZE, height=FIXTURE_SIZE, count=1,
+            dtype=dtype, crs="EPSG:" + str(display_crs["code"]),
+            transform=from_origin(FIXTURE_ORIGIN_X, FIXTURE_ORIGIN_Y, FIXTURE_PIXEL, FIXTURE_PIXEL),
+        ) as dataset:
+            dataset.write(fixture, 1)
+    except Exception as exc:
+        raise ProtocolError("RASTER_FIXTURE_PROFILE_UNSUPPORTED",
+                            "The template display CRS cannot back a synthetic fixture raster") from exc
+    buffer = io.StringIO(newline="")
+    writer = csv.writer(buffer, lineterminator="\n")
+    writer.writerow(["value", "label"])
+    writer.writerows([[code, label] for code, label in rows])
+    legend_path.write_bytes(buffer.getvalue().encode("utf-8-sig"))
+
+    font = Path(font)
+    preparation = RasterPreparationService(
+        project_root=workspace, allowed_roots=[str(workspace), str(font.parent)], registry=registry)
+    tiff_bytes = preparation.read_bytes(raster_path, 268435456)
+    legend_bytes = preparation.read_bytes(legend_path, 1048576)
+    request = {
+        "schema_version": 1,
+        "source": {
+            "schema_version": 1, "role": DATA_ROLE,
+            "source_ref": {"id": FIXTURE_SOURCE_ID, "version": "1.0.0",
+                           "digest": preparation.digest_bytes(tiff_bytes)},
+            "path": FIXTURE_TIFF, "format": "geotiff", "dataset_id": FIXTURE_DATASET_ID,
+            "size_bytes": len(tiff_bytes), "crs": deepcopy(display_crs), "band": 1,
+            "value_semantics": "categorical-integer", "mask_policy": "embedded",
+            "license": "project-approved", "data_nature": "synthetic",
+            "contains_sensitive_coordinates": False,
+        },
+        "legend": {"path": FIXTURE_LEGEND, "digest": preparation.digest_bytes(legend_bytes),
+                   "size_bytes": len(legend_bytes), "encoding": "utf-8-sig",
+                   "value_column": "value", "label_column": "label", "color_column": None},
+        "palette": "carto-categorical-v1", "legend_policy": "observed",
+    }
+    prepared = preparation.analyze(request, context, _fixture_gateway(preparation, workspace))
+    report, _ = preparation.load_verified(prepared.ref())
+    if report["status"] != "ready":
+        raise ProtocolError("CLASSIFICATION_CLARIFICATION_REQUIRED",
+                            "Fixture categories did not resolve into a ready classification")
+
+    bundle = RasterBundlePreparer(preparation).build(prepared.ref(), context)
+    bundle_ref = preparation.save_document(bundle, "prepared-data-bundle").ref()
+    portrayal_ref = RasterPortrayalCompiler(preparation).compile(
+        deepcopy(documents["portrayal"]), LAYER_ID, prepared.ref(), context).ref()
+    resolved_portrayal = preparation._json_ref(portrayal_ref, "resolved-raster-portrayal")
+    legend = resolved_portrayal["legend_items"]
+    scenario = documents["scenario"]
+    limit = int(scenario["embedded"]["layout"]["capacity"]["legend_items"])
+    if not legend or len(legend) > limit:
+        raise ProtocolError("RASTER_LEGEND_CAPACITY",
+                            "Legend must be nonempty and fit the layout capacity")
+    output = profile.definition["output_profile"]
+    resolved_layout = LayoutResolver(registry).resolve(
+        scenario["embedded"]["layout"], output["dpi"])
+    if any(resolved_layout["page"][key] != output[key]
+           for key in ("width_mm", "height_mm", "dpi", "width_px", "height_px")):
+        raise ProtocolError("SCENARIO_OUTPUT_PROFILE_MISMATCH",
+                            "Layout differs from the enabled output profile")
+    font_bytes = preparation.read_bytes(font, FONT_LIMIT)
+    page_request = {
+        "schema_version": 1,
+        "portrayal_ref": deepcopy(portrayal_ref),
+        "resolved_layout": deepcopy(resolved_layout),
+        "font": {"path": str(font), "digest": preparation.digest_bytes(font_bytes),
+                 "size_bytes": len(font_bytes)},
+        "texts": [
+            {"content_id": "title", "text": VALIDATION_TITLE},
+            {"content_id": "source", "text": profile.notice},
+        ],
+        "legend": {"content_id": "legend", "title": LEGEND_TITLE},
+        "typography": dict(TYPOGRAPHY),
+        "scale_bar": None,
+        "grid_north": None,
+    }
+    scene_id = "validation-scene-" + sha256_digest({
+        "package_digest": snapshot["package_digest"],
+        "fixture_set_digest": snapshot["fixture_set_digest"],
+        "validator_version": validator_version,
+    })[7:23]
+    return RasterSceneCompiler(preparation).compile(
+        bundle_ref=deepcopy(bundle_ref), page_request=page_request, context=context,
+        scene_id=scene_id, targets=tuple(sorted(targets)))

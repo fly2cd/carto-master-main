@@ -247,6 +247,7 @@ class TemplateCreationWorkflow:
             registry=self.registry,
             browser=browser,
             font_path=font_path,
+            context=self._validation_context(request, state),
         )
         evidence = validator.validate(expected, request["targets"])
         authored_digest = self._last_output_digest("staging-package")
@@ -306,7 +307,7 @@ class TemplateCreationWorkflow:
         validator = TemplatePackageValidator(
             path_guard=self.path_guard, package_root=package_root,
             evidence_root=evidence_path.parent, attestation_key=renderer_attestation_key,
-            registry=self.registry,
+            registry=self.registry, context=self._validation_context(request, state),
         )
         snapshot = validator.verify_evidence(evidence, self._expected_validation(request), request["targets"])
         repository_path = self._resolve_project_path(repository_root, must_exist=False)
@@ -427,6 +428,22 @@ class TemplateCreationWorkflow:
     def _expected_identity(request: dict[str, Any]) -> dict[str, str]:
         return {"namespace": request["namespace"], "kind": request["kind"],
                 "id": request["template_id"], "version": request["version"]}
+
+    @staticmethod
+    def _validation_context(request: dict[str, Any], state: Any) -> ExecutionContext:
+        """Trusted fixture-render scope; identical across validate and publish re-verification."""
+        context = ExecutionContext(
+            run_id=state.run_id,
+            tenant_id=request["subject"]["tenant_id"],
+            project_id=request["subject"]["project_id"],
+            subject_id=request["subject"]["requester_subject_id"],
+            roles=frozenset({"template-validator"}),
+            namespaces=frozenset({request["subject"]["project_id"]}),
+            authorized_capabilities=frozenset({"gis-raster-statistics"}),
+            environment=request["subject"]["environment"],
+        )
+        context.require_project_scope()
+        return context
 
     @classmethod
     def _expected_validation(cls, request: dict[str, Any]) -> dict[str, Any]:

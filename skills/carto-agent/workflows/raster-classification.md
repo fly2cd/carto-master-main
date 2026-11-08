@@ -20,7 +20,7 @@
 
 - MCP 不处理类别含义、颜色、图例、纸张或渲染。
 - MapLibre、QGIS 均不在这条静态图体路径中；不把它包装为 `maplibre-web` 回执。
-- **场景策略/实现白名单仍为空**。共享正式工作流已接通静态后端，但须由独立准入的业务组件使用；不把数据类型注册为业务场景。
+- 场景策略与实现白名单当前仅登记 `general-thematic-mapping`（实现 `general-thematic-raster`）。共享正式工作流已接通静态后端，由该已准入场景组件（含模板样张渲染分支）使用；不把数据类型注册为业务场景。
 - 准备报告的 `ready` 只表示分类合同完整，绝不表示 G1/G2/G3 已批准或完成地图验收。
 - 原始 TIFF 的 NoData、像元、掩膜不修改。用户回答 `semantic=nodata` 也是显示合同，不是数据重写操作。
 
@@ -193,7 +193,7 @@ page = renderer.load_verified(page_artifact.ref(), execution_context)
 & $CartoPython -B -m unittest discover -s skills/carto-agent/scripts/tests -t skills/carto-agent/scripts -p 'test_raster_*.py' -v
 ```
 
-未安装可选渲染依赖时相关测试会跳过，不能把 skip 称为渲染通过。
+未安装可选渲染依赖时相关测试会跳过，不能把 skip 称为渲染通过。`test_general_thematic.py` 的模板发布链测试同样需要上述渲染依赖与可嵌入 CJK TTF（可用 `CARTO_TEST_CJK_FONT` 显式指定，macOS 默认尝试 Arial Unicode.ttf），无依赖或字体时跳过。
 
 第三批 A 的合成测试另覆盖整页三格式、PDF MediaBox/嵌入字体/文字提取、十类中文图例换行、图体颜色不插值、格网北、投影比例尺、冻结复现及篡改拒绝。中文与独立 PDF 渲染验收需显式 `CARTO_TEST_CJK_FONT`，开发环境另装 `pypdf` / `pypdfium2`；它们不是运行时渲染依赖。`CARTO_RASTER_QA_DIR` 如设置，只允许仓库 `projects/.carto-dev/` 内保存合成 QA 图，不导出用户数据到测试目录。整页 PDF 已经独立光栅化目视核对；未做实体打印、CMYK/色彩管理或真实用户地图验收。
 
@@ -253,7 +253,7 @@ execution = RasterSceneCompiler(preparation_service).bind_execution(
 
 - `fixtures/raster-formal/` 提供 6 组合法/非法结构样例；不能当作运行产物或审批。
 - `test_raster_formal.py` 使用临时真实合成 TIFF/TTF 和测试密钥，覆盖共享 bundle/scene、正式回执、工作流预览→G2→渲染→终检→G3→交付、中断恢复、冻结字体、摘要/作用域/环境及输出篡改。
-- 工作流测试从合成候选边界开始，仅在测试里替代能力/已安装模板准入；不假称真实 T1/TP/G1、业务模板发布或用户地图已经验收。
+- 工作流测试从合成候选边界开始，仅在测试里替代能力/已安装模板发现安装；模板创建侧的合成测试真实走完 T1 → author → validate（合成样张渲染并冻结场景）→ 篡改拒绝 → TP → 发布与幂等重放，但全部使用合成数据与合成审批密钥，不假称真实用户数据、真实审批身份或用户地图已经验收。
 - **仍待独立完成**：真实业务用途和模板组件的准入、实际数据类别含义/配色确认、用户地图验收；不创建“分类栅格业务场景”来代替。没有新增直接导出地图的 CLI 或审批旁路。
 
 不得把合成测试、内部 PDF/PNG/SVG 或页面报告称为用户数据已完成正式 A4 制图交付。
