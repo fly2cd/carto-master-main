@@ -1,5 +1,8 @@
 # 地图表达目录、内置方法与符号库设计结论
 
+> 2026-11-09 设计收敛：采用 Encoding / Appearance / Composition 三个设计维度及独立 Renderer 执行层；模板是组合载体，不与维度一一映射。统一定义见[模板体系设计](../carto-template-dsg.md)，本轮决定及修订范围见[收敛记录](../design-convergence-20261109.md)。新增模型、引用、参数与作用域调整属于目标设计，不改变当前 Schema、能力准入和审批。
+
+
 更新日期：2026-10-22
 
 适用项目：Carto Master / Carto Agent
@@ -464,48 +467,25 @@ value = 400 → 直径 8 mm，面积为原来的 4 倍
 
 ## 10. 当前仓库状态与设计差距
 
-以下为截至本文更新日期的代码核对结果，不能用目标设计替代当前能力声明。
+本节于 2026-11-09 静态核对后替换旧洪涝演示的状态与半径算法诊断；历史诊断不代表当前注册链路。
 
-### 10.1 已有机制和实际边界
+| 已有基础 | 当前边界 |
+|---|---|
+| [表达目录](../../skills/carto-agent/policies/map-expression-catalog.yaml) 有 choropleth/sequential、proportional-symbol/count、raster/categorical | 目录登记不等于 general 已接入全部表达；当前仅接入分类栅格 |
+| [RasterPortrayalCompiler](../../skills/carto-agent/scripts/carto_core/compiler/raster_portrayal.py) 冻结类别表、颜色与图例 | 仅一个栅格图层，不执行影像分类、重分类或通用 GIS 分析 |
+| [portrayal Schema](../../skills/carto-agent/schemas/portrayal.schema.json) 有矢量/栅格分支 | 不等于矢量准备、符号计算、共享映射和正式交付已准入 |
+| [general 场景](../../skills/carto-agent/scripts/carto_core/scenarios/general_thematic.py) 已构建分类栅格模板样张和候选 | 单图、固定 A4 横向 300 dpi PDF+PNG；无生产能力声明 |
+| [后端分派](../../skills/carto-agent/scripts/carto_core/adapters/render_backend.py) 有浏览器和静态栅格分支 | 后端能力不等于表达能力；检查不能永远按 renderer_id 推断专题类型 |
 
-| 项目 | 当前事实 | 设计影响与依据 |
-|---|---|---|
-| 表达目录 | 仅有 `choropleth/sequential` 和 `proportional-symbol/count` 两项 | 已有轻量目录基础；见[目录文件](../../skills/carto-agent/policies/map-expression-catalog.yaml) |
-| 表达 Schema | 几何限定 point/polygon，视觉变量限定 fill-color/symbol-area，算法标识也限定为两类 | 新增图表、线表达或其他算法需要协议演进；见[表达 Schema](../../skills/carto-agent/schemas/map-expression.schema.json) |
-| 表达引用 | portrayal 按限定表达 ID 和版本引用，符号字段已有 `catalog_ref` 与参数 | 有引用结构不等于完整符号资源链路已经实现；见[portrayal Schema](../../skills/carto-agent/schemas/portrayal.schema.json) |
-| 作者流程 | 读取和校验表达条目，生成 ID、版本和摘要，并要求目录恰好包含既定两项 | 不能仅增加第三条 YAML 就扩展能力；见[模板作者流程](../../skills/carto-agent/scripts/carto_core/workflow/template_author.py) |
-| 依赖校验 | portrayal 引用须与锁资源一致，锁定集合还必须等于当前整个目录集合 | 这是有限基线，不是通用的按需引用子集解析；见[模板验证](../../skills/carto-agent/scripts/carto_core/workflow/template_validation.py) |
-| 地图计划与候选 | 围绕 `risk-area`、`shelter-point` 固定角色，规划仅接受 quantile 分类和声明的 area-proportional 缩放 | 尚不是由目录驱动的通用方法分发；见[地图规划](../../skills/carto-agent/scripts/carto_core/workflow/map_planning.py)与[候选编译](../../skills/carto-agent/scripts/carto_core/compiler/map_candidate.py) |
-| 数据准备 | 策略列出 read/filter/join/reproject/aggregate/classify，data agent 关闭 | Top K 等新操作需落实到受控能力，不能假定已经开放；见[数据准备策略](../../skills/carto-agent/policies/data-preparation-policy.yaml) |
-| 符号检查 | 渲染适配器校验引用资源存在且类型为 icon/sprite/symbol，检查相关要素源 | 已有部分输入校验；见[Web 地图渲染适配器](../../skills/carto-agent/scripts/carto_core/adapters/webmap_renderer.py) |
-| 符号实际绘制 | SVG 合成器中 `symbol` 绘制固定红圆，`complex-symbol` 绘制固定红色菱形；引用仅写入属性 | 通用符号资源的实际加载与实例化尚未接通；见[SVG 合成器](../../skills/carto-agent/scripts/carto_core/adapters/svg_compositor.py) |
-| 地理放置 | SVG 合成器要求 geographic/feature 覆盖物已有 `screen_position` | 存在坐标类型不能证明自动锚点解析和避让已完整实现；仍需上游提供解析结果 |
-| 通用图表与 Frame | 当前覆盖物没有通用 chart 类型；Layout Frame 没有专门的图表接口 | 文档里的 `chart_panel` 仍属设计；见[渲染场景 Schema](../../skills/carto-agent/schemas/render-scene.schema.json)和[Layout Schema](../../skills/carto-agent/schemas/layout.schema.json) |
+### 10.1 目标差距
 
-目录列出的参数范围也可能宽于具体链路。例如目录允许多种分类方法，但当前地图规划只接受 quantile。平台向用户声明能力时，应以已贯通且验证过的执行范围为准。
+1. Encoding 决定字段/单位、视觉变量、映射与比较语义；Appearance 提供兼容外观，不另存一套分类或缩放算法。当前 portrayal/cartography 字段须明确迁移与唯一有效来源。
+2. 多面板须引用表达实例和独立共享组；地理视图、颜色/大小映射、图例共享分别验证，不能只合并图例外观。
+3. 单一符号、矢量类别、面分级设色、点比例符号需要补齐实际准备、编译、绘制和检查；连续栅格显示及专项表达按需求后续准入。选择颜色不等于计算密度、等值线或影像分类。
+4. 共享符号/图表、地图锚定、辅助区域与标签避让仍需独立验收；freeform 或海报布局不自动赋予这些内容能力。
+5. 组合方案必须在现有 MapPlan/候选/执行快照中归一，后端在候选阶段匹配，冻结全部编码、资产和环境；不另建表达专用锁或任意脚本入口。
 
-### 10.2 优先修正：面积比例声明与半径计算不一致
-
-目录中的 `proportional-symbol/count` 声明使用 `symbol-area` 和 `area-proportional-scaling`，地图规划也要求 `area-proportional`。
-
-但当前候选编译中的 MapLibre `circle-radius` 采用下面的表达式：
-
-```python
-["interpolate", ["linear"], ["get", "count_value"],
- 0, 5, max(max_count, 1), 16]
-```
-
-它把数值线性映射到半径，并带有正的起始半径，不能证明符号面积与数值成正比。当前图例还只是容量点的单个示意项，没有给出可核对的数量尺寸序列。
-
-这意味着“按面积比例表达容量”目前是目录和计划中的语义要求，不能作为该演示链路已经准确实现的能力结论。
-
-后续应明确采用严格面积比例还是带最小尺寸/截断的规则，修正实际计算和图例，并增加数值映射验证。本文仅记录问题，不修改运行代码。
-
-### 10.3 本轮新增设计与现有能力的边界
-
-第 2.3、4.5、4.6、7.6 和 9.1 节补充的是目标设计。当前两项表达与固定候选链路尚不构成通用图形组合执行器，也没有每次制图动态运行模型新代码的能力。不能通过添加表达名称、`chart_type`、组合字段或脚本绕过现有 Schema 与能力检查。
-
-后续落地应先贯通常用方法与最小组合能力。模型辅助开发正式实现时，按仓库规则同步协议、策略、合法和非法样例以及测试；运行时动态代码执行是否需要开放，单独按实际需求评估。现有未实现部分与第 10.2 节的面积比例差异仍然保留，不因文档更新而视为修复。
+本节不宣称测试通过或真实用户地图已交付；当前运行准入仍以 Schema、策略及代码白名单为准。
 
 ## 11. 后续落地顺序与目录位置
 

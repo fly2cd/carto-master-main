@@ -1,5 +1,8 @@
 # MapLayout 完整说明
 
+> 2026-11-09 设计收敛：采用 Encoding / Appearance / Composition 三个设计维度及独立 Renderer 执行层；模板是组合载体，不与维度一一映射。统一定义见[模板体系设计](../carto-template-dsg.md)，本轮决定及修订范围见[收敛记录](../design-convergence-20261109.md)。新增模型、引用、参数与作用域调整属于目标设计，不改变当前 Schema、能力准入和审批。
+
+
 ## 1. 文档定位
 
 本文介绍 Carto Agent 模板体系中 MapLayout 的基本概念、作用、职责边界、内容结构、组合接口、适配方式、验证要求和输出产物。
@@ -168,6 +171,21 @@ Slot 可声明内容类型与最少/最多数量。其 `min_items: 1` 表示这�
 可选区域应声明缺失时保留空白、折叠还是采用其他已声明变体。必需内容缺失不能通过隐藏 Frame 解决。
 
 可选区折叠后，如果会改变邻近地图框、图例或页脚的大小，必须重新求解和验证，不能只删除一个元素后沿用旧测量结果。
+
+### 6.6 基础布局模型、附加结构与内容组织
+
+| 基础模型 | 如何形成空间结构 |
+|---|---|
+| single | 一个主要地图面板及附属区域 |
+| grid | 按声明的行列、间距和尺寸规则展开面板 |
+| mosaic | 按明确的跨行跨列关系展开面板 |
+| freeform | 直接声明各 Frame 的边界与受控空间关系 |
+
+inset 是依附具体视图的附加结构，可与基础模型组合，不是互斥的第五种布局。海报是用途/媒介，不等于 freeform；自由编排先支持固定构图，再扩展锚定和有限求解，须声明层级、允许重叠、裁剪和最小可读尺寸。
+
+这些模型共用 Canvas/Frame/内容接口，解析到同一 ResolvedLayout，不新建 subplot 或海报专用执行器。固定模板、有限变体和受控参数化均合法；模型能力不等于每个模板默认允许任意行列或任意尺寸。
+
+显式组合和分面归 Scenario/项目规划。规划先产生稳定 ID 的视图和内容，Layout 只验证接口、数量与空间并绑定。地理视图共享、编码共享和图例共享分开，可按组设置；Layout 只安排已获语义许可的图例，不自行合并尺度、筛选年份或减少分类。
 
 ## 7. 容量、测量与溢出
 
@@ -547,7 +565,7 @@ Layout 的毫米值不随导出 DPI 改变。Renderer 如果不能实现所需�
 
 派生 Layout 可记录父模板来源，但发布物仍须为完整、自洽的 layout 段。多个 Layout 的 Frame 不能在运行时任意拼接；有这种需求时，应先形成新的完整模板。
 
-当前所有权代码已经规定 `map-layout → layout` 整段替换。建议继续保留这个边界，并在替换之后执行组合检查。
+当前代码对 `map-layout → layout` 采用整段替换。目标保留它用于结构性更换，同时允许契约声明的参数绑定和限定作用域的调整；必须共同验证约束和记录来源，不允许任意深层合并。参数产生新的实例结果，不改写已发布模板。
 
 ### 13.4 超出模板规则的参考使用
 
@@ -685,32 +703,16 @@ Layout 校验可以验证“必需声明被完整放置”，但声明是否法�
 
 ## 18. 当前仓库状态与演进建议
 
-截至本文编写时，现有实现提供的是固定洪涝演示闭环中的内嵌 Layout，主要事实如下：
+截至 2026-11-09，当前实现不再是旧洪涝演示；以下依据现有代码与策略，非新增能力声明。
 
 | 当前事实 | 实现依据 |
 |---|---|
-| Layout v1 已有画布、Frame、占位符、容量和规则 | [layout.schema.json](../../skills/carto-agent/schemas/layout.schema.json) |
-| Frame 为 page 坐标，类型含 map、title、legend、scale-bar、north-arrow、inset、marginalia | 同上 |
-| 尚无通用 chart/table Frame 接口，也未贯通通用图表载荷及两类放置链路 | 本文辅助图表部分为目标设计；现有边界见 [表达与符号设计结论第 10 节](map-expression-and-symbol-design.md#10-当前仓库状态与设计差距) |
-| Canvas 使用 mm/px；Frame bounds 为四元素数组；容量主要是图例项数和标题字符数 | 同上及 [common.schema.json](../../skills/carto-agent/schemas/common.schema.json) |
-| Scenario 必须内嵌 identity、cartography、layout，可声明可替换段 | [scenario.schema.json](../../skills/carto-agent/schemas/scenario.schema.json) |
-| 所有权组件支持外部 MapLayout 整段替换 layout | [ownership.py](../../skills/carto-agent/scripts/carto_core/compiler/ownership.py) |
-| 模板作者生成固定 A3 横向及主图、图例、标题 Frame | [template_author.py](../../skills/carto-agent/scripts/carto_core/workflow/template_author.py) |
-| 候选编译器仍固定 viewport、camera padding 和多处页面元素像素位置 | [map_candidate.py](../../skills/carto-agent/scripts/carto_core/compiler/map_candidate.py) |
-| 成品检查验证必需元素与估算边界，尚非通用字体测量和排版引擎 | [map_final_check.py](../../skills/carto-agent/scripts/carto_core/workflow/map_final_check.py) |
-| Delivery v1 同时保存固定 A3 页面条件和 DPI，尚存在页面属性重复声明 | [delivery.schema.json](../../skills/carto-agent/schemas/delivery.schema.json) |
-| 独立 MapLayout 业务创建路由尚未开放 | [SKILL.md](../../skills/carto-agent/SKILL.md) |
+| general 使用固定 A4 横向 300 dpi、标题/主图/图例/声明区；不允许替换内嵌段 | [general_thematic.py](../../skills/carto-agent/scripts/carto_core/scenarios/general_thematic.py) |
+| v1 Layout 有 canvas、frames、content_id、容量与规则；inset 等枚举不等于可执行 | [layout.schema.json](../../skills/carto-agent/schemas/layout.schema.json) |
+| 解析器仅支持单地图、mm、DPR=1、不重叠区域；已有 ResolvedLayout | [layout.py](../../skills/carto-agent/scripts/carto_core/compiler/layout.py)、[resolved-layout.schema.json](../../skills/carto-agent/schemas/resolved-layout.schema.json) |
+| 静态栅格页面已有真实字体测量和物理尺寸检查，浏览器/SVG 路径仍有保守包络限制 | [raster_page_renderer.py](../../skills/carto-agent/scripts/carto_core/adapters/raster_page_renderer.py) |
+| v1 组件所有权有完整段替换机制，但独立 MapLayout 创建与通用匹配尚未开放 | [ownership.py](../../skills/carto-agent/scripts/carto_core/compiler/ownership.py)、[SKILL.md](../../skills/carto-agent/SKILL.md) |
 
-Schema 中存在 `web`、`mobile`、`paginate` 等枚举，不等于响应式或分页运行能力已经实现。`OwnershipResolver` 支持完整段组合，也不等于当前地图生成流程已经支持独立 Layout 的匹配、安装和排版。
+建设顺序：先定义面板/view/Frame 绑定与组合能力检查，利用当前 MapScenario 发布路径贯通固定多图；再接入受控参数、独立 Layout 组合和更多模型。无需等独立 Layout 创建路由完成才验证内嵌网格，但不能绕过模板发布、G1/G2/G3 或当前单图限制。
 
-建议按以下顺序演进：
-
-1. 明确页面属性的唯一所有者，Delivery 保留目标要求并与 Layout 核对；对旧协议进行明确版本升级。
-2. 明确页面坐标与单位，扩展 Slot、内容绑定和可选区规则。
-3. 先实现固定 Frame 的通用排版，使 Renderer 消费 Layout 求解结果，移除对应位置硬编码。
-4. 引入字体测量、图例尺寸测量和溢出报告。
-5. 增加 `ResolvedLayout` 并将其摘要纳入候选、预览和锁链路。
-6. 开放独立 MapLayout 创建、验证、发布和匹配。
-7. 根据实际需求再增加变体求解、多视图、图集和响应式能力。
-
-实现协议升级时，应同步提供合法、非法样例与自动验证，并保持完整段所有权、精确版本引用和不可变发布规则。
+页面构成由 Layout 提供，用户和 Delivery 只提出兼容条件；输出实例记录最终共同满足的规格。新协议须版本化、提供合法/非法样例和自动测试；旧模板、旧锁不就地补字段或静默迁移。固定自由编排、mosaic/inset 和更复杂约束须分别验收后开放。

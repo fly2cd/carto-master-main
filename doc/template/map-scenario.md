@@ -1,5 +1,8 @@
 # MapScenario 完整说明
 
+> 2026-11-09 设计收敛：采用 Encoding / Appearance / Composition 三个设计维度及独立 Renderer 执行层；模板是组合载体，不与维度一一映射。统一定义见[模板体系设计](../carto-template-dsg.md)，本轮决定及修订范围见[收敛记录](../design-convergence-20261109.md)。新增模型、引用、参数与作用域调整属于目标设计，不改变当前 Schema、能力准入和审批。
+
+
 ## 1. 文档定位
 
 本文介绍 Carto Agent 模板体系中 MapScenario 的基本概念、作用、职责边界、六份业务契约、组件装配、匹配方式、实例编译、验证要求和发布产物。
@@ -213,7 +216,11 @@ Scenario 可以要求保留来源、时点、数据性质和使用限制。具�
 
 ## 8. 组件装配与分段所有权
 
-### 8.1 内嵌基线与完整段替换
+### 8.1 v1 内嵌基线与目标组件组合
+
+MapScenario 的目标定位是组合方案，不是三个设计维度之外的第四种视觉维度。后续允许组件精确引用或内嵌，每项只有一个有效来源，验证闭合依赖；必须完整解析后才能冻结。组件替换、声明式参数绑定、限定作用域的允许调整分别校验，不以引用或参数接口绕过来源、许可与审批。
+
+下述完整段替换是 v1 当前规则；不表示所有未来调整只能整段替换，也不授权当前 general 使用新组合机制。
 
 | Scenario 内嵌段 | 可替换模板 | 替换单位 |
 |---|---|---|
@@ -449,7 +456,7 @@ analyze → brief → T1 → author → validate → TP → publish
 
 T1 批准创建简报，TP 批准具体发布对象。二者都不能用作地图项目的 G1、G2 或 G3。
 
-当前已开放这条流程中的固定洪涝作者策略，不代表可以创建任意 Scenario。新增作者策略需要相应协议、实现、合法与非法样例以及验证证据。
+当前已注册 general-thematic-authoring 作者与分类栅格样张分支，不代表可以创建任意 Scenario。新增组件、组合与作者策略仍需协议、实现、合法/非法样例及验证证据。
 
 ## 14. 地图实例编译与冻结
 
@@ -573,31 +580,13 @@ Manifest 管理身份、文件闭包和依赖入口；依赖锁固定表达、�
 
 ## 18. 当前仓库状态与演进建议
 
-截至本文编写时，MapScenario 已有实际创建、验证、发布和消费流程，但业务范围限于固定洪涝合成数据演示。
+截至 2026-11-09，唯一注册业务为 general_thematic_mapping，模板身份为 map-scenario/general-thematic-map@1.0.0，实现为 general-thematic-raster。接受用户已分类栅格，固定单图 A4 横向 300 dpi PDF+PNG，production_enabled=false；见[能力策略](../../skills/carto-agent/policies/scenario-capabilities.yaml)。不存在可作为当前基线引用的旧洪涝默认模板包。
 
-| 当前事实 | 实现依据 |
-|---|---|
-| Scenario v1 固定六个 owned segments，必须内嵌 identity、cartography、layout | [scenario.schema.json](../../skills/carto-agent/schemas/scenario.schema.json) |
-| 内置模板身份为 `urban-flood-risk/1.0.0`，状态为 draft 合成示例 | [manifest.yaml](../../skills/carto-agent/templates/map-scenario/urban-flood-risk/1.0.0/manifest.yaml) |
-| `flood-risk-overview` 是作者 profile，不是另一套模板 ID | [template_author.py](../../skills/carto-agent/scripts/carto_core/workflow/template_author.py) |
-| 模板流程具备 analyze、brief、author、validate、publish 和独立 T1/TP | [template_workflow.py](../../skills/carto-agent/scripts/carto_core/workflow/template_workflow.py) |
-| 消费侧通过权威仓库发现并安装精确已发布版本 | [template_repository.py](../../skills/carto-agent/scripts/carto_core/repository/template_repository.py)、[template_installer.py](../../skills/carto-agent/scripts/carto_core/repository/template_installer.py) |
-| 地图规划限定固定洪涝角色、quantile 分类，并要求 area-proportional 缩放；这不等于实际面积编码已正确实现 | [map_planning.py](../../skills/carto-agent/scripts/carto_core/workflow/map_planning.py) |
-| portrayal v1 仍持有分类、符号、层序和无数据等具体表达规则 | [portrayal.yaml](../../skills/carto-agent/templates/map-scenario/urban-flood-risk/1.0.0/contracts/portrayal.yaml) |
-| 所有权组件支持外部组件完整段替换，但独立组件业务创建与通用匹配尚未开放 | [ownership.py](../../skills/carto-agent/scripts/carto_core/compiler/ownership.py)、[SKILL.md](../../skills/carto-agent/SKILL.md) |
-| 已打通候选、预览、G2、锁驱动渲染、成品检查及 G3 本地交付 | [map_generation.py](../../skills/carto-agent/scripts/carto_core/workflow/map_generation.py) |
-| 当前为 A3 横向、144 DPI 的合成演示交付；生产任务列表为空 | [scope-baseline.yaml](../../skills/carto-agent/policies/scope-baseline.yaml) |
+- v1 仍要求六个 owned segments 与 identity/cartography/layout 内嵌段；当前 general 的 replaceable_segments 为空。见 [scenario.schema.json](../../skills/carto-agent/schemas/scenario.schema.json)、[general_thematic.py](../../skills/carto-agent/scripts/carto_core/scenarios/general_thematic.py)。
+- 模板样张场景已构建，validate 冻结合成样张和回执，publish 复核并消费 TP；不能再描述成样张分支未实现。
+- 框架已有候选、G2、正式渲染、终检、G3 和交付事务，不等于真实用户数据、身份和本机依赖已经验收。
+- 现有 common execution 有 views[]，但运行链路和 Layout 仍受单图限制；ResolvedLayout 已有实现。通用组件引用、分面、共享组、矢量混合表达及新的参数接口仍待实现。
 
-候选编译中的点半径仍按数值线性变化，与面积比例声明有差距；通用符号加载、图表及地理放置也尚未完整贯通，见[设计结论文档的实现核对](map-expression-and-symbol-design.md#10-当前仓库状态与设计差距)。现有三场景枚举、可替换段声明和协议骨架不等于通用场景理解、独立组件装配或生产制图已经完成。`ResolvedCartography`、`ResolvedLayout` 和本文所示的 Profile/Slot 通用绑定也仍是演进设计。
+演进先统一编码、Appearance、Composition、空间与输出的来源关系，再升级请求/规划/候选合同，以固定多图完成一个端到端组合；随后扩展矢量和后端能力。独立模板类型是复用分类，不必作为每个增量的前置条件；也不为每种布局×表达×后端的组合新增业务场景。
 
-建议按以下顺序完善：
-
-1. 明确数据语义、空间条件、表达实现和页面条件的唯一所有者，先收敛重复字段。
-2. 扩展数据角色与值角色的绑定、单位和时点验证，使实例输入不依赖固定洪涝字段约定。
-3. 将可替换的视觉配置迁入完整 MapStyle，让 portrayal 聚焦业务语义、表达绑定与业务约束；表达定义拥有映射语义，受信方法执行算法，迁移时明确各字段的唯一来源。
-4. 增加内容角色、视图关系和 Layout Slot 对接，并将实际表达与排版结果纳入现有候选和锁。
-5. 完善独立 Brand、Style、Layout 的创建发布与组合验证，再开放通用模板匹配。
-6. 按已注册任务逐项扩展 Scenario 作者和规划策略，补齐真实数据、空间工具及生产验收证据。
-7. 根据实际需求再增加多视图、批次成果与其他媒介，保持单次运行的计划、审批和交付边界。
-
-后续实现继续位于 `skills/carto-agent/`。协议升级应同步提供合法、非法样例与自动验证，沿用唯一 CLI、完整段所有权、精确版本引用和不可变发布机制。
+所有目标均通过唯一 CLI、严格协议、版本化策略和既有审批实施；不修改旧包和旧锁，不新增旧格式兼容旁路。合同引用、声明参数和受限作用域调整只有在实现、注册与验收后才能执行。

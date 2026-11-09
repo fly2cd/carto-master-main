@@ -1,5 +1,8 @@
 # MapBrand 完整说明
 
+> 2026-11-09 设计收敛：采用 Encoding / Appearance / Composition 三个设计维度及独立 Renderer 执行层；模板是组合载体，不与维度一一映射。统一定义见[模板体系设计](../carto-template-dsg.md)，本轮决定及修订范围见[收敛记录](../design-convergence-20261109.md)。新增模型、引用、参数与作用域调整属于目标设计，不改变当前 Schema、能力准入和审批。
+
+
 ## 1. 文档定位
 
 本文介绍 Carto Agent 模板体系中 MapBrand 的基本概念、作用、职责边界、身份资源、组合接口、匹配方式、实例解析、验证要求和发布产物。
@@ -592,32 +595,15 @@ analyze：分析品牌规范、原始资产与使用依据
 
 ## 18. 当前仓库状态与演进建议
 
-截至本文编写时，仓库已有 identity 协议和 Scenario 内嵌身份，但尚未形成可独立创建、发布、匹配与解析的完整 MapBrand 业务链路。
+截至 2026-11-09，identity 协议和 Scenario 内嵌身份存在，但独立 Brand 创建、发现与通用组合尚未开放。Brand 是身份资产、视觉默认与限制的复用载体，不是第四个视觉设计维度，更不是跨组件的最高覆盖优先级。
 
 | 当前事实 | 实现依据 |
 |---|---|
-| identity v1 已有机构名称、颜色及来源、字体角色、可选 Logo、署名格式和规则 | [identity.schema.json](../../skills/carto-agent/schemas/identity.schema.json) |
-| typography 主要保存 role、family、weight，尚无完整字体文件与多语言回退模型 | 同上 |
-| logo 已有 asset_ref，但 placement_rules 为字符串列表 | 同上 |
-| Scenario 必须内嵌 identity，可声明是否允许替换 | [scenario.schema.json](../../skills/carto-agent/schemas/scenario.schema.json) |
-| 所有权组件支持 `map-brand → identity` 完整段替换 | [ownership.py](../../skills/carto-agent/scripts/carto_core/compiler/ownership.py) |
-| 固定洪涝作者生成 neutral-emergency 中性身份 | [template_author.py](../../skills/carto-agent/scripts/carto_core/workflow/template_author.py) |
-| 生成请求仍显式提供字体 path、family、version | [generate-request.schema.json](../../skills/carto-agent/schemas/generate-request.schema.json) |
-| 候选编译器将请求字体作为 map-font 资源并固定摘要，不是通用 Brand 字体角色解析器 | [map_candidate.py](../../skills/carto-agent/scripts/carto_core/compiler/map_candidate.py) |
-| 渲染探测具备字体候选识别，但不等于已验证全部字符、字重或许可 | [renderer_probe.py](../../skills/carto-agent/scripts/carto_core/adapters/renderer_probe.py) |
-| 成品字体检查当前针对单个字体资源与 PDF 字体相关证据，尚非完整品牌符合性检查 | [map_final_check.py](../../skills/carto-agent/scripts/carto_core/workflow/map_final_check.py) |
-| 独立 MapBrand 业务创建路由未开放；当前能力限本地合成洪涝演示 | [SKILL.md](../../skills/carto-agent/SKILL.md)、[scope-baseline.yaml](../../skills/carto-agent/policies/scope-baseline.yaml) |
+| identity v1 定义机构、颜色来源、字体角色、可选 Logo、署名及规则 | [identity.schema.json](../../skills/carto-agent/schemas/identity.schema.json) |
+| v1 Scenario 内嵌 identity，所有权组件支持已允许的完整段替换；当前 general 未开放替换 | [scenario.schema.json](../../skills/carto-agent/schemas/scenario.schema.json)、[general_thematic.py](../../skills/carto-agent/scripts/carto_core/scenarios/general_thematic.py) |
+| 栅格页面冻结真实字体并验证字形与输出，不代表通用字体回退或品牌资产解析已完成 | [raster_page_renderer.py](../../skills/carto-agent/scripts/carto_core/adapters/raster_page_renderer.py) |
+| 当前业务为用户分类栅格的 general，非旧洪涝演示，仍禁生产数据 | [scenario-capabilities.yaml](../../skills/carto-agent/policies/scenario-capabilities.yaml) |
 
-Schema 中存在 Logo 或品牌色字段，不表示生成流程已完整消费它们。所有权组件支持整段替换，也不等于当前 CLI 已支持独立 Brand 的发现、安装、组合和品牌校验。
+目标让 Brand 的资产与限制参与统一实例解析；颜色不得覆盖业务/标准语义，字体与 Layout 可读性须共同满足。更换完整身份组件保留兼容性检查，允许的资产变体和参数须声明作用域、记录来源；不能借参数调整绕过字体许可或新增未批准资产。
 
-建议按以下顺序完善：
-
-1. 明确身份角色、字体角色和品牌色可消费位置，保持与 Scenario、Style、Layout 的单一所有权。
-2. 通过协议版本升级补齐资源引用、许可依据、字重与回退规则，将 Logo 使用限制结构化。
-3. 实现字体与 Logo 的确定性资源解析，校验字节摘要、字符覆盖和输出条件。
-4. 让 Style 与 Layout 消费解析结果，增加真实文字测量、Logo 净空和署名完整性检查。
-5. 将身份解析记录纳入现有候选、预览、环境和 MapSpecLock 摘要链。
-6. 开放独立 MapBrand 的创建、验证、发布和权威索引发现，再增加角色匹配与组合报告。
-7. 按实际需求扩展多语言、联合身份和色彩管理，不以枚举或描述代替可验证能力。
-
-后续实现继续位于 `skills/carto-agent/`。新增协议应同时提供合法、非法样例与自动验证，沿用唯一 CLI、完整 identity 段替换、精确版本引用和不可变发布原则。
+先贯通现有资源冻结与多面板测量，再按需求扩展独立 Brand 的创建、发布和匹配。保持精确版本、不可变包及审批，是否新增独立身份解析产物需单独定协议，不建立第二套锁。

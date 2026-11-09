@@ -1,5 +1,8 @@
 # MapStyle 完整说明
 
+> 2026-11-09 设计收敛：采用 Encoding / Appearance / Composition 三个设计维度及独立 Renderer 执行层；模板是组合载体，不与维度一一映射。统一定义见[模板体系设计](../carto-template-dsg.md)，本轮决定及修订范围见[收敛记录](../design-convergence-20261109.md)。新增模型、引用、参数与作用域调整属于目标设计，不改变当前 Schema、能力准入和审批。
+
+
 ## 1. 文档定位
 
 本文定义 Carto Agent 模板体系中 MapStyle 的概念、作用、职责边界、内容结构、组合接口、兼容规则、发布产物和实例编译结果。
@@ -24,18 +27,18 @@
 
 MapStyle 是一套可复用、版本化、可校验的**制图表达规范**。它在表达定义、Scenario 业务约束及适用标准范围内，通过 Profile 引用表达方法并配置视觉表现，例如：
 
-- 有序数值如何映射到颜色；
-- 数量如何映射到点符号面积；
+- 有序数值映射所允许的具体色带、方向和对比度；
+- 已确定面积编码后的符号外观与经共同验证的尺寸配置；
 - 分类对象如何使用不同符号；
 - 地名如何设置视觉层级；
 - 图层之间如何确定相对顺序；
 - 无数据和异常值如何表达；
-- 图例如何从实际表达结果生成；
+- 图例如何呈现实例编译提供的真实类别、断点和映射；
 - 哪些样式参数可以调整，哪些不可调整。
 
 MapStyle 回答的是：
 
-> 某种几何和语义的数据应该怎么画？
+> 在已确定的语义表达和业务约束下，采用怎样兼容的视觉表现？
 
 MapStyle 不回答：
 
@@ -572,7 +575,7 @@ portrayal_profiles:
 
 Profile 可以定义默认值并收窄表达允许的参数范围，但不能放宽表达适用条件、改变数量映射语义或保存某次数据计算出的分类断点。表达定义、Scenario、Style 和执行环境的约束必须同时满足；若 Scenario 已固定表达而 Profile 引用了不同方法，应报告不兼容。
 
-目录规定允许的参数，Profile 选择兼容默认值，两者有不同职责；不要在 Style 再维护一套独立算法或完整表达规则。示例中列出多种分类方法是目标配置，当前固定洪涝规划仍只接受 quantile。
+目录规定允许的参数，Profile 选择兼容默认值，两者有不同职责；不要在 Style 再维护一套独立算法或完整表达规则。示例中列出多种分类方法是目标配置；当前 general 仅接入已分类栅格的唯一值表达，未准入通用量化分级。
 
 #### 表达设计与 Profile 的关系
 
@@ -1114,37 +1117,16 @@ digest: "sha256:..."
 
 ## 17. 当前仓库状态
 
-当前仓库已经具备：
+截至 2026-11-09，以下是静态代码核对，不表示本机或真实业务验收完成：
 
-- MapScenario 内嵌的 `cartography` 段；
-- `map-style → cartography` 的完整段所有权映射；
-- 只含 `choropleth/sequential`、`proportional-symbol/count` 的轻量地图表达目录；
-- Schema、依赖锁和不可变发布基础；
-- 候选、RenderScene 和 MapSpecLock 管线。
+- v1 Scenario 内嵌 cartography，所有权组件保留 map-style → cartography 整段替换；独立 Style 创建、发现与组合业务尚未开放。
+- [cartography Schema](../../skills/carto-agent/schemas/cartography.schema.json) 已有 visual_language、symbolization、labeling、generalization、defaults、rules；[portrayal Schema](../../skills/carto-agent/schemas/portrayal.schema.json) 仍有分类、缩放、符号及层序定义，迁移不得形成双重执行来源。
+- [表达目录](../../skills/carto-agent/policies/map-expression-catalog.yaml) 包含 choropleth/sequential、proportional-symbol/count、raster/categorical；当前 general 仅接入最后一种，不应再把旧洪涝量化分级或半径计算描述为当前业务实现。
+- 分类栅格已有冻结类别表、图例、字体及整页渲染检查；见 [raster_portrayal.py](../../skills/carto-agent/scripts/carto_core/compiler/raster_portrayal.py)。这不代表通用矢量、图表或独立 Style 管线已完成。
 
-但当前独立 MapStyle 业务创建路由尚未开放。现有 `cartography` Schema 主要包含：
+目标演进顺序：先界定编码与 Appearance 的唯一来源；让 Profile 引用表达机制并提供受约束外观；在现有候选/执行快照中统一解析实例配置；增加共享组和按实际表达选择的检查；再按需求开放独立 Style 创建与组合。是否独立落盘 ResolvedCartography 需另定 Schema，不因此增加第二套实例锁。
 
-- `visual_language`；
-- `symbolization`；
-- `labeling`；
-- `generalization`；
-- `defaults`；
-- `rules`。
-
-目前分类、比例符号、图层顺序和无数据规则主要仍位于 MapScenario 的 `portrayal` 契约；部分颜色和符号参数由候选编译器生成。因此当前 MapStyle 还是较薄的视觉摘要，而不是本文目标结构下完整、可独立发布和匹配的模板。
-
-当前目录声明面积比例符号，但候选编译器实际按数值线性调整半径；通用符号资源实例化和图表核心也尚未贯通。具体依据与待修正事项见[设计结论文档第 10 节](map-expression-and-symbol-design.md#10-当前仓库状态与设计差距)。这些不能列为当前 Style 已经准确实现的能力。
-
-建议演进方向：
-
-1. 扩展 `cartography` Schema；
-2. 将符号使用配置和注记视觉规则收敛到 MapStyle，表达语义继续由表达定义拥有、算法由受信代码实现；
-3. 将 Scenario 的 `portrayal` 收敛为业务语义、表达/Profile 绑定及不能被外观覆盖的约束，明确旧字段迁移；
-4. 增加 `resolved-cartography` 协议；
-5. 增加制图标准注册和符合性检查；
-6. 增加独立 MapStyle 创建、验证和发布流程；
-7. 增加基于 `requires/provides` 的匹配报告；
-8. 保留精确版本、摘要、完整段替换和不可变发布原则。
+固定业务或标准颜色属于必须保留的语义约束，不是可任意更换的皮肤。组件替换、声明参数和作用域调整分别验证；超出接口的变更需新模板/版本，精确引用、不可变发布与审批不变。
 
 ---
 
@@ -1158,7 +1140,7 @@ MapStyle 应遵循以下原则：
 4. **默认值、允许范围和实例结果必须区分。**
 5. **Design Spec 解释原因，机器契约定义精确行为。**
 6. **制图标准约束 Style，Style 不复制或替代标准。**
-7. **通过完整模板版本演进，不进行运行时字段级拼接。**
+7. **结构变更通过模板版本演进；声明式参数与限定作用域的调整须显式验证，不进行任意深层合并。**
 8. **所有覆盖均显式声明、校验并记录来源。**
 9. **渲染器专用表达由 Adapter 生成。**
 10. **最终实例表达进入 ResolvedCartography 和 MapSpecLock。**

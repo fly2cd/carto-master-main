@@ -27,7 +27,7 @@
 <rect x="100" y="153" width="248" height="32" rx="16" fill="#EDF7FB" stroke="#EDF7FB" stroke-width="1.5" />
 <text x="224.0" y="176" class="label" style="fill:#137D9B" text-anchor="middle">目标活动／仍需扩展</text>
 <rect x="366" y="153" width="306" height="32" rx="16" fill="#EEF8F2" stroke="#EEF8F2" stroke-width="1.5" />
-<text x="519.0" y="176" class="label" style="fill:#24765E" text-anchor="middle">已有流程基础／限洪涝示例</text>
+<text x="519.0" y="176" class="label" style="fill:#24765E" text-anchor="middle">已有流程／限分类栅格单图</text>
 <rect x="690" y="153" width="230" height="32" rx="16" fill="#FFF8EA" stroke="#FFF8EA" stroke-width="1.5" />
 <text x="805.0" y="176" class="label" style="fill:#A96D13" text-anchor="middle">确认与能力门禁</text>
 <rect x="938" y="153" width="230" height="32" rx="16" fill="#F5F0FA" stroke="#F5F0FA" stroke-width="1.5" />
@@ -211,7 +211,7 @@
 <path class="link" d="M1637.5 1945 V1970 H960 V1985" />
 <rect x="240" y="1985" width="1440" height="94" rx="17" fill="#F7F9FC" stroke="#D8E2EE" stroke-width="1.5" />
 <text x="960" y="2019" class="card-title" text-anchor="middle">A：可独立形成 Style 与／或 Layout；B：Scenario 可自带身份、表达与版式基线。</text>
-<text x="960" y="2053" class="body" text-anchor="middle">组合时检查兼容性；Scenario 允许外部替换才按整段替换，每段只有一个执行来源。</text>
+<text x="960" y="2053" class="body" text-anchor="middle">目标组合检查组件、声明参数及作用域；当前 v1 仍按获准的完整段替换。</text>
 <path class="link" d="M960 2079 V2130" />
 <rect x="80" y="2140" width="1760" height="590" rx="26" fill="#FFFFFF" stroke="#DBE4EE" stroke-width="1.5" />
 <rect x="106" y="2162" width="48" height="43" rx="12" fill="#137D9B" stroke="#137D9B" stroke-width="1.5" />
@@ -464,7 +464,7 @@
 <text x="960" y="4870" class="small" text-anchor="middle">A 的发布不要求先复现原图；未来制图另走 G1／G2／G3，模板 T1／TP 不能替代地图实例确认。</text>
 <rect x="80" y="4920" width="1760" height="212" rx="22" fill="#E8EEF5" stroke="#D4DFEC" stroke-width="1.5" />
 <text x="110" y="4963" class="card-title">当前代码边界｜核对日期：2026-10-26</text>
-<text x="110" y="5000" class="body">已有：固定洪涝合成示例的创建、验证、发布与地图生成流程；版本、依赖、审批、状态和回执机制。</text>
+<text x="110" y="5000" class="body">已有：general 分类栅格单图、模板样张与发布、版本依赖、审批回执和交付框架。</text>
 <text x="110" y="5034" class="body">待扩展：图片分析、独立 Style／Layout 创建；本例的类别表达、分类栅格、河流线、区位图与真实空间处理。</text>
 <text x="110" y="5068" class="body">本图是目标设计；Schema 预留类型不等于执行能力。节点代表活动与职责，不表示新增智能体或服务。</text>
 <text x="110" y="5103" class="small">设计依据：MapScenario / MapStyle / MapLayout、表达与符号设计结论、模板创建 TRD；运行边界以 Skill 和代码为准。</text>

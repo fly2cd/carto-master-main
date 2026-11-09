@@ -1,5 +1,8 @@
 # 基于专题图片生成 MapStyle 与 MapLayout 的实施路径
 
+> 2026-11-09 一致性收敛：领域定义采用[模板体系设计](carto-template-dsg.md)中的 Encoding / Appearance / Composition 与独立执行层，变更见[收敛记录](design-convergence-20261109.md)。本轮仅调整设计，不升级机器协议或宣称新能力。旧阶段编号、场景示例和命令是历史/目标说明；当前仅注册 general 分类栅格单图，模板样张及正式渲染框架已存在，未完成的多图、组件、参数和后端组合须另行实现验收。
+
+
 | 项目 | 内容 |
 |---|---|
 | 文档状态 | 待实施方案；本文不代表能力已经开放 |
@@ -70,37 +73,18 @@
 
 ## 3. 当前代码能够复用什么，还缺什么
 
-以下结论来自本次静态代码核对，未以本次文档工作重新运行运行时验收。
+本节于 2026-11-09 核对，替换旧洪涝作者和仅浏览器场景的基线。参考图片不能证明原图的数据语义，也不能自动授予资产许可。
 
-| 层次 | 当前事实 | 本专项改动 |
-|---|---|---|
-| 顶层编排 | `template_workflow.py` 已有 analyze → brief → author → validate → publish，具备状态、回执和恢复机制 | 保留公共流程，按来源选择分析器、按 kind 选择作者与校验配置 |
-| 请求协议 | `template-create-request.schema.json` 仍绑定洪涝模板 ID、profile、数据角色和 CRS | 增加 Style／Layout 请求分支，移除这些分支对洪涝字段的要求 |
-| 来源分析 | `ControlledSourceAnalyzer` 仅接受受控合成 GeoJSON／CSV，拒绝非 Scenario | 新增图片分析器；不能仅扩大枚举即宣称支持图片 |
-| 来源声明 | `source-manifest` 已有 `png` 等枚举，但 `data_profile` 是合成地理数据约束 | 增加图片专属来源信息；不得把参考图片伪标记成 synthetic 数据集 |
-| 分析与简报 | 来源摘要要求至少两份数据，Brief 固定 `map-scenario`、风险面和避难点 | 摘要按来源类型分支；Brief 按 kind 规定必要字段，一张图即可合法输入 |
-| 作者 | `MapScenarioAuthor` 只生成固定洪涝包 | 新增 `MapStyleAuthor`、`MapLayoutAuthor`，共用经过改造的包写入器 |
-| Style 协议 | `cartography.schema.json` 有视觉语言、符号目录和少量默认值 | 补齐可实际执行的颜色、符号、文字、图例配置及兼容约束 |
-| Layout 协议 | `layout.schema.json` 有 Canvas、Frame、占位符与容量 | 补齐类型化内容绑定、必要约束、视图接口和可执行溢出策略 |
-| Manifest | 已识别四种 kind；只有 Scenario 有六契约入口 | 为独立组件增加明确契约和质量入口，避免靠扫描文件名寻找协议 |
-| 校验器 | `TemplatePackageValidator` 固定六份 Scenario 契约和洪涝语义 | 抽出公共包校验，按 kind 执行语义检查与 Fixture 编译 |
-| 渲染输入 | `RenderScene` 必须含空间上下文、地图和相机 | 增加页面／组件预览分支，不能填假 CRS 通过校验 |
-| 渲染实现 | `SvgCompositor` 依赖地图截图；浏览器和回执带 MapLibre 绑定 | 抽取公共页面合成与浏览器控制，补组件预览适配器及相应回执 |
-| 包写入与加载 | `StagingPackageWriter` 固定校验六契约和 `risk-overview` 原型；安装器直接读 `business_contracts` | 按 Manifest 的 kind 与入口读取；保留闭包、摘要与原子写入机制 |
-| 发布仓库 | 已有不可变包、权威索引、幂等发布与回执 | 复用事务；将发布前复核接到对应 kind 和渲染 profile |
-| 地图消费 | `map_candidate.py` 仍读 Scenario 内嵌样式，并固定部分整饰位置 | 将已解析的 Style／Layout 接到真实候选编译，而非只更新引用摘要 |
+| 已有基础 | 本路线仍需完善 |
+|---|---|
+| general 分类栅格作者、合成样张验证和发布 | 独立 Style/Layout 作者与图片来源合同尚未开放 |
+| v1 cartography/portrayal、表达目录 | 分离编码要求与 Appearance；图片提取的颜色不能反推真实类别或断点 |
+| Layout Frame、content_id、ResolvedLayout | 角色绑定、模板允许范围、多图及 freeform 的模型与检查 |
+| 静态栅格页面和浏览器后端 | 通用组件预览与每后端能力检查，不将样式预览伪装为有业务 CRS 的地图 |
+| 包闭合、权威索引、版本和发布事务 | 精确组件引用/内嵌及声明参数机制，不能只改 Manifest 即启用 |
+| 真实字体快照、页面测量、正式回执 | 扩展内容类型、层级和有意重叠的证据，不宣称任意海报已支持 |
 
-主要实现位置：
-
-- [创建编排](../skills/carto-agent/scripts/carto_core/workflow/template_workflow.py)
-- [来源分析](../skills/carto-agent/scripts/carto_core/workflow/template_analysis.py)
-- [模板校验](../skills/carto-agent/scripts/carto_core/workflow/template_validation.py)
-- [分段所有权](../skills/carto-agent/scripts/carto_core/compiler/ownership.py)
-- [页面合成](../skills/carto-agent/scripts/carto_core/adapters/svg_compositor.py)
-- [模板仓库](../skills/carto-agent/scripts/carto_core/repository/template_repository.py)
-- [地图候选编译](../skills/carto-agent/scripts/carto_core/compiler/map_candidate.py)
-
-[全局计划](global-implement-plan.md)中的 U-P4 是“三场景业务与生产闭环”。本专项可以为其提供能力，但不是 U-P4 的同义名称，也不以完成全部 U-P4 为前提。
+图片中的空间位置属于 Composition，视觉表现属于 Appearance，可识别的映射仅作为待核对的 Encoding 证据；可以生成组合模板，但不得让 Style 与 Layout 同时持有一份可执行颜色或位置定义。图片展示海报不意味着必须使用自由模型，也不意味着图表/插图计算已实现。
 
 ## 4. 核心设计决定
 
@@ -337,7 +321,7 @@ Manifest 中，Style 的机器入口为 `contracts/cartography.yaml`，Layout �
 **工作：**
 
 1. 在 `generate-map` 请求、规划和依赖解析中接收已发布 Style／Layout 精确引用；将 `TemplateInstaller` 的 `business_contracts` 固定读取改为按 Manifest 的 kind 与入口解析。
-2. 沿用 Scenario 的 `replaceable_segments` 与 `OwnershipResolver`，兼容后整段替换，保持每段单一执行来源。
+2. v1 沿用 replaceable_segments 与完整段替换；目标按升级合同验证组件来源、声明参数与限定作用域调整，保持每项最终执行值来源唯一，不做任意深层合并。
 3. 让 `map_candidate.py` 实际消费解析后的 cartography 和 layout，移除该路径上的固定配色和固定 overlay 坐标。
 4. 扩展候选、RenderScene 和 MapSpecLock 所需绑定，固定外部模板、字体、布局测量和渲染依赖。
 5. 用另一个兼容 Scenario／合成任务验证复用，不能为了让测试通过而强行将土地覆盖类别映射到洪涝风险等级。
