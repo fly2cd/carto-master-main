@@ -36,7 +36,7 @@ from carto_core.errors import ProtocolError, SecurityError
 from carto_core.repository.immutable_store import ImmutableArtifactStore
 from carto_core.repository.knowledge import DomainKnowledgeService
 from carto_core.schema_registry import SchemaRegistry
-from carto_core.security.approval import ApprovalReceipt, InMemoryNonceStore, sign_receipt
+from carto_core.security.approval import ApprovalReceipt, sign_receipt
 from carto_core.security.paths import PathGuard
 from carto_core.workflow.agent_runtime import AgentSubmission, BoundedAgentRuntime
 from carto_core.workflow.approvals import ApprovalGateCoordinator, GATES
@@ -139,15 +139,15 @@ class IntentAndRuntimeTests(unittest.TestCase):
     def fields(scene: str) -> dict[str, str]:
         if scene == "government_thematic":
             return {"geography": "示例市", "time": "2026", "source": "统计数据", "output": "A3 PDF"}
-        if scene == "emergency_mapping":
-            return {"hazard": "flood", "event-phase": "response", "data-nature": "observed", "observation-time": "2026-09-15", "geography": "示例市", "source": "应急数据", "output": "A3 PDF"}
+        if scene == "general_thematic_mapping":
+            return {"geography": "示例市", "source": "应急数据", "output": "A3 PDF"}
         return {"itinerary": "甲地至乙地", "visit-order": "1,2", "route-mode": "road", "geography": "示例市", "confidentiality": "internal", "output": "A3 PDF"}
 
-    def test_three_business_scenes_resolve_and_dispatch(self) -> None:
-        texts = {"government_thematic": "制作经济发展政务专题图", "emergency_mapping": "制作洪涝应急灾情图", "leadership_visit": "制作领导调研行程路线图"}
+    def test_two_business_scenes_resolve_and_dispatch(self) -> None:
+        texts = {"government_thematic": "制作经济发展政务专题图", "general_thematic_mapping": "制作洪涝应急专题图", "leadership_visit": "制作领导调研行程路线图"}
         for scene, text in texts.items():
             with self.subTest(scene=scene):
-                tasks = {"government_thematic": "indicator-map", "emergency_mapping": "hazard-result-map", "leadership_visit": "visit-route-map"}
+                tasks = {"government_thematic": "indicator-map", "general_thematic_mapping": "thematic-map", "leadership_visit": "visit-route-map"}
                 intent = self.resolver.resolve({"schema_version": 1, "intent_id": f"intent-{scene.replace('_', '-')}",
                     "text": text, "selection": {"fields": self.fields(scene), "tasks": [tasks[scene]]}})
                 self.assertEqual(intent["business_scene"], scene)
@@ -159,7 +159,7 @@ class IntentAndRuntimeTests(unittest.TestCase):
         self.assertEqual(ambiguous["intent_status"], "ambiguous")
         missing = self.resolver.resolve({"schema_version": 1, "text": "洪涝应急图", "selection": {"fields": {}}})
         self.assertEqual(missing["readiness_status"], "missing_information")
-        capability = self.resolver.resolve({"schema_version": 1, "text": "洪涝应急图", "selection": {"fields": self.fields("emergency_mapping"), "tasks": ["hazard-result-map"], "required_capabilities": ["web-map-export"]}})
+        capability = self.resolver.resolve({"schema_version": 1, "text": "洪涝应急图", "selection": {"fields": self.fields("general_thematic_mapping"), "tasks": ["thematic-map"], "required_capabilities": ["web-map-export"]}})
         self.assertEqual(capability["readiness_status"], "missing_capability")
         rejected = self.resolver.resolve({"schema_version": 1, "text": "写一首诗", "selection": {"fields": {}}})
         self.assertEqual(rejected["intent_status"], "unsupported")
@@ -202,16 +202,24 @@ class ProtocolAndGateTests(unittest.TestCase):
         SchemaRegistry().validate("validation-report", report.to_dict())
 
     def test_g1_g2_g3_verify_exact_context(self) -> None:
-        key = b"test-only-secret-that-is-at-least-32-bytes"
-        coordinator = ApprovalGateCoordinator(key, InMemoryNonceStore(), "carto-security", "trusted-local")
+        key = b"test-only-secret-that-is-at-least-16-bytes"
+        coordinator = ApprovalGateCoordinator(key)
         now = datetime.now(UTC)
-        for index, (gate_id, gate) in enumerate(GATES.items(), 1):
+        for gate_id, gate in GATES.items():
             digest = sha256_digest({"gate": gate_id})
-            unsigned = ApprovalReceipt(1, f"receipt-{gate_id.lower()}", "trusted-local", "reviewer-one", "tenant-one", gate.action, gate.object_type, digest, "project:project-one", "carto-security", "local", (now - timedelta(minutes=1)).isoformat(), (now + timedelta(minutes=10)).isoformat(), f"nonce-{index:016d}")
-            coordinator.require(gate_id, sign_receipt(unsigned, key), digest, context())
-        wrong = replace(unsigned, nonce="nonce-9999999999999999", object_digest=sha256_digest({"wrong": True}))
+            unsigned = ApprovalReceipt(
+                f"receipt-{gate_id.lower()}", gate.action, digest,
+                (now - timedelta(minutes=1)).isoformat(),
+                (now + timedelta(minutes=10)).isoformat(),
+            )
+            coordinator.require(gate_id, sign_receipt(unsigned, key), digest)
+        wrong = ApprovalReceipt(
+            "receipt-wrong", GATES["G3"].action, sha256_digest({"wrong": True}),
+            (now - timedelta(minutes=1)).isoformat(),
+            (now + timedelta(minutes=10)).isoformat(),
+        )
         with self.assertRaises(SecurityError):
-            coordinator.require("G3", sign_receipt(wrong, key), sha256_digest({"expected": True}), context())
+            coordinator.require("G3", sign_receipt(wrong, key), sha256_digest({"expected": True}))
 
     def test_deterministic_data_preparation_returns_valid_bundle(self) -> None:
         bundle = DeterministicDataPreparer(POLICIES / "data-preparation-policy.yaml").prepare_data(VALID_CASES["data-preparation-task"], context())

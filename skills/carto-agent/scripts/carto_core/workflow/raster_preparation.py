@@ -14,13 +14,17 @@ from ..adapters.geospatial_mcp import DTYPE_RANGES, TIFF_SIGNATURES, _publish_by
 from ..canonical import canonical_json_bytes, sha256_digest
 from ..compiler.raster_portrayal import algorithm_digest, parse_legend, resolve_classes
 from ..errors import ProtocolError, SecurityError
+from ..artifacts import protocol_version
 from ..repository.immutable_store import StoredArtifact
 from ..schema_registry import SchemaRegistry, load_document
 from ..security.paths import PathGuard
 from .models import ExecutionContext
 
 
-class RasterPreparationService:
+from .static_assets import StaticAssetStore
+
+
+class RasterPreparationService(StaticAssetStore):
     def __init__(self, *, project_root: Path, allowed_roots: list[str], registry: SchemaRegistry | None = None) -> None:
         self.registry = registry or SchemaRegistry()
         self.guard = PathGuard(allowed_roots)
@@ -28,38 +32,20 @@ class RasterPreparationService:
         self.project_guard = PathGuard([self.project])
         self.root = self.project_guard.resolve(self.project / ".carto" / "raster")
 
-    def read_bytes(self, path: Path, limit: int) -> bytes:
-        path = self.guard.resolve(path, must_exist=True)
-        if not path.is_file() or not 0 < path.stat().st_size <= limit:
-            raise ProtocolError("RASTER_ASSET_SIZE_INVALID", "Expected a bounded regular file")
-        with path.open("rb") as stream:
-            content = stream.read(limit + 1)
-        if not 0 < len(content) <= limit:
-            raise ProtocolError("RASTER_ASSET_SIZE_INVALID", "Asset changed or exceeds its size limit")
-        return content
 
-    @staticmethod
-    def digest_bytes(content: bytes) -> str:
-        return "sha256:" + hashlib.sha256(content).hexdigest()
 
-    def _asset(self, content: bytes, kind: str, extension: str) -> dict[str, Any]:
-        digest = self.digest_bytes(content)
-        path = self.project_guard.resolve(self.root / kind / (digest[7:] + extension))
-        _publish_bytes(self.project_guard, path, content)
-        return {"artifact_ref": {"id": kind, "version": "1.0.0", "digest": digest, "uri": path.as_posix()},
-                "size_bytes": len(content)}
 
     def save_document(self, value: dict[str, Any], schema: str) -> StoredArtifact:
         self.registry.validate(schema, value)
         digest = sha256_digest(value)
         path = self.project_guard.resolve(self.root / schema / (digest[7:] + ".json"))
         _publish_bytes(self.project_guard, path, canonical_json_bytes(value) + b"\n")
-        return StoredArtifact(schema, "1.0.0", digest, path)
+        return StoredArtifact(schema, protocol_version(schema), digest, path)
 
     def _json_ref(self, reference: dict[str, str], schema: str) -> dict[str, Any]:
         # Reference identity is checked before indexing, including for direct library callers.
         if (not isinstance(reference, dict) or set(reference) != {"id", "version", "digest", "uri"}
-                or reference.get("version") != "1.0.0"
+                or reference.get("version") != protocol_version(schema)
                 or not isinstance(reference.get("digest"), str)
                 or not re.fullmatch(r"sha256:[0-9a-f]{64}", reference["digest"])):
             raise ProtocolError("RASTER_REFERENCE_INVALID", "Expected a typed immutable local reference")
@@ -81,16 +67,6 @@ class RasterPreparationService:
         self.registry.validate(schema, value)
         return value
 
-    def snapshot_bytes(self, asset: dict[str, Any], kind: str, extension: str) -> bytes:
-        ref = asset["artifact_ref"]
-        expected = self.project_guard.resolve(self.root / kind / (ref["digest"][7:] + extension), must_exist=True)
-        if self.project_guard.resolve(ref["uri"], must_exist=True) != expected or ref["id"] != kind or ref["version"] != "1.0.0":
-            raise ProtocolError("RASTER_SNAPSHOT_SCOPE_INVALID", "Snapshot must belong to this project's content store")
-        limit = 268435456 if extension == ".tif" else 1048576 if extension == ".csv" else 67108864
-        content = self.read_bytes(expected, limit)
-        if len(content) != asset["size_bytes"] or self.digest_bytes(content) != ref["digest"]:
-            raise ProtocolError("RASTER_SNAPSHOT_CHANGED", "Immutable raster asset has changed")
-        return content
 
     def _check_result(self, result: dict[str, Any], source: dict[str, Any]) -> None:
         self.registry.validate("geospatial-result", result)

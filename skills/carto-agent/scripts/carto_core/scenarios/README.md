@@ -42,7 +42,7 @@
 
 分类栅格是数据类型；`raster/categorical` 是共享着色表达；Rasterio + Matplotlib 是静态渲染实现，SVG/PDF/PNG 是输出格式。不能为了接入栅格而添加同名业务场景或放开策略。
 
-`compiler/raster_portrayal.py` 根据显式模板角色和已澄清类别显示定义生成 `resolved-raster-portrayal`。图体与内部整页渲染只消费该合同；它不提供业务来源准入、审批或正式渲染回执。场景组件可以复用共享表达，不得复制另一套类别颜色/图例实现。
+`compiler/raster_portrayal.py` 根据显式模板角色和已澄清类别显示定义生成 `resolved-portrayal`（geometry=raster 分支）。图体与内部整页渲染只消费该合同；它不提供业务来源准入、审批或正式渲染回执。场景组件可以复用共享表达，不得复制另一套类别颜色/图例实现。
 
 第三批 C 已提供 `RasterBundlePreparer` / `RasterSceneCompiler` 与静态正式后端，详情见 `../../../workflows/raster-classification.md`。已准入场景可以复用：
 

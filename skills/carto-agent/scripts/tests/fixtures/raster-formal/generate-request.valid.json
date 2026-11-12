@@ -21,6 +21,7 @@
     "namespace": "test-project"
   },
   "idempotency_key": "request-one-00001",
+  "geometry": "raster",
   "intent": {
     "business_scene": "government_thematic",
     "theme_tags": [
@@ -75,6 +76,9 @@
     "classify",
     "render-preview"
   ],
+  "panels": [
+    {"id": "main-view", "source_id": "raster-source", "title": "Main map panel"}
+  ],
   "prepared_raster_bindings": [
     {
       "role": "classified-surface",
@@ -83,7 +87,8 @@
         "version": "1.0.0",
         "digest": "sha256:995574df7a10892556f30add25abbf3ea071305a061edd30dcc1848897c840d1",
         "uri": ".carto/raster/raster-prepared-data/995574df7a10892556f30add25abbf3ea071305a061edd30dcc1848897c840d1.json"
-      }
+      },
+      "source_id": "raster-source"
     }
   ],
   "requested_at": "2026-11-05T11:29:14.967Z",

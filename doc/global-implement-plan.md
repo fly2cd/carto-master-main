@@ -401,7 +401,7 @@ U-P2.0 范围冻结
 | 步骤 | 实现 |
 |---|---|
 | 请求 | `execution_mode: demonstration`，合成数据，A3 横向，PDF/PNG |
-| 意图 | `emergency_mapping` + `hazard_result_map`，灾种 flood，阶段 preparedness |
+| 意图 | `general_thematic_mapping` + `thematic-map`，灾种 flood，阶段 preparedness |
 | 数据准备 | 固定流程：GeoJSON/CSV 接入、Join 与字段绑定、单位检查、CRS 验证 |
 | 规划 | 安装模板精确版本、解析六契约、绑定数据角色、计算分类断点 |
 | 预览 | MapLibre Web 渲染候选，检查图例同步、无数据表达和比例符号面积 |
@@ -460,9 +460,11 @@ U-P2.0 范围冻结
 - 政务十个方向目前明确七项，其余三项须由业务确认后登记，不虚构名称。
 - 指标地图按数据契约绑定；行政区划图不必产生分类断点；设施分布图不必有连续数值。
 
-#### 6.3.2 应急测绘制图（`emergency_mapping`）
+#### 6.3.2 应急专题（已并入标准专题制图 `general_thematic_mapping`）
 
-| 灾种 | 首期输入与表达 | 必须阻止的误判 |
+> 应急制图不再作为独立的 `emergency_mapping` 业务场景。洪涝、滑坡、森林火灾等灾种作为 `general_thematic_mapping` 的主题标签（`theme_tags: [flood, landslide, forest-fire]`），通过标准专题制图管线完成编制。
+
+| 灾种 | 输入与表达 | 必须阻止的误判 |
 |---|---|---|
 | 地质滑坡 | 已核验滑坡点、调查边界、影响区 | 把点自动扩展为滑坡体或预测范围 |
 | 洪涝灾害 | 已有淹没范围、水位/风险指标、避难点 | 将降雨量当淹没范围 |

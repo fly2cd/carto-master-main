@@ -9,7 +9,7 @@ from ..canonical import sha256_digest
 from ..errors import ProtocolError, SecurityError
 from ..schema_registry import SchemaRegistry, load_document
 from ..repository.template_repository import TemplateRepository
-from ..security.approval import ApprovalReceipt, SqliteNonceStore
+from ..security.approval import ApprovalReceipt
 from ..security.paths import PathGuard
 from .approvals import ApprovalGateCoordinator
 from .models import ExecutionContext
@@ -110,9 +110,6 @@ class TemplateCreationWorkflow:
         approval_path: str | Path | None,
         *,
         approval_key: bytes,
-        nonce_db: str | Path,
-        policy_id: str,
-        issuer: str,
     ) -> dict[str, Any]:
         if approval_path is None:
             raise ProtocolError("BRIEF_NOT_CONFIRMED", "A T1 template-brief approval is required")
@@ -138,63 +135,8 @@ class TemplateCreationWorkflow:
             raise ProtocolError("BRIEF_NOT_CONFIRMED", "Approval receipt must be an object")
         self.registry.validate("approval-receipt", approval_value)
         receipt = ApprovalReceipt.from_dict(approval_value)
-        approval_copy = self.path_guard.resolve(self.work_root / "approvals/t1-template-brief.yaml")
-        approval_journal_exists = approval_copy.exists()
-        nonce_path = self._resolve_project_path(nonce_db, must_exist=False)
-        nonce_path.parent.mkdir(parents=True, exist_ok=True)
-        nonce_store = SqliteNonceStore(str(nonce_path))
-        context = ExecutionContext(
-            run_id=state.run_id,
-            tenant_id=request["subject"]["tenant_id"],
-            project_id=request["subject"]["project_id"],
-            subject_id=request["subject"]["requester_subject_id"],
-            roles=frozenset({"template-author"}),
-            namespaces=frozenset({request["subject"]["project_id"]}),
-            authorized_capabilities=frozenset({"create-template-author"}),
-            environment=request["subject"]["environment"],
-        )
-        context.require_project_scope()
-        coordinator = ApprovalGateCoordinator(
-            approval_key,
-            nonce_store,
-            policy_id,
-            issuer,
-        )
-        coordinator.validate(
-            "T1",
-            receipt,
-            sha256_digest(brief),
-            context,
-            approver_subject_id=request["subject"]["approver_subject_id"],
-        )
-        atomic_yaml(approval_copy, approval_value)
-        already_consumed = nonce_store.contains(receipt.issuer, receipt.nonce)
-        if already_consumed:
-            if not approval_journal_exists:
-                raise SecurityError(
-                    "APPROVAL_RECOVERY_EVIDENCE_MISSING",
-                    "Consumed T1 approval has no workflow-local intent record",
-                )
-            coordinator.require_consumed(
-                "T1",
-                receipt,
-                sha256_digest(brief),
-                context,
-                approver_subject_id=request["subject"]["approver_subject_id"],
-            )
-        else:
-            if package_exists:
-                raise SecurityError(
-                    "APPROVAL_NONCE_NOT_CONSUMED",
-                    "Existing staging package is not backed by a consumed approval",
-                )
-            coordinator.require(
-                "T1",
-                receipt,
-                sha256_digest(brief),
-                context,
-                approver_subject_id=request["subject"]["approver_subject_id"],
-            )
+        coordinator = ApprovalGateCoordinator(approval_key)
+        coordinator.require("T1", receipt, sha256_digest(brief))
         author = MapScenarioAuthor(self.path_guard, self.work_root, self.registry)
         package = (
             author.verify_existing(request, brief)
@@ -219,7 +161,6 @@ class TemplateCreationWorkflow:
             "state": state.to_dict(),
             "receipt": step_receipt.to_dict(),
             "package": package,
-            "idempotent_replay": already_consumed,
         }
 
     @serialized_workflow_step
@@ -282,9 +223,6 @@ class TemplateCreationWorkflow:
         idempotency_key: str,
         approval_key: bytes,
         renderer_attestation_key: bytes,
-        nonce_db: str | Path,
-        policy_id: str,
-        issuer: str,
     ) -> dict[str, Any]:
         request, inputs, state = self._resume_request(request_path)
         self._require_step(state.step, "publish")
@@ -315,19 +253,7 @@ class TemplateCreationWorkflow:
             path_guard=self.path_guard, root=repository_path,
             repository_scope=repository_scope, registry=self.registry,
         )
-        nonce_path = self._resolve_project_path(nonce_db, must_exist=False)
-        nonce_path.parent.mkdir(parents=True, exist_ok=True)
-        nonce_store = SqliteNonceStore(str(nonce_path))
-        coordinator = ApprovalGateCoordinator(approval_key, nonce_store, policy_id, issuer)
-        context = ExecutionContext(
-            run_id=state.run_id, tenant_id=request["subject"]["tenant_id"],
-            project_id=request["subject"]["project_id"],
-            subject_id=request["subject"]["requester_subject_id"],
-            roles=frozenset({"template-publisher"}),
-            namespaces=frozenset({request["namespace"]}),
-            authorized_capabilities=frozenset({"create-template-publish"}),
-            environment=request["subject"]["environment"],
-        )
+        coordinator = ApprovalGateCoordinator(approval_key)
         publication_object = {
             "package_digest": snapshot["package_digest"],
             "evidence_digest": evidence["evidence_digest"],
@@ -339,17 +265,15 @@ class TemplateCreationWorkflow:
             evidence_digest=evidence["evidence_digest"],
         )
         if prior is not None:
+            approval_value = repository.load_publication_approval(prior)
             if state.status == "succeeded":
                 if self.state_store.find_output_digest("publication-receipt") != sha256_digest(prior):
                     raise ProtocolError("JOB_PREREQUISITE_DRIFT", state.run_id)
                 return {"state": state.to_dict(), "publication": prior, "idempotent_replay": True}
             if state.status not in {"pending", "waiting_approval"}:
                 raise ProtocolError("JOB_RECOVERY_NOT_ALLOWED", f"status={state.status}")
-            approval_value = repository.load_publication_approval(prior)
-            coordinator.require_consumed(
-                "TP", ApprovalReceipt.from_dict(approval_value), publication_digest, context,
-                approver_subject_id=request["subject"]["approver_subject_id"],
-                expected_scope=repository_scope,
+            coordinator.require(
+                "TP", ApprovalReceipt.from_dict(approval_value), publication_digest,
             )
             publication_ref = {
                 "id": "publication-receipt", "version": "1.0.0",
@@ -372,9 +296,7 @@ class TemplateCreationWorkflow:
             raise ProtocolError("PUBLICATION_APPROVAL_REQUIRED", "Approval receipt must be an object")
         self.registry.validate("approval-receipt", approval_value)
         coordinator.require(
-            "TP", ApprovalReceipt.from_dict(approval_value), publication_digest, context,
-            approver_subject_id=request["subject"]["approver_subject_id"],
-            expected_scope=repository_scope,
+            "TP", ApprovalReceipt.from_dict(approval_value), publication_digest,
         )
         publication = repository.publish(
             package_root=package_root, snapshot=snapshot, evidence=evidence,

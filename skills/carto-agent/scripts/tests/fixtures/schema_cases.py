@@ -16,8 +16,8 @@ RESOLVED_LAYOUT = json.loads((Path(__file__).parent / "resolved-layout.valid.jso
 EXECUTION = {
     "intent_ref": A,
     "profile_refs": [],
-    "business_scene": "emergency_mapping",
-    "map_tasks": ["hazard-result-map"],
+    "business_scene": "general_thematic_mapping",
+    "map_tasks": ["thematic-map"],
     "template_refs": [T],
     "dependency_refs": [E],
     "policy_refs": [],
@@ -52,7 +52,7 @@ TEMPLATE_CREATE_REQUEST = {
     "version": "1.0.0",
     "profile": "test-profile",
     "purpose": "Protocol request",
-    "audience": ["emergency-planner"],
+    "audience": ["thematic-planner"],
     "reuse_intent": "Reuse with authorized role-compatible inputs",
     "supported_uses": ["engineering-preview"],
     "excluded_uses": ["navigation", "formal-delivery"],
@@ -105,7 +105,7 @@ TEMPLATE_BRIEF = {
     "version": "1.0.0",
     "scope": "project:project-one",
     "purpose": TEMPLATE_CREATE_REQUEST["purpose"],
-    "audience": ["emergency-planner"],
+    "audience": ["thematic-planner"],
     "reuse_intent": TEMPLATE_CREATE_REQUEST["reuse_intent"],
     "supported_uses": ["engineering-preview"],
     "excluded_uses": ["navigation", "formal-delivery"],
@@ -142,6 +142,9 @@ PROTOTYPE_DESCRIPTION = {
     "limitations": ["Browser rendering is deferred."],
 }
 
+CARTOGRAPHY.update(schema_version=2, version="2.0.0", typography={'title_pt': 18, 'body_pt': 9, 'legend_pt': 10, 'legend_heading_pt': 11, 'line_spacing': 1.25})
+LAYOUT["content_padding_mm"] = 2
+
 VALID_CASES = {
     "manifest": {"schema_version": 1, "package": {"namespace": "local", "kind": "map-scenario", "id": "test-scenario", "version": "1.0.0", "status": "draft", "summary": "Schema 测试对象"}, "business_contracts": BUSINESS_CONTRACTS, "dependencies": [], "dependency_lock": "dependencies.lock.yaml", "targets": ["svg", "pdf", "png"], "files": PACKAGE_FILES, "checksums": {path: D for path in PACKAGE_FILES}},
     "template-create-request": TEMPLATE_CREATE_REQUEST,
@@ -152,7 +155,7 @@ VALID_CASES = {
     "cartography": CARTOGRAPHY,
     "layout": LAYOUT,
     "resolved-layout": RESOLVED_LAYOUT,
-    "scenario": {"schema_version": 1, "scenario_id": "test-scenario", "version": "1.0.0", "business_scene": "emergency_mapping", "tasks": ["hazard-result-map"], "owned_segments": ["scenario", "data", "spatial-behavior", "portrayal", "delivery", "quality-gates"], "embedded": {"identity": IDENTITY, "cartography": CARTOGRAPHY, "layout": LAYOUT}, "replaceable_segments": ["identity", "cartography", "layout"], "data_role_refs": ["area-role", "point-role"], "target_ids": ["a3-pdf", "a3-png"], "application": {"supported_uses": ["engineering-preview"], "excluded_uses": ["navigation", "formal-delivery"]}, "compatibility": {"target_profiles": ["a3-landscape"], "placeholders": ["{{MAP_TITLE}}", "{{MAP_FRAME}}"]}, "rules": [R]},
+    "scenario": {"schema_version": 1, "scenario_id": "test-scenario", "version": "1.0.0", "business_scene": "general_thematic_mapping", "tasks": ["thematic-map"], "owned_segments": ["scenario", "data", "spatial-behavior", "portrayal", "delivery", "quality-gates"], "embedded": {"identity": IDENTITY, "cartography": CARTOGRAPHY, "layout": LAYOUT}, "replaceable_segments": ["identity", "cartography", "layout"], "data_role_refs": ["area-role", "point-role"], "target_ids": ["a3-pdf", "a3-png"], "application": {"supported_uses": ["engineering-preview"], "excluded_uses": ["navigation", "formal-delivery"]}, "compatibility": {"target_profiles": ["a3-landscape"], "placeholders": ["{{MAP_TITLE}}", "{{MAP_FRAME}}"]}, "rules": [R]},
     "data-role": {"schema_version": 1, "roles": [{"id": "area-role", "required": True, "geometry_types": ["polygon", "multipolygon"], "fields": [{"name": "thematic_value", "type": "number", "unit": "percent", "nullable": True, "semantic_role": "thematic-value"}], "join": {"key": "admin_code", "minimum_coverage": 0.98}, "freshness": {"max_age_days": 30}, "license_policy": "project-approved"}]},
     "spatial-behavior": {"schema_version": 1, "source_crs_policy": "reproject-approved", "display_crs": {"authority": "EPSG", "code": "4490"}, "extent_policy": "administrative-boundary", "scale_bands": [{"id": "regional", "min_denominator": 10000, "max_denominator": 1000000, "generalization": "simplify"}], "topology": {"preserve_adjacency": True, "preserve_route_order": False}, "rules": [R]},
     "portrayal": {"schema_version": 1, "layers": [{"id": "area-layer", "data_role": "area-role", "geometry": "polygon", "z_order": 10, "map_expression_ref": {"id": "choropleth/sequential", "version": "1.0.0", "digest": D}, "value_role": "thematic-value", "symbol": {"catalog_ref": "ramps/test-theme@1.0.0", "parameters": {"opacity": 0.8}}, "classification": {"method": "quantile", "classes": 4, "field_role": "thematic-value"}, "no_data": "explicit-symbol"}], "legend": {"generated_from_layers": True, "show_no_data": True, "overflow_policy": "reject"}, "rules": [R]},
@@ -163,8 +166,8 @@ VALID_CASES = {
     "dependency-lock": {"schema_version": 1, "lock_id": "test-scenario-lock", "package": {"namespace": "local", "kind": "map-scenario", "id": "test-scenario", "version": "1.0.0", "digest": D}, "dependencies": [], "resources": [{"id": "choropleth/sequential", "version": "1.0.0", "digest": D}, {"id": "proportional-symbol/count", "version": "1.0.0", "digest": D}], "resolver_version": "1.0.0", "generated_at": "2026-09-17T00:00:00Z"},
     "template-validation-evidence": {"schema_version": 1, "evidence_id": "validation-evidence-one", "namespace": "local", "package_ref": T, "manifest_digest": D, "dependency_lock_digest": D, "fixture_set_digest": D, "checker_set_digest": D, "renderer": {"renderer_id": "maplibre-web", "renderer_profile_digest": D, "adapter_version": "1.0.0", "frontend_build": "2026.09.18", "renderer_version": "1.0.0", "maplibre_version": "3.6.0", "overlay_engine_version": "1.0.0", "environment_fingerprint": D}, "render_receipt_ref": A, "preview_artifacts": [{"target": "svg", "artifact_ref": A}], "status": "passed", "counts": {"blocker": 0, "error": 0, "warning": 0, "info": 0}, "results": [{"check_id": "template.package-closed", "version": "1.0.0", "status": "passed", "severity": "blocker", "details": {}}], "created_at": "2026-09-18T00:00:00Z", "evidence_digest": D},
     "publication-receipt": {"schema_version": 1, "receipt_id": "publication-receipt-one", "namespace": "local", "package_ref": T, "manifest_digest": D, "evidence_ref": A, "dependency_lock_ref": A, "index_digest_before": D, "index_digest_after": D, "repository_scope": "local:templates", "approval_ref": A, "published_at": "2026-09-17T00:00:00Z", "idempotency_key": "publish-test-0001"},
-    "generate-request": {"schema_version": 1, "request_id": "request-one", "project_id": "test-project", "goal": "校验制图请求结构", "sources": [A], "requested_outputs": ["pdf", "png"], "subject": {"subject_id": "user-1", "tenant_id": "tenant-one", "namespace": "project-one"}, "idempotency_key": "request-one-00001"},
-    "map-intent": {"schema_version": 1, "intent_id": "intent-one", "revision": 1, "profile_version": "2.0.0", "business_scene": "emergency_mapping", "theme_tags": ["unit-theme"], "tasks": ["hazard-result-map"], "intent_status": "resolved", "readiness_status": "ready", "missing_items": [], "evidence_refs": [A]},
+    "generate-request": {"schema_version": 1, "request_id": "request-one", "project_id": "test-project", "goal": "校验制图请求结构", "geometry": "raster", "panels": [{"id": "base-view", "source_id": "ref-a", "title": "Base"}], "sources": [A], "requested_outputs": ["pdf", "png"], "subject": {"subject_id": "user-1", "tenant_id": "tenant-one", "namespace": "project-one"}, "idempotency_key": "request-one-00001"},
+    "map-intent": {"schema_version": 1, "intent_id": "intent-one", "revision": 1, "profile_version": "2.0.0", "business_scene": "general_thematic_mapping", "theme_tags": ["unit-theme"], "tasks": ["thematic-map"], "intent_status": "resolved", "readiness_status": "ready", "missing_items": [], "evidence_refs": [A]},
     "intent-profiles": {'schema_version': 1, 'catalog_version': '2.0.0', 'profiles': [{'business_scene': 'unit_scene', 'purpose_terms': ['unit purpose'], 'task_ids': ['unit-task'], 'required_information': ['theme_tags'], 'unsupported_actions': []}], 'themes': [{'id': 'unit-theme', 'label': 'Unit topic', 'terms': ['unit topic']}]},
     "map-brief": {"schema_version": 1, "brief_id": "map-brief-one", "revision": 1, "intent_ref": A, "purpose": "空间信息展示", "audience": "授权使用者", "source_plan": [{"role": "area-role", "source_ref": A, "allowed_operations": ["read", "join", "classify"]}], "targets": ["pdf", "png"], "template_candidates": [T], "delegation": {"allow_data_agent": False, "max_tool_calls": 10}, "approval_required": True, "business_scene": "government_thematic", "theme_tags": ["unit-theme"], "tasks": ["indicator-map"]},
     "source-manifest": {"schema_version": 1, "manifest_id": "source-manifest-one", "sources": [{"source_id": "area-data", "kind": "geopackage", "location_ref": "project-source:area.gpkg", "digest": D, "provenance": P, "license": "project-approved", "captured_at": "2026-09-14T00:00:00Z"}]},
@@ -172,7 +175,7 @@ VALID_CASES = {
     "knowledge-evidence": {"schema_version": 1, "evidence_id": "evidence-one", "claim": "指标字段单位为百分比", "publisher": "示例标准机构", "source": P, "applicability": {"jurisdiction": "示例地区", "valid_from": "2026-01-01", "industry": "emergency"}, "digest": D},
     "data-preparation-task": {"schema_version": 1, "task_id": "prepare-one", "required_roles": ["area-role"], "allowed_sources": [A], "allowed_operations": ["filter", "join", "reproject", "classify"], "budget": {"max_tool_calls": 10, "max_seconds": 300}, "acceptance_checks": ["schema-valid"]},
     "prepared-data-bundle": {"schema_version": 1, "bundle_id": "bundle-one", "task_ref": A, "datasets": [A], "transformations": [], "tool_receipts": [A], "quality_evidence": [A], "open_issues": [], "digest": D},
-    "map-plan": {"schema_version": 1, "plan_id": "plan-one", "revision": 1, "project_id": "test-project", "intent_ref": A, "brief_ref": A, "business_scene": "emergency_mapping", "tasks": ["hazard-result-map"], "template_refs": [T], "data_bindings": [{"role": "area-role", "dataset_ref": A}], "decisions": {"classification": "quantile", "class_count": 5, "extent": [100, 20, 101, 21], "title": "Protocol title", "legend_source": "actual-encoding", "renderer_id": "maplibre-web", "point_scaling": "area-proportional"}, "open_issues": []},
+    "map-plan": {"schema_version": 3, "plan_id": "plan-one", "revision": 1, "project_id": "test-project", "intent_ref": A, "brief_ref": A, "business_scene": "general_thematic_mapping", "tasks": ["thematic-map"], "template_refs": [T], "data_bindings": [{"role": "area-role", "dataset_ref": A}], "decisions": {"classification": "quantile", "class_count": 5, "extent": [100, 20, 101, 21], "title": "Protocol title", "legend_source": "actual-encoding", "renderer_id": "maplibre-web", "point_scaling": "area-proportional"}, "open_issues": []},
     "resolved-map": {"schema_version": 1, "candidate_id": "candidate-one", "project_id": "test-project", "run_id": "run-one", "execution_digest": EXECUTION_DIGEST, "execution": EXECUTION, "open_issues": [], "created_at": "2026-09-14T00:00:00Z"},
     "map-spec-lock": {"schema_version": 1, "lock_id": "lock-one", "project_id": "test-project", "run_id": "run-one", "candidate_ref": A, "execution_digest": EXECUTION_DIGEST, "execution": EXECUTION, "evidence": {"preflight_ref": A, "preview_ref": A}, "approvals": {"brief_ref": "approval:brief", "freeze_ref": "approval:freeze"}, "candidate_digest": D, "preview_evidence_digest": D, "render_receipt_ref": A, "environment_fingerprint": D, "created_at": "2026-09-14T00:00:00Z"},
     "render-attempt": {"schema_version": 1, "attempt_id": "render-attempt-run-one-1", "project_id": "test-project", "run_id": "run-one", "lock_ref": A, "lock_digest": D, "business_execution_digest": EXECUTION_DIGEST, "target_id": "formal-map", "attempt_number": 1, "status": "succeeded", "render_scene_digest": D, "renderer_profile_digest": D, "renderer_execution_digest": D, "resource_set_digest": D, "environment_fingerprint": D, "output_artifacts": [{"target": "pdf", "artifact_ref": A}, {"target": "png", "artifact_ref": A}], "render_receipt_ref": A, "retryable": False, "started_at": "2026-09-21T00:00:00Z", "completed_at": "2026-09-21T00:00:05Z"},
@@ -181,7 +184,7 @@ VALID_CASES = {
     "delivery-manifest": {"schema_version": 1, "manifest_id": "manifest-one", "project_id": "test-project", "tenant_id": "tenant-one", "run_id": "run-one", "lock_ref": A, "lock_digest": D, "execution_digest": EXECUTION_DIGEST, "render_attempt_ref": A, "renderer_execution_digest": D, "validation_report_ref": A, "artifacts": [{"path": "output/map.pdf", "format": "pdf", "digest": D, "size_bytes": 1024}, {"path": "output/map.png", "format": "png", "digest": D, "size_bytes": 2048}], "recipient": {"recipient_id": "reviewer-one", "recipient_type": "project-user"}, "destination": {"kind": "local-allowed-root", "relative_path": "deliveries/delivery-one"}, "scope": "project:test-project", "environment": "local", "licenses": ["unit-test-only"], "limitations": ["场景使用限制"], "idempotency_key": "delivery-one-00000001", "created_at": "2026-09-21T00:00:00Z"},
     "delivery-receipt": {"schema_version": 1, "receipt_id": "delivery-receipt-one", "delivery_id": "delivery-one", "transaction_id": "transaction-one", "manifest_ref": A, "manifest_digest": D, "idempotency_key": "delivery-one-00000001", "final_path": "deliveries/delivery-one", "artifacts": [{"path": "package/map.pdf", "format": "pdf", "digest": D, "size_bytes": 1024}, {"path": "package/map.png", "format": "png", "digest": D, "size_bytes": 2048}], "g3_approval_ref": A, "status": "committed", "delivered_at": "2026-09-21T00:00:00Z"},
     "delivery-transaction": {"schema_version": 1, "transaction_id": "transaction-one", "delivery_id": "delivery-one", "project_id": "test-project", "tenant_id": "tenant-one", "run_id": "run-one", "manifest_ref": A, "manifest_digest": D, "idempotency_key": "delivery-one-00000001", "recipient": {"recipient_id": "reviewer-one", "recipient_type": "project-user"}, "destination": {"kind": "local-allowed-root", "relative_path": "deliveries/delivery-one"}, "staging_path": "deliveries/.delivery-one.staging-0000000000000000", "final_path": "deliveries/delivery-one", "approval_ref": A, "status": "receipt-written", "phase": "receipt", "artifacts": [{"path": "map.pdf", "format": "pdf", "digest": D, "size_bytes": 1024}, {"path": "map.png", "format": "png", "digest": D, "size_bytes": 2048}], "receipt_ref": A, "created_at": "2026-09-21T00:00:00Z", "updated_at": "2026-09-21T00:00:02Z", "committed_at": "2026-09-21T00:00:01Z"},
-    "approval-receipt": {"schema_version": 1, "receipt_id": "receipt-one", "issuer": "local-host", "subject_id": "user-1", "tenant_id": "tenant-one", "action": "approve-freeze", "object_type": "resolved-map", "object_digest": D, "scope": "project:test-project", "policy_id": "carto-security", "environment": "local", "issued_at": "2026-09-14T00:00:00Z", "expires_at": "2026-09-15T00:00:00Z", "nonce": "nonce-0000000001", "signature_algorithm": "hmac-sha256", "signature": "0" * 64},
+    "approval-receipt": {"receipt_id": "receipt-one", "action": "approve-freeze", "object_digest": D, "issued_at": "2026-09-14T00:00:00Z", "expires_at": "2026-09-15T00:00:00Z", "signature_algorithm": "hmac-sha256", "signature": "0" * 64},
     "job-state": {"schema_version": 1, "revision": 1, "status": "running", "step": "validate", "attempt": 1, "run_id": "run-one", "input_fingerprint": D, "last_receipt": "receipts/validate-1.json"},
     "step-receipt": {"schema_version": 1, "receipt_id": "receipt-step-one", "run_id": "run-one", "step": "validate", "attempt": 1, "status": "succeeded", "input_fingerprint": D, "prerequisite_fingerprints": {"policy": D}, "tool_versions": {"schema-validate": "1.0.0"}, "output_refs": [A], "started_at": "2026-09-15T00:00:00Z", "completed_at": "2026-09-15T00:00:01Z"},
     "state-transition": {"schema_version": 1, "transition_id": "transition-one", "run_id": "run-one", "expected_revision": 1, "receipt_path": "receipts/validate-1.json", "receipt_digest": D, "previous_state": {"schema_version": 1, "revision": 1, "status": "running", "step": "validate", "attempt": 1, "run_id": "run-one", "input_fingerprint": D, "last_receipt": "receipts/prior.json"}, "next_state": {"schema_version": 1, "revision": 2, "status": "pending", "step": "publish", "attempt": 1, "run_id": "run-one", "input_fingerprint": D, "last_receipt": "receipts/validate-1.json"}, "created_at": "2026-09-15T00:00:01Z"},
@@ -234,17 +237,21 @@ VALID_CASES["scenario-capabilities"] = json.loads((Path(__file__).parent / "scen
 _general_generate = json.loads((Path(__file__).parent / "raster-formal" / "generate-request.valid.json").read_text(encoding="utf-8"))
 _general_generate["goal"] = "编制土地覆盖通用专题图"
 _general_generate["template"]["id"] = "general-thematic-map"
+_general_generate["template"]["version"] = "3.0.0"
+_general_generate["layout_parameters"] = {"rows":1,"columns":1,"legend_mode":"independent"}
+_general_generate["panels"] = [{"id":"main-view","source_id":_general_generate["source_bindings"][0]["source_ref"]["id"],"title":_general_generate["goal"]}]
 _general_generate["intent"].update({"business_scene": "general_thematic_mapping",
                                     "theme_tags": ["land-cover"], "tasks": ["thematic-map"],
                                     "fields": {"geography": "unit-region", "source": "user-supplied",
                                                "output": "pdf"}})
 _general_generate["source_bindings"][0]["data_nature"] = "user-provided"
-VALID_CASES["general-thematic-generate-request"] = _general_generate
+VALID_CASES["general-generate-request"] = _general_generate
 
 _general_create = deepcopy(TEMPLATE_CREATE_REQUEST)
 _general_create.update({
     "request_id": "general-template-request",
     "template_id": "general-thematic-map",
+    "version": "3.0.0",
     "profile": "general-thematic-authoring",
     "purpose": "通用专题图模板协议请求",
     "targets": ["pdf", "png"],
@@ -252,8 +259,9 @@ _general_create.update({
     "source_crs": {"authority": "EPSG", "code": "4326"},
     "display_crs": {"authority": "EPSG", "code": "4326"},
     "role_bindings": {"classified_surface": "legend-sample"},
+    "geometry": "raster",
 })
-VALID_CASES["general-thematic-template-create-request"] = _general_create
+VALID_CASES["general-template-create-request"] = _general_create
 
 INVALID_CASES = {}
 for name, case in VALID_CASES.items():
@@ -434,6 +442,11 @@ _old_hint = deepcopy(VALID_CASES["generate-request"])
 _old_hint["scene_hint"] = "government_thematic"
 SEMANTIC_INVALID_CASES["generate-request-legacy-scene-hint"] = ("generate-request", _old_hint)
 
+# Missing geometry field: generate-request now requires explicit geometry.
+_missing_geom = deepcopy(VALID_CASES["general-generate-request"])
+_missing_geom.pop("geometry")
+SEMANTIC_INVALID_CASES["generate-request-missing-geometry"] = ("generate-request", _missing_geom)
+
 # MCP/raster protocols are fixtures only, not registered scenarios or operator configuration.
 for _name in ("raster-input", "geospatial-mcp-config", "geospatial-request", "geospatial-wire", "geospatial-result"):
     VALID_CASES[_name] = json.loads((Path(__file__).parent / f"{_name}.valid.json").read_text(encoding="utf-8"))
@@ -445,13 +458,74 @@ for _name in ('raster-classification-request', 'raster-classification-answers', 
     INVALID_CASES[_name] = json.loads((Path(__file__).parent / f"{_name}.invalid.json").read_text(encoding="utf-8"))
 
 # Internal page output is not a formal rendering attestation or delivery.
-for _name in ("raster-page-request", "raster-page-output"):
+for _name in ("page-request", "page-output"):
     VALID_CASES[_name] = json.loads((Path(__file__).parent / f"{_name}.valid.json").read_text(encoding="utf-8"))
     INVALID_CASES[_name] = json.loads((Path(__file__).parent / f"{_name}.invalid.json").read_text(encoding="utf-8"))
 
 # Shared categorical portrayal does not register a business scenario or renderer receipt.
-for _name in ("map-expression-catalog", "resolved-raster-portrayal"):
+for _name in ("map-expression-catalog", "resolved-portrayal"):
     VALID_CASES[_name] = json.loads((Path(__file__).parent / f"{_name}.valid.json").read_text(encoding="utf-8"))
     INVALID_CASES[_name] = json.loads((Path(__file__).parent / f"{_name}.invalid.json").read_text(encoding="utf-8"))
 for _name, _schema in (("portrayal-raster", "portrayal"), ("map-expression-raster", "map-expression")):
     SEMANTIC_INVALID_CASES[_name] = (_schema, json.loads((Path(__file__).parent / f"{_name}.invalid.json").read_text(encoding="utf-8")))
+
+# S1-A/B contracts are strict synthetic fixtures, not enabled multi-panel execution.
+for _name in ("page-bindings", "resolved-appearance", "category-counts"):
+    VALID_CASES[_name] = json.loads((Path(__file__).parent / f"{_name}.valid.json").read_text(encoding="utf-8"))
+    INVALID_CASES[_name] = json.loads((Path(__file__).parent / f"{_name}.invalid.json").read_text(encoding="utf-8"))
+
+for _name in ("grid-parameters", "bundle-inputs"):
+    VALID_CASES[_name] = json.loads((Path(__file__).parent / f"{_name}.valid.json").read_text(encoding="utf-8"))
+    INVALID_CASES[_name] = json.loads((Path(__file__).parent / f"{_name}.invalid.json").read_text(encoding="utf-8"))
+
+# S2 strict synthetic vector protocols (not approval or admission evidence).
+for _name in ('vector-input', 'vector-encoding', 'vector-prepared-data'):
+    VALID_CASES[_name] = json.loads((Path(__file__).parent / f"{_name}.valid.json").read_text(encoding="utf-8"))
+    INVALID_CASES[_name] = json.loads((Path(__file__).parent / f"{_name}.invalid.json").read_text(encoding="utf-8"))
+
+# Geometry-vs-panels conflict: explicit geometry field must match the panel/source family.
+# These are rejected by the allOf constraint in generate-request.schema.json.
+_raster_geom_vector_panels = deepcopy(VALID_CASES["general-generate-request"])
+_p = {"id": "conflict-view", "source_id": "raster-source", "title": "Conflict", "extent": [-1, -1, 2, 2],
+      "encoding": deepcopy(VALID_CASES["vector-encoding"])}
+_raster_geom_vector_panels["vector_panels"] = [_p]
+SEMANTIC_INVALID_CASES["generate-request-raster-geometry-with-vector-panels"] = ("generate-request", _raster_geom_vector_panels)
+
+_vector_geom_raster_panels = deepcopy(VALID_CASES["general-generate-request"])
+_vector_geom_raster_panels["geometry"] = "vector"
+for _f in ("source_bindings", "prepared_raster_bindings"):
+    _vector_geom_raster_panels.pop(_f, None)
+SEMANTIC_INVALID_CASES["generate-request-vector-geometry-with-raster-panels"] = ("generate-request", _vector_geom_raster_panels)
+
+# Capability roadmap declares queueable not-implemented features (admission_class taxonomy).
+for _name in ("capability-roadmap",):
+    VALID_CASES[_name] = json.loads((Path(__file__).parent / f"{_name}.valid.json").read_text(encoding="utf-8"))
+    INVALID_CASES[_name] = json.loads((Path(__file__).parent / f"{_name}.invalid.json").read_text(encoding="utf-8"))
+
+# Vector variants of unified request schemas (not cacheable as inline JSON fixtures —
+# they are programmatically derived from raster fixtures above). Variant cases are
+# keyed by schema name + ".vector" and live outside VALID_CASES/INVALID_CASES so the
+# schema-coverage invariant (registry schemas == fixture keys) stays exact.
+VARIANT_CASES = {}
+VARIANT_INVALID_CASES = {}
+
+_vector_tc = deepcopy(VALID_CASES["general-template-create-request"])
+_vector_tc.update(version="4.0.0", profile="general-vector-authoring", geometry="vector")
+VARIANT_CASES["general-template-create-request.vector"] = _vector_tc
+VARIANT_INVALID_CASES["general-template-create-request.vector"] = {**deepcopy(_vector_tc), "version": "3.0.0"}
+
+_vector_gr = deepcopy(VALID_CASES["general-generate-request"])
+for _field in ("source_bindings", "prepared_raster_bindings", "panels", "geometry"):
+    _vector_gr.pop(_field, None)
+_vector_gr["template"]["version"] = "4.0.0"
+_vector_gr["geometry"] = "vector"
+_vector_source = deepcopy(VALID_CASES["vector-input"])
+_vector_source["data_nature"] = "user-provided"
+_vector_gr.update(vector_sources=[_vector_source], vector_panels=[{"id": "main-view", "source_id": "source-a", "title": _vector_gr["goal"], "extent": [-1,-1,2,2], "encoding": deepcopy(VALID_CASES["vector-encoding"])}])
+VARIANT_CASES["general-generate-request.vector"] = _vector_gr
+VARIANT_INVALID_CASES["general-generate-request.vector"] = {**deepcopy(_vector_gr), "unexpected": True}
+
+# Vector geometry variants of the unified page contracts (variant case, not a schema key).
+for _name in ("page-request.vector", "page-output.vector"):
+    VARIANT_CASES[_name] = json.loads((Path(__file__).parent / f"{_name}.valid.json").read_text(encoding="utf-8"))
+    VARIANT_INVALID_CASES[_name] = json.loads((Path(__file__).parent / f"{_name}.invalid.json").read_text(encoding="utf-8"))

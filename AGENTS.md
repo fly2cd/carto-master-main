@@ -8,6 +8,7 @@
 - 修改地图工作流、Schema、策略、脚本或测试前，必须先阅读 `skills/carto-agent/SKILL.md`。
 - `skills/carto-master/` 是空的历史占位目录，不是运行入口，不得在其中新增实现。
 - 架构和 TRD 位于 `doc/`，运行时不得把这些设计文档当作机器协议读取。
+- **设计原则**：[`doc/design-principles.md`](doc/design-principles.md) 定义了 LLM 设计自由与程序形式验证的四层决策边界（创意设计层 / 形式验证层 / 机械推导层 / 灰色地带）；所有新增或修改的制图能力实现必须符合该原则中声明的职责归属。
 
 ## IDE 宿主入口（Codex / Claude Code）
 

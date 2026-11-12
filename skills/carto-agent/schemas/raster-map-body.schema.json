@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.carto-agent.local/v1/raster-map-body.schema.json",
+  "$id": "https://schemas.carto-agent.local/v2/raster-map-body.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -21,11 +21,12 @@
     "crs",
     "ground_to_image",
     "legend_items",
-    "environment"
+    "environment",
+    "frame_id"
   ],
   "properties": {
     "schema_version": {
-      "const": 1
+      "const": 2
     },
     "kind": {
       "const": "raster-map-body"
@@ -34,7 +35,7 @@
       "const": "rasterio-matplotlib"
     },
     "renderer_version": {
-      "const": "1.0.0"
+      "const": "2.0.0"
     },
     "renderer_code_digest": {
       "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
@@ -210,7 +211,7 @@
           ],
           "properties": {
             "id": {
-              "const": "resolved-raster-portrayal"
+              "const": "resolved-portrayal"
             },
             "version": {
               "const": "1.0.0"
@@ -218,6 +219,9 @@
           }
         }
       ]
+    },
+    "frame_id": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
     }
   }
 }

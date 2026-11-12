@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "inputs": [
+    {
+      "source_id": "synthetic-raster",
+      "prepared_ref": {
+        "id": "raster-prepared-data",
+        "version": "1.0.0",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "uri": "/synthetic/prepared.json"
+      }
+    }
+  ],
+  "unexpected": true
+}

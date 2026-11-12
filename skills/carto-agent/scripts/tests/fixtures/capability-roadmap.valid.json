@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "version": "1.0.0",
+  "items": [
+    {"id": "raster-multi-layer-overlay", "status": "planned", "target": "U-P4", "note": "单页多栅格图层叠置;当前编译器只执行一个栅格图层。"},
+    {"id": "composition-map-counts", "status": "planned", "target": "U-P4", "note": "1×1/1×2/2×2 之外的面板数;当前有限网格仅 {1,2,4}。"},
+    {"id": "comparison-grid-shared-legend", "status": "delivered", "target": "U-P3.6", "note": "参数化网格与共享图例已交付,作为防回退锚点。"}
+  ]
+}

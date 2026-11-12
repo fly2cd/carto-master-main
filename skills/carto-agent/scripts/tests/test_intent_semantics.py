@@ -75,14 +75,14 @@ class IntentSemanticsTests(unittest.TestCase):
         document["intent_ref"] = {**document["intent_ref"], "digest": sha256_digest(intent)}
         return document
 
-    def test_brief_schema_does_not_force_emergency(self):
+    def test_brief_schema_accepts_every_registered_profile(self):
         for profile in self.policy["profiles"]:
             with self.subTest(scene=profile["business_scene"]):
                 intent = self.resolver.resolve(self.request(profile["business_scene"]))
                 self.schemas.validate("map-brief", self.projection("map-brief", intent))
 
     def test_topic_terms_do_not_choose_business_purpose(self):
-        cases = [("emergency_mapping", "洪涝应急专题图"),
+        cases = [("general_thematic_mapping", "制作洪涝应急专题图"),
                  ("leadership_visit", "领导调研洪涝安置点")]
         for scene, text in cases:
             with self.subTest(scene=scene):
@@ -186,7 +186,7 @@ class IntentSemanticsTests(unittest.TestCase):
             self.schemas.validate("map-brief", self.projection("map-brief", intent))
         # The temporary intent catalog never touches the packaged scenario policy:
         # it still admits only the registered general-thematic scenario.
-        self.assertEqual({("map-scenario", "general-thematic-map", "1.0.0")},
+        self.assertEqual({("map-scenario", "general-thematic-map", "3.0.0")},
                          set(ScenarioRegistry(self.schemas)._templates))
 
     def test_standalone_and_generate_share_the_same_intent(self):
@@ -208,7 +208,7 @@ class IntentSemanticsTests(unittest.TestCase):
         request["intent"]["theme_tags"] = ["transportation"]
         self.assert_code("SCENARIO_INTENT_MISMATCH", lambda: registry.for_generate(request))
         registry, _, request = self.generation_context()
-        request["intent"] = self.request("emergency_mapping")["selection"]
+        request["intent"] = self.request("general_thematic_mapping")["selection"]
         self.assert_code("SCENARIO_INTENT_MISMATCH", lambda: registry.for_generate(request))
 
     def test_intent_drift_inside_template_allowlist_still_fails(self):
@@ -228,7 +228,7 @@ class IntentSemanticsTests(unittest.TestCase):
                     "business_scene": "government_thematic", "tasks": ["administrative-map", "indicator-map"]}
         profile.require_contract(contract)
         for key, value in (("scenario_id", "government_thematic"),
-                           ("business_scene", "emergency_mapping"), ("tasks", ["administrative-map"])):
+                           ("business_scene", "general_thematic_mapping"), ("tasks", ["administrative-map"])):
             changed = {**contract, key: value}
             self.assert_code("SCENARIO_CONTRACT_MISMATCH", lambda: profile.require_contract(changed))
 
@@ -238,7 +238,7 @@ class IntentSemanticsTests(unittest.TestCase):
         for schema, kind in (("map-brief", "BRIEF"), ("map-plan", "PLAN")):
             document = self.projection(schema, intent)
             profile.require_intent_projection(document, intent, kind=kind)
-            for key, value in (("business_scene", "emergency_mapping"),
+            for key, value in (("business_scene", "general_thematic_mapping"),
                                ("theme_tags", ["flood"]), ("tasks", ["indicator-map"])):
                 changed = {**document, key: value}
                 self.assert_code(f"{kind}_INTENT_MISMATCH",
@@ -319,7 +319,7 @@ class IntentSemanticsTests(unittest.TestCase):
         intent["theme_tags"] = []
         self.assert_code("INTENT_THEME_REQUIRED", lambda: self.resolver.require_current_intent(intent))
 
-    def test_brief_builder_preserves_non_emergency_intent_without_io(self):
+    def test_brief_builder_preserves_non_general_thematic_intent_without_io(self):
         registry, _, request = self.generation_context()
         request.update(run_id="unit-run", audience="unit-audience", scope="project:test-project",
                        environment="unit", allowed_capabilities=["read"])

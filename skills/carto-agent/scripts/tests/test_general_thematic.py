@@ -1,4 +1,4 @@
-"""Tests for the registered general_thematic_mapping scenario (general-thematic-raster).
+"""Tests for the registered general_thematic_mapping scenario (general-thematic bundle).
 
 Synthetic data, synthetic approval keys and TemporaryDirectory roots only. These tests
 never create or consume a real user approval. The create line exercises the registered
@@ -41,12 +41,11 @@ from carto_core.artifacts import artifact_ref, atomic_yaml, file_digest, utc_now
 from carto_core.workflow.models import ExecutionContext
 from carto_core.validation.map_checks import MapQualityChecks
 from carto_core.workflow.map_generation import MapGenerationWorkflow
-from carto_core.workflow.raster_bundle import RasterBundlePreparer
+from carto_core.workflow.preparation_bundle import BundlePreparer
 from carto_core.workflow.template_workflow import TemplateCreationWorkflow
 from tests.fixtures.schema_cases import VALID_CASES
 from tests.test_raster_classification import PreparationFixture
-from tests.test_raster_page_renderer import release_test_font_handles
-from tests import test_raster_renderer as raster_helpers
+from tests.helpers import release_test_font_handles, set_raster
 
 KEY = b"synthetic-render-key-not-for-production-1234"
 APPROVAL_KEY = b"synthetic-approval-key-not-for-production-1234"
@@ -54,9 +53,9 @@ NOTICE = "通用专题图：依据用户提供的数据编制，未经业务审�
 GOAL = "编制土地覆盖通用专题图"
 LEGEND_TITLE = "图例"
 TEMPLATE = {"namespace": "local", "kind": "map-scenario",
-            "id": "general-thematic-map", "version": "1.0.0"}
+            "id": "general-thematic-map", "version": "3.0.0"}
 BRIEF_STUB = {"kind": "map-scenario", "namespace": "local",
-              "template_id": "general-thematic-map", "version": "1.0.0"}
+              "template_id": "general-thematic-map", "version": "3.0.0"}
 SCENE_TEXT = NOTICE + GOAL + LEGEND_TITLE
 # Every string the frozen validation page may draw: sample title, notice, legend, labels.
 VALIDATION_TEXT = "分类栅格模板样张" + NOTICE + LEGEND_TITLE + "示例类别一二三"
@@ -104,14 +103,13 @@ def find_cjk_font(required_text: str) -> Path | None:
     return None
 
 
-def sign(gate: str, action: str, object_type: str, digest: str, *,
-         tenant_id: str, approver: str, scope: str) -> ApprovalReceipt:
+def sign(gate: str, action: str, object_type: str, digest: str) -> ApprovalReceipt:
     now = datetime.now(UTC)
     return sign_receipt(ApprovalReceipt(
-        1, f"synthetic-{gate.lower()}-general", "synthetic-issuer", approver, tenant_id,
-        action, object_type, digest, scope, "synthetic-policy", "local",
-        (now - timedelta(minutes=1)).isoformat(), (now + timedelta(minutes=10)).isoformat(),
-        f"synthetic-nonce-{gate.lower()}-general-1"), APPROVAL_KEY)
+        f"synthetic-{gate.lower()}-general", action, digest,
+        (now - timedelta(minutes=1)).isoformat(),
+        (now + timedelta(minutes=10)).isoformat(),
+    ), APPROVAL_KEY)
 
 
 def build_installation(package_path: Path, package: dict[str, str]) -> dict:
@@ -158,11 +156,11 @@ class AdmissionTests(unittest.TestCase):
 
     def test_component_allowlist_is_closed(self):
         from carto_core import scenario_registry
-        entry = scenario_registry._COMPONENTS["general-thematic-raster"]
+        entry = scenario_registry._COMPONENTS["general-thematic"]
         self.assertEqual({"data_preparer", "planner", "candidate_compiler", "legend_checker",
                           "source_contract", "author", "validation_data_checker", "validation_scene"},
                          set(entry))
-        self.assertEqual({".scenarios.general_thematic"}, {module for module, _ in entry.values()})
+        self.assertEqual({".scenarios.general_dispatch"}, {module for module, _ in entry.values()})
         with self.assertRaisesRegex(ProtocolError, "CAPABILITY_NOT_AVAILABLE"):
             self.profile.component("renderer")
         with patch("carto_core.scenario_registry.import_module") as importer:
@@ -171,8 +169,8 @@ class AdmissionTests(unittest.TestCase):
             importer.assert_not_called()
 
     def test_generate_overlay_only_narrows_the_registered_shape(self):
-        base = deepcopy(VALID_CASES["general-thematic-generate-request"])
-        self.registry.validate("general-thematic-generate-request", base)
+        base = deepcopy(VALID_CASES["general-generate-request"])
+        self.registry.validate("general-generate-request", base)
         mutations = [
             ("template", {**TEMPLATE, "id": "test-scenario"}),
             ("intent", {**base["intent"], "business_scene": "government_thematic"}),
@@ -186,22 +184,22 @@ class AdmissionTests(unittest.TestCase):
             with self.subTest(key=key, value=value):
                 case = deepcopy(base)
                 case[key] = value
-                self.assert_schema_rejects("general-thematic-generate-request", case)
+                self.assert_schema_rejects("general-generate-request", case)
         for path, value in [("data_nature", "synthetic"), ("role", "other-role")]:
             with self.subTest(path=path):
                 case = deepcopy(base)
                 case["source_bindings"][0][path] = value
-                self.assert_schema_rejects("general-thematic-generate-request", case)
+                self.assert_schema_rejects("general-generate-request", case)
         case = deepcopy(base)
         case["prepared_raster_bindings"][0]["role"] = "other-role"
-        self.assert_schema_rejects("general-thematic-generate-request", case)
+        self.assert_schema_rejects("general-generate-request", case)
 
     def test_create_overlay_only_narrows_the_registered_shape(self):
-        base = deepcopy(VALID_CASES["general-thematic-template-create-request"])
-        self.registry.validate("general-thematic-template-create-request", base)
+        base = deepcopy(VALID_CASES["general-template-create-request"])
+        self.registry.validate("general-template-create-request", base)
         mutations = [
             ("profile", "test-profile"),
-            ("version", "2.0.0"),
+            ("version", "1.0.0"),
             ("targets", ["svg", "pdf", "png"]),
             ("data_nature", "observed"),
             ("contains_production_data", True),
@@ -213,10 +211,10 @@ class AdmissionTests(unittest.TestCase):
             with self.subTest(key=key, value=value):
                 case = deepcopy(base)
                 case[key] = value
-                self.assert_schema_rejects("general-thematic-template-create-request", case)
+                self.assert_schema_rejects("general-template-create-request", case)
 
     def test_intent_resolution_binds_only_the_registered_purpose(self):
-        request = deepcopy(VALID_CASES["general-thematic-generate-request"])
+        request = deepcopy(VALID_CASES["general-generate-request"])
         profile, intent = self.scenarios.resolve_generate(request)
         self.assertEqual(self.profile.ref, profile.ref)
         self.assertEqual("general_thematic_mapping", intent["business_scene"])
@@ -283,17 +281,15 @@ class CreateLineTests(unittest.TestCase):
             }],
         }
         atomic_yaml(self.root / "source-manifest.yaml", manifest)
-        self.request = deepcopy(VALID_CASES["general-thematic-template-create-request"])
+        self.request = deepcopy(VALID_CASES["general-template-create-request"])
         self.request_path = self.root / "create-request.json"
         self.request_path.write_text(json.dumps(self.request, ensure_ascii=False), encoding="utf-8")
         self.workflow = TemplateCreationWorkflow(allowed_roots=[self.root], project_root=self.root,
                                                  workdir=self.root / "work", registry=self.registry)
-        self.author_kwargs = dict(approval_key=APPROVAL_KEY, nonce_db=self.root / "nonces.sqlite",
-                                  policy_id="synthetic-policy", issuer="synthetic-issuer")
+        self.author_kwargs = dict(approval_key=APPROVAL_KEY)
 
     def t1(self, digest: str) -> ApprovalReceipt:
-        return sign("T1", "approve-template-brief", "template-brief", digest,
-                    tenant_id="tenant-one", approver="reviewer-one", scope="project:project-one")
+        return sign("T1", "approve-template-brief", "template-brief", digest)
 
     def run_to_brief(self):
         analyzed = self.workflow.analyze(self.request_path)
@@ -311,7 +307,7 @@ class CreateLineTests(unittest.TestCase):
         evidence = analyzed["analysis"]["evidence_records"]
         self.assertGreaterEqual(len(evidence), 4)
         suggestion = next(item for item in evidence if item["value_origin"] == "system_suggestion")
-        self.assertEqual(["raster/categorical@1.0.0"], suggestion["value"])
+        self.assertEqual(["categorical@2.0.0"], suggestion["value"])
         self.assertTrue(suggestion["rationale"])
         self.assertEqual([{"role_id": "classified-surface", "source_id": "legend-sample",
                            "geometry_types": ["none"], "value_field": "category_value",
@@ -347,9 +343,7 @@ class CreateLineTests(unittest.TestCase):
         with self.assertRaisesRegex(ProtocolError, "WORKFLOW_STEP_MISMATCH"):
             self.workflow.publish(self.request_path, None, repository_root=self.root / "repo",
                                   repository_scope="local:templates", idempotency_key="publish-1",
-                                  approval_key=APPROVAL_KEY, renderer_attestation_key=KEY,
-                                  nonce_db=self.root / "nonces.sqlite",
-                                  policy_id="synthetic-policy", issuer="synthetic-issuer")
+                                  approval_key=APPROVAL_KEY, renderer_attestation_key=KEY)
 
     def test_author_rejects_foreign_requests_and_crs_drift(self):
         guard = PathGuard([self.root])
@@ -360,7 +354,7 @@ class CreateLineTests(unittest.TestCase):
         with self.assertRaisesRegex(ProtocolError, "CAPABILITY_NOT_AVAILABLE"):
             author.author(foreign, BRIEF_STUB)
         with self.assertRaisesRegex(ProtocolError, "TEMPLATE_BRIEF_MISMATCH"):
-            author.author(self.request, dict(BRIEF_STUB, version="2.0.0"))
+            author.author(self.request, dict(BRIEF_STUB, version="1.0.0"))
         for mutation, code in [({"targets": ["svg", "pdf", "png"]}, "RENDER_TARGET_UNSUPPORTED"),
                                ({"display_crs": {"authority": "EPSG", "code": "3857"}}, "SOURCE_CRS_UNSUPPORTED")]:
             request = deepcopy(self.request)
@@ -379,7 +373,7 @@ class CreateLineTests(unittest.TestCase):
         snapshot = {"manifest": load_document(package_root / "manifest.yaml"),
                     "fixture_paths": ["fixtures/validation-input.csv"]}
         expected = {"namespace": "local", "kind": "map-scenario", "id": "general-thematic-map",
-                    "version": "1.0.0", "source_crs": deepcopy(CRS_4326),
+                    "version": "3.0.0", "source_crs": deepcopy(CRS_4326),
                     "display_crs": deepcopy(CRS_4326)}
         validation_data_checker(package_root, snapshot, expected)
         with self.assertRaisesRegex(ProtocolError, "TEMPLATE_IDENTITY_MISMATCH"):
@@ -487,25 +481,21 @@ class PublishLineTests(unittest.TestCase):
             }],
         }
         atomic_yaml(self.root / "source-manifest.yaml", manifest)
-        self.request = deepcopy(VALID_CASES["general-thematic-template-create-request"])
+        self.request = deepcopy(VALID_CASES["general-template-create-request"])
         self.request["source_crs"] = deepcopy(CRS_26911)
         self.request["display_crs"] = deepcopy(CRS_26911)
         self.request_path = self.root / "create-request.json"
         self.request_path.write_text(json.dumps(self.request, ensure_ascii=False), encoding="utf-8")
         self.workflow = TemplateCreationWorkflow(allowed_roots=[self.root], project_root=self.root,
                                                  workdir=self.root / "work", registry=self.registry)
-        self.author_kwargs = dict(approval_key=APPROVAL_KEY, nonce_db=self.root / "nonces.sqlite",
-                                  policy_id="synthetic-policy", issuer="synthetic-issuer")
+        self.author_kwargs = dict(approval_key=APPROVAL_KEY)
         self.publish_kwargs = dict(repository_root=self.root / "repo",
                                    repository_scope="local:templates",
                                    idempotency_key="publish-general-00000001",
-                                   approval_key=APPROVAL_KEY, renderer_attestation_key=KEY,
-                                   nonce_db=self.root / "nonces.sqlite",
-                                   policy_id="synthetic-policy", issuer="synthetic-issuer")
+                                   approval_key=APPROVAL_KEY, renderer_attestation_key=KEY)
 
     def t1(self, digest: str) -> ApprovalReceipt:
-        return sign("T1", "approve-template-brief", "template-brief", digest,
-                    tenant_id="tenant-one", approver="reviewer-one", scope="project:project-one")
+        return sign("T1", "approve-template-brief", "template-brief", digest)
 
     def run_to_validated(self) -> dict:
         self.workflow.analyze(self.request_path)
@@ -532,6 +522,45 @@ class PublishLineTests(unittest.TestCase):
         frozen_font = next(item for item in scene["resources"] if item["kind"] == "font")
         self.assertNotEqual(self.font_path.as_posix(), frozen_font["ref"]["uri"])
         self.assertTrue(Path(frozen_font["ref"]["uri"]).is_file())
+
+        # The one template declares six cases; evidence must cover the other five,
+        # not just render a successful single-map sample.
+        from carto_core.compiler.grid_layout import grid_cases
+        from carto_core.workflow.template_validation import TemplatePackageValidator
+        cases = grid_cases(scene["resolved_layout"]["template_contract"])
+        self.assertEqual(cases[1:], [item["parameters"] for item in evidence["grid_cases"]])
+        state = self.workflow.state_store.load()
+        evidence_ref = self.workflow.state_store.find_output_ref("template-validation-evidence")
+        validator = TemplatePackageValidator(
+            path_guard=self.workflow.path_guard, package_root=self.root / "work/staging/package",
+            evidence_root=(self.root / "work" / evidence_ref["uri"]).parent,
+            attestation_key=KEY, registry=self.registry,
+            context=self.workflow._validation_context(self.request, state))
+        for mutation in ("missing-cases", "missing-last", "swapped-scenes"):
+            bad = deepcopy(evidence)
+            if mutation == "missing-cases":
+                bad.pop("grid_cases")
+            elif mutation == "missing-last":
+                bad["grid_cases"].pop()
+            else:
+                bad["grid_cases"][0]["render_scene_ref"] = deepcopy(bad["grid_cases"][1]["render_scene_ref"])
+            bad.pop("evidence_digest")
+            bad["evidence_digest"] = sha256_digest(bad)
+            with self.subTest(mutation=mutation), self.assertRaisesRegex(ProtocolError, "GRID_VALIDATION_(COVERAGE|CASE)_MISMATCH"):
+                validator.verify_evidence(bad, self.workflow._expected_validation(self.request), self.request["targets"])
+        extra_path = Path(evidence["grid_cases"][-1]["render_scene_ref"]["uri"])
+        original_extra = extra_path.read_bytes()
+        try:
+            bad = load_document(extra_path)
+            bad["random_seed"] += 1
+            atomic_yaml(extra_path, bad, create_once=False)
+            with self.assertRaisesRegex(ProtocolError, "GRID_VALIDATION_CASE_MISMATCH|VALIDATION_RENDER_SCENE_DRIFT"):
+                self.workflow.publish(self.request_path, None, **self.publish_kwargs)
+        finally:
+            extra_path.write_bytes(original_extra)
+        # No case may depend on the author's original font after validation.
+        release_test_font_handles()
+        self.font_path.unlink()
 
         # Tampering with the frozen scene fails closed at publish re-verification.
         original_scene = scene_path.read_bytes()
@@ -561,8 +590,7 @@ class PublishLineTests(unittest.TestCase):
             "repository_scope": "local:templates",
         })
         atomic_yaml(self.root / "tp.yaml", asdict(sign(
-            "TP", "approve-template-publish", "template-publication", publication_digest,
-            tenant_id="tenant-one", approver="reviewer-one", scope="local:templates")))
+            "TP", "approve-template-publish", "template-publication", publication_digest)))
         published = self.workflow.publish(self.request_path, self.root / "tp.yaml",
                                           **self.publish_kwargs)
         self.assertFalse(published["idempotent_replay"])
@@ -632,7 +660,7 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
         (self.root / "fonts").mkdir()
         self.font_path = self.root / "fonts/selected-cjk.ttf"
         self.font_path.write_bytes(font_source.read_bytes())
-        raster_helpers.RasterRendererTests.set_raster(
+        set_raster(
             self, self.np.array([[1, 0, 255], [255, 1, 0]], dtype="uint8"))
         # The registered scenario admits user-provided data only; the synthetic fixture
         # raster stands in for it, and the preparation chain records the declared nature.
@@ -643,7 +671,7 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
         self.guard = self.service.project_guard
         self.work = self.root / "work"
         self.work.mkdir()
-        create = deepcopy(VALID_CASES["general-thematic-template-create-request"])
+        create = deepcopy(VALID_CASES["general-template-create-request"])
         create["source_crs"] = deepcopy(CRS_26911)
         create["display_crs"] = deepcopy(CRS_26911)
         template_work = self.root / "template-work"
@@ -657,7 +685,7 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
         self.intent = self.scenarios.generate_intent(self.generate)
 
     def build_request(self) -> dict:
-        request = deepcopy(VALID_CASES["general-thematic-generate-request"])
+        request = deepcopy(VALID_CASES["general-generate-request"])
         request.update({
             "request_id": "general-generate-request",
             "project_id": self.context.project_id,
@@ -671,14 +699,16 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
             "template": {**TEMPLATE, "digest": self.installation["template_ref"]["digest"]},
             "sources": [deepcopy(self.request["source"]["source_ref"])],
             "source_bindings": [deepcopy(self.request["source"])],
-            "prepared_raster_bindings": [{"role": self.request["source"]["role"],
+            "prepared_raster_bindings": [{"source_id":self.request["source"]["source_ref"]["id"],"role": self.request["source"]["role"],
                                           "prepared_ref": self.prepared.ref()}],
             "requested_at": utc_now(),
             "audience": "synthetic test only",
             "idempotency_key": "general-generate-00001",
             "font": {"path": "fonts/selected-cjk.ttf", "family": "Synthetic CJK", "version": "1.0.0"},
         })
-        self.registry.validate("general-thematic-generate-request", request)
+        request["layout_parameters"]={"rows":1,"columns":1,"legend_mode":"independent"}
+        request["panels"]=[{"id":"main-view","source_id":self.request["source"]["source_ref"]["id"],"title":GOAL}]
+        self.registry.validate("general-generate-request", request)
         return request
 
     def component_bundle(self) -> dict:
@@ -702,7 +732,7 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
         request_ref = artifact_ref("generate-request", self.generate)
         prepared = preparer.prepare(self.generate, request_ref)
         self.assertEqual(request_ref, prepared["request_ref"])
-        bundle = RasterBundlePreparer(self.service).prepare_request(self.generate, self.context)["bundle"]
+        bundle = BundlePreparer(self.service, "raster").prepare_request(self.generate, self.context)["bundle"]
         self.assertEqual(bundle, prepared["bundle"])
         self.assertEqual("user-provided", prepared["bundle"]["summary"]["data_nature"])
         drifted = dict(request_ref, digest="sha256:" + "0" * 64)
@@ -715,8 +745,9 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
             self.generate, self.intent, {"synthetic": "brief"}, bundle,
             self.installation, self.contracts)
         self.registry.validate("map-plan", plan)
-        self.assertEqual({"classification": "unique-values", "class_count": 12,
-                          "extent": bundle["summary"]["combined_bbox"], "title": GOAL,
+        self.assertEqual({"classification": "unique-values", "data_statistics": [{"source_id":b["source_id"],"counts":b["category_counts"]} for b in bundle["role_bindings"]],
+                          "legend_capacity": 12,
+                          "title": GOAL,
                           "legend_source": "actual-encoding", "renderer_id": RASTER_RENDERER_ID},
                          plan["decisions"])
         self.assertEqual(sha256_digest(self.intent), plan["intent_ref"]["digest"])
@@ -756,6 +787,27 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
         RasterSceneCompiler(self.service).validate_generation(
             scene, execution, self.generate, self.context)
 
+    def test_consistent_but_foreign_appearance_is_rejected_by_template_check(self):
+        from carto_core.compiler.raster_page_contract import compile_page_request
+        compiled = self.compile_via_components()
+        original = compiled["scene"]
+        page = self.service._json_ref(original["page_request_ref"], "page-request")
+        style = deepcopy(page["appearance"]["cartography"])
+        style["typography"]["title_pt"] = 14
+        raw = {k: deepcopy(v) for k, v in page.items() if k not in {"appearance", "bindings"}}
+        raw["legends"]=[{"content_id":x["content_id"],"title":x["title"]} for x in raw["legends"]]
+        page = compile_page_request(self.service, raw, style, self.context)
+        compiler = RasterSceneCompiler(self.service)
+        scene = compiler.compile(bundle_ref=original["prepared_bundle_ref"], page_request=page,
+                                 context=self.context, scene_id="different-template-style")
+        candidate = deepcopy(compiled["candidate"])
+        candidate["execution"] = compiler.bind_execution(candidate["execution"], scene, self.context)
+        candidate["execution_digest"] = sha256_digest(candidate["execution"])
+        with self.assertRaisesRegex(ProtocolError, "APPEARANCE_TEMPLATE_MISMATCH"):
+            MapCandidateCompiler(self.guard, self.registry, project_root=self.root,
+                                 context=self.context).check_candidate(
+                self.generate, candidate, scene, self.contracts)
+
     def test_candidate_compiler_rejects_context_drift_and_input_tampering(self):
         with self.assertRaisesRegex(SecurityError, "RASTER_EXECUTION_CONTEXT_REQUIRED"):
             self.compile_via_components(compiler_kwargs={"project_root": None})
@@ -771,7 +823,7 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
             self.compile_via_components(bundle=tampered)
 
     def test_candidate_compiler_rejects_display_crs_drift(self):
-        create = deepcopy(VALID_CASES["general-thematic-template-create-request"])
+        create = deepcopy(VALID_CASES["general-template-create-request"])
         work = self.root / "template-work-4326"
         work.mkdir()
         author = GeneralThematicAuthor(self.guard, work, self.registry)
@@ -783,7 +835,7 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
 
     def test_legend_checker_requires_an_unambiguous_ordered_legend(self):
         def context(items):
-            return {"raster": {"portrayal": {"legend_items": items}}}
+            return {"raster": {"page": {"legends": [{"content_id":"legend","title":"Legend","items":items}]}}}
         good = [{"value": 1, "label": "Category A", "color": "#FF0000", "order": 1},
                 {"value": 255, "label": "Category B", "color": "#0000FF", "order": 3}]
         passed, details, disposition = legend_checker(context(good))
@@ -833,9 +885,7 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
         self.assertEqual("compile", briefed["state"]["step"])
         self.assertEqual(GOAL, briefed["brief"]["purpose"])
         atomic_yaml(self.root / "workflow-g1.yaml", asdict(sign(
-            "G1", "approve-map-brief", "map-brief", briefed["approval_object_digest"],
-            tenant_id=self.context.tenant_id, approver="synthetic-reviewer",
-            scope=self.generate["scope"])))
+            "G1", "approve-map-brief", "map-brief", briefed["approval_object_digest"])))
         return workflow, request_path
 
     def test_failed_candidate_quality_does_not_advance_to_preview(self):
@@ -845,8 +895,7 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
         with patch.object(MapQualityChecks, "_classification", return_value=(False, {"synthetic_failure": True})):
             with self.assertRaisesRegex(ProtocolError, "CANDIDATE_QUALITY_FAILED"):
                 workflow.compile(request_path, self.root / "workflow-g1.yaml",
-                    approval_key=APPROVAL_KEY, nonce_db=self.root / "workflow-nonces.sqlite",
-                    policy_id="synthetic-policy", issuer="synthetic-issuer")
+                    approval_key=APPROVAL_KEY)
         state = workflow.state_store.load()
         self.assertEqual(("failed", "compile"), (state.status, state.step))
         report = load_document(self.work / "candidates/preflight-report.yaml")
@@ -858,29 +907,78 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
             workflow.preview(request_path, attestation_key=KEY)
         self.assertFalse((self.work / "candidates/render-receipt.yaml").exists())
 
+    def set_grid_sources(self, rows=2, columns=2, mode="shared"):
+        sources, prepared = [], []
+        for index, data in enumerate(([[1, 2], [2, 1]], [[1, 3, 3], [3, 1, 3]])):
+            self.source_path = self.root / f"grid-source-{index}.tif"
+            self.request["source"]["path"] = self.source_path.name
+            self.request["source"]["source_ref"]["id"] = f"grid-source-{index}"
+            self.legend_path = self.root / f"grid-legend-{index}.csv"
+            self.request["legend"]["path"] = self.legend_path.name
+            self.legend_path.write_text("value,label,color\n1,Class A,#FF0000\n2,Class B,#00FF00\n3,Class C,#0000FF\n", encoding="utf-8")
+            set_raster(
+                self, self.np.array(data, dtype="uint8"), xsize=30 * (index + 1))
+            report = self.analyze()
+            sources.append(deepcopy(self.request["source"]))
+            prepared.append({"source_id": sources[-1]["source_ref"]["id"],
+                             "role": sources[-1]["role"], "prepared_ref": report.ref()})
+        self.generate.update(
+            sources=[deepcopy(source["source_ref"]) for source in sources],
+            source_bindings=sources, prepared_raster_bindings=prepared,
+            layout_parameters={"rows": rows, "columns": columns, "legend_mode": mode},
+            panels=[{"id": f"view-r{r}-c{c}", "source_id": sources[(r * columns + c) % 2]["source_ref"]["id"],
+                     "title": f"Panel {r * columns + c + 1}"} for r in range(rows) for c in range(columns)])
+        self.registry.validate("general-generate-request", self.generate)
+        self.intent = self.scenarios.generate_intent(self.generate)
+
+    def test_multi_source_grid_request_rejects_duplicate_missing_unused_bindings(self):
+        self.set_grid_sources()
+        valid = deepcopy(self.generate)
+        for mutation in ("source-duplicate", "preparation-missing", "panel-duplicate", "panel-missing", "source-unused"):
+            self.generate = deepcopy(valid)
+            if mutation == "source-duplicate":
+                self.generate["source_bindings"][1]["source_ref"]["id"] = self.generate["source_bindings"][0]["source_ref"]["id"]
+            elif mutation == "preparation-missing":
+                self.generate["prepared_raster_bindings"].pop()
+            elif mutation == "panel-duplicate":
+                self.generate["panels"][1]["id"] = self.generate["panels"][0]["id"]
+            elif mutation == "panel-missing":
+                self.generate["panels"].pop()
+            else:
+                for panel in self.generate["panels"]:
+                    panel["source_id"] = self.generate["source_bindings"][0]["source_ref"]["id"]
+            with self.subTest(mutation=mutation), self.assertRaises(CartoError):
+                self.compile_via_components()
+
+    def test_four_panel_multi_source_workflow_and_delivery_recovery(self):
+        self.set_grid_sources()
+        self._exercise_full_workflow(recover_delivery=True)
+
     def test_full_workflow_preview_g2_render_check_g3_delivery(self):
+        self._exercise_full_workflow()
+
+    def _exercise_full_workflow(self, recover_delivery=False):
         workflow, request_path = self.workflow_at_compile()
         compiled = workflow.compile(request_path, self.root / "workflow-g1.yaml",
-                                    approval_key=APPROVAL_KEY,
-                                    nonce_db=self.root / "workflow-nonces.sqlite",
-                                    policy_id="synthetic-policy", issuer="synthetic-issuer")
+                                    approval_key=APPROVAL_KEY)
         self.assertEqual("preview", compiled["state"]["step"])
         self.assertEqual(f"candidate-{self.context.run_id}", compiled["candidate"]["candidate_id"])
         plan = load_document(self.work / "plan/map-plan.yaml")
         self.assertEqual(RASTER_RENDERER_ID, plan["decisions"]["renderer_id"])
         bundle = load_document(self.work / "data/prepared-data-bundle.yaml")
         self.assertEqual("user-provided", bundle["summary"]["data_nature"])
+        self.assertEqual(len(self.generate["source_bindings"]), len(bundle["role_bindings"]))
+        self.assertEqual(len(self.generate["panels"]), len(plan["bindings"]["panels"]))
+        if len(self.generate["panels"]) > 1:
+            self.assertNotIn("combined_bbox", bundle["summary"])
+            self.assertEqual(2, len({tuple(view["extent"]) for view in plan["bindings"]["views"]}))
         previewed = workflow.preview(request_path, attestation_key=KEY)
         self.assertEqual(("waiting_approval", "freeze"),
                          (previewed["state"]["status"], previewed["state"]["step"]))
         atomic_yaml(self.root / "workflow-g2.yaml", asdict(sign(
-            "G2", "approve-freeze", "resolved-map", previewed["approval_object_digest"],
-            tenant_id=self.context.tenant_id, approver="synthetic-reviewer",
-            scope=self.generate["scope"])), create_once=False)
+            "G2", "approve-freeze", "resolved-map", previewed["approval_object_digest"])), create_once=False)
         frozen = workflow.freeze(request_path, self.root / "workflow-g2.yaml",
-                                 approval_key=APPROVAL_KEY, attestation_key=KEY,
-                                 nonce_db=self.root / "workflow-nonces.sqlite",
-                                 policy_id="synthetic-policy", issuer="synthetic-issuer")
+                                 approval_key=APPROVAL_KEY, attestation_key=KEY)
         self.assertEqual("render", frozen["state"]["step"])
         rendered = workflow.render(request_path, attestation_key=KEY)
         self.assertEqual("check", rendered["state"]["step"])
@@ -894,12 +992,15 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
         self.assertEqual([NOTICE], manifest["limitations"])
         self.assertEqual(sha256_digest(manifest), checked["g3"]["object_digest"])
         atomic_yaml(self.root / "workflow-g3.yaml", asdict(sign(
-            "G3", "approve-delivery", "delivery-manifest", sha256_digest(manifest),
-            tenant_id=self.context.tenant_id, approver="synthetic-reviewer",
-            scope=self.generate["scope"])), create_once=False)
-        deliver_kwargs = dict(approval_key=APPROVAL_KEY,
-                              nonce_db=self.root / "workflow-nonces.sqlite",
-                              policy_id="synthetic-policy", issuer="synthetic-issuer")
+            "G3", "approve-delivery", "delivery-manifest", sha256_digest(manifest))), create_once=False)
+        deliver_kwargs = dict(approval_key=APPROVAL_KEY)
+        if recover_delivery:
+            def crash(phase):
+                if phase == "after-atomic-commit":
+                    raise RuntimeError("synthetic grid delivery interruption")
+            with self.assertRaisesRegex(RuntimeError, "synthetic grid delivery interruption"):
+                workflow.deliver(request_path, self.root / "workflow-g3.yaml",
+                                 failure_hook=crash, **deliver_kwargs)
         delivered = workflow.deliver(request_path, self.root / "workflow-g3.yaml", **deliver_kwargs)
         self.assertEqual(("succeeded", "deliver"),
                          (delivered["state"]["status"], delivered["state"]["step"]))

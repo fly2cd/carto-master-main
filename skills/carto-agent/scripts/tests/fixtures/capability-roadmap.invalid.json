@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "version": "1.0.0",
+  "items": [
+    {"id": "raster-multi-layer-overlay", "status": "wip", "target": "U-P4", "note": "状态取值非法,且 delivered/planned/backlog 之外不允许。"},
+    {"id": "Composition Map Counts", "status": "planned", "note": "id 含空格与大写,违反 pattern;且缺少 target 不影响必填但 id 非法。"}
+  ]
+}

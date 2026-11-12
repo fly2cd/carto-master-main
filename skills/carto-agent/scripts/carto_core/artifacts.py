@@ -69,8 +69,14 @@ def atomic_json(path: Path, value: dict[str, Any], *, create_once: bool = True) 
     atomic_write_bytes(path, payload.encode("utf-8"))
 
 
+def protocol_version(identifier: str) -> str:
+    return {"cartography":"2.0.0", "map-plan":"3.0.0", "page-request":"4.0.0",
+            "page-output":"4.0.0", "resolved-layout":"2.0.0", "raster-map-body":"2.0.0",
+            "page-bindings":"2.0.0", "resolved-appearance":"2.0.0"}.get(identifier, "1.0.0")
+
+
 def artifact_ref(identifier: str, value: Any, uri: str | Path | None = None) -> dict[str, str]:
-    result = {"id": identifier, "version": "1.0.0", "digest": sha256_digest(value)}
+    result = {"id": identifier, "version": protocol_version(identifier), "digest": sha256_digest(value)}
     if uri is not None:
         result["uri"] = str(uri)
     return result

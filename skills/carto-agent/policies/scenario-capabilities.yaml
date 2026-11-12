@@ -1,5 +1,5 @@
 schema_version: 1
-version: 1.3.0
+version: 1.5.0
 default: deny
 # Admission is default-deny: only profiles listed here (with a whitelisted code
 # implementation) enable create-template/generate-map. Data types, expressions and
@@ -7,16 +7,24 @@ default: deny
 # (standard thematic mapping) at the same level as the catalogued purpose scenes.
 profiles:
   - id: general-thematic-mapping
-    version: 1.0.0
-    implementation: general-thematic-raster
+    version: 3.0.0
+    implementation: general-thematic
+    routes:
+      - create-template
+      - generate-map
+    # Geometry is a data-axis strategy inside one bundle, not a second scenario.
+    # The vector strategy is code-ready but withheld from production until a
+    # profile admits it (capability-roadmap: variant-geometry-adapter-unification).
+    allowed_geometries:
+      - raster
     template:
       kind: map-scenario
       id: general-thematic-map
-      version: 1.0.0
+      version: 3.0.0
     authoring_profile: general-thematic-authoring
     request_schemas:
-      create-template: general-thematic-template-create-request
-      generate-map: general-thematic-generate-request
+      create-template: general-template-create-request
+      generate-map: general-generate-request
     intent_constraints:
       business_scene: general_thematic_mapping
       allowed_tasks:
@@ -45,4 +53,17 @@ profiles:
       dpi: 300
       width_px: 3508
       height_px: 2480
+    output_constraints:
+      max_width_mm: 420
+      max_height_mm: 297
+      min_dpi: 150
+      max_dpi: 300
+      allowed_formats: [pdf, png]
+      cmyk_supported: false
+    layout_constraints:
+      allowed_models: [grid]
+      grid:
+        max_rows: 2
+        max_columns: 2
+        allowed_shapes: [1×1, 1×2, 2×2]
     internal_field_names: []

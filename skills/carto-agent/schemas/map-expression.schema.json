@@ -9,7 +9,6 @@
     "version",
     "title",
     "status",
-    "geometry_types",
     "field_requirements",
     "parameter_definitions",
     "visual_variables",
@@ -18,14 +17,19 @@
     "outlier_policy",
     "checker_refs"
   ],
+  "oneOf": [
+    {"required": ["geometry_types"]},
+    {"required": ["applicable_geometry"]}
+  ],
   "properties": {
     "schema_version": {
       "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"
     },
     "expression_id": {
-      "type": "string",
-      "pattern": "^[a-z][a-z0-9-]*/[a-z][a-z0-9-]*$",
-      "maxLength": 120
+      "anyOf": [
+        {"type": "string", "pattern": "^[a-z][a-z0-9-]*/[a-z][a-z0-9-]*$", "maxLength": 120},
+        {"type": "string", "enum": ["categorical", "graduated-color", "proportional-symbol"], "maxLength": 120}
+      ]
     },
     "version": {
       "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"
@@ -49,13 +53,74 @@
         "enum": [
           "point",
           "polygon",
-          "raster"
+          "raster",
+          "vector"
         ]
+      }
+    },
+    "applicable_geometry": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "point",
+          "polygon",
+          "raster",
+          "vector"
+        ]
+      }
+    },
+    "superseded_by": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "adapters": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "patternProperties": {
+        "^(raster|vector|point|polygon)$": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["algorithm_id", "fixture_kind"],
+          "properties": {
+            "algorithm_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "fixture_kind": {
+              "type": "string",
+              "minLength": 1
+            },
+            "max_bytes": {"type": "integer", "minimum": 1},
+            "encoding": {"type": "string"},
+            "columns": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name", "type"],
+                "properties": {
+                  "name": {"type": "string", "minLength": 1},
+                  "type": {"enum": ["integer", "number", "string"]},
+                  "min": {"type": "number"},
+                  "max": {"type": "number"},
+                  "min_length": {"type": "integer", "minimum": 0},
+                  "max_length": {"type": "integer", "minimum": 0},
+                  "unique": {"type": "boolean"}
+                }
+              }
+            }
+          }
+        }
       }
     },
     "field_requirements": {
       "type": "array",
-      "minItems": 1,
+      "minItems": 0,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -172,7 +237,8 @@
             "enum": [
               "sequential-classification",
               "area-proportional-scaling",
-              "categorical-lookup"
+              "categorical-lookup",
+              "explicit-vector-encoding"
             ]
           }
         }
@@ -228,6 +294,113 @@
         "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/checkerRef"
       }
     },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rules": {
+          "type": "array",
+          "minItems": 0,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "param": {
+                "type": "string",
+                "minLength": 1
+              },
+              "param_a": {
+                "type": "string",
+                "minLength": 1
+              },
+              "param_b": {
+                "type": "string",
+                "minLength": 1
+              },
+              "relation": {
+                "enum": ["less_than_or_equal"]
+              },
+              "min": {
+                "type": "number"
+              },
+              "max": {
+                "type": "number"
+              },
+              "allowed": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              "value": {},
+              "description": {
+                "type": "string",
+                "maxLength": 500
+              }
+            }
+          }
+        }
+      }
+    },
+    "fixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "max_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "encoding": {
+          "type": "string"
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "type"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "type": {
+                "enum": ["integer", "number", "string"]
+              },
+              "min": {
+                "type": "number"
+              },
+              "max": {
+                "type": "number"
+              },
+              "min_length": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "max_length": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "unique": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    },
     "fixture_refs": {
       "type": "array",
       "minItems": 1,
@@ -240,6 +413,7 @@
   "allOf": [
     {
       "if": {
+        "required": ["geometry_types"],
         "anyOf": [
           {
             "properties": {
@@ -265,28 +439,6 @@
                     "algorithm_id": {
                       "const": "categorical-lookup"
                     }
-                  }
-                }
-              }
-            }
-          },
-          {
-            "properties": {
-              "legend": {
-                "properties": {
-                  "type": {
-                    "const": "categorical-color"
-                  }
-                }
-              }
-            }
-          },
-          {
-            "properties": {
-              "legend": {
-                "properties": {
-                  "label_source": {
-                    "const": "category-labels"
                   }
                 }
               }
@@ -335,6 +487,94 @@
           },
           "missing_value_policy": {
             "const": "reject"
+          },
+          "outlier_policy": {
+            "const": "reject"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["geometry_types"],
+        "anyOf": [
+          {
+            "required": [
+              "expression_id"
+            ],
+            "properties": {
+              "expression_id": {
+                "const": "vector/explicit"
+              }
+            }
+          },
+          {
+            "required": [
+              "geometry_types"
+            ],
+            "properties": {
+              "geometry_types": {
+                "contains": {
+                  "const": "vector"
+                }
+              }
+            }
+          },
+          {
+            "required": [
+              "visual_variables"
+            ],
+            "properties": {
+              "visual_variables": {
+                "contains": {
+                  "required": [
+                    "algorithm_id"
+                  ],
+                  "properties": {
+                    "algorithm_id": {
+                      "const": "explicit-vector-encoding"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "then": {
+        "properties": {
+          "expression_id": {
+            "const": "vector/explicit"
+          },
+          "geometry_types": {
+            "const": [
+              "vector"
+            ]
+          },
+          "field_requirements": {
+            "const": []
+          },
+          "parameter_definitions": {
+            "const": []
+          },
+          "visual_variables": {
+            "const": [
+              {
+                "variable": "fill-color",
+                "source_role": "thematic-value",
+                "algorithm_id": "explicit-vector-encoding"
+              }
+            ]
+          },
+          "legend": {
+            "const": {
+              "type": "categorical-color",
+              "show_no_data": true,
+              "label_source": "category-labels"
+            }
+          },
+          "missing_value_policy": {
+            "const": "explicit-symbol"
           },
           "outlier_policy": {
             "const": "reject"

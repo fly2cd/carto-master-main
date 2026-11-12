@@ -23,6 +23,9 @@
           },
           {
             "$ref": "#/$defs/rasterLayer"
+          },
+          {
+            "$ref": "#/$defs/explicitVectorLayer"
           }
         ]
       }
@@ -224,7 +227,7 @@
               "map_expression_ref": {
                 "properties": {
                   "id": {
-                    "const": "choropleth/sequential"
+                    "enum": ["choropleth/sequential", "graduated-color"]
                   }
                 }
               }
@@ -252,7 +255,7 @@
               "map_expression_ref": {
                 "properties": {
                   "id": {
-                    "const": "proportional-symbol/count"
+                    "enum": ["proportional-symbol/count", "proportional-symbol"]
                   }
                 }
               }
@@ -314,10 +317,10 @@
             {
               "properties": {
                 "id": {
-                  "const": "raster/categorical"
+                  "enum": ["raster/categorical", "categorical"]
                 },
                 "version": {
-                  "const": "1.0.0"
+                  "enum": ["1.0.0", "2.0.0"]
                 }
               }
             }
@@ -354,6 +357,58 @@
         },
         "no_data": {
           "const": "transparent"
+        }
+      }
+    },
+    "explicitVectorLayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "data_role",
+        "geometry",
+        "map_expression_ref",
+        "z_order",
+        "encoding_policy",
+        "validation_expressions"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+        },
+        "data_role": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+        },
+        "geometry": {
+          "const": "vector"
+        },
+        "map_expression_ref": {
+          "allOf": [
+            {
+              "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/mapExpressionRef"
+            },
+            {
+              "properties": {
+                "id": {
+                  "enum": ["vector/explicit", "categorical"]
+                }
+              }
+            }
+          ]
+        },
+        "z_order": {
+          "const": 0
+        },
+        "encoding_policy": {
+          "const": "explicit-per-panel"
+        },
+        "validation_expressions": {
+          "const": [
+            "single",
+            "categorical",
+            "choropleth",
+            "proportional"
+          ]
         }
       }
     }

@@ -7,11 +7,6 @@ profiles:
     task_ids: [administrative-map, indicator-map, facility-map]
     required_information: [theme_tags, geography, time, source, output]
     unsupported_actions: [invent-unconfirmed-policy-theme]
-  - business_scene: emergency_mapping
-    purpose_terms: [应急, 灾情, 救援]
-    task_ids: [hazard-result-map, resource-map, situation-map]
-    required_information: [hazard, event-phase, data-nature, observation-time, geography, source, output]
-    unsupported_actions: [hazard-prediction, remote-sensing-auto-extraction, command-decision]
   - business_scene: leadership_visit
     purpose_terms: [领导调研, 调研路线, 行程, 考察点, 调研点]
     task_ids: [visit-route-map]
@@ -20,7 +15,7 @@ profiles:
   # Standard thematic mapping: a statable purpose on the same level as the scenes
   # above, not a purpose-less catch-all. Content stays bound to catalogued themes.
   - business_scene: general_thematic_mapping
-    purpose_terms: [通用专题图, 标准专题图, 通用制图]
+    purpose_terms: [通用专题图, 标准专题图, 通用制图, 应急, 灾情, 救援]
     task_ids: [thematic-map]
     required_information: [theme_tags, geography, source, output]
     unsupported_actions: [invent-unregistered-business-purpose, alter-frozen-classification]

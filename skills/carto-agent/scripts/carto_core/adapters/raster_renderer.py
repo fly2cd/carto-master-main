@@ -23,7 +23,7 @@ from ..workflow.models import ExecutionContext
 from ..workflow.raster_preparation import RasterPreparationService
 from .svg_compositor import SvgCompositor
 
-VERSION = "1.0.0"
+VERSION = "2.0.0"
 MAX_PIXELS = 16_000_000
 MAX_DIMENSION = 4096
 
@@ -44,7 +44,9 @@ def _dependencies() -> tuple[Any, ...]:
 def renderer_digest() -> str:
     root = Path(__file__).resolve()
     files = [root, root.parents[1] / "compiler/layout.py", root.with_name("svg_compositor.py"),
-             root.parents[3] / "schemas/raster-map-body.schema.json"]
+             root.parents[1] / "compiler/grid_layout.py",
+             *[root.parents[3] / "schemas" / (name + ".schema.json") for name in
+               ("raster-map-body", "layout", "resolved-layout", "grid-parameters")]]
     return sha256_digest({"version": VERSION, "portrayal_compiler": portrayal_compiler_digest(), "files": {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in files}})
 
 
@@ -71,14 +73,15 @@ class RasterMapBodyRenderer:
         self.portrayal_compiler = RasterPortrayalCompiler(preparation)
 
     def render(self, portrayal_ref: dict[str, str], resolved_layout: dict[str, Any],
-               context: ExecutionContext) -> StoredArtifact:
+               context: ExecutionContext, *, frame_id=None) -> StoredArtifact:
         portrayal = self.portrayal_compiler.load_verified(portrayal_ref, context)
         report, evidence = self.preparation.load_verified(portrayal["prepared_ref"])
         self.layout.validate(resolved_layout)
         page = resolved_layout["page"]
         if max(page["width_px"], page["height_px"]) > MAX_DIMENSION or page["width_px"] * page["height_px"] > MAX_PIXELS:
             raise ProtocolError("RASTER_RENDER_SIZE_LIMIT", "Page exceeds the static raster output profile")
-        frame = self.layout.map_frame(resolved_layout)["bounds_px"]
+        selected_frame = self.layout.map_frame(resolved_layout, frame_id)
+        frame = selected_frame["bounds_px"]
         info = evidence["raster_info"]
         rect = fitted_rect(frame, info["bounds"])
         width, height = rect[2:]
@@ -135,7 +138,7 @@ class RasterMapBodyRenderer:
         left, bottom, right, top = info["bounds"]
         sx, sy = width / (right - left), height / (top - bottom)
         body = {
-            "schema_version": 1, "kind": "raster-map-body", "renderer_id": "rasterio-matplotlib",
+            "schema_version": 2, "frame_id": selected_frame["id"], "kind": "raster-map-body", "renderer_id": "rasterio-matplotlib",
             "renderer_version": VERSION, "renderer_code_digest": renderer_digest(), "portrayal_ref": portrayal_ref,
             "layout_digest": sha256_digest(resolved_layout), "image": self.preparation._asset(png, "map-body", ".png"),
             "width_px": width, "height_px": height, "dpi": page["dpi"], "frame_rect": frame, "image_rect": rect,
@@ -157,7 +160,7 @@ class RasterMapBodyRenderer:
         classification as the map. Remaining overlays (title, source, etc.) use the existing layout.
         """
         body = self.preparation._json_ref(body_ref, "raster-map-body")
-        verified = self.render(body["portrayal_ref"], resolved_layout, context)
+        verified = self.render(body["portrayal_ref"], resolved_layout, context, frame_id=body["frame_id"])
         if verified.digest != body_ref["digest"]:
             raise ProtocolError("RASTER_MAP_BODY_CHANGED", "Body, layout, renderer or environment differs from frozen output")
         from copy import deepcopy

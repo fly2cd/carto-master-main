@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/category-counts.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "observed_value_count",
+    "defined_class_count",
+    "observed_class_count",
+    "displayed_class_count",
+    "legend_item_count"
+  ],
+  "properties": {
+    "observed_value_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 256
+    },
+    "defined_class_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 256
+    },
+    "observed_class_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 256
+    },
+    "displayed_class_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 256
+    },
+    "legend_item_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 256
+    }
+  }
+}

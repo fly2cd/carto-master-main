@@ -4,7 +4,7 @@
 
 ## 当前编排（仅 general_thematic_mapping）
 
-- 通过 `policies/scenario-capabilities.yaml` 选择创建策略；当前仅注册 `general-thematic-mapping`。请求必须同时通过通用 `template-create-request` 和该场景的专用约束 `general-thematic-template-create-request`。
+- 通过 `policies/scenario-capabilities.yaml` 选择创建策略；当前仅注册 `general-thematic-mapping`。请求必须同时通过通用 `general-template-create-request` 和场景专用约束。
 - 通用分析、简报、作者和验证入口不固定业务字段；场景组件扩展位置为 `scripts/carto_core/scenarios/`，未知场景不能回退到其他实现。
 - 工作流严格按 `analyze → brief → author → validate → publish` 推进，不能跳过步骤或以独立渲染替代验证。
 - `author` 必须验证独立审批人的 T1 `approve-template-brief` 回执，且不得复用地图生成 G1 审批。
@@ -31,3 +31,9 @@
 - T1 writes a claims-validated workflow-local approval intent before nonce consumption. If interruption occurs after consumption, recovery must reconstruct and exactly verify the deterministic staging package; an unrelated existing package or a missing intent is rejected.
 - TP recovery is accepted only from the immutable publication transaction and its retained authenticated approval.
 - Recovery never consumes an approval nonce twice and does not permit ordinary approval replay.
+
+## S1 参数化布局验证
+
+当前 general 作者输出单个 `general-thematic-map@3.0.0` 包。Layout 声明 1×1、1×2、2×2 与 independent/shared 的六种组合；生成时只选参数，不改包也不复制五份固定模板。`validate` 对每种组合构建合成样张、冻结场景并取得真实 PDF/PNG 渲染回执；首组合保留主证据字段，另外五项记录于 `template-validation-evidence.grid_cases`。`publish` 根据包内声明重新检查完整集合、每个场景的模板/参数/外观、回执和输出；缺失、重复、交换或篡改均拒绝。
+
+旧模板版本及旧验证证据不自动升级，仍须独立 T1/TP。模板检索或无匹配时自动创建尚未实现；有限参数化不意味着任意布局求解、独立 Layout 创建路由或生产能力已开放。

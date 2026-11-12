@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "kind": "resolved-portrayal",
+  "geometry": "vector",
+  "key_mode": "discrete",
+  "compiler_version": "1.0.0",
+  "prepared_ref": {
+    "id": "vector-prepared-data",
+    "version": "1.0.0",
+    "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "uri": "/synthetic/.carto/vector/vector-prepared-data.json"
+  },
+  "encoding": {
+    "schema_version": 1,
+    "kind": "single",
+    "geometry": "polygon",
+    "field": null,
+    "unit": null,
+    "missing": {
+      "policy": "reject",
+      "label": "Missing",
+      "symbol": {
+        "color": "#BBBBBB",
+        "stroke": "#222222",
+        "stroke_width_pt": 0.4,
+        "radius_mm": 2
+      }
+    },
+    "label": "Features",
+    "symbol": {
+      "color": "#226688",
+      "stroke": "#222222",
+      "stroke_width_pt": 0.4,
+      "radius_mm": 2
+    }
+  },
+  "feature_styles": [
+    {
+      "feature_id": "feature-0",
+      "style": {
+        "symbol": {
+          "color": "#226688",
+          "stroke": "#222222",
+          "stroke_width_pt": 0.4,
+          "radius_mm": 2
+        },
+        "legend_id": "single"
+      }
+    }
+  ],
+  "legend_items": [
+    {
+      "id": "single",
+      "label": "Features",
+      "shape": "square",
+      "symbol": {
+        "color": "#226688",
+        "stroke": "#222222",
+        "stroke_width_pt": 0.4,
+        "radius_mm": 2
+      }
+    }
+  ],
+  "counts": {
+    "feature_count": 1,
+    "visible_count": 1,
+    "missing_count": 0,
+    "zero_count": 0
+  },
+  "compiler_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}

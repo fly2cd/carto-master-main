@@ -11,7 +11,7 @@ from ..repository.template_installer import ProjectTemplateInstaller
 from ..repository.template_repository import TemplateRepository
 from ..scenario_registry import ScenarioRegistry
 from ..schema_registry import SchemaRegistry, load_document
-from ..security.approval import ApprovalReceipt, SqliteNonceStore
+from ..security.approval import ApprovalReceipt
 from ..security.paths import PathGuard
 from .approvals import ApprovalGateCoordinator
 from ..artifacts import artifact_ref, atomic_json, atomic_yaml, file_digest, utc_now
@@ -32,7 +32,7 @@ class MapGenerationWorkflow:
 
     REQUIRED_REQUEST_FIELDS = {
         "run_id", "audience", "scope", "environment", "requested_at", "template",
-        "allowed_capabilities", "source_bindings", "font", "intent",
+        "allowed_capabilities", "font", "intent",
     }
 
     def __init__(self, *, allowed_roots: list[str | Path], project_root: str | Path,
@@ -84,7 +84,7 @@ class MapGenerationWorkflow:
                                                 version=request["template"]["version"])
             template_ref["digest"] = entry["digest"]
         source_plan = []
-        for binding in sorted(request["source_bindings"], key=lambda item: item["role"]):
+        for binding in sorted(request.get("source_bindings", []), key=lambda item: item["role"]):
             operations = [item for item in ("read", "filter", "join", "classify", "reproject")
                           if item in request["allowed_capabilities"]]
             source_plan.append({"role": binding["role"], "source_ref": binding["source_ref"],
@@ -93,6 +93,18 @@ class MapGenerationWorkflow:
                                 "field_bindings": [{"semantic_role": item["semantic_role"],
                                                     "source_field": item["source_field"]}
                                                    for item in binding.get("field_bindings", [])]})
+        if "vector_sources" in request:
+            for source in sorted(request["vector_sources"], key=lambda item: item["source_id"]):
+                actual = []
+                for item in sorted(source["files"], key=lambda item: item["extension"]):
+                    path = self.path_guard.resolve(item["path"], base_root=self.project_root, must_exist=True)
+                    if path.stat().st_size != item["size_bytes"] or file_digest(path) != item["digest"]:
+                        raise ProtocolError("VECTOR_SOURCE_CHANGED", "Vector sidecars differ from their declaration")
+                    actual.append({"extension": item["extension"], "digest": item["digest"], "size_bytes": item["size_bytes"]})
+                fields = sorted({p["encoding"]["field"] for p in request["vector_panels"] if p["source_id"] == source["source_id"] and p["encoding"]["field"] is not None})
+                source_plan.append({"role": source["role"], "source_ref": next(r for r in request["sources"] if r["id"] == source["source_id"]),
+                                    "allowed_operations": ["read", "classify"], "path_digest": sha256_digest(actual),
+                                    "field_bindings": [{"semantic_role": "thematic-value", "source_field": f} for f in fields]})
         brief = {
             "schema_version": 1, "brief_id": f"brief-{request['run_id']}", "revision": 1,
             "intent_ref": artifact_ref("map-intent", intent), "purpose": request["goal"],
@@ -116,50 +128,20 @@ class MapGenerationWorkflow:
                 "approval_object_digest": sha256_digest(brief)}
 
     @serialized_workflow_step
-    def compile(self, request_path: str | Path, approval_path: str | Path, *, approval_key: bytes,
-                nonce_db: str | Path, policy_id: str, issuer: str) -> dict[str, Any]:
+    def compile(self, request_path: str | Path, approval_path: str | Path, *, approval_key: bytes) -> dict[str, Any]:
         request, state = self._resume(request_path, "compile")
         intent = self._load("intent/map-intent.yaml", "map-intent")
         profile = ScenarioRegistry(self.registry).require_request_intent(request, intent)
         brief = self._load("brief/map-brief.yaml", "map-brief")
         profile.require_intent_projection(brief, intent, kind="BRIEF")
-        context = ExecutionContext.from_generate_request(request)
         approval_file = self._resolve_project_path(approval_path, must_exist=True)
         approval_value = load_document(approval_file)
         if not isinstance(approval_value, dict):
             raise ProtocolError("MAP_BRIEF_APPROVAL_REQUIRED", "Approval receipt must be an object")
         self.registry.validate("approval-receipt", approval_value)
         approval_receipt = ApprovalReceipt.from_dict(approval_value)
-        approval_copy = self.path_guard.resolve(self.work_root / "approvals/g1-map-brief.yaml")
-        approval_journal_exists = approval_copy.exists()
-        nonce_path = self._resolve_project_path(nonce_db)
-        nonce_path.parent.mkdir(parents=True, exist_ok=True)
-        nonce_store = SqliteNonceStore(str(nonce_path))
-        coordinator = ApprovalGateCoordinator(approval_key, nonce_store, policy_id, issuer)
-        coordinator.validate(
-            "G1", approval_receipt, sha256_digest(brief), context,
-            approver_subject_id=request["subject"]["approver_subject_id"],
-            expected_scope=request["scope"],
-        )
-        atomic_yaml(approval_copy, approval_value)
-        already_consumed = nonce_store.contains(approval_receipt.issuer, approval_receipt.nonce)
-        if already_consumed:
-            if not approval_journal_exists:
-                raise SecurityError(
-                    "APPROVAL_RECOVERY_EVIDENCE_MISSING",
-                    "Consumed G1 approval has no workflow-local intent record",
-                )
-            coordinator.require_consumed(
-                "G1", approval_receipt, sha256_digest(brief), context,
-                approver_subject_id=request["subject"]["approver_subject_id"],
-                expected_scope=request["scope"],
-            )
-        else:
-            coordinator.require(
-                "G1", approval_receipt, sha256_digest(brief), context,
-                approver_subject_id=request["subject"]["approver_subject_id"],
-                expected_scope=request["scope"],
-            )
+        coordinator = ApprovalGateCoordinator(approval_key)
+        coordinator.require("G1", approval_receipt, sha256_digest(brief))
         compiled, outputs = self._compile_approved_candidate(request, intent, brief)
         if compiled["preflight"]["status"] != "passed":
             self.state_store.complete_step(
@@ -176,7 +158,6 @@ class MapGenerationWorkflow:
             "state": state.to_dict(),
             "receipt": receipt.to_dict(),
             **compiled,
-            "idempotent_replay": already_consumed,
         }
 
     def _compile_approved_candidate(
@@ -261,7 +242,7 @@ class MapGenerationWorkflow:
 
     @serialized_workflow_step
     def freeze(self, request_path: str | Path, approval_path: str | Path, *, approval_key: bytes,
-               attestation_key: bytes, nonce_db: str | Path, policy_id: str, issuer: str,
+               attestation_key: bytes,
                browser: str | Path | None = None) -> dict[str, Any]:
         request = self._read_request(request_path)
         state = self.state_store.load()
@@ -293,11 +274,7 @@ class MapGenerationWorkflow:
             raise ProtocolError("FREEZE_APPROVAL_REQUIRED", "Approval receipt must be an object")
         self.registry.validate("approval-receipt", approval_value)
         approval_receipt = ApprovalReceipt.from_dict(approval_value)
-        nonce_path = self._resolve_project_path(nonce_db)
-        nonce_path.parent.mkdir(parents=True, exist_ok=True)
-        coordinator = ApprovalGateCoordinator(
-            approval_key, SqliteNonceStore(str(nonce_path)), policy_id, issuer,
-        )
+        coordinator = ApprovalGateCoordinator(approval_key)
         approval_digest = freeze_object_digest(request, candidate, evidence)
         compiler = MapSpecLockCompiler(self.registry)
         brief_approval_ref = "approvals/g1-map-brief.yaml"
@@ -317,20 +294,16 @@ class MapGenerationWorkflow:
             if state.step == "render":
                 if state.status != "pending":
                     raise ProtocolError("JOB_RECOVERY_NOT_ALLOWED", f"status={state.status}; step={state.step}")
-                coordinator.require_consumed(
-                    "G2", approval_receipt, approval_digest, ExecutionContext.from_generate_request(request),
-                    approver_subject_id=request["subject"]["approver_subject_id"],
-                    expected_scope=request["scope"],
+                coordinator.require(
+                    "G2", approval_receipt, approval_digest,
                 )
                 if self.state_store.find_output_digest("map-spec-lock") != sha256_digest(existing):
                     raise ProtocolError("JOB_PREREQUISITE_DRIFT", state.run_id)
                 return {"state": state.to_dict(), "lock": existing, "idempotent_replay": True}
             if state.status not in {"pending", "waiting_approval"}:
                 raise ProtocolError("JOB_RECOVERY_NOT_ALLOWED", f"status={state.status}; step={state.step}")
-            coordinator.require_consumed(
-                "G2", approval_receipt, approval_digest, ExecutionContext.from_generate_request(request),
-                approver_subject_id=request["subject"]["approver_subject_id"],
-                expected_scope=request["scope"],
+            coordinator.require(
+                "G2", approval_receipt, approval_digest,
             )
             state, step_receipt = self.state_store.complete_step(
                 state, status="succeeded",
@@ -344,9 +317,7 @@ class MapGenerationWorkflow:
         if state.step == "render":
             raise ProtocolError("JOB_PREREQUISITE_DRIFT", "map-spec-lock")
         coordinator.require(
-            "G2", approval_receipt, approval_digest, ExecutionContext.from_generate_request(request),
-            approver_subject_id=request["subject"]["approver_subject_id"],
-            expected_scope=request["scope"],
+            "G2", approval_receipt, approval_digest,
         )
         lock = compiler.compile(
             request, candidate, evidence, receipt, preflight,
@@ -667,9 +638,6 @@ class MapGenerationWorkflow:
         approval_path: str | Path,
         *,
         approval_key: bytes,
-        nonce_db: str | Path,
-        policy_id: str,
-        issuer: str,
         failure_hook: Callable[[str], None] | None = None,
     ) -> dict[str, Any]:
         request = self._read_request(request_path)
@@ -694,8 +662,8 @@ class MapGenerationWorkflow:
         )
         delivered = service.deliver(
             request=request, manifest=manifest, manifest_ref=manifest_ref, report=report,
-            approval_path=approval_path, approval_key=approval_key, nonce_db=nonce_db,
-            policy_id=policy_id, issuer=issuer, failure_hook=failure_hook,
+            approval_path=approval_path, approval_key=approval_key,
+            failure_hook=failure_hook,
         )
         transaction = delivered["transaction"]
         delivery_receipt = delivered["receipt"]
@@ -826,8 +794,8 @@ class MapGenerationWorkflow:
                 brief_approval_ref=lock["approvals"]["brief_ref"],
                 freeze_approval_ref=lock["approvals"]["freeze_ref"],
             )
-            if scene["renderer_id"] == "rasterio-matplotlib-page":
-                self._verify_raster_inputs(lock["execution"], scene, request)
+            if scene["renderer_id"] in {"rasterio-matplotlib-page", "matplotlib-vector-page"}:
+                self._verify_page_inputs(lock["execution"], scene, request)
                 return lock, lock_ref, scene, preview_receipt
             refs = [
                 *lock["execution"].get("dataset_refs", []),
@@ -917,7 +885,7 @@ class MapGenerationWorkflow:
         if not subject.get("approver_subject_id"):
             raise ProtocolError("APPROVER_REQUIRED", "subject.approver_subject_id")
         required_capabilities = {"read", "classify", "render-preview"}
-        if any(item.get("join", {}).get("required") for item in request["source_bindings"]):
+        if any(item.get("join", {}).get("required") for item in request.get("source_bindings", [])):
             required_capabilities.add("join")
         missing_capabilities = required_capabilities - set(request["allowed_capabilities"])
         if missing_capabilities:
@@ -926,6 +894,15 @@ class MapGenerationWorkflow:
             raise ProtocolError("RENDER_TARGET_UNSUPPORTED", str(request["requested_outputs"]))
         def identity(ref: dict[str, Any]) -> tuple[str, str, str]:
             return ref["id"], ref["version"], ref["digest"]
+        if "vector_sources" in request:
+            from ..compiler.page_bindings import index_by
+            sources = index_by(request["vector_sources"], "source_id")
+            roots = index_by(request["sources"], "id")
+            if request.get("source_bindings") or set(sources) != set(roots) or any(roots[sid]["version"] != "1.0.0" or roots[sid]["digest"] != sha256_digest(source) for sid, source in sources.items()):
+                raise ProtocolError("GENERATE_SOURCE_REF_MISMATCH", "Vector source declarations must match root references")
+            return
+        if not request.get("source_bindings"):
+            raise ProtocolError("GENERATE_REQUEST_INCOMPLETE", "source_bindings")
         if {identity(item) for item in request["sources"]} != {identity(item["source_ref"]) for item in request["source_bindings"]}:
             raise ProtocolError("SOURCE_REFERENCE_SET_MISMATCH", request["request_id"])
 
@@ -969,7 +946,7 @@ class MapGenerationWorkflow:
         current = compiler.check_candidate(request, candidate, scene, contracts)
         if current != preflight or current["status"] != "passed":
             raise ProtocolError("CANDIDATE_PREFLIGHT_DRIFT", "Quality gates or their evidence changed; recompile before G2")
-        if scene["renderer_id"] == "rasterio-matplotlib-page":
+        if scene["renderer_id"] in {"rasterio-matplotlib-page", "matplotlib-vector-page"}:
             return
         for ref in [*candidate["execution"]["dataset_refs"], *candidate["execution"].get("prepared_data_refs", []),
                     *candidate["execution"].get("resolved_assets", [])]:
@@ -977,7 +954,14 @@ class MapGenerationWorkflow:
             if uri and file_digest(self.path_guard.resolve(uri, must_exist=True)) != ref["digest"]:
                 raise ProtocolError("CANDIDATE_RESOURCE_DRIFT", ref["id"])
 
-    def _verify_raster_inputs(self, execution, scene, request):
+    def _verify_page_inputs(self, execution, scene, request):
+        if scene["renderer_id"] == "matplotlib-vector-page":
+            from ..compiler.vector_scene import VectorSceneCompiler
+            from .vector_preparation import VectorPreparationService
+            service = VectorPreparationService(project_root=self.project_root,
+                allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
+            VectorSceneCompiler(service).validate_generation(scene, execution, request, ExecutionContext.from_generate_request(request))
+            return
         from ..compiler.raster_scene import RasterSceneCompiler
         from .raster_preparation import RasterPreparationService
         preparation = RasterPreparationService(project_root=self.project_root,

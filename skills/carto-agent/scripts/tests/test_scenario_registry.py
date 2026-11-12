@@ -35,10 +35,10 @@ class ScenarioRegistryTests(unittest.TestCase):
     def test_packaged_registry_admits_only_the_registered_scenario(self):
         with patch("carto_core.scenario_registry.import_module") as importer:
             registry = ScenarioRegistry(self.schemas)
-            self.assertEqual({("map-scenario", "general-thematic-map", "1.0.0")},
+            self.assertEqual({("map-scenario", "general-thematic-map", "3.0.0")},
                              set(registry._templates))
             profile = registry.for_create(
-                deepcopy(VALID_CASES["general-thematic-template-create-request"]))
+                deepcopy(VALID_CASES["general-template-create-request"]))
             self.assertEqual("general-thematic-mapping", profile.definition["id"])
             self.assertEqual("general_thematic_mapping",
                              profile.definition["intent_constraints"]["business_scene"])

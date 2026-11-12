@@ -78,7 +78,7 @@
           "$ref": "https://schemas.carto-agent.local/v1/identity.schema.json"
         },
         "cartography": {
-          "$ref": "https://schemas.carto-agent.local/v1/cartography.schema.json"
+          "$ref": "https://schemas.carto-agent.local/v2/cartography.schema.json"
         },
         "layout": {
           "$ref": "https://schemas.carto-agent.local/v1/layout.schema.json"

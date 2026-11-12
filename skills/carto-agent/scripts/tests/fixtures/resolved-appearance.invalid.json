@@ -1,0 +1,58 @@
+{
+  "schema_version": 2,
+  "cartography": {
+    "schema_version": 2,
+    "style_id": "synthetic-style",
+    "version": "2.0.0",
+    "visual_language": "technical",
+    "symbolization": {
+      "color_system": "qualitative",
+      "symbol_catalogs": [
+        "ramps/test-theme@1.0.0"
+      ]
+    },
+    "labeling": {
+      "density": "low",
+      "collision_policy": "avoid",
+      "font_role": "body"
+    },
+    "generalization": {
+      "scale_dependent": false,
+      "strategy": "none"
+    },
+    "defaults": {},
+    "typography": {
+      "title_pt": 18,
+      "body_pt": 9,
+      "legend_pt": 10,
+      "legend_heading_pt": 11,
+      "line_spacing": 1.25
+    },
+    "rules": []
+  },
+  "style_ref": {
+    "id": "cartography",
+    "version": "2.0.0",
+    "digest": "sha256:553d952156749cbbd82a92f4dc4d666061d9ff52c9a39675fa1455105e0456d3"
+  },
+  "typography": {
+    "title_pt": 18,
+    "body_pt": 9,
+    "legend_pt": 10,
+    "legend_heading_pt": 11,
+    "padding_mm": 2,
+    "line_spacing": 1.25
+  },
+  "unexpected": true,
+  "color_sources": [
+    {
+      "view_id": "main-view",
+      "ref": {
+        "id": "resolved-portrayal",
+        "version": "1.0.0",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "uri": "/synthetic/.carto/raster/resolved-portrayal/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.json"
+      }
+    }
+  ]
+}

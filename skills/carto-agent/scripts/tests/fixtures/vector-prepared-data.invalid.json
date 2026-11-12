@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "kind": "vector-prepared-data",
+  "context": {
+    "run_id": "test-run",
+    "project_id": "test-project",
+    "tenant_id": "test-tenant",
+    "subject_id": "test-subject"
+  },
+  "source": {
+    "schema_version": 1,
+    "source_id": "source-a",
+    "role": "thematic-features",
+    "format": "geojson",
+    "crs": "EPSG:4326",
+    "encoding": "utf-8",
+    "files": [
+      {
+        "extension": ".geojson",
+        "path": "synthetic.geojson",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "size_bytes": 256
+      }
+    ],
+    "data_nature": "synthetic",
+    "contains_sensitive_coordinates": false,
+    "contains_production_data": false,
+    "license": "project-approved"
+  },
+  "source_manifest_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "source_assets": [
+    {
+      "extension": ".geojson",
+      "ref": {
+        "id": "vector-source",
+        "version": "1.0.0",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "uri": "/synthetic/.carto/vector/vector-source.json"
+      },
+      "size_bytes": 256
+    }
+  ],
+  "crs_wkt": "synthetic-wkt-not-runtime",
+  "crs_kind": "geographic",
+  "geometry": "polygon",
+  "bounds": [
+    0,
+    0,
+    1,
+    1
+  ],
+  "features": [
+    {
+      "id": "feature-0",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              0,
+              0
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "category": 1,
+        "value": 1
+      }
+    }
+  ],
+  "reader_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "runtime": {
+    "fiona": "1.10.1",
+    "shapely": "2.0.0",
+    "gdal": "3.9.0"
+  },
+  "unexpected": true
+}

@@ -16,6 +16,8 @@ dependencies = [
 geospatial = ["mcp>=2.2.0,<3"]
 raster-rendering = ["rasterio>=1.4,<2", "numpy>=1.26,<3", "matplotlib>=3.8,<4", "Pillow>=10,<13", "fonttools>=4.40,<5"]
 
+vector-rendering = ["rasterio>=1.4,<2", "numpy>=1.26,<3", "matplotlib>=3.8,<4", "Pillow>=10,<13", "fonttools>=4.40,<5", "fiona>=1.10,<2", "shapely>=2.0,<3"]
+
 [project.scripts]
 carto = "carto_core.cli:main"
 

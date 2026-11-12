@@ -137,7 +137,9 @@
               "bbox",
               "crs",
               "width",
-              "height"
+              "height",
+              "source_id",
+              "category_counts"
             ],
             "properties": {
               "data_type": {
@@ -185,6 +187,79 @@
               "height": {
                 "type": "integer",
                 "minimum": 1
+              },
+              "source_id": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+              },
+              "category_counts": {
+                "$ref": "https://schemas.carto-agent.local/v1/category-counts.schema.json"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "role",
+              "dataset_ref",
+              "prepared_ref",
+              "geometry_types",
+              "feature_count",
+              "bbox",
+              "crs",
+              "data_type",
+              "source_id"
+            ],
+            "properties": {
+              "role": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+              },
+              "dataset_ref": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+              },
+              "prepared_ref": {
+                "allOf": [
+                  {
+                    "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+                  },
+                  {
+                    "required": [
+                      "uri"
+                    ],
+                    "properties": {
+                      "id": {
+                        "const": "vector-prepared-data"
+                      },
+                      "version": {
+                        "const": "1.0.0"
+                      }
+                    }
+                  }
+                ]
+              },
+              "geometry_types": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string"
+                }
+              },
+              "feature_count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "bbox": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/bbox"
+              },
+              "crs": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/crs"
+              },
+              "data_type": {
+                "const": "vector"
+              },
+              "source_id": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
               }
             }
           }
@@ -195,7 +270,6 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "combined_bbox",
         "data_nature"
       ],
       "properties": {
@@ -205,6 +279,9 @@
         "data_nature": {
           "type": "string",
           "minLength": 1
+        },
+        "category_counts": {
+          "$ref": "https://schemas.carto-agent.local/v1/category-counts.schema.json"
         }
       }
     }

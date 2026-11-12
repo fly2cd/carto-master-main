@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/general-generate-request.schema.json",
+  "description": "Strict generate-map overlay for the registered general_thematic_mapping scenario. Supports raster (v3.0.0) and vector (v4.0.0) variants.",
+  "allOf": [
+    {
+      "$ref": "https://schemas.carto-agent.local/v1/generate-request.schema.json"
+    },
+    {
+      "oneOf": [
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/sharedOverlay"
+            },
+            {
+              "required": [
+                "run_id",
+                "audience",
+                "scope",
+                "environment",
+                "requested_at",
+                "template",
+                "allowed_capabilities",
+                "source_bindings",
+                "font",
+                "prepared_raster_bindings",
+                "layout_parameters",
+                "panels"
+              ],
+              "properties": {
+                "template": {
+                  "properties": {
+                    "version": {
+                      "const": "3.0.0"
+                    }
+                  }
+                },
+                "source_bindings": {
+                  "minItems": 1,
+                  "maxItems": 4,
+                  "items": {
+                    "allOf": [
+                      {
+                        "$ref": "https://schemas.carto-agent.local/v1/raster-input.schema.json"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "role": {
+                            "const": "classified-surface"
+                          },
+                          "data_nature": {
+                            "const": "user-provided"
+                          },
+                          "contains_sensitive_coordinates": {
+                            "const": false
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                "prepared_raster_bindings": {
+                  "minItems": 1,
+                  "maxItems": 4,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "role": {
+                        "const": "classified-surface"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/sharedOverlay"
+            },
+            {
+              "required": [
+                "run_id",
+                "audience",
+                "scope",
+                "environment",
+                "requested_at",
+                "template",
+                "allowed_capabilities",
+                "font",
+                "layout_parameters",
+                "vector_sources",
+                "vector_panels"
+              ],
+              "properties": {
+                "template": {
+                  "properties": {
+                    "version": {
+                      "const": "4.0.0"
+                    }
+                  }
+                },
+                "source_bindings": {
+                  "maxItems": 0
+                },
+                "prepared_raster_bindings": {
+                  "maxItems": 0
+                },
+                "panels": {
+                  "maxItems": 0
+                },
+                "vector_sources": {
+                  "minItems": 1,
+                  "maxItems": 4,
+                  "items": {
+                    "properties": {
+                      "role": {
+                        "const": "thematic-features"
+                      },
+                      "data_nature": {
+                        "const": "user-provided"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "$defs": {
+    "sharedOverlay": {
+      "properties": {
+        "goal": {
+          "maxLength": 60
+        },
+        "template": {
+          "type": "object",
+          "properties": {
+            "namespace": {
+              "const": "local"
+            },
+            "kind": {
+              "const": "map-scenario"
+            },
+            "id": {
+              "const": "general-thematic-map"
+            }
+          }
+        },
+        "requested_outputs": {
+          "minItems": 2,
+          "maxItems": 2,
+          "allOf": [
+            {
+              "contains": {
+                "const": "pdf"
+              }
+            },
+            {
+              "contains": {
+                "const": "png"
+              }
+            }
+          ]
+        },
+        "font": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "pattern": "[.](ttf|TTF)$"
+            }
+          }
+        },
+        "intent": {
+          "type": "object",
+          "properties": {
+            "business_scene": {
+              "const": "general_thematic_mapping"
+            },
+            "tasks": {
+              "const": [
+                "thematic-map"
+              ]
+            }
+          }
+        },
+        "layout_parameters": {
+          "$ref": "https://schemas.carto-agent.local/v1/grid-parameters.schema.json"
+        }
+      }
+    }
+  }
+}

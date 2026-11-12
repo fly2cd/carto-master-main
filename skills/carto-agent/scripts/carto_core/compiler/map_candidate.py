@@ -147,10 +147,29 @@ class MapCandidateCompiler:
                 allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
             inputs = RasterSceneCompiler(preparation).validate_generation(
                 scene, candidate["execution"], request, self.context)
+            template_style = contracts["scenario"].get("embedded", {}).get("cartography")
+            if scene['resolved_layout']['template_contract'] != contracts['scenario']['embedded']['layout']:
+                raise ProtocolError('LAYOUT_TEMPLATE_MISMATCH','Layout differs from installed template')
+            if any(layer['portrayal']['portrayal'] != contracts['portrayal'] for layer in inputs['layers'].values()):
+                raise ProtocolError('PORTRAYAL_TEMPLATE_MISMATCH','Expression differs from installed template')
+            if inputs["page"]["appearance"]["cartography"] != template_style:
+                raise ProtocolError("APPEARANCE_TEMPLATE_MISMATCH", "Page appearance differs from the installed template")
             if bundle is not None and inputs["bundle"] != bundle:
                 raise ProtocolError("RASTER_CANDIDATE_BUNDLE_MISMATCH", "Candidate must preserve the prepared bundle")
+        vector = None
+        if scene["renderer_id"] == "matplotlib-vector-page":
+            from .vector_scene import VectorSceneCompiler
+            from ..workflow.vector_preparation import VectorPreparationService
+            service = VectorPreparationService(project_root=self.project_root,
+                allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
+            vector = VectorSceneCompiler(service).validate_generation(scene, candidate["execution"], request, self.context)
+            if (scene["resolved_layout"]["template_contract"] != contracts["scenario"]["embedded"]["layout"]
+                    or vector["page"]["cartography"] != contracts["scenario"]["embedded"]["cartography"]):
+                raise ProtocolError("VECTOR_TEMPLATE_MISMATCH", "Page layout or appearance differs from the installed template")
+            if bundle is not None and bundle != vector["bundle"]:
+                raise ProtocolError("VECTOR_BUNDLE_MISMATCH", "Page does not preserve the prepared bundle")
         return MapQualityChecks(self.registry).inspect(
-            candidate, scene, contracts["quality_gates"], profile=profile, raster=inputs)
+            candidate, scene, contracts["quality_gates"], profile=profile, raster=inputs, vector=vector)
 
     @staticmethod
     def require_execution_intent(execution: dict[str, Any], intent: dict[str, Any]) -> None:

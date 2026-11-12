@@ -10,17 +10,17 @@
   → Carto 分类表匹配与动态澄清
   → 不可变 TIFF、CSV 快照 + 待绑定的类别显示定义
   → 显式 portrayal 图层 + 受信 raster/categorical 表达引用
-  → RasterPortrayalCompiler → resolved-raster-portrayal 冻结表达
+  → RasterPortrayalCompiler → resolved-portrayal 冻结表达
   → Rasterio 解码快照、核验统计证据
   → Matplotlib 离散颜色映射 → 图体 PNG
   → LayoutResolver 的共享页面/框合同
      ├─ RasterMapBodyRenderer.compose + SvgCompositor → 既有内部 SVG 挂接
-     └─ RasterPageRenderer + Matplotlib → 物理字号的整页 PDF / PNG / SVG
+     └─ PageRenderer + Matplotlib → 物理字号的整页 PDF / PNG / SVG
 ```
 
 - MCP 不处理类别含义、颜色、图例、纸张或渲染。
 - MapLibre、QGIS 均不在这条静态图体路径中；不把它包装为 `maplibre-web` 回执。
-- 场景策略与实现白名单当前仅登记 `general-thematic-mapping`（实现 `general-thematic-raster`）。共享正式工作流已接通静态后端，由该已准入场景组件（含模板样张渲染分支）使用；不把数据类型注册为业务场景。
+- 场景策略与实现白名单当前仅登记 `general-thematic-mapping`（实现 `general-thematic`，准入几何 raster）。共享正式工作流已接通静态后端，由该已准入场景组件（含模板样张渲染分支）使用；不把数据类型注册为业务场景。
 - 准备报告的 `ready` 只表示分类合同完整，绝不表示 G1/G2/G3 已批准或完成地图验收。
 - 原始 TIFF 的 NoData、像元、掩膜不修改。用户回答 `semantic=nodata` 也是显示合同，不是数据重写操作。
 
@@ -87,7 +87,7 @@ CSV 与统计值取并集，最多 256 类。即使 `legend_policy=observed`，C
 - `.carto/geospatial/evidence/tool-gis-raster-statistics/1.0.0/`：网关统计证据。
 - `.carto/raster/source/`、`legend/`：以原始字节 SHA256 命名的自包含源快照。
 - `.carto/raster/raster-prepared-data/`：绑定输入、算法摘要、上下文、证据、澄清与分类行。
-- `.carto/raster/resolved-raster-portrayal/`：绑定模板表达、类别显示定义、源快照与上下文的不可变表达。
+- `.carto/raster/resolved-portrayal/`、`.carto/vector/resolved-portrayal/`：绑定模板表达、类别显示定义或显式编码、源快照与上下文的不可变表达（单一 schema，geometry 条件体）。
 - `.carto/raster/map-body/`、`raster-map-body/`：PNG 与类型化图体产物。
 
 发布采用原子 create-only；相同内容复用，冲突拒绝。不是跨文件事务，失败可能留下无成功报告引用的快照；不自动删除或导入残留。
@@ -97,7 +97,7 @@ CSV 与统计值取并集，最多 256 类。即使 `legend_policy=observed`，C
 底层 API 位于 `workflow/raster_preparation.py`、`compiler/raster_portrayal.py`、`adapters/raster_renderer.py`，不是单独宿主实现：
 
 - `RasterPreparationService.analyze / clarify / load_verified`。
-- `RasterPortrayalCompiler.compile(portrayal, layer_id, prepared_ref, context)` → 不可变 `resolved-raster-portrayal`。
+- `RasterPortrayalCompiler.compile(portrayal, layer_id, prepared_ref, context)` → 不可变 `resolved-portrayal`（geometry=raster）。
 - `RasterMapBodyRenderer.render(portrayal_ref, resolved_layout, context)` → 不可变 `raster-map-body`。
 - `.compose(body_ref, resolved_layout, overlays, output_path, context, inline_fonts=...)` → 内部 SVG；重新渲染比对产物，拒绝图体/布局/环境漂移。
 - 调用方提供一个分类图例 overlay；条目从冻结分类合同填充。调用方若给出冲突条目则拒绝，绝不独立生成第二份色表。
@@ -121,7 +121,7 @@ Rasterio 从快照字节的 MemoryFile 全分辨率解码，检查真实元数�
 - 共享 `map-expression` 和 `portrayal` 协议增加 raster 分支，受信目录固定为 `policies/map-expression-catalog.yaml`。新增目录 Schema；已有两种矢量表达定义不变。
 - 模板 `portrayal` 只声明图层 ID、数据角色、精确表达引用及固定策略：唯一值匹配、未知值拒绝、源掩膜保留、nearest、NoData 透明；类别名称和颜色来自项目内已澄清定义，不把实际类别行写入模板。
 - `MapExpressionCatalog` 验证目录、重复身份、active 状态、引用摘要、图层唯一 ID 与几何兼容性；模板静态校验和候选编译共用同一校验器。目录登记表达不是场景准入或后端开放。
-- `resolved-raster-portrayal` 冻结模板合同、准备引用、表达引用、源快照、上下文和编译器摘要；`lookup_table` 仅含 value/display/label/color/order/include_in_legend，图例从同表派生。不携带统计计数或把 `semantic=nodata` 变成源 NoData。
+- `resolved-portrayal`(geometry=raster) 冻结模板合同、准备引用、表达引用、源快照、上下文和编译器摘要；`lookup_table` 仅含 value/display/label/color/order/include_in_legend，图例从同表派生。不携带统计计数或把 `semantic=nodata` 变成源 NoData。
 - 每次消费重新验证源证据和目录，并重建合同比对；不能通过手改类别颜色、隐藏状态、图例或来源字段绕过。图体和整页都只接受 `portrayal_ref`，不再直接接收准备引用。
 - 当前编译器只执行一个栅格图层，无规则执行器；多图层/混合图层、非空 rules、双线性插值、Jenks 等均拒绝，不悄悄遗漏。
 
@@ -146,21 +146,25 @@ body_artifact = RasterMapBodyRenderer(preparation_service).render(
 新增 `adapters/raster_page_renderer.py`。它消费同一个冻结图体和 `LayoutResolver`，不重新计算版式框、不另建颜色合同，也不经 MapLibre/浏览器。**SVG 是一种输出格式，不是本分支必须经过的中间渲染引擎。** 旧 `RasterMapBodyRenderer.compose` 保持原固定像素 SVG 挂接；物理字号页面使用新的 Matplotlib 页面适配器，两者不能混称。
 
 ```python
-renderer = RasterPageRenderer(preparation_service)
+from carto_core.compiler.raster_page_contract import compile_page_request
+# unresolved_page 只包含本次页面内容、布局、字体和按 view_id 绑定的 portrayals，以及未解析条目的 legends；不能传旧页面或已归一字段。
+page_request = compile_page_request(preparation_service, unresolved_page, cartography_contract, execution_context)
+renderer = PageRenderer(preparation_service)
 page_artifact = renderer.render(page_request, execution_context)
 page = renderer.load_verified(page_artifact.ref(), execution_context)
 # page["outputs"]["pdf"|"png"|"svg"] 为项目内的不可变资源引用。
 # 不是 RenderReceipt，不可用于替代预览、G2、成品检查或交付。
 ```
 
-### 严格输入：`raster-page-request`
+### 严格输入：`page-request` v4
 
-- `portrayal_ref`：同 run/tenant/project/subject 的 `resolved-raster-portrayal` 引用；其类别定义必须来自 ready 准备报告。页面重新核验表达、目录摘要和源快照，未澄清时在页面依赖加载前拒绝；不再直接接受 `prepared_ref`。
-- `resolved_layout`：由现有 `LayoutResolver` 产生并重新验证的完整快照；纸张不硬编码为 A4。
+- `portrayals[]`：每项显式绑定 `view_id + ref`；ref 是同 run/tenant/project/subject 的 `resolved-portrayal`（geometry=raster）引用；其类别定义必须来自 ready 准备报告。页面重新核验表达、目录摘要和源快照，未澄清时在页面依赖加载前拒绝；不再直接接受 `prepared_ref`。
+- `resolved_layout`：由现有 `LayoutResolver` 产生并重新验证的 v2 快照，保存 `template_contract + parameters + contract` 与 `map_frame_ids`；共享组件不硬编码 A4，general 策略仍限定 A4。
 - `font`：显式绝对路径、字节 SHA256、大小；先允许根校验，再冻结到 `.carto/raster/font/`。最多 32 MiB，只支持单字体 TrueType TTF，不支持 TTC/OTF/WOFF。
-- `texts`：`content_id + text`，只能绑定 title/marginalia；必须恰好一个标题。`legend`：`content_id + title`，条目只来自图体的冻结分类，禁止请求传入另一套颜色。
-- `typography`：显式 `title_pt/body_pt/legend_pt/legend_heading_pt/padding_mm/line_spacing`。字体单位为 pt，不是 px；默认值由调用方决策，组件不补写。
-- `scale_bar`、`grid_north`：必须显式传对象或 `null`。所有非地图框必须且只能被绑定一次；多余、不支持的框拒绝。
+- `texts`：`content_id + text`，只能绑定 title/marginalia；必须恰好一个标题。`legends[]`：各项为 `content_id + title`，条目只由对应已验证表达编译；共享项通过严格兼容性检查后取并集，禁止请求传入另一套颜色。
+- `appearance`：由新版 cartography 和 Layout 归一，包含模板快照、摘要引用、颜色来源引用及最终 typography；字号/行距来自 cartography，padding_mm 来自 Layout.content_padding_mm。页面不再接受顶层 typography。
+- `bindings`：显式关联数据、图层、视图、面板、图例和页面元素；必须与冻结数据及模板一致。S1 允许单图及模板声明的 1×2/2×2，一面板一分类层；仅整页共享编码/图例，任意分组共享仍拒绝。
+- `scale_bar`、`grid_north`：必须显式传对象或 `null`；本期多图必须为 null。所有非地图框必须且只能被绑定一次；多余、不支持的框拒绝。
 - 图例遵守布局的 `capacity.legend_items`，标题遵守 `capacity.title_characters`。实际字形测宽后换行，不省略类别名、不缩小字号、不默默裁剪；实测边界超框则拒绝。
 
 ### 字体与输出
@@ -171,8 +175,8 @@ page = renderer.load_verified(page_artifact.ref(), execution_context)
 - PNG：页面像素按既有规则四舍五入，A4/300dpi 为 3508×2480；白色页底，隐藏区域透出页底。图体不做平滑分类插值。
 - SVG：物理 pt 页面，栅格图体内嵌、字形路径化，不依赖查看端字体或外部 URL。
 - 原始字体删除后仍可从冻结字体复现；输出、来源、字体、布局、代码或环境漂移均被重载验证拒绝。重复导出不含当前时钟或随机 SVG ID。
-- 内部页面报告 `raster-page-output` 记录请求/图体/字体引用、环境、三格式资源与测量结果；`capability_boundary` 固定为 `internal-page-output-not-formal-render-receipt`。
-- 新增命名空间 `.carto/raster/raster-page-request/`、`raster-page-output/`、`page-pdf/`、`page-png/`、`page-svg/`、`font/`。依然不是跨文件事务：失败可留孤立的源/字体/图体快照，不发布成功页面报告。用户原文件不改写。
+- 内部页面报告 `page-output` 记录请求/图体/字体引用、环境、三格式资源与测量结果；`capability_boundary` 固定为 `internal-page-output-not-formal-render-receipt`。
+- 新增命名空间 `.carto/raster/page-request/`、`page-output/`、`page-pdf/`、`page-png/`、`page-svg/`、`font/`。依然不是跨文件事务：失败可留孤立的源/字体/图体快照，不发布成功页面报告。用户原文件不改写。
 
 ### 比例尺和北向
 
@@ -201,26 +205,26 @@ page = renderer.load_verified(page_artifact.ref(), execution_context)
 
 ### 1. 正式数据与场景契约
 
-`generate-request` 新增可选 `prepared_raster_bindings`，静态后端要求恰好一项，角色与 `source_bindings` 一致，引用同 run/tenant/project/subject 的 ready 报告。示意片段（不是真实可执行引用）：
+`generate-request` 新增可选 `prepared_raster_bindings`，静态后端要求 1～4 个唯一源绑定，`source_id` 和角色与 `source_bindings` 一致，引用同 run/tenant/project/subject 的 ready 报告。示意片段（不是真实可执行引用）：
 
 ```json
-{"prepared_raster_bindings": [{"role": "land-cover", "prepared_ref": {
+{"prepared_raster_bindings": [{"source_id": "source-a", "role": "classified-surface", "prepared_ref": {
   "id": "ready-preparation", "version": "1.0.0",
   "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
   "uri": "fixture-project/.carto/raster/raster-prepared-data/example.json"
 }}]}
 ```
 
-- `RasterBundlePreparer` 验证准备报告后生成正式 `PreparedDataBundle`：类型化 raster role、band、实际 CRS/bbox/宽高、源快照和 GIS/质量证据；不虚构 vector feature_count/join_coverage/观测时间，不声称发生重投影。
+- `BundlePreparer` 验证全部准备报告后生成正式 `PreparedDataBundle`：类型化 raster role、band、实际 CRS/bbox/宽高、源快照和 GIS/质量证据；task_ref 绑定 `bundle-inputs` 清单；多源不产生一个假定的 combined_bbox 或聚合类别统计；不虚构 vector feature_count/join_coverage/观测时间，不声称发生重投影。
 - `RasterSceneCompiler` 冻结页面请求及 TTF，生成独立 `rasterio-matplotlib-page` RenderScene；保存项目上下文、bundle/page 引用、布局、DPI、输出与精确资源集，无 browser camera/map/overlays 字段。
-- `bind_execution` 向场景已构造的业务 execution 绑定 `raster_inputs`、数据/字体引用、视图、目标参数和真实后端环境。调用方仍须传入已核验的意图、模板/依赖和策略，不由共享编译器替用户决定。
+- `bind_execution` 向场景已构造的业务 execution 绑定 `page_inputs`、数据/字体引用、视图、目标参数和真实后端环境。调用方仍须传入已核验的意图、模板/依赖和策略，不由共享编译器替用户决定。
 - 资源集闭合到 bundle、准备请求、ready 报告、MCP 证据、portrayal、page、TIFF、CSV、TTF。引用按其类别分别校验规范 JSON 或原始字节摘要，重新构建后必须精确匹配；不从 URI 反推可信项目范围。
 - `MapCandidateCompiler` 和正式工作流再校验生成请求的源/准备报告、输出目标、数据性质、图层、范围及 CRS；不允许静默换源、换配色或重投影。
 
 已准入场景组件可复用以下 API（示意，不是跳过 G1/G2 的调用入口）：
 
 ```python
-prepared = RasterBundlePreparer(preparation_service).prepare_request(request, context)
+prepared = BundlePreparer(preparation_service, "raster").prepare_request(request, context)
 scene = RasterSceneCompiler(preparation_service).compile(
     bundle_ref=prepared["bundle_ref"], page_request=page_request,
     context=context, scene_id=scene_id, targets=request["requested_outputs"],
@@ -238,7 +242,7 @@ execution = RasterSceneCompiler(preparation_service).bind_execution(
 
 - 绑定 scene/revision/digest、session、资源集、执行摘要、随机种子、renderer profile/code digest。
 - 环境包含 Python、Rasterio/GDAL、NumPy、Matplotlib、Pillow、FreeType、fonttools、zlib 的实际版本；fingerprint 还绑定平台和架构。不填写虚假的浏览器/MapLibre 版本。
-- 绑定内部 page_output_ref 与 PDF/PNG（可附 SVG）的精确路径、格式、大小和原始字节摘要；HMAC 验证后仍重新校验场景、页面、资源和成果，不能仅凭签名放行错误绑定。
+- 绑定内部 v3 page_output_ref（含逐面板 body_refs）与 PDF/PNG（可附 SVG）的精确路径、格式、大小和原始字节摘要；HMAC 验证后仍重新校验场景、页面、资源和成果，不能仅凭签名放行错误绑定。
 - 回执如实声明 `process_isolation=in-process`、`network_isolation=not-provided`，以及源/页像素上限。项目路径约束不等于 OS/网络沙箱；HMAC 不是远程可信执行或硬件证明。
 
 候选预览证据进入既有 G2 对象摘要，`MapSpecLock` 保留同一 execution，无第二套 raster lock。冻结之后删除原字体路径仍可从受验证快照复现；修改冻结字体、输入、布局、环境或代码必须拒绝旧候选/锁。
@@ -257,3 +261,7 @@ execution = RasterSceneCompiler(preparation_service).bind_execution(
 - **仍待独立完成**：真实业务用途和模板组件的准入、实际数据类别含义/配色确认、用户地图验收；不创建“分类栅格业务场景”来代替。没有新增直接导出地图的 CLI 或审批旁路。
 
 不得把合成测试、内部 PDF/PNG/SVG 或页面报告称为用户数据已完成正式 A4 制图交付。
+
+### S1-C/D 补充验证
+
+`test_s1cd_grid.py` 验证六种实例化参数、不同合成 TIFF、同源复用、独立/共享图例、独立范围、全部图体与篡改拒绝；`test_general_thematic.py` 还覆盖四图真实生成工作流、G3 原子提交后的恢复，以及模板声明组合缺失/交换时拒绝发布。测试密钥和工具统计适配器仅存在于测试，不构成真实授权或独立 GIS 服务验收。

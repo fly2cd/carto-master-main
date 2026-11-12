@@ -1,4 +1,5 @@
 from __future__ import annotations
+from .grid_layout import instantiate_grid
 
 import math
 from copy import deepcopy
@@ -7,8 +8,9 @@ from typing import Any
 from ..canonical import sha256_digest
 from ..errors import ProtocolError
 from ..schema_registry import SchemaRegistry
+from ..roadmap import not_implemented
 
-RESOLVER_VERSION = "1.0.0"
+RESOLVER_VERSION = "2.0.0"
 # These are conservative envelopes for the existing fixed-size SVG primitives,
 # NOT measured glyph bounds. Real font/content measurement is a later stage.
 FONT_SIZE_PX = 16
@@ -46,10 +48,70 @@ def overlay_bounds(item: dict[str, Any], x: float, y: float) -> tuple[float, flo
     return x, y - 20, x + width, y + 5
 
 
+_SEMANTIC_POSITIONS = {
+    "top-left":      lambda x, y, w, h, inset: (x + inset,           y + inset),
+    "top-center":    lambda x, y, w, h, inset: (x + w / 2,           y + inset),
+    "top-right":     lambda x, y, w, h, inset: (x + w - inset,       y + inset),
+    "center-left":   lambda x, y, w, h, inset: (x + inset,           y + h / 2),
+    "center":        lambda x, y, w, h, inset: (x + w / 2,           y + h / 2),
+    "center-right":  lambda x, y, w, h, inset: (x + w - inset,       y + h / 2),
+    "bottom-left":   lambda x, y, w, h, inset: (x + inset,           y + h - inset),
+    "bottom-center": lambda x, y, w, h, inset: (x + w / 2,           y + h - inset),
+    "bottom-right":  lambda x, y, w, h, inset: (x + w - inset,       y + h - inset),
+}
+
+
+# Type-specific default semantic specs as (anchor, dx_px, dy_px) from the anchor point.
+# Persisted with the derived anchor so validation round-trips are idempotent.
+_DEFAULT_OFFSET_PX = {
+    "text": ("top-left", 0, 20), "attribution": ("top-left", 0, 20),
+    "legend": ("top-left", 0, 4), "north-arrow": ("top-center", 0, 43),
+    "scale-bar": ("top-left", 0, 27),
+}
+
+
+def _semantic_spec(position: Any, kind: str, dpi: int) -> tuple[str, float, float]:
+    """Normalize an overlay position into (anchor, offset_mm_x, offset_mm_y).
+
+    The semantic source travels with the derived anchor so validation round-trips
+    re-derive the same pixel anchor. An absolute position without its semantic source
+    is rejected rather than trusted: trust would make anchor tampering undetectable.
+    """
+    if position is None:
+        anchor, dx_px, dy_px = _DEFAULT_OFFSET_PX[kind]
+        return anchor, dx_px * 25.4 / dpi, dy_px * 25.4 / dpi
+    if isinstance(position, str):
+        return position, 0.0, 0.0
+    if isinstance(position, dict):
+        if "anchor" in position or "offset_mm" in position:
+            offset = position.get("offset_mm", [0, 0])
+            return position.get("anchor", "top-left"), float(offset[0]), float(offset[1])
+        raise ProtocolError("LAYOUT_POSITION_UNSUPPORTED",
+            "Absolute position without its semantic source cannot be re-validated")
+    raise ProtocolError("LAYOUT_POSITION_UNSUPPORTED",
+        f"Position must be a semantic string or dict, got {type(position).__name__}")
+
+
+def _derive_anchor(spec: tuple[str, float, float], x: float, y: float, w: float, h: float,
+                   inset: float, dpi: int) -> tuple[float, float]:
+    """Mechanically derive the pixel anchor from a semantic spec.
+
+    The position declaration is a pure semantic parameter — the program computes the
+    exact pixel coordinates without injecting any design preference.
+    """
+    anchor, off_x_mm, off_y_mm = spec
+    if anchor not in _SEMANTIC_POSITIONS:
+        raise ProtocolError("LAYOUT_POSITION_UNSUPPORTED",
+            f"Unknown anchor '{anchor}'; expected one of {sorted(_SEMANTIC_POSITIONS)}")
+    base_x, base_y = _SEMANTIC_POSITIONS[anchor](x, y, w, h, inset)
+    return base_x + _pixels(off_x_mm, dpi), base_y + _pixels(off_y_mm, dpi)
+
+
 class LayoutResolver:
     """One layout-contract interpreter shared by compilation, rendering and checks.
 
-    The supported subset is one map, disjoint page frames, millimetres, DPR=1,
+    The supported subset is one map or a template-declared finite grid,
+    disjoint page frames, millimetres, DPR=1,
     map clipping and reject-only overlays. No automatic shrink, pagination,
     overlap exceptions, real content measurement or layout search is implied.
     """
@@ -57,11 +119,17 @@ class LayoutResolver:
     def __init__(self, registry: SchemaRegistry | None = None) -> None:
         self.registry = registry or SchemaRegistry()
 
-    def resolve(self, contract: dict[str, Any], dpi: int, device_pixel_ratio: int = 1) -> dict[str, Any]:
+    def resolve(self, contract: dict[str, Any], dpi: int, device_pixel_ratio: int = 1, *, parameters=None) -> dict[str, Any]:
+        template_contract = deepcopy(contract)
+        contract = instantiate_grid(contract, parameters, self.registry)
         self.registry.validate("layout", contract)
         canvas = contract["canvas"]
-        if canvas["unit"] != "mm" or device_pixel_ratio != 1:
-            raise ProtocolError("LAYOUT_COORDINATE_UNSUPPORTED", "Only mm canvas and DPR=1 are executable")
+        if canvas["unit"] != "mm":
+            raise ProtocolError("LAYOUT_COORDINATE_UNSUPPORTED",
+                f"Canvas unit '{canvas['unit']}' is not supported by the current page backend; only 'mm' is executable")
+        if device_pixel_ratio is not None and device_pixel_ratio != 1:
+            raise ProtocolError("LAYOUT_DPR_UNSUPPORTED",
+                f"device_pixel_ratio={device_pixel_ratio} is not supported by the current page backend; DPR must be 1")
         if isinstance(dpi, bool) or not isinstance(dpi, int) or not 72 <= dpi <= 1200:
             raise ProtocolError("LAYOUT_DPI_INVALID", str(dpi))
         numeric = [canvas["width"], canvas["height"], canvas["safe_margin"]]
@@ -86,10 +154,12 @@ class LayoutResolver:
             contents.add(frame["content_id"])
             kind = frame["type"]
             if kind != "map" and kind not in _FRAME_OVERLAYS:
-                raise ProtocolError("LAYOUT_FRAME_UNSUPPORTED", kind)
+                not_implemented("layout-frame-types", "LAYOUT_FRAME_UNSUPPORTED",
+                    f"Frame type {kind} is on the roadmap; current layout admits map and controlled overlays")
             expected_overflow = "clip" if kind == "map" else "reject"
             if frame["overflow_policy"] != expected_overflow:
-                raise ProtocolError("LAYOUT_OVERFLOW_UNSUPPORTED", f"{frame['id']}:{frame['overflow_policy']}")
+                not_implemented("layout-overflow-strategies", "LAYOUT_OVERFLOW_UNSUPPORTED",
+                    f"Overflow policy {frame['overflow_policy']} is on the roadmap; current layout admits clip for map and reject elsewhere")
             x, y, w, h = frame["bounds"]
             if min(w, h) <= 0 or x < margin or y < margin or x + w > width - margin or y + h > height - margin:
                 raise ProtocolError("LAYOUT_FRAME_OUT_OF_BOUNDS", frame["id"])
@@ -103,25 +173,34 @@ class LayoutResolver:
                            "overflow_policy": frame["overflow_policy"]})
             if kind == "map":
                 maps.append(frame["id"])
-        if len(maps) != 1:
-            raise ProtocolError("LAYOUT_MAP_COUNT_UNSUPPORTED", str(len(maps)))
+        if len(maps) != 1 and parameters is None:
+            not_implemented("composition-map-counts", "LAYOUT_MAP_COUNT_UNSUPPORTED",
+                f"Panel count {len(maps)} is on the roadmap; current layout admits one map or a template-declared grid")
         resolved = {
-            "schema_version": 1, "resolver_version": RESOLVER_VERSION,
-            "contract_ref": {"id": contract["layout_id"], "version": contract["version"], "digest": sha256_digest(contract)},
-            "contract": deepcopy(contract), "page": page, "map_frame_id": maps[0], "frames": frames,
+            "schema_version": 2, "resolver_version": RESOLVER_VERSION,
+            "contract_ref": {"id": template_contract["layout_id"], "version": template_contract["version"], "digest": sha256_digest(template_contract)},
+            "contract": deepcopy(contract), "template_contract": template_contract, "parameters": deepcopy(parameters),
+            "page": page, "map_frame_ids": maps, "frames": frames,
         }
         self.registry.validate("resolved-layout", resolved)
         return resolved
 
     def validate(self, resolved: dict[str, Any]) -> None:
         self.registry.validate("resolved-layout", resolved)
-        expected = self.resolve(resolved["contract"], resolved["page"]["dpi"], resolved["page"]["device_pixel_ratio"])
+        expected = self.resolve(resolved["template_contract"], resolved["page"]["dpi"], resolved["page"]["device_pixel_ratio"], parameters=resolved["parameters"])
         if resolved != expected:
             raise ProtocolError("LAYOUT_SNAPSHOT_MISMATCH", resolved["contract_ref"]["id"])
 
     @staticmethod
-    def map_frame(resolved: dict[str, Any]) -> dict[str, Any]:
-        return next(frame for frame in resolved["frames"] if frame["id"] == resolved["map_frame_id"])
+    def map_frame(resolved: dict[str, Any], frame_id=None) -> dict[str, Any]:
+        if frame_id is None:
+            if len(resolved["map_frame_ids"]) != 1:
+                raise ProtocolError("LAYOUT_MAP_BINDING_REQUIRED", "Select a map frame explicitly")
+            frame_id = next(iter(resolved["map_frame_ids"]))
+        matches = [f for f in resolved["frames"] if f["id"] == frame_id and f["type"] == "map"]
+        if len(matches) != 1:
+            raise ProtocolError("LAYOUT_MAP_BINDING_MISMATCH", str(frame_id))
+        return matches[0]
 
     def place_overlays(self, resolved: dict[str, Any], overlays: list[dict[str, Any]],
                        map_view_id: str = "main-view") -> list[dict[str, Any]]:
@@ -139,19 +218,18 @@ class LayoutResolver:
             if item["type"] not in _FRAME_OVERLAYS[frame["type"]]:
                 raise ProtocolError("LAYOUT_CONTENT_TYPE_MISMATCH", item["id"])
             x, y, w, h = frame["bounds_px"]
-            anchor_x, anchor_y = x + INSET_PX, y + 20 + INSET_PX
-            if item["type"] == "legend":
-                anchor_y = y + 4 + INSET_PX
-            elif item["type"] == "north-arrow":
-                anchor_x, anchor_y = x + w / 2, y + 43 + INSET_PX
-            elif item["type"] == "scale-bar":
-                anchor_y = y + 27 + INSET_PX
+            spec = _semantic_spec(item.get("position"), item["type"], resolved["page"]["dpi"])
+            anchor_x, anchor_y = _derive_anchor(spec, x, y, w, h, INSET_PX, resolved["page"]["dpi"])
+            if item["type"] == "scale-bar":
                 item["length_px"] = round(w - 2 * INSET_PX, 6)
             # Discarding unresolved alternate coordinates would hide a bad contract.
             if any(key in item for key in ("screen_position", "anchor", "anchor_rule", "source_id", "feature_id")):
                 raise ProtocolError("LAYOUT_CONTENT_COORDINATE_UNSUPPORTED", item["id"])
             item["coordinate_space"] = "page"
-            item["position"] = {"x": round(anchor_x, 6), "y": round(anchor_y, 6), "unit": "pixel"}
+            # Persist the semantic source next to the derived anchor so re-validation
+            # re-derives the same pixel anchor instead of resetting to the frame corner.
+            item["position"] = {"x": round(anchor_x, 6), "y": round(anchor_y, 6), "unit": "pixel",
+                                "anchor": spec[0], "offset_mm": [spec[1], spec[2]]}
             left, top, right, bottom = overlay_bounds(item, anchor_x, anchor_y)
             if left < x or top < y or right > x + w or bottom > y + h:
                 raise ProtocolError("LAYOUT_CONTENT_OVERFLOW", f"{item['id']}: conservative envelope exceeds reject frame")
@@ -180,7 +258,7 @@ class LayoutResolver:
         if (any(scene["viewport"].get(key) != page[key] for key in ("width_px", "height_px", "device_pixel_ratio"))
                 or scene["export"]["dpi"] != page["dpi"]):
             raise ProtocolError("LAYOUT_PAGE_MISMATCH", scene["scene_id"])
-        if scene.get("renderer_id") == "rasterio-matplotlib-page":
+        if scene.get("renderer_id") in {"rasterio-matplotlib-page", "matplotlib-vector-page"}:
             if scene["viewport"]["device_pixel_ratio"] != 1:
                 raise ProtocolError("RASTER_PIXEL_RATIO_UNSUPPORTED", "Static page uses physical pixels, DPR must be one")
             return
@@ -196,14 +274,15 @@ class LayoutResolver:
             raise ProtocolError("LAYOUT_EXECUTION_MISMATCH", scene["scene_id"])
         if execution.get("render_scene_ref", {}).get("digest") != sha256_digest(scene):
             raise ProtocolError("LAYOUT_SCENE_DIGEST_MISMATCH", scene["scene_id"])
-        if scene.get("renderer_id") == "rasterio-matplotlib-page":
+        if scene.get("renderer_id") in {"rasterio-matplotlib-page", "matplotlib-vector-page"}:
             if (execution.get("environment", {}).get("renderer_id") != scene["renderer_id"]
-                    or execution.get("raster_inputs") != {k: scene[k] for k in ("prepared_bundle_ref", "page_request_ref")}):
+                    or execution.get("page_inputs") != {k: scene[k] for k in ("prepared_bundle_ref", "page_request_ref")}):
                 raise ProtocolError("RASTER_EXECUTION_INPUT_DRIFT", scene["scene_id"])
         elif execution.get("camera") != scene["camera"]:
             raise ProtocolError("LAYOUT_CAMERA_MISMATCH", scene["scene_id"])
         views = execution["views"]
-        if len(views) != 1 or views[0]["id"] != self.map_frame(scene["resolved_layout"])["content_id"]:
+        expected_views = {f["content_id"] for f in scene["resolved_layout"]["frames"] if f["type"] == "map"}
+        if len(views) != len(expected_views) or {v["id"] for v in views} != expected_views:
             raise ProtocolError("LAYOUT_MAP_BINDING_MISMATCH", scene["scene_id"])
         self.validate_targets(scene["resolved_layout"], list(execution["targets"].values()))
 

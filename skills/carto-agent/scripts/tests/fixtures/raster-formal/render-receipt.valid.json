@@ -25,10 +25,10 @@
     "zlib": "1.3.2"
   },
   "page_output_ref": {
-    "id": "raster-page-output",
-    "version": "1.0.0",
+    "id": "page-output",
+    "version": "4.0.0",
     "digest": "sha256:1ffc2e61d07bb546871d3e8a1abbf081c9b3b49b5ce3e620cb171ff160f3d67e",
-    "uri": ".carto/raster/raster-page-output/1ffc2e61d07bb546871d3e8a1abbf081c9b3b49b5ce3e620cb171ff160f3d67e.json"
+    "uri": ".carto/raster/page-output/1ffc2e61d07bb546871d3e8a1abbf081c9b3b49b5ce3e620cb171ff160f3d67e.json"
   },
   "status": "succeeded",
   "viewport": {
@@ -58,7 +58,7 @@
       "status": "loaded"
     },
     {
-      "resource_id": "raster-page-request",
+      "resource_id": "page-request",
       "digest": "sha256:78b0de8d080b96b75c8331aa13f7438be0eb550067f4ddb34fd8233a960386cb",
       "status": "loaded"
     },
@@ -68,7 +68,7 @@
       "status": "loaded"
     },
     {
-      "resource_id": "resolved-raster-portrayal",
+      "resource_id": "resolved-portrayal",
       "digest": "sha256:3dee6c48660ad15578f1219eb84be8459c968b8afe4d362edb8c22560dda5a16",
       "status": "loaded"
     },

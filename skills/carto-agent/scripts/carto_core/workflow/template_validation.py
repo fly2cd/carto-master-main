@@ -14,7 +14,9 @@ from ..adapters.webmap_renderer import (
 from ..artifacts import atomic_yaml, file_digest, utc_now
 from ..canonical import sha256_digest
 from ..compiler.layout import LayoutResolver
+from ..compiler.grid_layout import grid_cases
 from ..compiler.dependencies import DependencyResolver
+from ..compiler.expression_validator import ExpressionValidator
 from ..compiler.ownership import OwnershipResolver
 from ..errors import CartoError, ProtocolError, SecurityError
 from ..scenario_registry import ScenarioRegistry
@@ -24,7 +26,7 @@ from ..validation.registry import CheckerRegistry
 from ..validation.map_checks import MapQualityChecks
 from .models import ExecutionContext
 
-VALIDATOR_VERSION = "1.4.0"
+VALIDATOR_VERSION = "1.5.0"
 ADAPTER_VERSION = "1.1.0"
 
 
@@ -33,6 +35,19 @@ def _raster_renderer_id() -> str:
     # imports this module, so the renderer id resolves lazily instead of at import time.
     from ..compiler.raster_scene import RASTER_RENDERER_ID
     return RASTER_RENDERER_ID
+
+
+def _is_static_backend(renderer_id):
+    return renderer_id in {_raster_renderer_id(), "matplotlib-vector-page"}
+
+
+def _validation_cases(snapshot):
+    docs = snapshot["documents"]
+    parameters = grid_cases(docs["scenario"]["embedded"]["layout"])
+    expressions = [mode for layer in docs["portrayal"]["layers"] for mode in layer.get("validation_expressions", [])]
+    if expressions:
+        return [{"parameters": params, "expression": mode} for mode in expressions for params in parameters]
+    return [{"parameters": params} for params in parameters]
 
 
 class TemplatePackageValidator:
@@ -69,6 +84,7 @@ class TemplatePackageValidator:
         self.fixture_workspace = self.path_guard.resolve(self.evidence_root / "fixture")
 
     def validate(self, expected: dict[str, Any], expected_targets: list[str]) -> dict[str, Any]:
+        self._grid_evidence = []
         results: list[dict[str, Any]] = []
         snapshot = self._validate_static(expected, expected_targets, results)
         if self.checkers.has_blocking_failure(results):
@@ -83,7 +99,7 @@ class TemplatePackageValidator:
             if self.render_hook is not None:
                 self.render_hook()
             receipt, profile, scene = self._render_fixture(snapshot, expected_targets)
-            if receipt["renderer_id"] == _raster_renderer_id():
+            if _is_static_backend(receipt["renderer_id"]):
                 renderer_binding = {
                     "renderer_id": profile.renderer_id,
                     "renderer_profile_digest": profile.profile_digest(),
@@ -196,8 +212,9 @@ class TemplatePackageValidator:
         if receipt.get("renderer_attestation") != compute_renderer_attestation(receipt, self.attestation_key):
             raise ProtocolError("VALIDATION_RENDER_ATTESTATION_INVALID", receipt.get("receipt_id", "unknown"))
         renderer = evidence["renderer"]
-        if receipt["renderer_id"] == _raster_renderer_id():
+        if _is_static_backend(receipt["renderer_id"]):
             self._verify_raster_evidence(evidence, receipt)
+            self._verify_grid_cases(snapshot, evidence, receipt)
         else:
             expected_renderer = {
                 "renderer_id": receipt["renderer_id"],
@@ -234,7 +251,7 @@ class TemplatePackageValidator:
 
     def _verify_raster_evidence(self, evidence: dict[str, Any], receipt: dict[str, Any]) -> None:
         """Re-verify the frozen raster scene and re-render it through the raster backend."""
-        from ..adapters.raster_formal_renderer import RasterFormalRenderer
+        from ..adapters.formal_renderer import FormalRenderer
         if self.context is None:
             raise SecurityError("RASTER_EXECUTION_CONTEXT_REQUIRED",
                                 "Raster evidence verification requires the trusted validation context")
@@ -247,7 +264,7 @@ class TemplatePackageValidator:
             raise ProtocolError("VALIDATION_RENDER_SCENE_INVALID", str(scene_path))
         self.registry.validate("render-scene", scene)
         if (sha256_digest(scene) != scene_ref["digest"]
-                or scene.get("renderer_id") != _raster_renderer_id()
+                or not _is_static_backend(scene.get("renderer_id"))
                 or receipt["scene_digest"] != scene_ref["digest"]):
             raise ProtocolError("VALIDATION_RENDER_SCENE_DRIFT", str(scene_path))
         renderer = evidence["renderer"]
@@ -267,7 +284,8 @@ class TemplatePackageValidator:
         # original font on the authoring host is never needed again.
         self.fixture_workspace.mkdir(parents=True, exist_ok=True)
         (self.fixture_workspace / "render").mkdir(parents=True, exist_ok=True)
-        verifier = RasterFormalRenderer(
+        from ..adapters.render_backend import create_render_backend
+        verifier = create_render_backend(scene["renderer_id"],
             path_guard=PathGuard([self.fixture_workspace]),
             output_root=self.fixture_workspace / "render",
             attestation_key=self.attestation_key,
@@ -278,6 +296,56 @@ class TemplatePackageValidator:
         # validate_receipt re-renders the page from the frozen inputs and compares the
         # rebuilt receipt (profile digest, code digest, runtime) plus output digests.
         verifier.validate_receipt(scene, receipt)
+
+    def _verify_grid_cases(self, snapshot, evidence, primary_receipt):
+        """Reverify the exact declared cases, never infer coverage from one sample."""
+        from .raster_preparation import RasterPreparationService
+        layout = snapshot["documents"]["scenario"]["embedded"]["layout"]
+        cases = _validation_cases(snapshot)
+        supplied = evidence.get("grid_cases", [])
+        if [{k: v for k, v in item.items() if k not in {"render_scene_ref", "render_receipt_ref"}} for item in supplied] != cases[1:]:
+            raise ProtocolError("GRID_VALIDATION_COVERAGE_MISMATCH",
+                                "Every declared parameter combination must be validated")
+        if not cases:
+            return
+        preparation = RasterPreparationService(
+            project_root=self.fixture_workspace, allowed_roots=[str(self.fixture_workspace)],
+            registry=self.registry)
+        records = [{**cases[0], "render_scene_ref": evidence["render_scene_ref"],
+                    "render_receipt_ref": evidence["render_receipt_ref"]}, *supplied]
+        for index, item in enumerate(records):
+            scene = load_document(self.path_guard.resolve(item["render_scene_ref"]["uri"], must_exist=True))
+            receipt = primary_receipt if index == 0 else load_document(
+                self.path_guard.resolve(item["render_receipt_ref"]["uri"], must_exist=True))
+            self.registry.validate("render-scene", scene)
+            self.registry.validate("render-receipt", receipt)
+            if sha256_digest(receipt) != item["render_receipt_ref"]["digest"]:
+                raise ProtocolError("VALIDATION_RENDER_RECEIPT_DRIFT", "Grid receipt changed")
+            if (sha256_digest(scene) != item["render_scene_ref"]["digest"]
+                    or not _is_static_backend(scene["renderer_id"])):
+                raise ProtocolError("VALIDATION_RENDER_SCENE_DRIFT", "Grid scene changed")
+            if (scene["resolved_layout"]["template_contract"] != layout
+                    or scene["resolved_layout"]["parameters"] != item["parameters"]):
+                raise ProtocolError("GRID_VALIDATION_CASE_MISMATCH",
+                                    "Scene does not represent the declared grid case")
+            if scene["renderer_id"] == "matplotlib-vector-page":
+                from .vector_preparation import VectorPreparationService
+                vector = VectorPreparationService(project_root=self.fixture_workspace,
+                    allowed_roots=[str(self.fixture_workspace)], registry=self.registry)
+                page = vector.document(scene["page_request_ref"], "page-request")
+                from ..compiler.vector_portrayal import VectorPortrayalCompiler
+                if any(VectorPortrayalCompiler(vector).load_verified(p["portrayal_ref"], self.context)[0]["encoding"]["kind"] != item["expression"] for p in page["panels"]):
+                    raise ProtocolError("GRID_VALIDATION_CASE_MISMATCH", "Vector expression coverage differs")
+            else:
+                page = preparation._json_ref(scene["page_request_ref"], "page-request")
+            if page["appearance"]["cartography"] != snapshot["documents"]["scenario"]["embedded"]["cartography"]:
+                raise ProtocolError("APPEARANCE_TEMPLATE_MISMATCH", "Fixture style differs from template")
+            expected_session = f"template-validation-{snapshot['package_digest'][7:23]}-{sha256_digest(scene)[7:23]}"
+            if receipt["session_id"] != expected_session:
+                raise ProtocolError("GRID_VALIDATION_CASE_MISMATCH",
+                                    "Fixture session does not bind this package and case")
+            if index:
+                self._verify_raster_evidence({**evidence, **item}, receipt)
 
     def _check_package_files(self) -> dict[str, Any]:
         if not self.package_root.is_dir():
@@ -396,6 +464,16 @@ class TemplatePackageValidator:
         # Required, fail-closed component: validates content, source CRS, data roles and
         # licensing/sensitivity before any validation input can enter a published package.
         profile.component("validation_data_checker")(self.package_root, snapshot, expected)
+        # Expression-level validation: each portrayal layer's parameters are checked
+        # against the catalog entry's own validation rules.  This keeps expression
+        # knowledge in the catalog, not hardcoded in scenario components.
+        from ..repository.map_expression_catalog import MapExpressionCatalog
+        expr_catalog = MapExpressionCatalog(self.registry)
+        expr_validator = ExpressionValidator(expr_catalog, self.registry)
+        for layer in docs["portrayal"]["layers"]:
+            findings = expr_validator.validate_layer(layer)
+            for finding in findings:
+                raise ProtocolError(finding["code"], finding["message"])
         profile.require_contract(docs["scenario"])
         expected_display_crs = expected.get("display_crs")
         if expected_display_crs is not None and docs["spatial_behavior"]["display_crs"] != expected_display_crs:
@@ -420,42 +498,64 @@ class TemplatePackageValidator:
             raise ProtocolError("PROTOTYPE_REFERENCE_MISMATCH", prototype["prototype_id"])
 
     @staticmethod
-    def _check_targets(snapshot: dict[str, Any], expected_targets: list[str]) -> None:
+    def _check_targets(snapshot, expected_targets):
+        documents = snapshot["documents"]
+        layout = documents["scenario"]["embedded"]["layout"]
+        targets = documents["delivery"]["targets"]
         profile = ScenarioRegistry().for_template(snapshot["manifest"]["package"])
-        resolved = LayoutResolver().resolve(snapshot["documents"]["scenario"]["embedded"]["layout"],
-                                            profile.definition["output_profile"]["dpi"])
-        if any(resolved["page"][key] != profile.definition["output_profile"][key]
-               for key in ("width_mm", "height_mm", "dpi", "width_px", "height_px")):
-            raise ProtocolError("SCENARIO_OUTPUT_PROFILE_MISMATCH", "Layout differs from the enabled output profile")
-        LayoutResolver.validate_targets(resolved, [target["page"] for target in snapshot["documents"]["delivery"]["targets"]])
-        supported = {"svg", "png", "pdf"}
-        targets = set(expected_targets)
-        if not targets or not targets.issubset(supported):
-            raise ProtocolError("RENDER_TARGET_UNSUPPORTED", str(sorted(targets - supported)))
-        for target in snapshot["documents"]["delivery"]["targets"]:
+        output = profile.definition["output_profile"]
+        if not expected_targets or not set(expected_targets) <= {"pdf", "png", "svg"}:
+            raise ProtocolError("RENDER_TARGET_UNSUPPORTED", "Unsupported export target")
+        for parameters in grid_cases(layout) or [None]:
+            resolved = LayoutResolver().resolve(layout, output["dpi"], parameters=parameters)
+            if any(resolved["page"][key] != output[key]
+                   for key in ("width_mm", "height_mm", "dpi", "width_px", "height_px")):
+                raise ProtocolError("SCENARIO_OUTPUT_PROFILE_MISMATCH", "Page differs from registered profile")
+            LayoutResolver.validate_targets(resolved, [target["page"] for target in targets])
+        for target in targets:
             if target["production_ready"]:
                 raise ProtocolError("DELIVERY_PRODUCTION_CLAIM_INVALID", target["id"])
             if target["format"] == "png" and target["vector_claim"] != "none":
                 raise ProtocolError("DELIVERY_VECTOR_CLAIM_INVALID", target["id"])
 
-    def _render_fixture(self, snapshot: dict[str, Any],
-                        targets: list[str]) -> tuple[dict[str, Any], Any, dict[str, Any] | None]:
+    def _render_fixture(self, snapshot, targets):
         font = self._select_font()
-        scene = self._scene(snapshot, targets, font)
-        if scene.get("renderer_id") == _raster_renderer_id():
-            return self._render_raster_fixture(snapshot, scene)
-        return self._render_browser_fixture(snapshot, font, scene)
+        cases = _validation_cases(snapshot)
+        def scene_for(case):
+            return self._scene(snapshot, targets, font, parameters=case.get("parameters"),
+                               expression=case.get("expression"))
+        scene = scene_for(cases[0] if cases else {})
+        if not _is_static_backend(scene.get("renderer_id")):
+            if cases:
+                raise ProtocolError("GRID_RENDER_BACKEND_UNSUPPORTED", "Grid requires a static backend")
+            return self._render_browser_fixture(snapshot, font, scene)
+        primary = self._render_raster_fixture(snapshot, scene)
+        self._grid_evidence = []
+        for case in cases[1:]:
+            extra_scene = scene_for(case)
+            receipt, _, extra_scene = self._render_raster_fixture(snapshot, extra_scene)
+            parameters = case["parameters"]
+            name = f"{parameters['rows']}-{parameters['columns']}-{parameters['legend_mode']}"
+            if "expression" in case:name += "-" + case["expression"]
+            directory = self.path_guard.resolve(self.evidence_root / "grid" / name)
+            scene_path, receipt_path = directory / "render-scene.yaml", directory / "render-receipt.yaml"
+            atomic_yaml(scene_path, extra_scene);atomic_yaml(receipt_path, receipt)
+            self._grid_evidence.append({**case,
+                "render_scene_ref": {"id": "fixture-render-scene", "version": "1.0.0", "digest": sha256_digest(extra_scene), "uri": str(scene_path)},
+                "render_receipt_ref": {"id": "fixture-render-receipt", "version": "1.0.0", "digest": sha256_digest(receipt), "uri": str(receipt_path)}})
+        return primary
 
     def _render_raster_fixture(self, snapshot: dict[str, Any],
                                scene: dict[str, Any]) -> tuple[dict[str, Any], Any, dict[str, Any]]:
-        from ..adapters.raster_formal_renderer import RasterFormalRenderer
+        from ..adapters.formal_renderer import FormalRenderer
         if self.context is None:
             raise SecurityError("RASTER_EXECUTION_CONTEXT_REQUIRED",
                                 "Raster fixture rendering requires the trusted validation context")
         self.fixture_workspace.mkdir(parents=True, exist_ok=True)
         render_root = self.fixture_workspace / "render"
         render_root.mkdir(parents=True, exist_ok=True)
-        renderer = RasterFormalRenderer(
+        from ..adapters.render_backend import create_render_backend
+        renderer = create_render_backend(scene["renderer_id"],
             path_guard=PathGuard([self.fixture_workspace]),
             output_root=render_root,
             attestation_key=self.attestation_key,
@@ -463,7 +563,7 @@ class TemplatePackageValidator:
             context=self.context,
             registry=self.registry,
         )
-        session_id = f"template-validation-{snapshot['package_digest'][7:23]}"
+        session_id = f"template-validation-{snapshot['package_digest'][7:23]}-{sha256_digest(scene)[7:23]}"
         receipt = renderer.render(session_id, scene)
         renderer.validate_receipt(scene, receipt)
         return receipt, renderer.profile, scene
@@ -494,16 +594,17 @@ class TemplatePackageValidator:
         )
         adapter = WebMapRendererAdapter(RendererCapabilityRegistry([profile]), renderer)
         scene = adapter.compile_scene(scene)
-        session_id = f"template-validation-{snapshot['package_digest'][7:23]}"
+        session_id = f"template-validation-{snapshot['package_digest'][7:23]}-{sha256_digest(scene)[7:23]}"
         receipt = adapter.submit_render(session_id, scene, profile.renderer_id, FRONTEND_BUILD)
         adapter.validate_receipt(receipt, self.attestation_key)
         return receipt, profile, None
 
-    def _scene(self, snapshot: dict[str, Any], targets: list[str], font: Path) -> dict[str, Any]:
-        profile = ScenarioRegistry(self.registry).for_template(snapshot["manifest"]["package"])
-        return profile.component("validation_scene")(
-            self.package_root, snapshot, targets, font, VALIDATOR_VERSION,
-            context=self.context, workspace=self.fixture_workspace, registry=self.registry)
+    def _scene(self, snapshot, targets, font, *, parameters=None, expression=None):
+        profile=ScenarioRegistry(self.registry).for_template(snapshot['manifest']['package'])
+        kwargs={'context':self.context,'workspace':self.fixture_workspace,'registry':self.registry}
+        if parameters is not None:kwargs['layout_parameters']=parameters
+        if expression is not None:kwargs['validation_expression']=expression
+        return profile.component('validation_scene')(self.package_root,snapshot,targets,font,VALIDATOR_VERSION,**kwargs)
 
     def _select_font(self) -> Path:
         candidates: list[Path] = []
@@ -562,6 +663,8 @@ class TemplatePackageValidator:
                     "id": "fixture-render-scene", "version": "1.0.0",
                     "digest": sha256_digest(scene), "uri": str(self.evidence_root / "render-scene.yaml"),
                 }
+        if "grid" in snapshot.get("documents", {}).get("scenario", {}).get("embedded", {}).get("layout", {}):
+            evidence["grid_cases"] = deepcopy(getattr(self, "_grid_evidence", []))
         evidence["evidence_digest"] = sha256_digest(evidence)
         self.registry.validate("template-validation-evidence", evidence)
         return evidence

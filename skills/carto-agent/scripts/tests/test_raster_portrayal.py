@@ -37,7 +37,7 @@ class MapExpressionCatalogTests(unittest.TestCase):
     def test_catalog_resolves_existing_and_raster_expressions(self):
         catalog = MapExpressionCatalog()
         document = load_document(SKILL / "policies/map-expression-catalog.yaml")
-        self.assertEqual(3, len(document["entries"]))
+        self.assertEqual(7, len(document["entries"]))
         for entry in document["entries"]:
             self.assertEqual(entry, catalog.require(catalog.reference(entry["expression_id"], entry["version"])))
         # Retrieval returns copies, not mutable catalog state.
@@ -59,9 +59,12 @@ class MapExpressionCatalogTests(unittest.TestCase):
         with patch("carto_core.repository.map_expression_catalog.load_document", return_value=duplicate), \
                 self.assertRaisesRegex(CartoError, "CATALOG_DUPLICATE"):
             MapExpressionCatalog()
-        deprecated = deepcopy(original); deprecated["entries"][-1]["status"] = "deprecated"
-        with patch("carto_core.repository.map_expression_catalog.load_document", return_value=deprecated), \
-                self.assertRaisesRegex(CartoError, "NOT_AVAILABLE"):
+        deprecated = deepcopy(original); next(e for e in deprecated["entries"] if e["expression_id"] == "raster/categorical")["status"] = "deprecated"
+        with patch("carto_core.repository.map_expression_catalog.load_document", return_value=deprecated):
+            MapExpressionCatalog().reference("raster/categorical", "1.0.0")  # deprecated is allowed
+        retired = deepcopy(original); next(e for e in retired["entries"] if e["expression_id"] == "raster/categorical")["status"] = "retired"
+        with patch("carto_core.repository.map_expression_catalog.load_document", return_value=retired), \
+                self.assertRaises(CartoError):
             MapExpressionCatalog().reference("raster/categorical", "1.0.0")
         unknown = deepcopy(original); unknown["backend"] = "external-program"
         with patch("carto_core.repository.map_expression_catalog.load_document", return_value=unknown), self.assertRaises(CartoError):
@@ -99,7 +102,9 @@ class MapExpressionCatalogTests(unittest.TestCase):
         self.assertEqual(["general-thematic-mapping"], [item["id"] for item in policy["profiles"]])
         self.assertEqual(["general_thematic_mapping"],
                          [item["intent_constraints"]["business_scene"] for item in policy["profiles"]])
-        self.assertEqual({"general-thematic-raster"}, set(scenario_registry._COMPONENTS))
+        self.assertEqual({"general-thematic"}, set(scenario_registry._COMPONENTS))
+        with self.assertRaisesRegex(CartoError, "CAPABILITY_NOT_AVAILABLE"):
+            scenario_registry.ScenarioRegistry().for_template({"kind": "map-scenario", "id": "general-thematic-map", "version": "4.0.0"})
         for key in ("business_scene", "backend", "source_path", "lookup_table"):
             contract = raster_contract(); contract[key] = "not-a-template-expression-field"
             with self.subTest(key=key), self.assertRaises(CartoError):
@@ -217,14 +222,14 @@ class RasterPortrayalCompilerTests(PreparationFixture, unittest.TestCase):
             if kind == "compiler": result["compiler_digest"] = "sha256:" + "0"*64
             if kind == "source": result["source_snapshot"]["artifact_ref"]["digest"] = "sha256:" + "0"*64
             if kind == "expression": result["expression_ref"]["digest"] = "sha256:" + "0"*64
-            bad = self.service.save_document(result, "resolved-raster-portrayal")
+            bad = self.service.save_document(result, "resolved-portrayal")
             with self.subTest(kind=kind), self.assertRaisesRegex(CartoError, "PORTRAYAL_CHANGED"):
                 self.compiler.load_verified(bad.ref(), self.context)
 
     def test_existing_compiler_rechecks_trusted_expression_catalog(self):
         artifact = self.compile()
         catalog = load_document(SKILL / "policies/map-expression-catalog.yaml")
-        catalog["entries"][-1]["title"] += " changed"
+        next(e for e in catalog["entries"] if e["expression_id"] == "raster/categorical")["title"] += " changed"
         with patch("carto_core.repository.map_expression_catalog.load_document", return_value=catalog), \
                 self.assertRaisesRegex(CartoError, "CATALOG_MISMATCH"):
             self.compiler.load_verified(artifact.ref(), self.context)

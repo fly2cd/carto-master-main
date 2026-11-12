@@ -24,7 +24,7 @@
       ],
       "properties": {
         "resolved_layout": {
-          "$ref": "https://schemas.carto-agent.local/v1/resolved-layout.schema.json"
+          "$ref": "https://schemas.carto-agent.local/v2/resolved-layout.schema.json"
         },
         "schema_version": {
           "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"
@@ -275,7 +275,7 @@
           }
         },
         "resolved_layout": {
-          "$ref": "https://schemas.carto-agent.local/v1/resolved-layout.schema.json"
+          "$ref": "https://schemas.carto-agent.local/v2/resolved-layout.schema.json"
         },
         "export": {
           "type": "object",
@@ -310,7 +310,10 @@
           "maximum": 4294967295
         },
         "renderer_id": {
-          "const": "rasterio-matplotlib-page"
+          "enum": [
+            "rasterio-matplotlib-page",
+            "matplotlib-vector-page"
+          ]
         },
         "context": {
           "type": "object",
@@ -367,10 +370,10 @@
               ],
               "properties": {
                 "id": {
-                  "const": "raster-page-request"
+                  "const": "page-request"
                 },
                 "version": {
-                  "const": "1.0.0"
+                  "const": "4.0.0"
                 }
               }
             }
@@ -421,7 +424,55 @@
             }
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "renderer_id": {
+                "const": "rasterio-matplotlib-page"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "page_request_ref": {
+                "properties": {
+                  "id": {
+                    "const": "page-request"
+                  },
+                  "version": {
+                    "const": "4.0.0"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "renderer_id": {
+                "const": "matplotlib-vector-page"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "page_request_ref": {
+                "properties": {
+                  "id": {
+                    "const": "page-request"
+                  },
+                  "version": {
+                    "const": "4.0.0"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
     }
   ],
   "$defs": {
@@ -639,6 +690,27 @@
             "normalized",
             "pixel"
           ]
+        },
+        "anchor": {
+          "enum": [
+            "top-left",
+            "top-center",
+            "top-right",
+            "center-left",
+            "center",
+            "center-right",
+            "bottom-left",
+            "bottom-center",
+            "bottom-right"
+          ]
+        },
+        "offset_mm": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number"
+          }
         }
       }
     },

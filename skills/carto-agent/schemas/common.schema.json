@@ -93,9 +93,10 @@
       ],
       "properties": {
         "id": {
-          "type": "string",
-          "pattern": "^[a-z][a-z0-9-]*/[a-z][a-z0-9-]*$",
-          "maxLength": 120
+          "anyOf": [
+            {"type": "string", "pattern": "^[a-z][a-z0-9-]*/[a-z][a-z0-9-]*$", "maxLength": 120},
+            {"type": "string", "enum": ["categorical", "graduated-color", "proportional-symbol"], "maxLength": 120}
+          ]
         },
         "version": {
           "$ref": "#/$defs/semanticVersion"
@@ -499,7 +500,7 @@
           "uniqueItems": true
         },
         "resolved_layout": {
-          "$ref": "https://schemas.carto-agent.local/v1/resolved-layout.schema.json"
+          "$ref": "https://schemas.carto-agent.local/v2/resolved-layout.schema.json"
         },
         "render_scene_ref": {
           "$ref": "#/$defs/artifactRef"
@@ -706,10 +707,124 @@
                   "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
                 }
               }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "renderer_id",
+                "renderer_version",
+                "renderer_code_digest",
+                "runtime",
+                "fingerprint"
+              ],
+              "properties": {
+                "renderer_id": {
+                  "const": "matplotlib-vector-page"
+                },
+                "renderer_version": {
+                  "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"
+                },
+                "renderer_code_digest": {
+                  "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+                },
+                "runtime": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "python",
+                    "rasterio",
+                    "gdal",
+                    "numpy",
+                    "matplotlib",
+                    "pillow",
+                    "freetype",
+                    "fonttools",
+                    "zlib",
+                    "fiona",
+                    "shapely",
+                    "vector_gdal"
+                  ],
+                  "properties": {
+                    "python": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                    },
+                    "rasterio": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                    },
+                    "gdal": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                    },
+                    "numpy": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                    },
+                    "matplotlib": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                    },
+                    "pillow": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                    },
+                    "freetype": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                    },
+                    "fonttools": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                    },
+                    "zlib": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                    },
+                    "fiona": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "shapely": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "vector_gdal": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    }
+                  }
+                },
+                "fingerprint": {
+                  "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+                }
+              }
             }
           ]
         },
-        "raster_inputs": {
+        "page_inputs": {
           "type": "object",
           "additionalProperties": false,
           "required": [
@@ -748,10 +863,7 @@
                   ],
                   "properties": {
                     "id": {
-                      "const": "raster-page-request"
-                    },
-                    "version": {
-                      "const": "1.0.0"
+                      "const": "page-request"
                     }
                   }
                 }
@@ -775,11 +887,24 @@
           },
           "then": {
             "required": [
-              "raster_inputs",
+              "page_inputs",
               "prepared_data_refs",
               "resolved_assets",
               "render_scene_ref"
             ],
+            "properties": {
+              "page_inputs": {
+                "properties": {
+                  "page_request_ref": {
+                    "properties": {
+                      "id": {
+                        "const": "page-request"
+                      }
+                    }
+                  }
+                }
+              }
+            },
             "not": {
               "anyOf": [
                 {
@@ -801,10 +926,63 @@
             }
           },
           "else": {
-            "not": {
+            "if": {
+              "properties": {
+                "environment": {
+                  "properties": {
+                    "renderer_id": {
+                      "const": "matplotlib-vector-page"
+                    }
+                  }
+                }
+              }
+            },
+            "then": {
               "required": [
-                "raster_inputs"
-              ]
+                "page_inputs",
+                "prepared_data_refs",
+                "resolved_assets",
+                "render_scene_ref"
+              ],
+              "properties": {
+                "page_inputs": {
+                  "properties": {
+                    "page_request_ref": {
+                      "properties": {
+                        "id": {
+                          "const": "page-request"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "camera"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "overlay_coordinate_policy"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "interaction_policy"
+                    ]
+                  }
+                ]
+              }
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "page_inputs"
+                ]
+              }
             }
           }
         }

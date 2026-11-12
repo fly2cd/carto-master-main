@@ -74,9 +74,9 @@ class BrowserRenderBackend:
 def create_render_backend(renderer_id, **kwargs):
     if renderer_id == "maplibre-web":
         return BrowserRenderBackend(**kwargs)
-    if renderer_id == "rasterio-matplotlib-page":
-        from .raster_formal_renderer import RasterFormalRenderer
+    if renderer_id in ("rasterio-matplotlib-page", "matplotlib-vector-page"):
+        from .formal_renderer import FormalRenderer
         kwargs.pop("browser", None)
         kwargs.pop("limits", None)
-        return RasterFormalRenderer(**kwargs)
+        return FormalRenderer(renderer_id=renderer_id, **kwargs)
     raise ProtocolError("RENDER_BACKEND_NOT_AVAILABLE", str(renderer_id))

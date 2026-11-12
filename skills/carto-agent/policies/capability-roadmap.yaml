@@ -1,0 +1,67 @@
+schema_version: 1
+version: 1.0.0
+# Declared not-implemented queue. Guards may raise admission_class=not_implemented
+# ONLY for features listed here with status planned/backlog. Safety rejects
+# (unknown backend, arbitrary code, symlink, unknown fields) stay forbidden and
+# must NOT appear here.
+items:
+  - id: raster-multi-layer-overlay
+    status: planned
+    target: U-P4
+    note: 单页多栅格图层叠置(底图上下文+主题+高亮轮廓);当前编译器只执行一个栅格图层。
+  - id: raster-portrayal-rules
+    status: planned
+    target: U-P4
+    note: 非空 portrayal 规则执行器;当前无规则执行器,非空 rules 明确不入编译。
+  - id: raster-bilinear-resampling
+    status: backlog
+    target: 待定
+    note: 双线性/立方重采样;当前仅 nearest 以保持离散类别索引可复现。
+  - id: classification-quantiles
+    status: planned
+    target: U-P4
+    note: 连续值分位数分级;当前类别表仅来自显式 CSV 合同与澄清。
+  - id: classification-jenks
+    status: planned
+    target: U-P4
+    note: Jenks 自然断点分级;同上,须先确定统计输入与冻结口径。
+  - id: composition-map-counts
+    status: planned
+    target: U-P4
+    note: 1×1/1×2/2×2 之外的面板数(2×1、3×3 等);当前有限网格仅 {1,2,4}。
+  - id: composition-mosaic
+    status: backlog
+    target: 待定
+    note: 马赛克组合;目标设计,未实现。
+  - id: composition-freeform
+    status: backlog
+    target: 待定
+    note: 自由编排(声明层级/允许重叠/裁剪);目标设计,未实现。
+  - id: composition-inset
+    status: backlog
+    target: 待定
+    note: inset 附加视图关联结构;目标设计,未实现。
+  - id: layout-frame-types
+    status: backlog
+    target: 待定
+    note: map/overlay 之外的 frame 类型;当前仅 map 与受控 overlay。
+  - id: layout-overflow-strategies
+    status: backlog
+    target: 待定
+    note: clip/reject 之外的溢出策略;当前 map=clip、其他=reject。
+  - id: browser-multi-image
+    status: backlog
+    target: 待定
+    note: 浏览器后端多图;当前浏览器仅接受单图。
+  - id: vector-template-4-authoring
+    status: planned
+    target: U-P4
+    note: general-thematic-map@4.0.0 矢量作者与 matplotlib-vector-page 准入;代码就绪、策略未登记。
+  - id: variant-geometry-adapter-unification
+    status: planned
+    target: U-P4
+    note: 双 bundle 已合并为单一 general-thematic(S1 键统一与 S4 bundle/准入杆已落地,2026-11-11);剩余为内部协议统一:resolved-portrayal union(S2)与准备链 statistics strategy(S3),见 doc/dev-log/20261111-variant-geometry-adapter-unification.md。
+  - id: comparison-grid-shared-legend
+    status: delivered
+    target: U-P3.6
+    note: 1×2/2×2 参数化网格 + 独立/整页共享图例已交付;保留作为 delivered 示例与防回退锚点。

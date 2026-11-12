@@ -3,22 +3,72 @@
   "$id": "https://schemas.carto-agent.local/v1/layout.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "layout_id", "version", "category", "canvas", "frames", "placeholders", "capacity", "rules"],
+  "required": [
+    "schema_version",
+    "layout_id",
+    "version",
+    "category",
+    "canvas",
+    "frames",
+    "placeholders",
+    "capacity",
+    "rules"
+  ],
   "properties": {
-    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
-    "layout_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
-    "version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"},
-    "category": {"enum": ["general", "report", "poster", "atlas", "web", "mobile"]},
+    "schema_version": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"
+    },
+    "layout_id": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+    },
+    "version": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"
+    },
+    "category": {
+      "enum": [
+        "general",
+        "report",
+        "poster",
+        "atlas",
+        "web",
+        "mobile"
+      ]
+    },
     "canvas": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["width", "height", "unit", "orientation", "safe_margin"],
+      "required": [
+        "width",
+        "height",
+        "unit",
+        "orientation",
+        "safe_margin"
+      ],
       "properties": {
-        "width": {"type": "number", "exclusiveMinimum": 0},
-        "height": {"type": "number", "exclusiveMinimum": 0},
-        "unit": {"enum": ["mm", "px"]},
-        "orientation": {"enum": ["landscape", "portrait"]},
-        "safe_margin": {"type": "number", "minimum": 0}
+        "width": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "height": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "unit": {
+          "enum": [
+            "mm",
+            "px"
+          ]
+        },
+        "orientation": {
+          "enum": [
+            "landscape",
+            "portrait"
+          ]
+        },
+        "safe_margin": {
+          "type": "number",
+          "minimum": 0
+        }
       }
     },
     "frames": {
@@ -27,27 +77,205 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "content_id", "type", "coordinate_space", "bounds", "overflow_policy"],
+        "required": [
+          "id",
+          "content_id",
+          "type",
+          "coordinate_space",
+          "bounds",
+          "overflow_policy"
+        ],
         "properties": {
-          "id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
-          "content_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier", "description": "Explicit binding to one view or overlay id."},
-          "type": {"enum": ["map", "title", "legend", "scale-bar", "north-arrow", "inset", "marginalia"]},
-          "coordinate_space": {"const": "page"},
-          "bounds": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/pageBox"},
-          "overflow_policy": {"enum": ["clip", "shrink", "paginate", "reject"]}
+          "id": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+          },
+          "content_id": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier",
+            "description": "Explicit binding to one view or overlay id."
+          },
+          "type": {
+            "enum": [
+              "map",
+              "title",
+              "legend",
+              "scale-bar",
+              "north-arrow",
+              "inset",
+              "marginalia"
+            ]
+          },
+          "coordinate_space": {
+            "const": "page"
+          },
+          "bounds": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/pageBox"
+          },
+          "overflow_policy": {
+            "enum": [
+              "clip",
+              "shrink",
+              "paginate",
+              "reject"
+            ]
+          },
+          "legend_columns": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4
+          },
+          "view_ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+            }
+          }
         }
       }
     },
-    "placeholders": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^\\{\\{[A-Z][A-Z0-9_]+\\}\\}$"}},
+    "placeholders": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^\\{\\{[A-Z][A-Z0-9_]+\\}\\}$"
+      }
+    },
     "capacity": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["legend_items", "title_characters"],
+      "required": [
+        "legend_items",
+        "title_characters"
+      ],
       "properties": {
-        "legend_items": {"type": "integer", "minimum": 1, "maximum": 100},
-        "title_characters": {"type": "integer", "minimum": 1, "maximum": 200}
+        "legend_items": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "title_characters": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        }
       }
     },
-    "rules": {"type": "array", "items": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/rule"}}
+    "rules": {
+      "type": "array",
+      "items": {
+        "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/rule"
+      }
+    },
+    "content_padding_mm": {
+      "type": "number",
+      "minimum": 0.5,
+      "maximum": 8
+    },
+    "grid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowed_shapes",
+        "legend_modes",
+        "panel_area",
+        "shared_panel_area",
+        "shared_legend_bounds",
+        "source_bounds",
+        "column_gap_mm",
+        "row_gap_mm",
+        "caption_height_mm",
+        "caption_gap_mm",
+        "legend_width_mm",
+        "legend_gap_mm",
+        "shared_legend_columns"
+      ],
+      "properties": {
+        "allowed_shapes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              [
+                1,
+                1
+              ],
+              [
+                1,
+                2
+              ],
+              [
+                2,
+                2
+              ]
+            ]
+          }
+        },
+        "legend_modes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "independent",
+              "shared"
+            ]
+          }
+        },
+        "panel_area": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/pageBox"
+        },
+        "shared_panel_area": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/pageBox"
+        },
+        "shared_legend_bounds": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/pageBox"
+        },
+        "source_bounds": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/pageBox"
+        },
+        "column_gap_mm": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "row_gap_mm": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "caption_height_mm": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "caption_gap_mm": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "legend_width_mm": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "legend_gap_mm": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "shared_legend_columns": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        }
+      }
+    }
   }
 }

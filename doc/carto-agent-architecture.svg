@@ -3,10 +3,14 @@
   <title id="title">地图制图智能体总体架构</title>
   <desc id="desc">单主智能体分阶段承担 MapPlanner 制图规划和 MapComposer 图面实现。MapComposer 在冻结前细化布局并修订候选，G2 后 Renderer 按实例锁确定性输出。两个独立工作流使用五模块共享内核，经受控工具、知识和数据资源生产不可变模板版本或地图成果。数据准备子智能体按需启用，编辑原生地图和目录治理路由暂未详设。审批、安全、质量、加载、状态和审计贯穿所有层。各框表示逻辑职责，不代表独立智能体或微服务。</desc>
   <defs>
-    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+    <!-- Visio 兼容：orient 改为 SVG 1.1 合法值 auto。本图两个 marker 分别由下方 style 块的 .flow 规则
+         和元素上的 marker-end 引用，均无 marker-start，故原先的 SVG 2 反向取值与 auto 渲染等价。
+         此处刻意保留 viewBox 与默认 markerUnits=strokeWidth：有效 stroke-width 由 CSS 规则提供（.flow 为 2、.optional 为 1.8），
+         改成 userSpaceOnUse 需同步重写样式，收益不抵风险。 -->
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto">
       <path d="M 0 0 L 10 5 L 0 10 Z" fill="#52677e"/>
     </marker>
-    <marker id="green-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <marker id="green-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
       <path d="M 0 0 L 10 5 L 0 10 Z" fill="#277a68"/>
     </marker>
     <style>
@@ -47,7 +51,7 @@
   <text x="62" y="197" class="body">对话 / CLI / 企业 API</text>
   <line x1="300" y1="175" x2="300" y2="211" class="divider"/>
   <text x="323" y="197" class="body">政务专题制图</text>
-  <text x="507" y="197" class="body">应急测绘制图</text>
+  <text x="507" y="197" class="body">标准专题制图</text>
   <text x="691" y="197" class="body">领导调研用图</text>
   <text x="926" y="157" class="small">真实主体 · 项目 · 授权范围</text>
   <text x="926" y="197" class="small">文字 / 数据 / 参考 / 模板</text>

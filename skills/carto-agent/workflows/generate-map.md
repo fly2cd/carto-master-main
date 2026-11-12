@@ -1,5 +1,26 @@
 # generate-map 工作流
 
+## S1 参数化网格请求
+
+明确选择已验证发布的 `map-scenario/general-thematic-map@3.0.0`，而不是按布局复制模板。请求还必须满足原有意图、数据许可、字体及审批要求。以下仅为关系字段示意，不是可执行完整请求：
+
+```json
+{
+  "layout_parameters": {"rows": 1, "columns": 2, "legend_mode": "shared"},
+  "panels": [
+    {"id": "view-r0-c0", "source_id": "source-a", "title": "第一幅图"},
+    {"id": "view-r0-c1", "source_id": "source-b", "title": "第二幅图"}
+  ]
+}
+```
+
+- `sources[].id`、`source_bindings[].source_ref.id`、`prepared_raster_bindings[].source_id` 必须按源一一对应；准备绑定还包含角色与精确 `prepared_ref`。面板可重复引用同一 source_id，但不能有未使用源、重复面板或缺失地图框。
+- 单图使用 `main-view`，其标题等于 goal；多图使用 `view-r{row}-c{column}`，每格显式标题。只支持 1×1、1×2、2×2，不接受 2×1 或任意行列。
+- 每个面板独立保持源范围，共享图例不意味着统一范围。所有源 CRS 须一致并匹配模板；不隐式重投影。
+- `independent` 保留各面板图例；`shared` 严格比较完整类别定义和 legend_policy，observed 取已确认项并集，all 还比较纳入标志。容量与实际字形溢出均可拒绝，不自动改色、删类、缩字或回退。
+- 模板布局源合同、参数、实例框、全部源及图例关系进入候选/冻结。预览、正式渲染、终检、G3 和交付重验全部面板。
+- 自动查找模板及无匹配时创建模板属于后续能力；本期仍要求明确选择模板，创建/发布仍须独立 T1/TP。
+
 ## 宿主检查与本工作流的关系
 
 首次核对 Hermes 接入或更换宿主工具时，按 `host-preflight.md` 做辅助检查。缺少能力如实报告；`probe-host` 成功不意味着本工作流可以处理真实 TIFF，不替代 G1/G2/G3，也不代表第二批结果回传已实现。
@@ -7,7 +28,7 @@
 ## 场景分派约束
 
 - 通用请求 Schema 只负责结构；运行入口还必须验证注册能力及该场景明确注册的请求约束。
-- 数据准备、规划、候选编译和业务图例检查由注册的场景组件承担，实现入口保留在 `scripts/carto_core/scenarios/`，当前无启用实现。
+- 数据准备、规划、候选编译和业务图例检查由注册的场景组件承担，实现入口保留在 `scripts/carto-agent/scripts/carto_core/scenarios/` 的单一 `general-thematic` bundle（几何 strategy 分派），当前仅准入 raster 几何的单图/有限网格实现。
 - 先以 `goal + intent` 解析实际用户意图，再检查明确选定模板的 `intent_constraints` 是否兼容；绝不从模板策略反填业务场景、主题或默认任务。Intent 与 Brief/Plan 的业务场景、主题和任务一致，execution 使用同一语义。
 - Intent 的 `evidence_refs` 按顺序绑定意图目录、用户意图输入、模板能力策略；execution 的 `profile_refs` 为 `[意图目录引用, 能力策略引用]`，并通过 `intent_ref` 绑定完整 Intent。旧格式或任一摘要漂移均拒绝。
 - 输入与术语规范见 `intent-contract.md`；本阶段仍要求显式模板引用，没有自动模板检索或候选排序。
@@ -16,7 +37,7 @@
 
 ## 当前能力
 
-- `policies/intent-profiles.yaml` 是意图识别目录，`policies/scenario-capabilities.yaml` 是独立的执行能力准入策略；后者当前 `profiles: []` 且代码实现白名单为空。意图未就绪先报意图错误；就绪后无匹配能力返回 `CAPABILITY_NOT_AVAILABLE`，不存在备用场景。
+- `policies/intent-profiles.yaml` 是意图识别目录，`policies/scenario-capabilities.yaml` 是独立的执行能力准入策略；后者与代码白名单当前仅登记 general-thematic-mapping。意图未就绪先报意图错误；就绪后无匹配能力返回 `CAPABILITY_NOT_AVAILABLE`，不存在备用场景。
 - 工作流严格按 `intake → brief → compile → preview → freeze → render → check → deliver` 推进；不能跳过 G1、预览证据、G2、正式渲染证据、最终检查或 G3。
 - `intake` 先解析 `MapIntent` 并检查所选模板兼容性，再校验项目作用域、调用能力、精确模板引用、数据源引用和输出目标；缺场景、任务或该场景所需主题时不通过模板补齐。
 - `brief` 从权威模板索引发现精确版本，固定数据访问、字段语义、模板摘要和允许操作，随后等待 G1 `approve-map-brief`。
@@ -32,13 +53,13 @@
 
 共享实现及输入例子见 `raster-classification.md` 的“第三批 C”。这不是独立顶层路由。
 
-- 已准入场景的数据组件在 G1 后可调用 `RasterBundlePreparer.prepare_request`；请求必须包含唯一 GeoTIFF source binding 和精确 `prepared_raster_bindings`。准备报告只证明数据/显示定义已澄清，不代替 G1。
+- 已准入场景的数据组件在 G1 后可调用 `BundlePreparer(preparation, "raster").prepare_request`；请求必须包含唯一 GeoTIFF source binding 和精确 `prepared_raster_bindings`。准备报告只证明数据/显示定义已澄清，不代替 G1。
 - 候选组件调用 `RasterSceneCompiler.compile` 和 `bind_execution`，保留业务意图、模板、策略引用；通用 `MapCandidateCompiler` 再核对请求、bundle、execution 和场景。共享模块不会生成业务模板或选择场景。
 - 候选和锁通过 bundle/page 引用冻结 TIFF、CSV、MCP 证据、类别表达、布局和 TTF；JSON 文档用规范摘要，二进制用原始字节摘要，模式由实现确定而非调用方任选。
 - 正式回执绑定真实运行依赖、渲染代码、session、资源集、页面报告和成果。HMAC 只证明持钥本地渲染器签发及绑定，不宣称硬件证明、OS/网络沙箱或逐像元遥感语义正确。
 - 终检继续要求场景图例检查器、声明与许可；增加静态分支的毫米页面、像素/DPI、真实字体、测量布局、共用分类表与 nearest/掩膜策略检查。失败不发 G3 Manifest。
 - G2/G3 仍校验精确对象、身份、scope、environment、issuer、policy、时效和 nonce；原子交付包仍仅含 PDF/PNG、说明和清单，不打包原始 TIFF/CSV、内部回执或审批。
-- 当前场景策略为空。测试只对候选边界注入合成场景/模板准入，验证真实预览到交付链；不声称已打通真实 T1/TP/G1 或已制作用户地图。
+- 当前仅准入 general 的单图、1×2、2×2 分类栅格组合，仍为静态后端、A4 横向 PDF+PNG。测试只对候选边界注入合成场景/模板准入，验证真实预览到交付链；不声称已打通真实 T1/TP/G1 或已制作用户地图。
 
 ## 场景语义
 
@@ -95,3 +116,7 @@ carto generate-map <intake|brief|compile|preview|freeze|render|check|deliver|sta
 ```
 
 运行时只读取 Skill 内协议、策略、索引和项目产物，不读取 `doc/` 设计稿。
+
+## S2 矢量候选（未准入）
+
+新代码以 `vector_sources` 声明文件组、CRS、编码和许可，以 `vector_panels` 声明 source_id、标题、显式 extent 和 encoding；支持 single/categorical/choropleth/proportional。不同 CRS 或栅矢混合不随此开放。现行能力策略未登记该档案，不能用新后端或 Schema 绕过业务门禁。2026-11-10 合成统一回归已通过，但仍须候选能力正式登记和真实任务验收，才能通过正式生成入口使用；新建用户项目仍须正常 G1/G2/G3。

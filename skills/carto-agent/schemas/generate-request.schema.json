@@ -8,6 +8,7 @@
     "request_id",
     "project_id",
     "goal",
+    "geometry",
     "sources",
     "requested_outputs",
     "subject",
@@ -321,16 +322,20 @@
     "intent": {
       "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/intentSelection"
     },
+    "geometry": {
+      "enum": ["raster", "vector"]
+    },
     "prepared_raster_bindings": {
       "type": "array",
       "minItems": 1,
-      "maxItems": 1,
+      "maxItems": 4,
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": [
           "role",
-          "prepared_ref"
+          "prepared_ref",
+          "source_id"
         ],
         "properties": {
           "role": {
@@ -355,9 +360,111 @@
                 }
               }
             ]
+          },
+          "source_id": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+          }
+        }
+      }
+    },
+    "layout_parameters": {
+      "anyOf": [
+        {
+          "$ref": "https://schemas.carto-agent.local/v1/grid-parameters.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "panels": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "source_id",
+          "title"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+          },
+          "source_id": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          }
+        }
+      }
+    },
+    "vector_sources": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "items": {
+        "$ref": "https://schemas.carto-agent.local/v1/vector-input.schema.json"
+      }
+    },
+    "vector_panels": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "source_id",
+          "title",
+          "extent",
+          "encoding"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+          },
+          "source_id": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "extent": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/bbox"
+          },
+          "encoding": {
+            "$ref": "https://schemas.carto-agent.local/v1/vector-encoding.schema.json"
           }
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "geometry": {"const": "raster"}
+        },
+        "required": ["geometry"]
+      },
+      "then": {
+        "required": ["panels"],
+        "not": {"required": ["vector_panels"]}
+      },
+      "else": {
+        "required": ["vector_panels"],
+        "not": {"required": ["panels"]}
+      }
+    }
+  ]
 }

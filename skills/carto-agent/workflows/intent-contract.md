@@ -35,7 +35,7 @@
 
 1. 校验严格请求结构。拒绝 `scene_hint`、旧单值 `theme`、`fields.theme` 等并行语义入口。
 2. 根据 `policies/intent-profiles.yaml` 分别识别业务用途和主题：`profiles[].purpose_terms` 只服务用途识别；`themes[].terms` 只服务内容识别。通用“专题”不作为用途判据。
-3. 校验场景内任务、主题目录成员和上下文字段；缺任务/必需信息不补默认值。没有可确定业务场景时用 `business_scene: null` 表示未确定，不填应急或政务占位。
+3. 校验场景内任务、主题目录成员和上下文字段；缺任务/必需信息不补默认值。没有可确定业务场景时用 `business_scene: null` 表示未确定，不填未注册场景占位。
 4. 得到 MapIntent 的独立状态：`intent_status` 表示 resolved / ambiguous / unsupported，`readiness_status` 表示信息和能力是否齐备。单独解析可返回未就绪结果；生成入口拒绝继续。
 5. 就绪后，按请求明确给出的模板身份查询执行能力注册表，并校验该能力的请求 Schema 与 `intent_constraints`。不兼容返回 `SCENARIO_INTENT_MISMATCH`，无注册能力返回 `CAPABILITY_NOT_AVAILABLE`，不通过改写意图适配模板。
 

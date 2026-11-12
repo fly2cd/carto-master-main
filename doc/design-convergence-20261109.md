@@ -2,7 +2,7 @@
 
 日期：2026-11-09（Asia/Shanghai）
 
-状态：本轮设计决定已整理并写入相关文档；运行实现未变。
+状态：以下保留最初设计收敛记录。后续已实施 S1-A/B 与 S1-C/D，当前能力及版本以 [阶段计划](阶段实施计划详细.md)、[S1-C/D 实施记录](dev-log/20261109-s1cd-parameterized-grid-and-workflow.md) 和 Skill 为准；不把后续阶段视为已开放。
 
 本记录说明讨论结论、替代的旧表述、修订位置、实现边界和待决项。它不是机器协议、能力注册、审批回执或测试通过证明。运行时只消费 `skills/carto-agent/` 下的 Schema、策略、权威模板及项目产物。
 
@@ -71,7 +71,7 @@
 
 本轮不重写 doc/dev-log、doc/impl-log、doc/reference 中的历史记录，也不把其他按日期记录的专项计划整体替换为当前状态。保留的洪涝等业务例子是示意/历史目标，不是当前已注册能力。
 
-## 5. 当前实现基线：未随文档改变
+## 5. 收敛起草时的实现基线（历史）
 
 静态核对依据为 [SKILL](../skills/carto-agent/SKILL.md)、[能力策略](../skills/carto-agent/policies/scenario-capabilities.yaml) 与其实现引用：
 
@@ -106,3 +106,19 @@
 本轮只修改上述 doc 文档；不改 Python、Schema、策略、Fixture、运行工作流、已发布包或业务数据，不安装依赖，不签发审批。
 
 检查范围为差异/空白检查、新增和替换的相对文档链接、Markdown 围栏结构、SVG XML 与短文案长度，以及新旧职责和当前状态表述的定向检索。未运行开发测试、CLI 制图或真实数据验收；文档收敛不表示任何目标能力已经可用。SVG 仅做结构与文本检查，未进行像素渲染验收。
+
+## 9. S1 实施后的补充收敛
+
+- 编码/外观/构成仍是可分离职责，Renderer 仍是执行层；没有新增 general 专用 subplot 系统或第二套实例锁。
+- 将第 5 节的单图基线演进为单个 3.0.0 参数化模板的 1×1、1×2、2×2。参数约束属于 Layout，源/面板组织属于计划和 page-bindings；原合同、参数和实例结果一起冻结。
+- 字号与内边距归一；分类含义和颜色来自用户已确认 portrayal。共享图例是严格兼容后的显式关联，不是任意合并开关。
+- 当前仍只开放分类栅格及静态后端的有限组合；矢量、跨格/自由/插图、内容策划、外部组件组合、自动模板检索/生成和生产能力不随 S1 开放。
+- 本节只追溯设计与实施的对应关系；测试数量、版本明细和外部验收边界集中在 S1-C/D 实施记录，运行时不读取本文。
+
+## 10. P3.6 协议层统一与应急并入（2026-11-11）
+
+- **请求 Schema 合并**：原先按数据类型分叉的 4 份请求 Schema（`general-thematic-*` / `general-vector-*`）合并为 2 份统一 Schema（`general-generate-request` / `general-template-create-request`），通过 `oneOf` / `if-then` 按 `version`（3.0.0 / 4.0.0）区分 raster / vector 变体。旧 wrapper 文件全部删除，不保留向后兼容旁路。
+- **Bundle-inputs 统一**：`raster-bundle-inputs` 与 `vector-bundle-inputs` 字节级相同，合并为单一 `bundle-inputs`。
+- **Render-scene 收敛**：原先三个 `oneOf` 变体收敛为两个（maplibre-web + unified static page），后两者因结构相同合并，通过 `renderer_id` 枚举区分 raster / vector 后端。
+- **应急制图并入标准专题**：`emergency_mapping` 删除为独立场景，其灾种（洪涝、滑坡、森林火灾）作为 `general_thematic_mapping` 的 `theme_tags`。`intent-profiles.yaml` 不再单独登记应急 profile，`[应急,灾情,救援]` 目的词并入标准专题制图。
+- 本节不新增 Schema、不改变已注册能力范围、不引入新的业务场景。合并后的统一 Schema 保持原有约束强度，不做放宽。

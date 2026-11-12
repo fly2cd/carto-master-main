@@ -27,8 +27,8 @@ MapScenario 回答：
 
 | 概念 | 示例 | 作用 |
 |---|---|---|
-| 业务场景 `business_scene` | `emergency_mapping` | 对业务用途分类，帮助选择规划策略 |
-| 地图任务 `tasks` | `hazard-result-map` | 说明需要完成的制图任务，并核对平台能力 |
+| 业务场景 `business_scene` | `general_thematic_mapping` | 对业务用途分类，帮助选择规划策略 |
+| 地图任务 `tasks` | `thematic-map` | 说明需要完成的制图任务，并核对平台能力 |
 | MapScenario 模板 | `urban-flood-risk/1.0.0` | 为具体可重复任务提供版本化制图合同 |
 | 地图运行 | 某项目某次生成 | 绑定数据、目标、审批、候选和最终成果 |
 
@@ -299,8 +299,8 @@ MapScenario
 schema_version: 1
 scenario_id: urban-flood-risk
 version: 1.0.0
-business_scene: emergency_mapping
-tasks: [hazard-result-map]
+business_scene: general_thematic_mapping
+tasks: [thematic-map]
 owned_segments:
   - scenario
   - data
@@ -316,7 +316,7 @@ application:
   excluded_uses: [navigation, formal-delivery]
 ```
 
-完整现有示例见 [scenario.yaml](../../skills/carto-agent/templates/map-scenario/urban-flood-risk/1.0.0/contracts/scenario.yaml)。这是 draft 合成示例的声明；其中 `formal-delivery` 的禁止用途不能被解释为生产交付授权。当前 U-P3 的 PDF/PNG 交付仍仅限本地合成演示。
+本节保留旧洪涝 draft 合成设计的结构片段，不表示仓库仍包含该默认模板包，也不是当前运行协议。现行模板由 [general 作者](../../skills/carto-agent/scripts/carto_core/scenarios/general_thematic.py)生成，当前能力见第 18 节；历史片段中的声明不得解释为生产交付授权。
 
 ### 10.2 数据角色示例
 
@@ -412,7 +412,7 @@ content_requirements:
 
 ### 11.3 当前匹配边界
 
-当前 `generate-map` 要求请求精确指定已发布的 `urban-flood-risk/1.0.0`，并不执行通用智能模板搜索。Schema 中出现三个业务场景枚举，不表示三个场景的任务均已开放。
+当前 `generate-map` 要求请求精确指定已发布的 `general-thematic-map/3.0.0`，并不执行通用智能模板搜索。意图目录有其他业务场景，不表示这些任务已获执行准入。
 
 ## 12. 覆盖、版本与派生
 
@@ -580,13 +580,13 @@ Manifest 管理身份、文件闭包和依赖入口；依赖锁固定表达、�
 
 ## 18. 当前仓库状态与演进建议
 
-截至 2026-11-09，唯一注册业务为 general_thematic_mapping，模板身份为 map-scenario/general-thematic-map@1.0.0，实现为 general-thematic-raster。接受用户已分类栅格，固定单图 A4 横向 300 dpi PDF+PNG，production_enabled=false；见[能力策略](../../skills/carto-agent/policies/scenario-capabilities.yaml)。不存在可作为当前基线引用的旧洪涝默认模板包。
+截至 2026-11-09，唯一注册业务为 general_thematic_mapping，模板身份为 map-scenario/general-thematic-map@3.0.0，实现为 general-thematic-raster。接受用户已分类栅格，单图或有限 1×2/2×2 网格、独立/共享图例，A4 横向 300 dpi PDF+PNG，production_enabled=false；见[能力策略](../../skills/carto-agent/policies/scenario-capabilities.yaml)。不存在可作为当前基线引用的旧洪涝默认模板包。
 
 - v1 仍要求六个 owned segments 与 identity/cartography/layout 内嵌段；当前 general 的 replaceable_segments 为空。见 [scenario.schema.json](../../skills/carto-agent/schemas/scenario.schema.json)、[general_thematic.py](../../skills/carto-agent/scripts/carto_core/scenarios/general_thematic.py)。
-- 模板样张场景已构建，validate 冻结合成样张和回执，publish 复核并消费 TP；不能再描述成样张分支未实现。
+- 模板 validate 为一个模板声明的六种网格/图例参数组合逐一生成并冻结样张和回执，publish 重验完整覆盖后消费精确 TP。
 - 框架已有候选、G2、正式渲染、终检、G3 和交付事务，不等于真实用户数据、身份和本机依赖已经验收。
-- 现有 common execution 有 views[]，但运行链路和 Layout 仍受单图限制；ResolvedLayout 已有实现。通用组件引用、分面、共享组、矢量混合表达及新的参数接口仍待实现。
+- page-bindings、v3 页面/计划及 ResolvedLayout v2 已接入有限多图；每图显式源/范围/图层，完整类别定义兼容时可共享整页图例。通用组件引用、自动分面、任意共享组及矢量混合仍未开放。
 
-演进先统一编码、Appearance、Composition、空间与输出的来源关系，再升级请求/规划/候选合同，以固定多图完成一个端到端组合；随后扩展矢量和后端能力。独立模板类型是复用分类，不必作为每个增量的前置条件；也不为每种布局×表达×后端的组合新增业务场景。
+S1 已统一编码、Appearance、Composition、空间与输出的来源并完成有限参数化多图闭环，见 [实施记录](../dev-log/20261109-s1cd-parameterized-grid-and-workflow.md)；后续按实际需求扩展矢量和后端能力。独立模板类型是复用分类，不必作为每个增量的前置条件；也不为每种布局×表达×后端的组合新增业务场景。
 
 所有目标均通过唯一 CLI、严格协议、版本化策略和既有审批实施；不修改旧包和旧锁，不新增旧格式兼容旁路。合同引用、声明参数和受限作用域调整只有在实现、注册与验收后才能执行。

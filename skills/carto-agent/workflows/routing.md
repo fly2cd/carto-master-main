@@ -3,7 +3,7 @@
 | 路由 | 请求目标 | 当前状态 |
 |---|---|---|
 | `create-template` | 创建可复用地图模板包 | 保留 `analyze → brief → author → validate → publish` 编排；仅准入已注册的 `general_thematic_mapping` 场景（`general-thematic-map` 模板）。静态检查通过后 `validate` 在受信验证上下文内渲染合成样张并冻结场景/回执/预览证据，`publish` 重新核验冻结证据并消费精确 TP；缺少栅格渲染依赖、可嵌入字体或投影展示 CRS 时失败关闭；其余默认拒绝 |
-| `generate-map` | 从业务意图和数据生成地图成果 | 保留 `intake → brief → compile → preview → freeze → render → check → deliver` 编排及状态查询；仅准入已注册的 `general_thematic_mapping` 场景（用户提供已分类栅格 → A4 横版 PDF+PNG），其余默认拒绝 |
+| `generate-map` | 从业务意图和数据生成地图成果 | 保留 `intake → brief → compile → preview → freeze → render → check → deliver` 编排及状态查询；仅准入已注册的 `general_thematic_mapping` 场景（用户提供已分类栅格 → 单图/1×2/2×2，独立或共享图例 → A4 横版 PDF+PNG），其余默认拒绝 |
 | `edit-native-map` | 保留原生 GIS 工程并编辑 | 未开放，返回 `CAPABILITY_NOT_AVAILABLE` |
 | `curate-catalog` | 治理符号、标准和目录 | 未开放，返回 `CAPABILITY_NOT_AVAILABLE` |
 
@@ -17,7 +17,7 @@
 
 ## 能力声明
 
-当前执行能力策略（`policies/scenario-capabilities.yaml` v1.3.0）和代码实现白名单只注册 `general-thematic-mapping`（`general_thematic_mapping` / 实现 `general-thematic-raster` / 模板 `map-scenario/general-thematic-map@1.0.0`）；输入结构有效且意图就绪后，其余未注册能力返回 `CAPABILITY_NOT_AVAILABLE`，不选择默认场景。生成入口先验证并解析实际用户意图，缺项、歧义或不支持的意图先返回对应错误。`intent resolve` 只识别业务场景、主题与任务，不授权执行；其目录条目不代表业务场景已开放。输入边界见 `intent-contract.md`。通用编排存在不等于场景已启用。它不代表地图工作流内的真实 CRS 转换、生产数据处理、三场景业务验收、共享服务或公网发布能力。`formal_capability_boundary.production_tasks` 保持为空。
+当前执行能力策略（`policies/scenario-capabilities.yaml` v1.5.0）和代码实现白名单只注册 `general-thematic-mapping`（`general_thematic_mapping` / 实现 `general-thematic` / `allowed_geometries: [raster]` / 模板 `map-scenario/general-thematic-map@3.0.0`）；输入结构有效且意图就绪后，其余未注册能力返回 `CAPABILITY_NOT_AVAILABLE`，不选择默认场景。生成入口先验证并解析实际用户意图，缺项、歧义或不支持的意图先返回对应错误。`intent resolve` 只识别业务场景、主题与任务，不授权执行；其目录条目不代表业务场景已开放。输入边界见 `intent-contract.md`。通用编排存在不等于场景已启用。它不代表地图工作流内的真实 CRS 转换、生产数据处理、三场景业务验收、共享服务或公网发布能力。`formal_capability_boundary.production_tasks` 保持为空。
 
 ## 宿主辅助检查
 
@@ -26,8 +26,8 @@
 
 ## 基础 GIS 数据辅助入口
 
-`data inspect-raster` 通过显式配置的独立 MCP 服务读取分类 TIFF 元数据和精确类别统计，使用前阅读 `geospatial-data.md`。这不是第五条业务路由，也不代表 `generate-map` 已支持栅格。重投影仅有适配器能力，只读 CLI 拒绝变换；不能用单个工具结果替代场景、审批或地图成果证据。
+`data inspect-raster` 通过显式配置的独立 MCP 服务读取分类 TIFF 元数据和精确类别统计，使用前阅读 `geospatial-data.md`。这不是第五条业务路由；工具可读栅格不等于任意场景可生成地图，general 的受限组合须走正式工作流。重投影仅有适配器能力，只读 CLI 拒绝变换；不能用单个工具结果替代场景、审批或地图成果证据。
 
 分类准备辅助入口 `data analyze-classification` / `data clarify-classification` 见 `raster-classification.md`。它们只冻结数据与显示合同，不开放业务场景、地图导出或审批旁路。
 
-内部整页 `RasterPageRenderer` 的 PDF/PNG/SVG 与字体/布局验收见同一 `raster-classification.md`；其页面报告不是正式渲染回执。第三批 C 的 `RasterFormalRenderer` 已将该内部组件接入现有预览、G2、锁驱动渲染、终检和 G3 交付链，但不新增路由、业务场景或审批旁路；仍须由独立准入的业务组件和模板使用。
+内部整页 `PageRenderer` 的 PDF/PNG/SVG 与字体/布局验收见同一 `raster-classification.md`；其页面报告不是正式渲染回执。第三批 C 的 `FormalRenderer` 已将该内部组件接入现有预览、G2、锁驱动渲染、终检和 G3 交付链，但不新增路由、业务场景或审批旁路；仍须由独立准入的业务组件和模板使用。

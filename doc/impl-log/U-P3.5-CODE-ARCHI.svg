@@ -1,7 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1000" viewBox="0 0 1280 1000" font-family="Segoe UI, Microsoft YaHei, Noto Sans CJK SC, sans-serif">
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1000" viewBox="0 0 1280 1000" font-family="'Segoe UI', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif">
   <defs>
-    <marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0,0 L10,5 L0,10 z" fill="#5b6472"/>
+    <!-- Visio 兼容写法：orient 只用 SVG 1.1 合法值 auto；markerUnits 显式声明避免箭头随 stroke-width 漂移；
+         尺寸按原 7 × stroke-width(1.6) ≈ 11 用户单位换算，浏览器渲染视觉不变 -->
+    <marker id="ar" markerWidth="11" markerHeight="11" refX="9" refY="5.5" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0,0 L11,5.5 L0,11 Z" fill="#5b6472"/>
     </marker>
   </defs>
 

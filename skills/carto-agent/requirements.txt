@@ -4,3 +4,7 @@ PyYAML>=6.0.2,<7
 # Optional MCP client: see requirements-geospatial.txt / root [geospatial] extra.
 
 # Optional static raster renderer: requirements-raster-rendering.txt / [raster-rendering].
+
+# S2 vector-rendering extra (opt-in; no runtime installation):
+# fiona>=1.10,<2
+# shapely>=2.0,<3

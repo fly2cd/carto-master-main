@@ -214,12 +214,14 @@ class CheckerConsolidationTests(unittest.TestCase):
         table = [{"value": 1, "label": "Category A", "color": "#FF0000", "order": 1,
                   "display": "color", "include_in_legend": True}]
         items = [{key: row[key] for key in ("value", "label", "color", "order")} for row in table]
-        report = {"status": "ready", "questions": []}
+        report = {"status": "ready", "questions": [], "request": {"source": {"source_ref": {"id": "source-a"}}}}
         ref = artifact_ref("raster-prepared-data", report)
         portrayal = {"lookup_table": table, "legend_items": items, "prepared_ref": ref,
                      "source_mask_policy": "preserve", "resampling": "nearest"}
-        raster = {"portrayal": portrayal, "report": report,
-                  "bundle": {"open_issues": [], "role_bindings": [{"prepared_ref": ref}]}}
+        raster = {"layers": {"main-view": {"portrayal": portrayal, "report": report}},
+                  "page": {"legends": [{"content_id": "legend", "items": items}]},
+                  "bundle": {"digest": "sha256:" + "a" * 64, "open_issues": [],
+                             "role_bindings": [{"source_id": "source-a", "prepared_ref": ref}]}}
         context = {"raster": raster, "scenario_profile": Profile()}
         self.assertTrue(legend_consistency(context)[0])
         checks = MapQualityChecks(self.schemas).checkers

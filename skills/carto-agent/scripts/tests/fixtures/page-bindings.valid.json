@@ -1,0 +1,89 @@
+{
+  "schema_version": 2,
+  "data_bindings": [
+    {
+      "id": "data-6ab91cef717c0a0d",
+      "role": "land-cover",
+      "dataset_ref": {
+        "id": "synthetic-raster",
+        "version": "1.0.0",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "uri": "/synthetic/synthetic-raster.json"
+      },
+      "prepared_ref": {
+        "id": "raster-prepared-data",
+        "version": "1.0.0",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "uri": "/synthetic/raster-prepared-data.json"
+      },
+      "source_id": "synthetic-raster"
+    }
+  ],
+  "layers": [
+    {
+      "id": "raster-layer",
+      "data_binding_id": "data-6ab91cef717c0a0d",
+      "expression_ref": {
+        "id": "raster/categorical",
+        "version": "1.0.0",
+        "digest": "sha256:4541a292e44cdc48c2a543203757c723ab7d21b705900218da69e5650c675a31"
+      }
+    }
+  ],
+  "views": [
+    {
+      "id": "main-view",
+      "layer_ids": [
+        "raster-layer"
+      ],
+      "extent": [
+        0,
+        0,
+        30,
+        30
+      ],
+      "crs": {
+        "authority": "EPSG",
+        "code": "3857"
+      }
+    }
+  ],
+  "panels": [
+    {
+      "id": "map",
+      "view_id": "main-view",
+      "frame_id": "map"
+    }
+  ],
+  "legends": [
+    {
+      "id": "legend",
+      "frame_id": "legend",
+      "view_ids": [
+        "main-view"
+      ],
+      "layer_ids": [
+        "raster-layer"
+      ]
+    }
+  ],
+  "elements": [
+    {
+      "id": "source",
+      "frame_id": "source",
+      "kind": "marginalia",
+      "view_id": null
+    },
+    {
+      "id": "title",
+      "frame_id": "title",
+      "kind": "title",
+      "view_id": null
+    }
+  ],
+  "sharing": {
+    "view_groups": [],
+    "encoding_groups": [],
+    "legend_groups": []
+  }
+}

@@ -32,8 +32,8 @@ from carto_core.security.paths import PathGuard
 
 RASTER_MODULES = (
     "test_schemas", "test_geospatial_mcp", "test_geospatial_stdio",
-    "test_raster_classification", "test_raster_portrayal", "test_raster_renderer",
-    "test_raster_page_renderer", "test_raster_formal",
+    "test_raster_classification", "test_raster_portrayal", "helpers",
+    "test_raster_formal",
 )
 DEPENDENCIES = ("numpy", "rasterio", "matplotlib", "PIL", "fontTools", "mcp", "pypdf", "pypdfium2")
 STATUS = {"passed": "通过", "failed": "失败", "blocked": "阻塞", "not_run": "未执行", "skipped": "跳过"}

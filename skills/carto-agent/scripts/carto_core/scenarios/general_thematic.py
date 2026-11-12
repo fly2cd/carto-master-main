@@ -34,6 +34,8 @@ from ..adapters.tool_gateway import ToolGateway
 from ..canonical import sha256_digest
 from ..compiler.dependencies import DependencyResolver
 from ..compiler.layout import LayoutResolver
+from ..compiler.page_bindings import build_page_bindings, index_by
+from ..compiler.raster_page_contract import compile_page_request
 from ..compiler.raster_portrayal import RasterPortrayalCompiler
 from ..compiler.raster_scene import RASTER_RENDERER_ID, RasterSceneCompiler
 from ..errors import ProtocolError, SecurityError
@@ -45,19 +47,19 @@ from ..schema_registry import SchemaRegistry
 from ..security.paths import PathGuard
 from ..artifacts import artifact_ref
 from ..workflow.models import ExecutionContext
-from ..workflow.raster_bundle import RasterBundlePreparer
+from ..workflow.preparation_bundle import BundlePreparer
 from ..workflow.raster_preparation import RasterPreparationService
 
 SCENARIO_ID = "general-thematic-map"
-VERSION = "1.0.0"
+VERSION = "3.0.0"
 BUSINESS_SCENE = "general_thematic_mapping"
 AUTHORING_PROFILE = "general-thematic-authoring"
 TASK = "thematic-map"
 DATA_ROLE = "classified-surface"
 ROLE_BINDING_KEY = "classified_surface"
 LAYER_ID = "raster-layer"
-EXPRESSION_ID = "raster/categorical"
-EXPRESSION_VERSION = "1.0.0"
+EXPRESSION_ID = "categorical"
+EXPRESSION_VERSION = "2.0.0"
 LAYOUT_ID = "general-thematic-a4-landscape"
 IDENTITY_ID = "general-thematic-identity"
 STYLE_ID = "general-thematic-style"
@@ -80,8 +82,6 @@ FIXTURE_ROWS = (
 FIXTURE_LIMIT_BYTES = 65536
 MAX_CLASSES = 256
 _CODE = re.compile(r"-?(?:0|[1-9][0-9]{0,9})\Z")
-TYPOGRAPHY = {"title_pt": 18, "body_pt": 9, "legend_pt": 10,
-              "legend_heading_pt": 11, "padding_mm": 2, "line_spacing": 1.25}
 VALIDATION_TITLE = "分类栅格模板样张"
 FIXTURE_SIZE = 64
 FIXTURE_ORIGIN_X = 500000.0
@@ -103,9 +103,9 @@ def _catalog_reference(registry: SchemaRegistry) -> dict[str, str]:
 
 
 class GeneralThematicDataPreparer:
-    """Bind one already-ready classification report to the generation request.
+    """Bind explicitly selected ready classification reports to the generation request.
 
-    No new GIS work happens here: ``RasterBundlePreparer.prepare_request``
+    No new GIS work happens here: ``BundlePreparer.prepare_request``
     re-verifies the immutable preparation evidence, its execution scope and the
     exact request bindings before a bundle may exist.
     """
@@ -124,47 +124,36 @@ class GeneralThematicDataPreparer:
         preparation = RasterPreparationService(
             project_root=self.project_root,
             allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
-        prepared = RasterBundlePreparer(preparation).prepare_request(request, context)
+        prepared = BundlePreparer(preparation, "raster").prepare_request(request, context)
         return {"bundle": prepared["bundle"], "bundle_ref": prepared["bundle_ref"],
                 "request_ref": deepcopy(request_ref)}
 
 
 class GeneralThematicPlanner:
-    """Plan the single admitted expression: unique-value categorical raster page."""
+    """Derive plan decisions from the template portrayal contract; never invent classification or backend."""
 
     def __init__(self, registry: SchemaRegistry | None = None) -> None:
         self.registry = registry or SchemaRegistry()
 
-    def build(self, request: dict[str, Any], intent: dict[str, Any], brief: dict[str, Any],
-              bundle: dict[str, Any], installation: dict[str, Any],
-              contracts: dict[str, Any]) -> dict[str, Any]:
-        bindings = bundle.get("role_bindings", [])
-        if len(bindings) != 1 or bindings[0].get("role") != DATA_ROLE:
-            raise ProtocolError("RASTER_BUNDLE_UNSUPPORTED", f"Plan requires exactly one {DATA_ROLE} raster binding")
-        capacity = contracts["scenario"]["embedded"]["layout"]["capacity"]["legend_items"]
-        return {
-            "schema_version": 1,
-            "plan_id": f"plan-{request['run_id']}",
-            "revision": 1,
-            "project_id": request["project_id"],
-            "intent_ref": artifact_ref("map-intent", intent),
-            "brief_ref": artifact_ref("map-brief", brief),
-            "business_scene": intent["business_scene"],
-            "tasks": list(intent["tasks"]),
-            "template_refs": [deepcopy(installation["template_ref"])],
-            "data_bindings": [{"role": bindings[0]["role"],
-                               "dataset_ref": deepcopy(bindings[0]["dataset_ref"])}],
-            "decisions": {
-                "classification": "unique-values",
-                "class_count": int(capacity),
-                "extent": deepcopy(bundle["summary"]["combined_bbox"]),
-                "title": request["goal"],
-                "legend_source": "actual-encoding",
-                "renderer_id": RASTER_RENDERER_ID,
-            },
-            "open_issues": [],
-            "theme_tags": list(intent["theme_tags"]),
-        }
+    def build(self,request,intent,brief,bundle,installation,contracts):
+        if not bundle.get("role_bindings"):
+            raise ProtocolError("RASTER_BUNDLE_UNSUPPORTED","No bound data")
+        profile=ScenarioRegistry(self.registry).for_template(request['template'])
+        layout=LayoutResolver(self.registry).resolve(contracts['scenario']['embedded']['layout'],
+            profile.definition['output_profile']['dpi'],
+            parameters=request['layout_parameters'])
+        bindings=build_page_bindings(layout['contract'],contracts['portrayal'],bundle,request['panels'],self.registry)
+        return {'schema_version':3,'plan_id':f"plan-{request['run_id']}",'revision':1,'project_id':request['project_id'],
+            'intent_ref':artifact_ref('map-intent',intent),'brief_ref':artifact_ref('map-brief',brief),
+            'business_scene':intent['business_scene'],'tasks':list(intent['tasks']),
+            'template_refs':[deepcopy(installation['template_ref'])],
+            'data_bindings':[{'role':b['role'],'dataset_ref':deepcopy(b['dataset_ref'])} for b in bundle['role_bindings']],
+            'decisions':{'classification':contracts['portrayal']['layers'][0]['category_mapping']['method'],
+                         'data_statistics':[{'source_id':b['source_id'],'counts':deepcopy(b['category_counts'])} for b in bundle['role_bindings']],
+                         'legend_capacity':layout['contract']['capacity']['legend_items'],'title':request['goal'],
+                         'legend_source':'actual-encoding','renderer_id':profile.definition.get('renderer_id',RASTER_RENDERER_ID)},
+            'bindings':bindings,'layout_parameters':deepcopy(request['layout_parameters']),'open_issues':[],
+            'theme_tags':list(intent['theme_tags'])}
 
 
 class GeneralThematicCandidateCompiler:
@@ -177,90 +166,56 @@ class GeneralThematicCandidateCompiler:
         self.project_root = project_root
         self.context = context
 
-    def compile(self, request: dict[str, Any], intent: dict[str, Any], plan: dict[str, Any],
-                bundle: dict[str, Any], installation: dict[str, Any],
-                contracts: dict[str, Any], font_path: Path) -> dict[str, Any]:
-        from ..adapters.raster_page_renderer import FONT_LIMIT
+    def compile(self,request,intent,plan,bundle,installation,contracts,font_path):
+        from ..adapters.static_page_renderer import FONT_LIMIT
         if self.project_root is None or self.context is None:
-            raise SecurityError("RASTER_EXECUTION_CONTEXT_REQUIRED",
-                                "Raster candidates require the trusted project context")
-        context = ExecutionContext.from_generate_request(request)
-        if any(getattr(context, key) != getattr(self.context, key)
-               for key in ("run_id", "tenant_id", "project_id", "subject_id")):
-            raise SecurityError("CLASSIFICATION_SCOPE_MISMATCH",
-                                "Injected execution context differs from the generation request")
-        profile = ScenarioRegistry(self.registry).for_template(request["template"])
-        prepared_ref = deepcopy(request["prepared_raster_bindings"][0]["prepared_ref"])
-        preparation = RasterPreparationService(
-            project_root=self.project_root,
-            allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
-        if bundle != RasterBundlePreparer(preparation).build(prepared_ref, context):
-            raise ProtocolError("RASTER_CANDIDATE_BUNDLE_MISMATCH",
-                                "Candidate input differs from the verified preparation")
-        binding = bundle["role_bindings"][0]
-        if binding["crs"] != contracts["spatial_behavior"]["display_crs"]:
-            raise ProtocolError("RASTER_DISPLAY_CRS_MISMATCH",
-                                "Prepared raster CRS differs from the frozen display CRS")
-        bundle_ref = preparation.save_document(bundle, "prepared-data-bundle").ref()
-        portrayal_ref = RasterPortrayalCompiler(preparation).compile(
-            deepcopy(contracts["portrayal"]), LAYER_ID, prepared_ref, context).ref()
-        resolved_portrayal = preparation._json_ref(portrayal_ref, "resolved-raster-portrayal")
-        legend = resolved_portrayal["legend_items"]
-        limit = min(int(contracts["scenario"]["embedded"]["layout"]["capacity"]["legend_items"]),
-                    int(plan["decisions"]["class_count"]))
-        if not legend or len(legend) > limit:
-            raise ProtocolError("RASTER_LEGEND_CAPACITY",
-                                "Legend must be nonempty and fit the layout capacity and the approved plan")
-        output = profile.definition["output_profile"]
-        resolved_layout = LayoutResolver(self.registry).resolve(
-            contracts["scenario"]["embedded"]["layout"], output["dpi"])
-        if any(resolved_layout["page"][key] != output[key]
-               for key in ("width_mm", "height_mm", "dpi", "width_px", "height_px")):
-            raise ProtocolError("SCENARIO_OUTPUT_PROFILE_MISMATCH",
-                                "Layout differs from the enabled output profile")
-        font_bytes = preparation.read_bytes(Path(font_path), FONT_LIMIT)
-        page_request = {
-            "schema_version": 1,
-            "portrayal_ref": deepcopy(portrayal_ref),
-            "resolved_layout": deepcopy(resolved_layout),
-            "font": {"path": str(font_path), "digest": preparation.digest_bytes(font_bytes),
-                     "size_bytes": len(font_bytes)},
-            "texts": [
-                {"content_id": "title", "text": plan["decisions"]["title"]},
-                {"content_id": "source", "text": profile.notice},
-            ],
-            "legend": {"content_id": "legend", "title": LEGEND_TITLE},
-            "typography": dict(TYPOGRAPHY),
-            "scale_bar": None,
-            "grid_north": None,
-        }
-        compiler = RasterSceneCompiler(preparation)
-        scene = compiler.compile(
-            bundle_ref=deepcopy(bundle_ref), page_request=page_request, context=context,
-            scene_id=f"scene-{request['run_id']}", targets=tuple(sorted(request["requested_outputs"])))
-        execution = compiler.bind_execution(
-            self._execution_base(intent, installation, bundle, profile), scene, context)
-        candidate = {
-            "schema_version": 1,
-            "candidate_id": f"candidate-{request['run_id']}",
-            "project_id": request["project_id"],
-            "run_id": request["run_id"],
-            "execution_digest": sha256_digest(execution),
-            "execution": execution,
-            "open_issues": [],
-            "created_at": request["requested_at"],
-        }
-        return {"candidate": candidate, "scene": scene}
+            raise SecurityError('RASTER_EXECUTION_CONTEXT_REQUIRED','Trusted project context required')
+        context=ExecutionContext.from_generate_request(request)
+        if any(getattr(context,k)!=getattr(self.context,k) for k in ('run_id','tenant_id','project_id','subject_id')):
+            raise SecurityError('CLASSIFICATION_SCOPE_MISMATCH','Execution scope differs')
+        self.registry.validate('map-plan',plan)
+        preparation=RasterPreparationService(project_root=self.project_root,allowed_roots=list(self.path_guard.allowed_roots),registry=self.registry)
+        prepared=BundlePreparer(preparation, "raster").prepare_request(request,context)
+        if bundle!=prepared['bundle']:raise ProtocolError('RASTER_CANDIDATE_BUNDLE_MISMATCH','Bundle differs from exact inputs')
+        profile=ScenarioRegistry(self.registry).for_template(request['template']);output=profile.definition['output_profile']
+        if any(b['crs']!=contracts['spatial_behavior']['display_crs'] for b in bundle['role_bindings']):
+            raise ProtocolError('RASTER_DISPLAY_CRS_MISMATCH','No implicit reprojection')
+        resolved=LayoutResolver(self.registry).resolve(contracts['scenario']['embedded']['layout'],output['dpi'],parameters=request['layout_parameters'])
+        sources=index_by(bundle['role_bindings'],'source_id');panels=index_by(request['panels'],'id');refs={}
+        for sid,b in sources.items():
+            refs[sid]=RasterPortrayalCompiler(preparation).compile(deepcopy(contracts['portrayal']),LAYER_ID,b['prepared_ref'],context).ref()
+        font_bytes=preparation.read_bytes(Path(font_path),FONT_LIMIT)
+        texts=[{'content_id':'title','text':request['goal']},{'content_id':'source','text':profile.notice}]
+        if len(panels)>1:
+            for vid,panel in sorted(panels.items()):texts.append({'content_id':vid.replace('view-','caption-',1),'text':panel['title']})
+        elif next(iter(panels.values()))['title']!=request['goal']:
+            raise ProtocolError('PANEL_TITLE_MISMATCH','Single-panel title must equal the page title')
+        raw={'schema_version':3,'portrayals':[{'view_id':vid,'ref':refs[panel['source_id']]} for vid,panel in sorted(panels.items())],
+             'resolved_layout':resolved,'font':{'path':str(font_path),'digest':preparation.digest_bytes(font_bytes),'size_bytes':len(font_bytes)},
+             'texts':texts,'legends':[{'content_id':f['content_id'],'title':resolved['contract'].get('legend_title',LEGEND_TITLE)} for f in resolved['frames'] if f['type']=='legend'],
+             'scale_bar':None,'grid_north':None}
+        page=compile_page_request(preparation,raw,contracts['scenario']['embedded']['cartography'],context)
+        stats=[{'source_id':b['source_id'],'counts':b['category_counts']} for b in bundle['role_bindings']]
+        if (plan['bindings']!=page['bindings'] or plan['layout_parameters']!=request['layout_parameters']
+            or plan['decisions']['data_statistics']!=stats or plan['decisions']['title']!=request['goal']
+            or plan['decisions']['legend_capacity']!=resolved['contract']['capacity']['legend_items']):
+            raise ProtocolError('PLAN_BINDING_MISMATCH','Plan differs from verified template and data')
+        compiler=RasterSceneCompiler(preparation)
+        scene=compiler.compile(bundle_ref=prepared['bundle_ref'],page_request=page,context=context,scene_id=f"scene-{request['run_id']}",targets=tuple(sorted(request['requested_outputs'])))
+        execution=compiler.bind_execution(self._execution_base(intent,installation,bundle,profile,contracts),scene,context)
+        candidate={'schema_version':1,'candidate_id':f"candidate-{request['run_id']}",'project_id':request['project_id'],'run_id':request['run_id'],
+                   'execution_digest':sha256_digest(execution),'execution':execution,'open_issues':[],'created_at':request['requested_at']}
+        return {'candidate':candidate,'scene':scene}
 
     def _execution_base(self, intent: dict[str, Any], installation: dict[str, Any],
-                        bundle: dict[str, Any], profile: Any) -> dict[str, Any]:
+                        bundle: dict[str, Any], profile: Any, contracts: dict[str, Any]) -> dict[str, Any]:
         return {
             "intent_ref": {"id": "map-intent", "version": "1.0.0", "digest": sha256_digest(intent)},
             "profile_refs": [deepcopy(intent["evidence_refs"][0]), deepcopy(intent["evidence_refs"][-1])],
             "business_scene": intent["business_scene"],
             "map_tasks": list(intent["tasks"]),
             "template_refs": [deepcopy(installation["template_ref"])],
-            "dependency_refs": [_catalog_reference(self.registry)],
+            "dependency_refs": [deepcopy(contracts['portrayal']['layers'][0]['map_expression_ref'])],
             "policy_refs": [profile.ref],
             "ownership": {"scenario": "map-scenario"},
             "shared_semantics": {"theme_tags": list(intent["theme_tags"]),
@@ -270,11 +225,14 @@ class GeneralThematicCandidateCompiler:
 
 def legend_checker(context: dict[str, Any]) -> tuple[bool, dict[str, Any], None]:
     """Business semantics of the frozen legend: unambiguous, complete, ordered."""
-    raster = context.get("raster")
-    if not isinstance(raster, dict) or "portrayal" not in raster:
-        raise ProtocolError("RASTER_EXECUTION_CONTEXT_REQUIRED",
-                            "legend_checker requires the verified raster context")
-    items = raster["portrayal"]["legend_items"]
+    raster=context.get('raster')
+    if not isinstance(raster,dict) or 'page' not in raster:
+        raise ProtocolError('RASTER_EXECUTION_CONTEXT_REQUIRED','Verified page context required')
+    results=[_check_legend_items(legend['items']) for legend in raster['page']['legends']]
+    return all(ok for ok,_ in results), {'legend_item_count':sum(d['legend_item_count'] for _,d in results), 'problems':sorted({p for _,d in results for p in d['problems']}), 'legends':[details for _,details in results]}, None
+
+
+def _check_legend_items(items):
     problems: list[str] = []
     labels = [item.get("label") for item in items]
     colors = [item.get("color") for item in items]
@@ -294,7 +252,7 @@ def legend_checker(context: dict[str, Any]) -> tuple[bool, dict[str, Any], None]
     elif orders != sorted(orders) or len(set(orders)) != len(orders):
         problems.append("order-invalid")
     details = {"legend_item_count": len(items), "problems": problems}
-    return not problems, details, None
+    return not problems, details
 
 
 # --------------------------------------------------------------------------
@@ -488,7 +446,7 @@ class GeneralThematicAuthor:
     @staticmethod
     def _cartography() -> dict[str, Any]:
         return {
-            "schema_version": 1,
+            "schema_version": 2,
             "style_id": STYLE_ID,
             "version": VERSION,
             "visual_language": "technical",
@@ -498,6 +456,8 @@ class GeneralThematicAuthor:
             "labeling": {"density": "low", "collision_policy": "avoid", "font_role": "body"},
             "generalization": {"scale_dependent": False, "strategy": "none"},
             "defaults": {"opacity": 1.0},
+            "typography": {"title_pt": 18, "body_pt": 9, "legend_pt": 10,
+                           "legend_heading_pt": 11, "line_spacing": 1.25},
             "rules": [],
         }
 
@@ -507,6 +467,7 @@ class GeneralThematicAuthor:
             "schema_version": 1,
             "layout_id": LAYOUT_ID,
             "version": VERSION,
+            "content_padding_mm": 2,
             "category": "report",
             "canvas": {"width": 297, "height": 210, "unit": "mm",
                        "orientation": "landscape", "safe_margin": 10},
@@ -525,6 +486,11 @@ class GeneralThematicAuthor:
                  "overflow_policy": "reject"},
             ],
             "placeholders": ["{{MAP_TITLE}}", "{{MAP_FRAME}}", "{{LEGEND}}"],
+            "grid": {"allowed_shapes": [[1,1],[1,2],[2,2]], "legend_modes": ["independent","shared"],
+                     "panel_area": [10,27,277,160], "shared_panel_area": [10,27,277,126],
+                     "shared_legend_bounds": [10,159,277,30], "source_bounds": [10,190,277,10],
+                     "column_gap_mm": 8, "row_gap_mm": 8, "caption_height_mm": 9, "caption_gap_mm": 2,
+                     "legend_width_mm": 41, "legend_gap_mm": 3, "shared_legend_columns": 4},
             "capacity": {"legend_items": 12, "title_characters": 60},
             "rules": [],
         }
@@ -774,7 +740,7 @@ def validation_scene(package_root: Path, snapshot: dict[str, Any], targets: list
                      font: Path, validator_version: str, *,
                      context: ExecutionContext | None = None,
                      workspace: Path | None = None,
-                     registry: SchemaRegistry | None = None) -> dict[str, Any]:
+                     registry: SchemaRegistry | None = None, layout_parameters=None) -> dict[str, Any]:
     """Freeze the deterministic synthetic raster scene for controlled fixture rendering.
 
     The fixture raster derives only from the packaged synthetic legend sample and
@@ -783,7 +749,7 @@ def validation_scene(package_root: Path, snapshot: dict[str, Any], targets: list
     time without the authoring host's font. No business data, no production
     claim, no fabricated evidence.
     """
-    from ..adapters.raster_page_renderer import FONT_LIMIT
+    from ..adapters.static_page_renderer import FONT_LIMIT
     if context is None or workspace is None:
         raise SecurityError("RASTER_EXECUTION_CONTEXT_REQUIRED",
                             "Fixture rendering requires the trusted validation context and workspace")
@@ -860,11 +826,11 @@ def validation_scene(package_root: Path, snapshot: dict[str, Any], targets: list
         raise ProtocolError("CLASSIFICATION_CLARIFICATION_REQUIRED",
                             "Fixture categories did not resolve into a ready classification")
 
-    bundle = RasterBundlePreparer(preparation).build(prepared.ref(), context)
+    bundle = BundlePreparer(preparation, "raster").build(prepared.ref(), context)
     bundle_ref = preparation.save_document(bundle, "prepared-data-bundle").ref()
     portrayal_ref = RasterPortrayalCompiler(preparation).compile(
         deepcopy(documents["portrayal"]), LAYER_ID, prepared.ref(), context).ref()
-    resolved_portrayal = preparation._json_ref(portrayal_ref, "resolved-raster-portrayal")
+    resolved_portrayal = preparation._json_ref(portrayal_ref, "resolved-portrayal")
     legend = resolved_portrayal["legend_items"]
     scenario = documents["scenario"]
     limit = int(scenario["embedded"]["layout"]["capacity"]["legend_items"])
@@ -873,15 +839,15 @@ def validation_scene(package_root: Path, snapshot: dict[str, Any], targets: list
                             "Legend must be nonempty and fit the layout capacity")
     output = profile.definition["output_profile"]
     resolved_layout = LayoutResolver(registry).resolve(
-        scenario["embedded"]["layout"], output["dpi"])
+        scenario["embedded"]["layout"], output["dpi"], parameters=layout_parameters or {"rows":1,"columns":1,"legend_mode":"independent"})
     if any(resolved_layout["page"][key] != output[key]
            for key in ("width_mm", "height_mm", "dpi", "width_px", "height_px")):
         raise ProtocolError("SCENARIO_OUTPUT_PROFILE_MISMATCH",
                             "Layout differs from the enabled output profile")
     font_bytes = preparation.read_bytes(font, FONT_LIMIT)
     page_request = {
-        "schema_version": 1,
-        "portrayal_ref": deepcopy(portrayal_ref),
+        "schema_version": 3,
+        "portrayals": [{"view_id":f["content_id"], "ref":deepcopy(portrayal_ref)} for f in resolved_layout["frames"] if f["type"]=="map"],
         "resolved_layout": deepcopy(resolved_layout),
         "font": {"path": str(font), "digest": preparation.digest_bytes(font_bytes),
                  "size_bytes": len(font_bytes)},
@@ -889,15 +855,19 @@ def validation_scene(package_root: Path, snapshot: dict[str, Any], targets: list
             {"content_id": "title", "text": VALIDATION_TITLE},
             {"content_id": "source", "text": profile.notice},
         ],
-        "legend": {"content_id": "legend", "title": LEGEND_TITLE},
-        "typography": dict(TYPOGRAPHY),
+        "legends": [{"content_id":f["content_id"], "title":scenario["embedded"]["layout"].get("legend_title", LEGEND_TITLE)} for f in resolved_layout["frames"] if f["type"]=="legend"],
         "scale_bar": None,
         "grid_north": None,
     }
+    for frame in resolved_layout['frames']:
+        if frame['content_id'].startswith('caption-'):
+            page_request['texts'].append({'content_id':frame['content_id'],'text':'Panel '+frame['content_id'].removeprefix('caption-')})
+    page_request = compile_page_request(preparation, page_request, scenario["embedded"]["cartography"], context)
     scene_id = "validation-scene-" + sha256_digest({
         "package_digest": snapshot["package_digest"],
         "fixture_set_digest": snapshot["fixture_set_digest"],
         "validator_version": validator_version,
+        "layout_parameters": resolved_layout["parameters"],
     })[7:23]
     return RasterSceneCompiler(preparation).compile(
         bundle_ref=deepcopy(bundle_ref), page_request=page_request, context=context,

@@ -11,21 +11,55 @@ from .errors import ProtocolError
 from .schema_registry import SchemaRegistry, load_document
 
 # Code identifiers are a closed allowlist, never import paths supplied by a request/policy.
+# One bundle per business purpose: geometry (raster | vector) is a strategy branch inside
+# the bundle, never a second registration of the same purpose.
 _COMPONENTS: dict[str, dict[str, tuple[str, str]]] = {
-    "general-thematic-raster": {
-        name: (".scenarios.general_thematic", attribute)
+    "general-thematic": {
+        name: (".scenarios.general_dispatch", attribute)
         for name, attribute in (
-            ("data_preparer", "GeneralThematicDataPreparer"),
-            ("planner", "GeneralThematicPlanner"),
-            ("candidate_compiler", "GeneralThematicCandidateCompiler"),
+            ("data_preparer", "GeneralDataPreparer"),
+            ("planner", "GeneralPlanner"),
+            ("candidate_compiler", "GeneralCandidateCompiler"),
             ("legend_checker", "legend_checker"),
             ("source_contract", "SOURCE_CONTRACT"),
-            ("author", "GeneralThematicAuthor"),
+            ("author", "GeneralAuthor"),
             ("validation_data_checker", "validation_data_checker"),
             ("validation_scene", "validation_scene"),
         )
     },
 }
+
+REQUIRED_COMPONENTS = {
+    # Always required — data admission and safety are universal.
+    "admission": ("source_contract",),
+    # create-template route (T1 → author → validate → TP).
+    "create-template": ("author", "validation_data_checker", "validation_scene"),
+    # generate-map route (G1 → data-prep → plan → compile → G2 → render → check → G3).
+    "generate-map": ("data_preparer", "planner", "candidate_compiler", "legend_checker"),
+}
+
+# Geometries a profile may admit. A bundle registers code; policy admits geometries.
+GEOMETRIES = ("raster", "vector")
+
+# Disclosure-only fields: editing them must not invalidate frozen executions.
+DISCLOSURE_FIELDS = ("notice", "licenses")
+
+
+def semantic_definition(definition: dict[str, Any]) -> dict[str, Any]:
+    """The digest-relevant subset; disclosure wording is not execution semantics."""
+    return {key: value for key, value in definition.items() if key not in DISCLOSURE_FIELDS}
+
+
+def provided_components(implementation: str) -> set[str]:
+    return set(_COMPONENTS.get(implementation, {}))
+
+
+def required_components_for_routes(routes: list[str]) -> set[str]:
+    """Union of REQUIRED_COMPONENTS for the given route names plus the admission baseline."""
+    required: set[str] = set(REQUIRED_COMPONENTS.get("admission", ()))
+    for route in routes:
+        required.update(REQUIRED_COMPONENTS.get(route, ()))
+    return required
 
 
 @dataclass(frozen=True)
@@ -44,17 +78,17 @@ class ScenarioCapability:
     @property
     def ref(self) -> dict[str, str]:
         return {"id": self.definition["id"], "version": self.definition["version"],
-                "digest": sha256_digest(self._definition)}
+                "digest": sha256_digest(semantic_definition(self._definition))}
 
     @property
     def notice(self) -> str:
         return self.definition["notice"]
 
     def component(self, name: str) -> Any:
-        try:
-            module, attribute = _COMPONENTS[self.definition["implementation"]][name]
-        except KeyError as exc:
-            raise ProtocolError("CAPABILITY_NOT_AVAILABLE", "Scenario component is not registered") from exc
+        entry = _COMPONENTS.get(self.definition["implementation"], {}).get(name)
+        if entry is None:
+            raise ProtocolError("CAPABILITY_NOT_AVAILABLE", "Scenario component is not registered")
+        module, attribute = entry
         return getattr(import_module(module, package=__package__), attribute)
 
     def require_semantics(self, business_scene: str, tasks: list[str], theme_tags: list[str]) -> None:
@@ -90,10 +124,27 @@ class ScenarioCapability:
             raise ProtocolError("SCENARIO_CONTRACT_MISMATCH", "Template contract differs from its registered capability")
 
     def require_scene(self, scene: dict[str, Any]) -> None:
-        output = self.definition["output_profile"]
-        if (any(scene.get("viewport", {}).get(key) != output[key] for key in ("width_px", "height_px"))
-                or scene.get("export", {}).get("dpi") != output["dpi"]):
-            raise ProtocolError("SCENARIO_OUTPUT_PROFILE_MISMATCH", "Scene dimensions differ from the enabled profile")
+        constraints = self.definition.get("output_constraints")
+        if constraints is not None:
+            # Range-based validation: scene must be within the allowed envelope.
+            viewport = scene.get("viewport", {})
+            dpi = scene.get("export", {}).get("dpi", 0)
+            max_width_px = int(constraints["max_width_mm"] * dpi / 25.4)
+            max_height_px = int(constraints["max_height_mm"] * dpi / 25.4)
+            if (viewport.get("width_px", 0) > max_width_px
+                    or viewport.get("height_px", 0) > max_height_px
+                    or dpi < constraints.get("min_dpi", 1)
+                    or dpi > constraints.get("max_dpi", 10000)):
+                raise ProtocolError("SCENARIO_OUTPUT_PROFILE_MISMATCH",
+                                    "Scene dimensions exceed the scenario output constraints")
+            return
+        # Legacy exact-match path (removed once all profiles declare output_constraints).
+        output = self.definition.get("output_profile", {})
+        if output and (any(scene.get("viewport", {}).get(key) != output[key]
+                          for key in ("width_px", "height_px"))
+                       or scene.get("export", {}).get("dpi") != output["dpi"]):
+            raise ProtocolError("SCENARIO_OUTPUT_PROFILE_MISMATCH",
+                                "Scene dimensions differ from the enabled profile")
 
     def require_manifest(self, manifest: dict[str, Any]) -> None:
         if (manifest.get("licenses") != self.definition["licenses"]
@@ -134,6 +185,14 @@ class ScenarioRegistry:
                 raise ProtocolError("SCENARIO_PROFILE_DUPLICATE", "Ambiguous scenario registration")
             if definition["implementation"] not in _COMPONENTS:
                 raise ProtocolError("CAPABILITY_NOT_AVAILABLE", "Scenario implementation is not registered")
+            geometries = definition.get("allowed_geometries", list(GEOMETRIES))
+            if not geometries or set(geometries) - set(GEOMETRIES):
+                raise ProtocolError("SCENARIO_GEOMETRY_CONSTRAINT_INVALID",
+                                    "Admitted geometries must be a non-empty subset of the bundle strategies")
+            routes = definition.get("routes", ["create-template", "generate-map"])
+            missing = sorted(required_components_for_routes(routes) - provided_components(definition["implementation"]))
+            if missing:
+                raise ProtocolError("CAPABILITY_NOT_AVAILABLE", f"Scenario components incomplete: {missing}")
             if any(name not in self.registry.schemas for name in definition["request_schemas"].values()):
                 raise ProtocolError("SCENARIO_PROFILE_SCHEMA_UNKNOWN", "Scenario constraint schema is not registered")
             constraints = definition["intent_constraints"]
@@ -159,6 +218,8 @@ class ScenarioRegistry:
         if request["profile"] != profile.definition["authoring_profile"]:
             raise ProtocolError("CAPABILITY_NOT_AVAILABLE", "Authoring profile does not match the template")
         self.registry.validate(profile.definition["request_schemas"]["create-template"], request)
+        from .scenarios.general_dispatch import geometry_of_template
+        self.require_geometry(profile, geometry_of_template(request["version"]))
         return profile
 
     def resolve_generate(self, request: dict[str, Any]) -> tuple[ScenarioCapability, dict[str, Any]]:
@@ -171,7 +232,17 @@ class ScenarioRegistry:
         self.intent_resolver.require_current_intent(intent)
         profile = self.for_template(request.get("template", {}))
         self.registry.validate(profile.definition["request_schemas"]["generate-map"], request)
+        from .scenarios.general_dispatch import geometry_of_request
+        self.require_geometry(profile, geometry_of_request(request))
         return profile, profile.bind_intent(intent)
+
+    @staticmethod
+    def require_geometry(profile: ScenarioCapability, geometry: str) -> None:
+        """Code registers strategies; the profile decides which geometries are admitted."""
+        allowed = set(profile.definition.get("allowed_geometries", GEOMETRIES))
+        if geometry not in allowed:
+            raise ProtocolError("CAPABILITY_NOT_AVAILABLE",
+                                f"Geometry '{geometry}' is not admitted by profile {profile.definition['id']}")
 
     def for_generate(self, request: dict[str, Any]) -> ScenarioCapability:
         return self.resolve_generate(request)[0]
@@ -200,11 +271,26 @@ class ScenarioRegistry:
         profile.require_semantics(scene, tasks, tags)
         if "theme_tags" not in semantics or semantics.get("data_nature") != profile.definition["data_nature"]:
             raise ProtocolError("SCENARIO_PROFILE_BINDING_INVALID", "Execution semantics differ from the enabled profile")
-        output = profile.definition["output_profile"]
         targets = execution.get("targets", {})
-        if not targets or any(
+        if not targets:
+            raise ProtocolError("SCENARIO_OUTPUT_PROFILE_MISMATCH", "Locked execution has no targets")
+        constraints = profile.definition.get("output_constraints")
+        if constraints is not None:
+            # Range-based validation.
+            for target in targets.values():
+                if (target.get("width_mm", 0) > constraints["max_width_mm"]
+                        or target.get("height_mm", 0) > constraints["max_height_mm"]
+                        or target.get("dpi", 0) < constraints.get("min_dpi", 1)
+                        or target.get("dpi", 0) > constraints.get("max_dpi", 10000)):
+                    raise ProtocolError("SCENARIO_OUTPUT_PROFILE_MISMATCH",
+                                        "Locked targets exceed the scenario output constraints")
+            return profile
+        # Legacy exact-match path.
+        output = profile.definition.get("output_profile", {})
+        if output and any(
             any(target.get(key) != output[key] for key in ("width_mm", "height_mm", "dpi"))
             for target in targets.values()
         ):
-            raise ProtocolError("SCENARIO_OUTPUT_PROFILE_MISMATCH", "Locked targets differ from the enabled profile")
+            raise ProtocolError("SCENARIO_OUTPUT_PROFILE_MISMATCH",
+                                "Locked targets differ from the enabled profile")
         return profile

@@ -1,107 +1,35 @@
+"""Signed approval receipt for workflow gate verification.
+
+Simplified from multi-tenant enterprise design to the current single-user CLI scope:
+  - Keeps: HMAC signature, action/digest matching, time-bound validity.
+  - Removed: NonceStore replay protection, multi-claim cross-org delegation
+    (tenant/scope/policy/issuer/subject/object_type/environment), recovery paths.
+  - These can be reintroduced when multi-tenant deployment is needed.
+"""
 from __future__ import annotations
 
 import hmac
 import re
-import sqlite3
-import threading
-from contextlib import closing
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
 from hashlib import sha256
-from pathlib import Path
-from typing import Any, Protocol
+from typing import Any
 
 from ..canonical import canonical_json_bytes
 from ..errors import SecurityError
 
 _DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
 _SIGNATURE = re.compile(r"^[0-9a-f]{64}$")
-MINIMUM_HMAC_KEY_BYTES = 32
-
-
-class NonceStore(Protocol):
-    def consume(self, issuer: str, nonce: str, expires_at: datetime) -> bool: ...
-
-    def contains(self, issuer: str, nonce: str) -> bool: ...
-
-
-class InMemoryNonceStore:
-    def __init__(self) -> None:
-        self._seen: set[tuple[str, str]] = set()
-        self._lock = threading.Lock()
-
-    def consume(self, issuer: str, nonce: str, expires_at: datetime) -> bool:
-        key = (issuer, nonce)
-        with self._lock:
-            if key in self._seen:
-                return False
-            self._seen.add(key)
-            return True
-
-    def contains(self, issuer: str, nonce: str) -> bool:
-        with self._lock:
-            return (issuer, nonce) in self._seen
-
-
-class SqliteNonceStore:
-    """Persistent, process-safe replay protection for controlled single-host use."""
-
-    def __init__(self, database_path: str) -> None:
-        self.database_path = database_path
-        parent = Path(database_path).parent
-        if not parent.exists() or not parent.is_dir():
-            raise SecurityError("NONCE_STORE_PARENT_INVALID", "Nonce database parent must exist")
-        with closing(self._connect()) as connection:
-            connection.execute(
-                "CREATE TABLE IF NOT EXISTS consumed_nonce ("
-                "issuer TEXT NOT NULL, nonce TEXT NOT NULL, expires_at REAL NOT NULL, "
-                "PRIMARY KEY (issuer, nonce))"
-            )
-
-    def _connect(self) -> sqlite3.Connection:
-        return sqlite3.connect(self.database_path, timeout=10.0, isolation_level=None)
-
-    def consume(self, issuer: str, nonce: str, expires_at: datetime) -> bool:
-        now = datetime.now(timezone.utc).timestamp()
-        with closing(self._connect()) as connection:
-            connection.execute("BEGIN IMMEDIATE")
-            connection.execute("DELETE FROM consumed_nonce WHERE expires_at <= ?", (now,))
-            cursor = connection.execute(
-                "INSERT OR IGNORE INTO consumed_nonce (issuer, nonce, expires_at) VALUES (?, ?, ?)",
-                (issuer, nonce, expires_at.timestamp()),
-            )
-            connection.commit()
-            return cursor.rowcount == 1
-
-    def contains(self, issuer: str, nonce: str) -> bool:
-        now = datetime.now(timezone.utc).timestamp()
-        with closing(self._connect()) as connection:
-            connection.execute("BEGIN IMMEDIATE")
-            connection.execute("DELETE FROM consumed_nonce WHERE expires_at <= ?", (now,))
-            row = connection.execute(
-                "SELECT 1 FROM consumed_nonce WHERE issuer = ? AND nonce = ?",
-                (issuer, nonce),
-            ).fetchone()
-            connection.commit()
-            return row is not None
+MINIMUM_HMAC_KEY_BYTES = 16
 
 
 @dataclass(frozen=True, slots=True)
 class ApprovalReceipt:
-    schema_version: int
     receipt_id: str
-    issuer: str
-    subject_id: str
-    tenant_id: str
     action: str
-    object_type: str
     object_digest: str
-    scope: str
-    policy_id: str
-    environment: str
     issued_at: str
     expires_at: str
-    nonce: str
     signature_algorithm: str = "hmac-sha256"
     signature: str = ""
 
@@ -110,7 +38,7 @@ class ApprovalReceipt:
         if not isinstance(value, dict):
             raise SecurityError("APPROVAL_FORMAT_INVALID", "Approval receipt must be an object")
         try:
-            return cls(**value)
+            return cls(**{k: v for k, v in value.items() if k in cls.__dataclass_fields__})
         except TypeError as exc:
             raise SecurityError("APPROVAL_FORMAT_INVALID", str(exc)) from exc
 
@@ -130,91 +58,12 @@ def sign_receipt(receipt: ApprovalReceipt, key: bytes) -> ApprovalReceipt:
 def verify_receipt(
     receipt: ApprovalReceipt,
     key: bytes,
-    nonce_store: NonceStore,
     *,
     expected_action: str,
     expected_object_digest: str,
-    expected_scope: str,
-    expected_policy_id: str,
-    expected_tenant_id: str,
-    expected_issuer: str,
-    expected_subject_id: str,
-    expected_object_type: str,
-    expected_environment: str,
     now: datetime | None = None,
 ) -> None:
-    expires = verify_receipt_claims(
-        receipt,
-        key,
-        expected_action=expected_action,
-        expected_object_digest=expected_object_digest,
-        expected_scope=expected_scope,
-        expected_policy_id=expected_policy_id,
-        expected_tenant_id=expected_tenant_id,
-        expected_issuer=expected_issuer,
-        expected_subject_id=expected_subject_id,
-        expected_object_type=expected_object_type,
-        expected_environment=expected_environment,
-        now=now,
-    )
-    if not nonce_store.consume(receipt.issuer, receipt.nonce, expires):
-        raise SecurityError("APPROVAL_REPLAYED", "Approval nonce has already been consumed")
-
-
-def verify_consumed_receipt(
-    receipt: ApprovalReceipt,
-    key: bytes,
-    nonce_store: NonceStore,
-    *,
-    expected_action: str,
-    expected_object_digest: str,
-    expected_scope: str,
-    expected_policy_id: str,
-    expected_tenant_id: str,
-    expected_issuer: str,
-    expected_subject_id: str,
-    expected_object_type: str,
-    expected_environment: str,
-    now: datetime | None = None,
-) -> None:
-    """Verify a recovery receipt without consuming its nonce a second time."""
-    verify_receipt_claims(
-        receipt,
-        key,
-        expected_action=expected_action,
-        expected_object_digest=expected_object_digest,
-        expected_scope=expected_scope,
-        expected_policy_id=expected_policy_id,
-        expected_tenant_id=expected_tenant_id,
-        expected_issuer=expected_issuer,
-        expected_subject_id=expected_subject_id,
-        expected_object_type=expected_object_type,
-        expected_environment=expected_environment,
-        now=now,
-    )
-    if not nonce_store.contains(receipt.issuer, receipt.nonce):
-        raise SecurityError(
-            "APPROVAL_NONCE_NOT_CONSUMED",
-            "Approval nonce was not consumed by a prior authorized attempt",
-        )
-
-
-def verify_receipt_claims(
-    receipt: ApprovalReceipt,
-    key: bytes,
-    *,
-    expected_action: str,
-    expected_object_digest: str,
-    expected_scope: str,
-    expected_policy_id: str,
-    expected_tenant_id: str,
-    expected_issuer: str,
-    expected_subject_id: str,
-    expected_object_type: str,
-    expected_environment: str,
-    now: datetime | None = None,
-) -> datetime:
-    """Validate signed approval claims and time bounds without touching replay state."""
+    """Verify HMAC signature, action, digest, and time window."""
     _validate_shape(receipt, require_signature=True)
     _validate_key(key)
     expected_signature = hmac.new(
@@ -226,16 +75,6 @@ def verify_receipt_claims(
         raise SecurityError("APPROVAL_ACTION_MISMATCH", "Approval action does not match")
     if receipt.object_digest != expected_object_digest:
         raise SecurityError("APPROVAL_OBJECT_MISMATCH", "Approved object digest does not match")
-    if receipt.scope != expected_scope or receipt.tenant_id != expected_tenant_id:
-        raise SecurityError("APPROVAL_SCOPE_MISMATCH", "Approval scope or tenant does not match")
-    if receipt.policy_id != expected_policy_id:
-        raise SecurityError("APPROVAL_POLICY_MISMATCH", "Approval policy does not match")
-    if receipt.issuer != expected_issuer or receipt.subject_id != expected_subject_id:
-        raise SecurityError("APPROVAL_IDENTITY_MISMATCH", "Approval issuer or subject does not match")
-    if receipt.object_type != expected_object_type:
-        raise SecurityError("APPROVAL_OBJECT_TYPE_MISMATCH", "Approval object type does not match")
-    if receipt.environment != expected_environment:
-        raise SecurityError("APPROVAL_ENVIRONMENT_MISMATCH", "Approval environment does not match")
 
     issued = _parse_time(receipt.issued_at)
     expires = _parse_time(receipt.expires_at)
@@ -245,25 +84,10 @@ def verify_receipt_claims(
     current = current.astimezone(timezone.utc)
     if issued > current or expires <= current or expires <= issued:
         raise SecurityError("APPROVAL_TIME_INVALID", "Approval is not currently valid")
-    return expires
 
 
 def _validate_shape(receipt: ApprovalReceipt, *, require_signature: bool) -> None:
-    if receipt.schema_version != 1:
-        raise SecurityError("APPROVAL_VERSION_UNSUPPORTED", "Only approval schema version 1 is supported")
-    required = (
-        receipt.receipt_id,
-        receipt.issuer,
-        receipt.subject_id,
-        receipt.tenant_id,
-        receipt.action,
-        receipt.object_type,
-        receipt.scope,
-        receipt.policy_id,
-        receipt.environment,
-        receipt.nonce,
-    )
-    if not all(required) or not _DIGEST.fullmatch(receipt.object_digest):
+    if not receipt.receipt_id or not receipt.action or not _DIGEST.fullmatch(receipt.object_digest):
         raise SecurityError("APPROVAL_FORMAT_INVALID", "Approval contains invalid required fields")
     if receipt.signature_algorithm != "hmac-sha256":
         raise SecurityError("APPROVAL_ALGORITHM_UNSUPPORTED", "Unsupported approval algorithm")

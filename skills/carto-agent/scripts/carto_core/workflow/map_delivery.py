@@ -8,11 +8,10 @@ from ..errors import ProtocolError, SecurityError
 from ..repository.delivery_repository import DeliveryRepository
 from ..scenario_registry import ScenarioRegistry
 from ..schema_registry import SchemaRegistry, load_document
-from ..security.approval import ApprovalReceipt, SqliteNonceStore
+from ..security.approval import ApprovalReceipt
 from ..security.paths import PathGuard
 from .approvals import ApprovalGateCoordinator
-from ..artifacts import atomic_yaml, file_digest
-from .models import ExecutionContext
+from ..artifacts import file_digest
 
 FailureHook = Callable[[str], None]
 
@@ -33,7 +32,7 @@ class MapDeliveryService:
 
     def deliver(self, *, request: dict[str, Any], manifest: dict[str, Any],
                 manifest_ref: dict[str, str], report: dict[str, Any], approval_path: str | Path,
-                approval_key: bytes, nonce_db: str | Path, policy_id: str, issuer: str,
+                approval_key: bytes,
                 failure_hook: FailureHook | None = None) -> dict[str, Any]:
         self.validate_inputs(request=request, manifest=manifest, manifest_ref=manifest_ref, report=report)
         approval_file = self.path_guard.resolve(approval_path, base_root=self.project_root, must_exist=True)
@@ -42,60 +41,16 @@ class MapDeliveryService:
             raise ProtocolError("DELIVERY_APPROVAL_REQUIRED", "G3 approval must be an object")
         self.registry.validate("approval-receipt", approval_value)
         approval = ApprovalReceipt.from_dict(approval_value)
-        approval_target = self.path_guard.resolve(
-            self.work_root / "approvals" / "g3" / f"{manifest['manifest_id']}.yaml"
-        )
-        journal_exists = approval_target.exists()
-        context = ExecutionContext(
-            run_id=request["run_id"], tenant_id=request["subject"]["tenant_id"],
-            project_id=request["project_id"], subject_id=request["subject"]["subject_id"],
-            roles=frozenset({"operator"}), namespaces=frozenset({request["project_id"]}),
-            authorized_capabilities=frozenset(request["allowed_capabilities"]),
-            environment=request["environment"],
-        )
-        nonce_path = self.path_guard.resolve(nonce_db, base_root=self.project_root)
-        nonce_path.parent.mkdir(parents=True, exist_ok=True)
-        nonce_store = SqliteNonceStore(str(nonce_path))
-        coordinator = ApprovalGateCoordinator(approval_key, nonce_store, policy_id, issuer)
+        coordinator = ApprovalGateCoordinator(approval_key)
         manifest_digest = sha256_digest(manifest)
-        coordinator.validate(
-            "G3", approval, manifest_digest, context,
-            approver_subject_id=request["subject"]["approver_subject_id"],
-            expected_scope=request["scope"],
-        )
-        already_consumed = nonce_store.contains(approval.issuer, approval.nonce)
-        if already_consumed:
-            if not journal_exists:
-                raise SecurityError(
-                    "APPROVAL_RECOVERY_EVIDENCE_MISSING",
-                    "Consumed G3 approval has no workflow-local intent record",
-                )
-            retained = load_document(approval_target)
-            if retained != approval_value:
-                raise SecurityError("APPROVAL_RECOVERY_EVIDENCE_CONFLICT", manifest["manifest_id"])
-            coordinator.require_consumed(
-                "G3", approval, manifest_digest, context,
-                approver_subject_id=request["subject"]["approver_subject_id"],
-                expected_scope=request["scope"],
-            )
-        else:
-            if approval_target.exists():
-                retained = load_document(approval_target)
-                if retained != approval_value:
-                    raise SecurityError("APPROVAL_RECOVERY_EVIDENCE_CONFLICT", manifest["manifest_id"])
-            atomic_yaml(approval_target, approval_value)
-            coordinator.require(
-                "G3", approval, manifest_digest, context,
-                approver_subject_id=request["subject"]["approver_subject_id"],
-                expected_scope=request["scope"],
-            )
+        coordinator.require("G3", approval, manifest_digest)
         if failure_hook:
             failure_hook("after-approval-consumed")
         approval_ref = {
             "id": approval.receipt_id,
             "version": "1.0.0",
             "digest": sha256_digest(approval_value),
-            "uri": str(approval_target),
+            "uri": str(approval_file),
         }
         result = self.repository.deliver(
             manifest=manifest, manifest_ref=manifest_ref, approval_ref=approval_ref,
@@ -103,7 +58,6 @@ class MapDeliveryService:
         )
         result["approval"] = approval_value
         result["approval_ref"] = approval_ref
-        result["approval_replay"] = already_consumed
         return result
 
     def validate_inputs(self, *, request: dict[str, Any], manifest: dict[str, Any],

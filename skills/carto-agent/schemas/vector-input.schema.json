@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/vector-input.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_id",
+    "role",
+    "format",
+    "crs",
+    "encoding",
+    "files",
+    "data_nature",
+    "contains_sensitive_coordinates",
+    "contains_production_data",
+    "license"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "source_id": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+    },
+    "role": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+    },
+    "format": {
+      "enum": [
+        "geojson",
+        "shapefile"
+      ]
+    },
+    "crs": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+    },
+    "encoding": {
+      "enum": [
+        "utf-8",
+        "gbk",
+        "cp1252"
+      ]
+    },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "extension",
+          "path",
+          "digest",
+          "size_bytes"
+        ],
+        "properties": {
+          "extension": {
+            "enum": [
+              ".geojson",
+              ".shp",
+              ".shx",
+              ".dbf",
+              ".prj",
+              ".cpg"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          },
+          "digest": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 33554432
+          }
+        }
+      }
+    },
+    "data_nature": {
+      "enum": [
+        "synthetic",
+        "user-provided"
+      ]
+    },
+    "contains_sensitive_coordinates": {
+      "const": false
+    },
+    "contains_production_data": {
+      "const": false
+    },
+    "license": {
+      "enum": [
+        "public",
+        "project-approved"
+      ]
+    }
+  }
+}

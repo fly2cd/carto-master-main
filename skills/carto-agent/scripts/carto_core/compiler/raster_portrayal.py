@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 from ..canonical import sha256_digest
 from ..errors import ProtocolError, SecurityError
 from ..repository.map_expression_catalog import MapExpressionCatalog
+from ..roadmap import not_implemented
 
 if TYPE_CHECKING:
     from ..repository.immutable_store import StoredArtifact
@@ -150,7 +151,7 @@ def portrayal_compiler_digest() -> str:
     files = [Path(__file__).resolve(),
              root / "scripts/carto_core/repository/map_expression_catalog.py",
              root / "schemas/portrayal.schema.json",
-             root / "schemas/resolved-raster-portrayal.schema.json",
+             root / "schemas/resolved-portrayal.schema.json",
              root / "schemas/map-expression.schema.json",
              root / "schemas/map-expression-catalog.schema.json"]
     return sha256_digest({"version": VERSION,
@@ -173,8 +174,12 @@ class RasterPortrayalCompiler:
         MapExpressionCatalog(self.preparation.registry).validate_portrayal(portrayal)
         # Current map-body/page adapters render exactly one layer. Do not silently drop
         # extra layers or rules that this compiler has no executor for.
-        if len(portrayal["layers"]) != 1 or portrayal["rules"]:
-            raise ProtocolError("RASTER_PORTRAYAL_UNSUPPORTED", "Require one raster layer and no unresolved portrayal rules")
+        if len(portrayal["layers"]) != 1:
+            not_implemented("raster-multi-layer-overlay", "RASTER_PORTRAYAL_UNSUPPORTED",
+                "Multiple raster layers are on the roadmap; current compiler executes one layer")
+        if portrayal["rules"]:
+            not_implemented("raster-portrayal-rules", "RASTER_PORTRAYAL_UNSUPPORTED",
+                "Non-empty portrayal rules are on the roadmap; current compiler has no rule executor")
         layer = portrayal["layers"][0]
         if layer["id"] != layer_id or layer["geometry"] != "raster":
             raise ProtocolError("RASTER_PORTRAYAL_LAYER_MISMATCH", "Select the declared categorical raster layer")
@@ -189,7 +194,8 @@ class RasterPortrayalCompiler:
         rows = [{key: row[key] for key in ("value", "display", "label", "color", "order", "include_in_legend")}
                 for row in report["rows"]]
         # A display-only semantic such as 'nodata' never changes source metadata.
-        return {"schema_version": 1, "kind": "resolved-raster-portrayal",
+        return {"schema_version": 1, "kind": "resolved-portrayal",
+                "geometry": "raster", "key_mode": "discrete",
                 "compiler_version": VERSION, "compiler_digest": portrayal_compiler_digest(),
                 "portrayal": deepcopy(portrayal), "layer_id": layer_id,
                 "prepared_ref": deepcopy(prepared_ref), "expression_ref": deepcopy(layer["map_expression_ref"]),
@@ -201,10 +207,10 @@ class RasterPortrayalCompiler:
     def compile(self, portrayal: dict[str, Any], layer_id: str,
                 prepared_ref: dict[str, str], context: ExecutionContext) -> StoredArtifact:
         result = self._build(portrayal, layer_id, prepared_ref, context)
-        return self.preparation.save_document(result, "resolved-raster-portrayal")
+        return self.preparation.save_document(result, "resolved-portrayal")
 
     def load_verified(self, reference: dict[str, str], context: ExecutionContext) -> dict[str, Any]:
-        result = self.preparation._json_ref(reference, "resolved-raster-portrayal")
+        result = self.preparation._json_ref(reference, "resolved-portrayal")
         expected = self._build(result["portrayal"], result["layer_id"], result["prepared_ref"], context)
         if result != expected:
             raise ProtocolError("RASTER_PORTRAYAL_CHANGED", "Display contract, source, expression or compiler differs from frozen portrayal")

@@ -98,7 +98,11 @@ class FinalMapCheckService:
             "artifacts": selected,
         }
         if scene.get("renderer_id") == "rasterio-matplotlib-page":
-            context["raster"] = self._raster_context(scene, lock, receipt)
+            context["static_page"] = self._raster_context(scene, lock, receipt)
+            context["raster"] = context["static_page"]
+        elif scene.get("renderer_id") == "matplotlib-vector-page":
+            context["static_page"] = self._vector_context(scene, lock, receipt)
+            context["vector"] = context["static_page"]
         results = [self.checkers.evaluate(item["id"], lock, context).to_dict()
                    for item in self.definitions]
         counts = {
@@ -134,7 +138,7 @@ class FinalMapCheckService:
         return report
 
     def _raster_context(self, scene, lock, receipt):
-        from ..adapters.raster_page_renderer import RasterPageRenderer
+        from ..adapters.page_renderer import PageRenderer
         from ..compiler.raster_scene import RasterSceneCompiler
         from .raster_preparation import RasterPreparationService
         if self.execution_context is None:
@@ -142,7 +146,7 @@ class FinalMapCheckService:
         preparation = RasterPreparationService(project_root=self.project_root,
             allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
         inputs = RasterSceneCompiler(preparation).validate_execution(scene, lock["execution"], self.execution_context)
-        page = RasterPageRenderer(preparation).load_verified(receipt["page_output_ref"], self.execution_context)
+        page = PageRenderer(preparation).load_verified(receipt["page_output_ref"], self.execution_context)
         if (page["request_ref"] != scene["page_request_ref"]
                 or receipt["renderer_id"] != scene["renderer_id"]
                 or page["environment"] != receipt["runtime"]
@@ -153,7 +157,32 @@ class FinalMapCheckService:
             if (item["artifact_ref"]["digest"] != asset["artifact_ref"]["digest"]
                     or item["size_bytes"] != asset["size_bytes"]):
                 raise ProtocolError("FINAL_CHECK_RASTER_BINDING", "Attested outputs differ from the verified page")
-        return {**inputs, "output": page, "body": preparation._json_ref(page["body_ref"], "raster-map-body")}
+        bodies={item['view_id']:preparation._json_ref(item['ref'],'raster-map-body') for item in page['body_refs']}
+        expected={p['view_id']:p['frame_id'] for p in inputs['page']['bindings']['panels']}
+        if len(page['body_refs'])!=len(expected) or {p['view_id']:p['frame_id'] for p in page['body_refs']}!=expected:
+            raise ProtocolError('FINAL_CHECK_RASTER_BINDING','Missing or duplicate panel output')
+        if any(bodies[vid]['frame_id']!=frame for vid,frame in expected.items()):
+            raise ProtocolError('FINAL_CHECK_RASTER_BINDING','Panel output is bound to another frame')
+        return {**inputs, "output": page, "bodies": bodies}
+
+    def _vector_context(self, scene, lock, receipt):
+        from ..adapters.page_renderer import PageRenderer
+        from ..compiler.vector_scene import VectorSceneCompiler
+        from .vector_preparation import VectorPreparationService
+        if self.execution_context is None:
+            raise SecurityError("VECTOR_EXECUTION_CONTEXT", "Trusted execution scope required")
+        preparation = VectorPreparationService(project_root=self.project_root,
+            allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
+        inputs = VectorSceneCompiler(preparation).validate_execution(scene, lock["execution"], self.execution_context)
+        page = PageRenderer(preparation).load_verified(receipt["page_output_ref"], self.execution_context)
+        if (page["request_ref"] != scene["page_request_ref"] or receipt["renderer_id"] != scene["renderer_id"]
+                or page["environment"] != receipt["runtime"] or page["environment"] != lock["execution"]["environment"]["runtime"]):
+            raise ProtocolError("FINAL_CHECK_VECTOR_BINDING", "Scene, page and attested runtime differ")
+        for artifact in receipt["output_artifacts"]:
+            actual = page["outputs"][artifact["target"]]
+            if actual["artifact_ref"]["digest"] != artifact["artifact_ref"]["digest"] or actual["size_bytes"] != artifact["size_bytes"]:
+                raise ProtocolError("FINAL_CHECK_VECTOR_BINDING", "Page and attested output differ")
+        return {**inputs, "output": page}
 
     def report_path(self, attempt_id: str) -> Path:
         return self.path_guard.resolve(
@@ -411,9 +440,9 @@ class FinalMapCheckService:
         path = self._artifact_path(pdf) if pdf else None
         payload = path.read_bytes() if path else b""
         pdf_font_evidence = any(marker in payload for marker in (b"/FontFile", b"/CIDFontType", b"/Type3"))
-        if "raster" in context:
-            output = context["raster"]["output"]
-            font_ok = (output["font_snapshot"] == context["raster"]["font"]
+        if "static_page" in context:
+            output = context["static_page"]["output"]
+            font_ok = (output["font_snapshot"] == context["static_page"]["font"]
                        and output["checks"]["glyph-coverage"] == "passed"
                        and not output["font_embedding_flags"] & (0x0002 | 0x0100 | 0x0200))
             return resource_ok and pdf_font_evidence and font_ok, {
@@ -430,10 +459,10 @@ class FinalMapCheckService:
 
     def _layout_elements(self, context: dict[str, Any]) -> tuple[bool, dict[str, Any], None]:
         scene = context["scene"]
-        if "raster" in context:
+        if "static_page" in context:
             LayoutResolver(self.registry).validate_execution(scene, context["lock"]["execution"])
             frames = {f["id"]: f for f in scene["resolved_layout"]["frames"] if f["type"] != "map"}
-            measurements = context["raster"]["output"]["measurements"]
+            measurements = context["static_page"]["output"]["measurements"]
             valid = {m["frame_id"] for m in measurements} == set(frames)
             for m in measurements:
                 frame = frames.get(m["frame_id"])
@@ -446,7 +475,7 @@ class FinalMapCheckService:
                                    and x+w <= fx+fw+1e-5 and y+h <= fy+fh+1e-5)
             return valid, {"layout_contract_valid": True, "frame_coverage_valid": valid,
                 "measurements": measurements, "bounds_method": "matplotlib-measured-frozen-font",
-                "optional_adornments": {k: context["raster"]["page"][k] is not None for k in ("scale_bar", "grid_north")}}, None
+                "optional_adornments": {k: context["static_page"]["page"][k] is not None for k in ("scale_bar", "grid_north")}}, None
         required = {"title": "text", "legend": "legend", "scale": "scale-bar", "north": "north-arrow", "source": "attribution"}
         by_id = {item["id"]: item for item in scene["overlays"]}
         present = {key: by_id.get(key, {}).get("type") == value for key, value in required.items()}
@@ -473,8 +502,8 @@ class FinalMapCheckService:
 
     def _scenario_notice(self, context: dict[str, Any]) -> tuple[bool, dict[str, Any], None]:
         notice = context["scenario_profile"].notice
-        if "raster" in context:
-            notices = [item for item in context["raster"]["page"]["texts"] if item["text"] == notice]
+        if "static_page" in context:
+            notices = [item for item in context["static_page"]["page"]["texts"] if item["text"] == notice]
         else:
             notices = [item for item in context["scene"]["overlays"]
                        if item.get("content") == notice and item.get("coordinate_space") == "page"]
@@ -511,18 +540,18 @@ class FinalMapCheckService:
             hits = [marker.decode("utf-8") for marker in forbidden if marker in payload]
             if hits:
                 findings[item["target"]] = hits
-        if "raster" in context:
+        if "static_page" in context:
             # PDF streams may be compressed and SVG glyphs are paths: also inspect
             # the verified source strings actually used to produce these bytes.
-            raster = context["raster"]
+            raster = context["static_page"]
             strings = ([item["text"] for item in raster["page"]["texts"]]
-                       + [raster["page"]["legend"]["title"]]
-                       + [row["label"] for row in raster["portrayal"]["legend_items"]])
+                       + [legend["title"] for legend in raster["page"]["legends"]]
+                       + [row["label"] for legend in raster["page"]["legends"] for row in legend["items"]])
             if raster["page"]["grid_north"] is not None:
                 strings.append(raster["page"]["grid_north"]["label"])
             if raster["page"]["scale_bar"] is not None:
-                from ..adapters.raster_page_renderer import RasterPageRenderer
-                strings.append(RasterPageRenderer._scale_label(raster["page"]["scale_bar"]))
+                from ..adapters.page_renderer import PageRenderer
+                strings.append(PageRenderer._scale_label(raster["page"]["scale_bar"]))
             payload = "\n".join(strings).encode("utf-8")
             hits = [marker.decode("utf-8") for marker in forbidden if marker in payload]
             if hits:
@@ -531,6 +560,6 @@ class FinalMapCheckService:
 
     def _renderer_warnings(self, context: dict[str, Any]) -> tuple[bool, dict[str, Any], str]:
         warnings = context["receipt"].get("warnings", [])
-        allowed = set() if "raster" in context else _ALLOWED_RENDER_WARNINGS
+        allowed = set() if "static_page" in context else _ALLOWED_RENDER_WARNINGS
         unknown = sorted(set(warnings) - allowed)
         return not unknown, {"warnings": warnings, "unknown_warnings": unknown}, "accepted" if not unknown else "blocked"

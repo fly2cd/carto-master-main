@@ -17,7 +17,7 @@ SCRIPTS_ROOT = Path(__file__).resolve().parents[1]
 if str(SCRIPTS_ROOT) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_ROOT))
 
-from carto_core.adapters.raster_formal_renderer import RasterFormalRenderer, RasterRendererProfile
+from carto_core.adapters.formal_renderer import FormalRenderer, RendererProfile
 from carto_core.adapters.render_backend import create_render_backend
 from carto_core.adapters.webmap_renderer import compute_renderer_attestation, WebMapRendererAdapter
 from carto_core.canonical import sha256_digest
@@ -28,7 +28,7 @@ from carto_core.compiler.raster_scene import RasterSceneCompiler, RASTER_RENDERE
 from carto_core.errors import CartoError, ProtocolError, SecurityError
 from carto_core.scenario_registry import ScenarioRegistry, ScenarioCapability
 from carto_core.schema_registry import load_document
-from carto_core.security.approval import ApprovalReceipt, InMemoryNonceStore, sign_receipt
+from carto_core.security.approval import ApprovalReceipt, sign_receipt
 from carto_core.workflow.approvals import ApprovalGateCoordinator
 from carto_core.artifacts import atomic_yaml, artifact_ref, utc_now
 from carto_core.workflow.map_delivery import MapDeliveryService
@@ -36,11 +36,10 @@ from carto_core.validation.map_checks import MapQualityChecks
 from carto_core.workflow.map_final_check import FinalMapCheckService
 from carto_core.workflow.map_preview import MapPreviewService, freeze_object_digest
 from carto_core.workflow.map_render import FormalMapRenderService
-from carto_core.workflow.raster_bundle import RasterBundlePreparer
+from carto_core.workflow.preparation_bundle import BundlePreparer
 from tests.fixtures.schema_cases import VALID_CASES
 from tests.test_raster_classification import PreparationFixture
-from tests.test_raster_page_renderer import page_request, release_test_font_handles
-from tests import test_raster_renderer as raster_helpers
+from tests.helpers import page_request, release_test_font_handles, set_raster
 
 KEY = b"synthetic-render-key-not-for-production-1234"
 APPROVAL_KEY = b"synthetic-approval-key-not-for-production-1234"
@@ -53,7 +52,8 @@ class SyntheticCapability:
     definition = {"licenses": ["synthetic-test-only"], "internal_field_names": ["private-test-marker"]}
 
     def require_contract(self, contract):
-        assert contract == {"scenario_id": "synthetic-test"}
+        assert contract["scenario_id"] == "synthetic-test"
+        assert contract["embedded"]["cartography"] == VALID_CASES["cartography"]
 
     def require_scene(self, scene):
         assert scene["renderer_id"] == RASTER_RENDERER_ID
@@ -63,7 +63,7 @@ class SyntheticCapability:
     def component(self, name):
         assert name == "legend_checker"
         # This synthetic purpose explicitly checks its test display labels.
-        return lambda ctx: (ctx["raster"]["portrayal"]["legend_items"][0]["label"] == "Category A",
+        return lambda ctx: (ctx["raster"]["layers"]["main-view"]["portrayal"]["legend_items"][0]["label"] == "Category A",
                             {"synthetic-purpose-check": True}, None)
 
     def require_manifest(self, manifest):
@@ -81,9 +81,9 @@ class RasterFormalTests(PreparationFixture, unittest.TestCase):
         except (CartoError, ImportError) as exc:
             self.skipTest(str(exc))
         self.addCleanup(release_test_font_handles)
-        raster_helpers.RasterRendererTests.set_raster(self, self.np.array([[1,0,255],[255,1,0]],dtype="uint8"))
+        set_raster(self, self.np.array([[1,0,255],[255,1,0]],dtype="uint8"))
         self.prepared = self.ready()
-        self.bundle_preparer = RasterBundlePreparer(self.service)
+        self.bundle_preparer = BundlePreparer(self.service, "raster")
         self.bundle_ref = self.bundle_preparer.prepare(self.prepared.ref(), self.context).ref()
         self.page = page_request(self.service, self.prepared, self.context, dpi=72)
         self.compiler = RasterSceneCompiler(self.service)
@@ -113,14 +113,15 @@ class RasterFormalTests(PreparationFixture, unittest.TestCase):
         no_browser.start(); self.addCleanup(no_browser.stop)
         self.registry = self.service.registry
 
-    def approval(self, gate, digest, *, nonce=None):
+    def approval(self, gate, digest):
         now = datetime.now(UTC)
         action, kind = {"G2": ("approve-freeze", "resolved-map"),
                         "G3": ("approve-delivery", "delivery-manifest")}[gate]
-        return sign_receipt(ApprovalReceipt(1, "synthetic-approval-"+gate.lower(), "synthetic-issuer",
-            "synthetic-reviewer", self.context.tenant_id, action, kind, digest, self.generate["scope"],
-            "synthetic-policy", "local", (now-timedelta(minutes=1)).isoformat(),
-            (now+timedelta(minutes=10)).isoformat(), nonce or "synthetic-nonce-"+gate.lower()+"-123456"), APPROVAL_KEY)
+        return sign_receipt(ApprovalReceipt(
+            "synthetic-approval-"+gate.lower(), action, digest,
+            (now-timedelta(minutes=1)).isoformat(),
+            (now+timedelta(minutes=10)).isoformat(),
+        ), APPROVAL_KEY)
 
     def freeze_and_render(self):
         self.preview_result = self.preview.render(self.generate, self.candidate, self.scene)
@@ -128,9 +129,8 @@ class RasterFormalTests(PreparationFixture, unittest.TestCase):
         evidence, receipt = self.preview_result["evidence"], self.preview_result["receipt"]
         digest = freeze_object_digest(self.generate, self.candidate, evidence)
         approval = self.approval("G2", digest)
-        coordinator = ApprovalGateCoordinator(APPROVAL_KEY, InMemoryNonceStore(), "synthetic-policy", "synthetic-issuer")
-        coordinator.require("G2", approval, digest, self.context, approver_subject_id="synthetic-reviewer",
-                            expected_scope=self.generate["scope"])
+        coordinator = ApprovalGateCoordinator(APPROVAL_KEY)
+        coordinator.require("G2", approval, digest)
         self.lock = MapSpecLockCompiler().compile(self.generate, self.candidate, evidence, receipt,
             deepcopy(VALID_CASES["validation-report"]), brief_approval_ref="synthetic-g1-test-boundary",
             freeze_approval_ref="synthetic-g2")
@@ -167,10 +167,12 @@ class RasterFormalTests(PreparationFixture, unittest.TestCase):
         request["subject"]["namespace"] = self.context.project_id
         request.update(source_bindings=[deepcopy(self.request["source"])],
             sources=[deepcopy(self.request["source"]["source_ref"])],
-            prepared_raster_bindings=[{"role": self.request["source"]["role"], "prepared_ref": self.prepared.ref()}],
+            prepared_raster_bindings=[{"source_id":self.request["source"]["source_ref"]["id"],"role": self.request["source"]["role"], "prepared_ref": self.prepared.ref()}],
             requested_at=utc_now(), audience="synthetic test only",
             allowed_capabilities=["read", "classify", "render-preview"],
             font={"path": self.page["font"]["path"], "family": "DejaVu Sans", "version": "1.0.0"})
+        request["layout_parameters"] = self.page["resolved_layout"]["parameters"]
+        request["panels"] = [{"id":"main-view","source_id":self.request["source"]["source_ref"]["id"],"title":request["goal"]}]
         self.registry.validate("generate-request", request)
         return request
 
@@ -191,8 +193,11 @@ class RasterFormalTests(PreparationFixture, unittest.TestCase):
             intent_ref={"id": intent["intent_id"], "version": "1.0.0", "digest": sha256_digest(intent)},
             profile_refs=[intent["evidence_refs"][0], intent["evidence_refs"][-1]])
         self.execution["shared_semantics"]["theme_tags"] = intent["theme_tags"]
-        self.contracts = {"scenario": {"scenario_id": "synthetic-test"},
+        self.contracts = {"scenario": {"scenario_id": "synthetic-test",
+                          "embedded": {"cartography": deepcopy(self.page["appearance"]["cartography"]),
+                                       "layout":deepcopy(self.page["resolved_layout"]["template_contract"])}},
                           "quality_gates": deepcopy(VALID_CASES["quality-gates"])}
+        self.contracts["portrayal"] = self.service._json_ref(self.page["portrayals"][0]["ref"], "resolved-portrayal")["portrayal"]
         reference = MapQualityChecks(self.registry).reference(self.contracts["quality_gates"], self.scene)
         self.execution["policy_refs"] = [reference]
         self.candidate.update(execution=self.execution, execution_digest=sha256_digest(self.execution))
@@ -219,11 +224,8 @@ class RasterFormalTests(PreparationFixture, unittest.TestCase):
         preview = workflow.preview(self.request_path, attestation_key=KEY)
         self.assertEqual(("waiting_approval", "freeze"), (preview["state"]["status"], preview["state"]["step"]))
         approval_path = self.root/"workflow-g2.yaml"
-        kwargs = dict(approval_key=APPROVAL_KEY, attestation_key=KEY, nonce_db=self.root/"workflow-nonces.sqlite",
-                      policy_id="synthetic-policy", issuer="synthetic-issuer")
-        for wrong in [self.approval("G2", "sha256:"+"0"*64),
-                      sign_receipt(replace(self.approval("G2", preview["approval_object_digest"]),
-                                           scope="project:other"), APPROVAL_KEY)]:
+        kwargs = dict(approval_key=APPROVAL_KEY, attestation_key=KEY)
+        for wrong in [self.approval("G2", "sha256:"+"0"*64)]:
             atomic_yaml(approval_path, asdict(wrong), create_once=False)
             with self.assertRaises(SecurityError): workflow.freeze(self.request_path, approval_path, **kwargs)
             self.assertFalse((self.work/"locks"/f"lock-{self.context.run_id}"/"map-spec-lock.yaml").exists())
@@ -246,11 +248,8 @@ class RasterFormalTests(PreparationFixture, unittest.TestCase):
         manifest = checked["delivery_manifest"]
         self.assertEqual(sha256_digest(frozen["lock"]), manifest["lock_ref"]["digest"])
         approval_path = self.root/"workflow-g3.yaml"
-        kwargs = dict(approval_key=APPROVAL_KEY, nonce_db=self.root/"workflow-nonces.sqlite",
-                      policy_id="synthetic-policy", issuer="synthetic-issuer")
-        for wrong in [self.approval("G3", "sha256:"+"0"*64),
-                      sign_receipt(replace(self.approval("G3", sha256_digest(manifest)),
-                                           scope="project:other"), APPROVAL_KEY)]:
+        kwargs = dict(approval_key=APPROVAL_KEY)
+        for wrong in [self.approval("G3", "sha256:"+"0"*64)]:
             atomic_yaml(approval_path, asdict(wrong), create_once=False)
             with self.assertRaises(SecurityError): workflow.deliver(self.request_path, approval_path, **kwargs)
             self.assertFalse((self.root/"deliveries/workflow").exists())
@@ -265,10 +264,14 @@ class RasterFormalTests(PreparationFixture, unittest.TestCase):
         self.assertTrue(repeated["idempotent_replay"])
         self.assertEqual({"map.pdf", "map.png", "README.md", "delivery-manifest.yaml", "checksums.sha256"},
                          {p.name for p in (self.root/"deliveries/workflow").iterdir()})
-        original = ApprovalReceipt.from_dict(load_document(approval_path))
-        changed = sign_receipt(replace(original, receipt_id="changed-g3-receipt"), APPROVAL_KEY)
-        atomic_yaml(approval_path, asdict(changed), create_once=False)
-        with self.assertRaisesRegex(SecurityError, "APPROVAL_RECOVERY_EVIDENCE_CONFLICT"):
+        # Re-deliver with a different approval digest is rejected
+        wrong_approval = sign_receipt(ApprovalReceipt(
+            "wrong-receipt", "approve-delivery", sha256_digest({"wrong": True}),
+            (datetime.now(UTC)-timedelta(minutes=1)).isoformat(),
+            (datetime.now(UTC)+timedelta(minutes=10)).isoformat(),
+        ), APPROVAL_KEY)
+        atomic_yaml(approval_path, asdict(wrong_approval), create_once=False)
+        with self.assertRaisesRegex(SecurityError, "APPROVAL"):
             workflow.deliver(self.request_path, approval_path, **kwargs)
 
     def test_preview_rejects_tampered_preflight_before_rendering(self):
@@ -293,11 +296,8 @@ class RasterFormalTests(PreparationFixture, unittest.TestCase):
         with patch.object(ApprovalGateCoordinator, "require") as consume:
             with self.assertRaisesRegex(ProtocolError, "CANDIDATE_CHECKER_SET_DRIFT"):
                 workflow.freeze(self.request_path, self.root / "absent-g2.yaml",
-                    approval_key=APPROVAL_KEY, attestation_key=KEY,
-                    nonce_db=self.root / "unconsumed-nonces.sqlite",
-                    policy_id="synthetic-policy", issuer="synthetic-issuer")
+                    approval_key=APPROVAL_KEY, attestation_key=KEY)
             consume.assert_not_called()
-        self.assertFalse((self.root / "unconsumed-nonces.sqlite").exists())
         self.assertFalse(list((self.work / "locks").rglob("map-spec-lock.yaml")))
 
     def test_lock_replay_rejects_changed_quality_policy(self):
@@ -313,9 +313,9 @@ class RasterFormalTests(PreparationFixture, unittest.TestCase):
     def test_workflow_environment_drift_requires_new_preview_and_freeze(self):
         workflow = self.staged_workflow()
         self.freeze_workflow(workflow)
-        profile = RasterRendererProfile.current()
+        profile = RendererProfile.current()
         changed = replace(profile, runtime={**profile.runtime, "matplotlib": "0.0.0"})
-        with patch.object(RasterRendererProfile, "current", return_value=changed):
+        with patch.object(RendererProfile, "current", return_value=changed):
             with self.assertRaisesRegex(ProtocolError, "RENDER_ENVIRONMENT_DRIFT"):
                 workflow.render(self.request_path, attestation_key=KEY)
         self.assertEqual("failed", workflow.state_store.load().status)
@@ -357,7 +357,7 @@ class RasterFormalTests(PreparationFixture, unittest.TestCase):
         page = deepcopy(self.page)
         page["grid_north"] = {"label": "private-test-marker"}
         context = {"scenario_profile": self.capability, "artifacts": [],
-                   "raster": {"page": page, "portrayal": {"legend_items": []}}}
+                   "static_page": {"page": page}}
         passed, details, _ = checker._sensitive_content(context)
         self.assertFalse(passed)
         self.assertIn("frozen-rendered-text", str(details))
@@ -409,8 +409,7 @@ class RasterFormalTests(PreparationFixture, unittest.TestCase):
         approval_path = self.root/"synthetic-g3.yaml"
         atomic_yaml(approval_path, asdict(self.approval("G3", sha256_digest(manifest))), create_once=False)
         kwargs = dict(request=self.generate, manifest=manifest, manifest_ref=ref, report=report,
-                      approval_path=approval_path, approval_key=APPROVAL_KEY, nonce_db=self.root/"nonces.sqlite",
-                      policy_id="synthetic-policy", issuer="synthetic-issuer")
+                      approval_path=approval_path, approval_key=APPROVAL_KEY)
         def crash(phase):
             if phase == "after-atomic-commit":
                 raise RuntimeError("synthetic interruption")

@@ -22,7 +22,7 @@ for root in (SCRIPTS_ROOT, TESTS_ROOT):
 from carto_core.canonical import sha256_digest
 from carto_core.cli import build_parser, main as cli_main
 from carto_core.errors import ProtocolError, SecurityError
-from carto_core.security.approval import ApprovalReceipt, InMemoryNonceStore, sign_receipt
+from carto_core.security.approval import ApprovalReceipt, sign_receipt
 from carto_core.workflow.approvals import ApprovalGateCoordinator
 from carto_core.workflow.models import ExecutionContext
 from carto_core.workflow.state_machine import WorkflowStateStore
@@ -243,35 +243,16 @@ class RouteClosureTests(unittest.TestCase):
         now = datetime.now(UTC)
         digest = sha256_digest({"brief": "one"})
         unsigned = ApprovalReceipt(
-            1,
             "approval-one",
-            "trusted-local",
-            "reviewer-one",
-            "tenant-one",
             "approve-template-brief",
-            "template-brief",
             digest,
-            "project:project-one",
-            "carto-security",
-            "local",
             (now - timedelta(minutes=1)).isoformat(),
             (now + timedelta(minutes=10)).isoformat(),
-            "nonce-0000000000000001",
         )
         receipt = sign_receipt(unsigned, KEY)
-        context = ExecutionContext(
-            run_id="run-one",
-            tenant_id="tenant-one",
-            project_id="project-one",
-            subject_id="operator-one",
-            roles=frozenset({"operator"}),
-            namespaces=frozenset({"project-one"}),
-            authorized_capabilities=frozenset(),
-            environment="local",
-        )
-        coordinator = ApprovalGateCoordinator(KEY, InMemoryNonceStore(), "carto-security", "trusted-local")
+        coordinator = ApprovalGateCoordinator(KEY)
         with self.assertRaises(SecurityError) as raised:
-            coordinator.require("G1", receipt, digest, context, approver_subject_id="reviewer-one")
+            coordinator.require("G1", receipt, digest)
         self.assertEqual(raised.exception.code, "APPROVAL_ACTION_MISMATCH")
 
 

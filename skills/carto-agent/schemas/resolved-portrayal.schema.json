@@ -1,0 +1,588 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/resolved-portrayal.schema.json",
+  "title": "resolved-portrayal",
+  "description": "Single frozen expression artifact for every geometry. The header is shared; the display/render body is geometry-conditional. key_mode names the legend contract (discrete lookup, interval breaks or continuous scaling); the rendering table stays geometry-specific until the renderer merge.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "kind",
+    "geometry",
+    "key_mode",
+    "compiler_version",
+    "compiler_digest",
+    "prepared_ref"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "kind": {
+      "const": "resolved-portrayal"
+    },
+    "geometry": {
+      "enum": [
+        "raster",
+        "vector"
+      ]
+    },
+    "key_mode": {
+      "enum": [
+        "discrete",
+        "interval",
+        "scaling"
+      ]
+    },
+    "compiler_version": {
+      "const": "1.0.0"
+    },
+    "compiler_digest": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+    },
+    "prepared_ref": {
+      "allOf": [
+        {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+        },
+        {
+          "required": [
+            "uri"
+          ],
+          "properties": {
+            "id": {
+              "enum": [
+                "raster-prepared-data",
+                "vector-prepared-data"
+              ]
+            },
+            "version": {
+              "const": "1.0.0"
+            }
+          }
+        }
+      ]
+    },
+    "expression_ref": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/mapExpressionRef"
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "tenant_id",
+        "project_id",
+        "subject_id"
+      ],
+      "properties": {
+        "run_id": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+        },
+        "tenant_id": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+        },
+        "project_id": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+        },
+        "subject_id": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+        }
+      }
+    },
+    "portrayal": {
+      "$ref": "https://schemas.carto-agent.local/v1/portrayal.schema.json"
+    },
+    "layer_id": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+    },
+    "source_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_ref",
+        "size_bytes"
+      ],
+      "properties": {
+        "artifact_ref": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 268435456
+        }
+      }
+    },
+    "lookup_table": {
+      "$ref": "#/$defs/lookupTable"
+    },
+    "source_mask_policy": {
+      "const": "preserve"
+    },
+    "unknown_value_policy": {
+      "const": "reject"
+    },
+    "resampling": {
+      "const": "nearest"
+    },
+    "encoding": {
+      "$ref": "https://schemas.carto-agent.local/v1/vector-encoding.schema.json"
+    },
+    "feature_styles": {
+      "$ref": "#/$defs/featureStyles"
+    },
+    "counts": {
+      "$ref": "#/$defs/counts"
+    },
+    "legend_items": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/rasterLegendItems"
+        },
+        {
+          "$ref": "#/$defs/vectorLegendItems"
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "geometry": {
+            "const": "raster"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "portrayal",
+          "layer_id",
+          "expression_ref",
+          "source_snapshot",
+          "context",
+          "lookup_table",
+          "legend_items",
+          "source_mask_policy",
+          "unknown_value_policy",
+          "resampling"
+        ],
+        "properties": {
+          "key_mode": {
+            "const": "discrete"
+          },
+          "prepared_ref": {
+            "properties": {
+              "id": {
+                "const": "raster-prepared-data"
+              }
+            }
+          },
+          "legend_items": {
+            "$ref": "#/$defs/rasterLegendItems"
+          }
+        },
+        "not": {
+          "required": [
+            "encoding",
+            "feature_styles",
+            "counts"
+          ]
+        }
+      },
+      "else": {
+        "required": [
+          "encoding",
+          "feature_styles",
+          "legend_items",
+          "counts"
+        ],
+        "properties": {
+          "prepared_ref": {
+            "properties": {
+              "id": {
+                "const": "vector-prepared-data"
+              }
+            }
+          },
+          "legend_items": {
+            "$ref": "#/$defs/vectorLegendItems"
+          }
+        },
+        "not": {
+          "required": [
+            "lookup_table",
+            "portrayal",
+            "layer_id",
+            "source_snapshot",
+            "source_mask_policy",
+            "unknown_value_policy",
+            "resampling"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "encoding"
+        ],
+        "properties": {
+          "encoding": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "single",
+                  "categorical"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "key_mode": {
+            "const": "discrete"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "encoding"
+        ],
+        "properties": {
+          "encoding": {
+            "properties": {
+              "kind": {
+                "const": "choropleth"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "key_mode": {
+            "const": "interval"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "encoding"
+        ],
+        "properties": {
+          "encoding": {
+            "properties": {
+              "kind": {
+                "const": "proportional"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "key_mode": {
+            "const": "scaling"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "lookupTable": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "value",
+          "display",
+          "label",
+          "color",
+          "order",
+          "include_in_legend"
+        ],
+        "properties": {
+          "value": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 4294967295
+          },
+          "display": {
+            "enum": [
+              "color",
+              "hidden"
+            ]
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^#[0-9A-Fa-f]{6}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1023
+          },
+          "include_in_legend": {
+            "type": "boolean"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "display": {
+                  "const": "hidden"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "color": {
+                  "type": "null"
+                },
+                "include_in_legend": {
+                  "const": false
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "display": {
+                  "const": "color"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256,
+                  "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                },
+                "color": {
+                  "type": "string",
+                  "pattern": "^#[0-9A-F]{6}$"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "rasterLegendItems": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "value",
+          "label",
+          "color",
+          "order"
+        ],
+        "properties": {
+          "value": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 4294967295
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1023
+          }
+        }
+      }
+    },
+    "vectorSymbol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "color",
+        "stroke",
+        "stroke_width_pt",
+        "radius_mm"
+      ],
+      "properties": {
+        "color": {
+          "type": "string",
+          "pattern": "^#[0-9A-F]{6}$"
+        },
+        "stroke": {
+          "type": "string",
+          "pattern": "^#[0-9A-F]{6}$"
+        },
+        "stroke_width_pt": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "radius_mm": {
+          "type": "number",
+          "minimum": 1e-06,
+          "maximum": 20
+        }
+      }
+    },
+    "vectorLegendItems": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 33,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "label",
+          "symbol",
+          "shape"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          },
+          "symbol": {
+            "$ref": "#/$defs/vectorSymbol"
+          },
+          "shape": {
+            "enum": [
+              "circle",
+              "square"
+            ]
+          }
+        }
+      }
+    },
+    "featureStyles": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "feature_id",
+          "style"
+        ],
+        "properties": {
+          "feature_id": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+          },
+          "style": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "symbol",
+                  "legend_id"
+                ],
+                "properties": {
+                  "symbol": {
+                    "$ref": "#/$defs/vectorSymbol"
+                  },
+                  "legend_id": {
+                    "oneOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "feature_count",
+        "visible_count",
+        "missing_count",
+        "zero_count"
+      ],
+      "properties": {
+        "feature_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "visible_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "missing_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "zero_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        }
+      }
+    }
+  }
+}

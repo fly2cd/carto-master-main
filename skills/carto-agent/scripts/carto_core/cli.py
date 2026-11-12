@@ -10,7 +10,7 @@ from .adapters.renderer_probe import RendererCapabilityProbe
 from .adapters.host_probe import HermesHostProbe
 from .errors import CartoError, ProtocolError
 from .schema_registry import SchemaRegistry, load_document
-from .security.approval import ApprovalReceipt, SqliteNonceStore, verify_receipt
+from .security.approval import ApprovalReceipt, verify_receipt
 from .security.paths import PathGuard
 from .workflow.data_preparation import DeterministicDataPreparer
 from .workflow.intent import IntentResolver
@@ -50,7 +50,7 @@ def build_parser() -> argparse.ArgumentParser:
     check_path.add_argument("--allowed-root", action="append", required=True)
     check_path.add_argument("--must-exist", action="store_true")
 
-    approval = sub.add_parser("approval", help="Verify a trusted approval receipt")
+    approval = sub.add_parser("approval", help="Verify a signed approval receipt")
     approval_sub = approval.add_subparsers(dest="approval_command", required=True)
     verify = approval_sub.add_parser("verify")
     verify.add_argument("receipt")
@@ -58,14 +58,6 @@ def build_parser() -> argparse.ArgumentParser:
     verify.add_argument("--key-env", default="CARTO_APPROVAL_HMAC_KEY")
     verify.add_argument("--action", required=True)
     verify.add_argument("--object-digest", required=True)
-    verify.add_argument("--scope", required=True)
-    verify.add_argument("--policy-id", required=True)
-    verify.add_argument("--tenant-id", required=True)
-    verify.add_argument("--issuer", required=True)
-    verify.add_argument("--subject-id", required=True)
-    verify.add_argument("--object-type", required=True)
-    verify.add_argument("--environment", required=True)
-    verify.add_argument("--nonce-db", required=True)
 
     intent = sub.add_parser("intent", help="Resolve a typed map intent")
     intent_sub = intent.add_subparsers(dest="intent_command", required=True)
@@ -130,9 +122,6 @@ def build_parser() -> argparse.ArgumentParser:
     _add_template_paths(author)
     author.add_argument("--approval", required=True)
     author.add_argument("--key-env", default="CARTO_APPROVAL_HMAC_KEY")
-    author.add_argument("--policy-id", default="carto-security")
-    author.add_argument("--issuer", required=True)
-    author.add_argument("--nonce-db", required=True)
     validate_template = create_sub.add_parser("validate", help="Validate and render the staged scenario validation input")
     _add_template_paths(validate_template)
     validate_template.add_argument("--attestation-key-env", default="CARTO_RENDER_ATTESTATION_KEY")
@@ -146,9 +135,6 @@ def build_parser() -> argparse.ArgumentParser:
     publish.add_argument("--idempotency-key", required=True)
     publish.add_argument("--key-env", default="CARTO_APPROVAL_HMAC_KEY")
     publish.add_argument("--attestation-key-env", default="CARTO_RENDER_ATTESTATION_KEY")
-    publish.add_argument("--policy-id", default="carto-security")
-    publish.add_argument("--issuer", required=True)
-    publish.add_argument("--nonce-db", required=True)
     status = create_sub.add_parser("status", help="Read current template workflow state")
     _add_template_paths(status, request=False)
     retry = create_sub.add_parser("retry", help="Retry the current failed template workflow step")
@@ -180,9 +166,6 @@ def build_parser() -> argparse.ArgumentParser:
         if name in {"compile", "freeze", "deliver"}:
             item.add_argument("--approval", required=True)
             item.add_argument("--key-env", default="CARTO_APPROVAL_HMAC_KEY")
-            item.add_argument("--nonce-db", required=True)
-            item.add_argument("--policy-id", default="carto-security")
-            item.add_argument("--issuer", required=True)
         if name in {"preview", "freeze", "render", "check"}:
             item.add_argument("--attestation-key-env", default="CARTO_RENDER_ATTESTATION_KEY")
             item.add_argument("--browser")
@@ -224,17 +207,13 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "approval" and args.approval_command == "verify":
             path_guard = PathGuard(args.allowed_root)
             path = path_guard.resolve(args.receipt, must_exist=True)
-            nonce_db = path_guard.resolve(args.nonce_db)
             value = load_document(path)
             SchemaRegistry().validate("approval-receipt", value)
             key = os.environ.get(args.key_env, "").encode("utf-8")
             verify_receipt(
-                ApprovalReceipt.from_dict(value), key, SqliteNonceStore(str(nonce_db)),
-                expected_action=args.action, expected_object_digest=args.object_digest,
-                expected_scope=args.scope, expected_policy_id=args.policy_id,
-                expected_tenant_id=args.tenant_id,
-                expected_issuer=args.issuer, expected_subject_id=args.subject_id,
-                expected_object_type=args.object_type, expected_environment=args.environment,
+                ApprovalReceipt.from_dict(value), key,
+                expected_action=args.action,
+                expected_object_digest=args.object_digest,
             )
             return _success({"receipt": str(path), "verified": True})
         if args.command == "intent" and args.intent_command == "resolve":
@@ -328,7 +307,6 @@ def main(argv: list[str] | None = None) -> int:
                 return _success(workflow.compile(
                     args.request, args.approval,
                     approval_key=os.environ.get(args.key_env, "").encode("utf-8"),
-                    nonce_db=args.nonce_db, policy_id=args.policy_id, issuer=args.issuer,
                 ))
             if args.generate_command == "preview":
                 return _success(workflow.preview(
@@ -341,7 +319,6 @@ def main(argv: list[str] | None = None) -> int:
                     args.request, args.approval,
                     approval_key=os.environ.get(args.key_env, "").encode("utf-8"),
                     attestation_key=os.environ.get(args.attestation_key_env, "").encode("utf-8"),
-                    nonce_db=args.nonce_db, policy_id=args.policy_id, issuer=args.issuer,
                     browser=args.browser,
                 ))
             if args.generate_command == "render":
@@ -364,7 +341,6 @@ def main(argv: list[str] | None = None) -> int:
                 return _success(workflow.deliver(
                     args.request, args.approval,
                     approval_key=os.environ.get(args.key_env, "").encode("utf-8"),
-                    nonce_db=args.nonce_db, policy_id=args.policy_id, issuer=args.issuer,
                 ))
             if args.generate_command == "delivery-status":
                 return _success(workflow.delivery_status(args.idempotency_key))
@@ -396,9 +372,6 @@ def main(argv: list[str] | None = None) -> int:
                         args.request,
                         args.approval,
                         approval_key=key,
-                        nonce_db=args.nonce_db,
-                        policy_id=args.policy_id,
-                        issuer=args.issuer,
                     )
                 )
             if args.create_command == "validate":
@@ -413,7 +386,6 @@ def main(argv: list[str] | None = None) -> int:
                     args.request, args.approval, repository_root=args.repository_root,
                     repository_scope=args.repository_scope, idempotency_key=args.idempotency_key,
                     approval_key=approval_key, renderer_attestation_key=attestation_key,
-                    nonce_db=args.nonce_db, policy_id=args.policy_id, issuer=args.issuer,
                 ))
             if args.create_command == "status":
                 return _success(workflow.status())

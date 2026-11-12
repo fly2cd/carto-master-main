@@ -255,7 +255,6 @@ run_id: run-flood-001
 project_id: project-flood-001
 goal: 制作城市洪涝风险专题图
 audience: 应急管理人员
-scene_hint: emergency_mapping
 requested_outputs: [svg, png, pdf]
 subject:
   subject_id: operator-one            # 发起人
@@ -339,7 +338,7 @@ template_candidates:
 delegation: {allow_data_agent: false, max_tool_calls: 0}
 approval_required: true
 project_id: project-flood-001
-business_scene: emergency_mapping
+business_scene: general_thematic_mapping
 scope: project:project-flood-001
 environment: local
 allowed_capabilities: [classify, filter, read, render-preview]

@@ -1,12 +1,12 @@
 ---
 name: carto-agent
 description: 地图制图智能体的创建模板与生成地图工作流入口。
-version: 0.5.0
+version: 0.8.0
 ---
 
 # Carto Agent Skill
 
-本目录是地图制图智能体的唯一运行实现。当前已落地 U-P0 安全底座、U-P1 内核协议骨架、U-P2.0～U-P2.7 的 MapScenario 创建发布与地图候选冻结闭环，以及 U-P3.1～U-P3.3 的锁驱动正式渲染、成品检查、精确 G3 和原子本地交付；不得在仓库其他位置建立并行实现。
+本目录是地图制图智能体的唯一运行实现。当前已落地 U-P0 安全底座、U-P1 内核协议骨架、U-P2.0～U-P2.7 的 MapScenario 创建发布与地图候选冻结闭环，U-P3.1～U-P3.3 的锁驱动正式渲染、成品检查、精确 G3 和原子本地交付，以及 U-P3.6 的协议层统一（请求/模板创建 schema 合并、bundle-inputs 统一、应急制图并入标准专题制图）。不得在仓库其他位置建立并行实现。
 
 ## 必读顺序
 
@@ -18,7 +18,7 @@ version: 0.5.0
 ## 当前阶段边界
 
 - 保留通用框架：Schema 与安全底座、状态与回执、审批协调、ToolGateway、知识服务、模板创建发布编排、候选编译与冻结、锁驱动渲染、成品检查和原子本地交付。
-- **当前只注册了一个业务场景**：`general_thematic_mapping`（标准专题图编制；`policies/scenario-capabilities.yaml` v1.3.0 的 `general-thematic-mapping` 档案，代码实现白名单 `general-thematic-raster`，模板 `map-scenario/general-thematic-map@1.0.0`）。它只接受用户提供的已分类栅格（`data_nature: user-provided`、禁敏感坐标、禁生产数据），A4 横版 300dpi 输出 PDF+PNG，`production_enabled: false`，成果强制携带场景 NOTICE 与用户声明的源许可。其余一切能力仍默认拒绝：结构合法且意图就绪后，创建和生成入口对未注册能力返回 `CAPABILITY_NOT_AVAILABLE`；生成入口的缺项或歧义先返回意图错误，不能用通用 Schema 通过代替能力准入。
+- **当前只注册了一个业务场景**：`general_thematic_mapping`（标准专题图编制；`policies/scenario-capabilities.yaml` v1.5.0 的 `general-thematic-mapping` 档案，代码实现白名单 `general-thematic`（几何 strategy：raster 已准入、vector 代码就绪未准入），模板 `map-scenario/general-thematic-map@3.0.0`）。它只接受用户提供的已分类栅格（`data_nature: user-provided`、禁敏感坐标、禁生产数据），在一个参数化网格模板内选择 1×1、1×2 或 2×2，独立/整页共享图例；A4 横版 300dpi 输出 PDF+PNG，`production_enabled: false`，成果强制携带场景 NOTICE 与用户声明的源许可。其余一切能力仍默认拒绝：结构合法且意图就绪后，创建和生成入口对未注册能力返回 `CAPABILITY_NOT_AVAILABLE`；生成入口的缺项或歧义先返回意图错误，不能用通用 Schema 通过代替能力准入。
 - 该场景的分类栅格模板样张渲染分支已注册：`validate` 在静态检查全部通过后，于受信验证上下文内由包内图例样本派生确定性合成栅格，经授权 MCP 网关测量统计，并用 `rasterio-matplotlib-page` 后端渲染 PDF+PNG 样张、冻结渲染场景与带签名 RenderReceipt；`publish` 按冻结场景重新核验证据（不依赖作者宿主字体）并消费精确 TP。宿主缺少栅格渲染依赖、无可嵌入字体或展示 CRS 为地理坐标系时仍失败关闭，不得伪造渲染证据绕过。
 - 仓库不附带业务示例数据、示例模板包或默认测试项目。后续由用户提供真实数据和场景需求，完成对应实现、注册和验收后才能启用。
 - 模板发布仍必须验证闭合包、依赖锁、场景验证输入、检查器集合、RenderReceipt、冻结样张场景（`render_scene_ref`）和环境绑定，并消费精确 TP。验证数据是否适合进入模板包由场景安全检查明确判定，不能把原始敏感业务数据打包。
@@ -28,6 +28,31 @@ version: 0.5.0
 - 不声明生产制图、地图工作流中的真实 CRS 转换、任意输入格式、三场景覆盖、共享服务或公网发布；`production_tasks` 为空。`map-brand`、`map-style`、`map-layout` 的业务创建路由仍未开放。
 - CLI 入口：`python skills/carto-agent/scripts/carto.py --help`。
 - 开发测试仅在用户允许时执行；不作为正式运行协议或真实场景验收证据。
+
+## S1：合同归一与有限参数化多图
+
+- general 作者只输出一个 `general-thematic-map@3.0.0` 模板，不复制多份固定模板。Layout 声明可用形状、图例模式、空间区域和间距；`layout_parameters` 显式选择 `1×1 / 1×2 / 2×2` 与 `independent / shared`。不支持 2×1、任意行列数或自动模板检索/生成。
+- 模板升级须重新验证发布，旧页面/候选/锁不能自动迁移，也不能沿用旧审批。`map-plan`、`page-request/output` 为 v4；`cartography`、`page-bindings`、`resolved-appearance`、`resolved-layout`、`raster-map-body` 为 v2；准备报告与分类 portrayal 版本不变。
+- `source_id`、view、layer、panel、legend 显式关联。同源可复用，多源可同角色；每个视图保留对应数据范围。源 CRS 必须一致且匹配模板，不做隐式重投影或范围并集。
+- 独立图例使用对应面板的已确认类别；共享图例要求完整类别定义（编码、语义、显示、名称、颜色、顺序）及 legend_policy 一致。observed 使用已确认图例项并集；all 还要求逐类纳入标志一致。冲突拒绝，不改色、不重新分类、不降级。
+- 字号/行距唯一来自 cartography，内边距来自 Layout，类别颜色来自已确认 portrayal；最终 appearance、模板布局、参数与全部关系随页面冻结并重验。类别统计与模板图例容量分开。
+- 模板 `validate/publish` 覆盖声明的六种参数组合，每种都有冻结场景和真实渲染回执；不能用单图样张证明多图能力。正式渲染、终检和交付验证每个面板，不只检查第一幅图。
+- 本期一页一个静态后端，每面板一层分类栅格；普通单图也走同一内核。浏览器多图、任意共享组、多图比例尺/指北针、矢量、mosaic/freeform/inset、内容策划、独立 Style/Layout 创建及生产能力仍未开放。
+
+## S2 工程候选：合成回归通过，尚未正式准入
+
+- 已新增有界 GeoJSON/成组 Shapefile、点/面单符号与类别、显式面分级、点圆面积比例，以及共享物理页面、矢量场景/正式适配器和测试代码。
+- `general-thematic-map@4.0.0` 矢量作者和 `matplotlib-vector-page` 为待验证实现；正式能力策略未登记，不能把新 Schema/表达目录/后端存在理解为可执行业务准入。
+- 2026-11-10 已在现有 geo313（Python 3.13.18、Fiona/Shapely）完成修复和统一回归：81 个 Schema 有效，420 项测试中 407 通过、13 项外部环境测试跳过，零失败/错误；S2 单元 15 项及工作流 2 项全部通过。本次未安装依赖、未执行真实制图；不把跳过项或合成审批等同于真实场景验收。
+- 真实输入指定为 `projects/dataset/shp`，目前只核对文件清单；不得据目录名推断指标、生成业务数据 Fixture 或签发审批。
+
+## P3.6 协议层统一
+
+- **请求 Schema 合并**：`general-thematic-generate-request` 与 `general-vector-generate-request` 合并为 `general-generate-request`；`general-thematic-template-create-request` 与 `general-vector-template-create-request` 合并为 `general-template-create-request`。统一 Schema 通过 `oneOf`/`if-then` 按 `version`（3.0.0 / 4.0.0）区分 raster / vector 变体，不做向后兼容 wrapper。
+- **Bundle-inputs 统一**：`raster-bundle-inputs` 与 `vector-bundle-inputs`（字节级相同）合并为单一 `bundle-inputs`。
+- **Render-scene 收敛**：三个 `oneOf` 变体（maplibre-web / raster-page / vector-page）收敛为两个，后两者因结构相同合并为一个 unified static page scene（`page-request`），通过 `renderer_id` 枚举区分。
+- **应急制图并入标准专题**：`emergency_mapping` 不再作为独立业务场景，洪涝/滑坡/森林火灾作为 `general_thematic_mapping` 的主题标签（`theme_tags`）。`intent-profiles.yaml` 中删除 `emergency_mapping` profile，`[应急,灾情,救援]` 并入 `general_thematic_mapping` 的 `purpose_terms`。
+- 以上变更均为直接替换，不保留旧名称 wrapper、旧 schema 文件或向后兼容旁路。
 
 ## 基础 GIS 数据接入（第一批）
 
@@ -49,18 +74,18 @@ version: 0.5.0
 
 - 分类栅格是数据类型，`raster/categorical` 是表达，Rasterio + Matplotlib 是后端；三者都不是业务用途，不新建“分类栅格业务场景”。
 - `compiler/raster_portrayal.py`（原 `raster_classification.py`）保留 Carto 的显示定义匹配和澄清，新增 `RasterPortrayalCompiler`，不实现 GIS 重分类/重投影。
-- 共享 `portrayal` 新增 raster 图层；目录引用需精确 ID/版本/摘要。模板只声明角色和策略，项目类别表冻结到 `resolved-raster-portrayal`，图例从同一表派生。
+- 共享 `portrayal` 新增 raster 图层；目录引用需精确 ID/版本/摘要。模板只声明角色和策略，项目类别表冻结到 `resolved-portrayal`（geometry=raster 分支），图例从同一表派生。
 - 图体和整页渲染改为消费 `portrayal_ref`，重验类别合同、源快照、目录与上下文；单层、nearest、保留源掩膜，未实现的多层/规则明确拒绝。
-- 共享表达继续由独立的准备/显示合同冻结，第三批 C 将其接入正式链路，场景策略保持为空。旧内部快照须重新准备/编译，不保留旧模块别名或旧请求字段。
+- 共享表达继续由独立的准备/显示合同冻结，第三批 C 将其接入正式链路，场景策略仅准入 general 的受限单图/有限网格能力。旧内部快照须重新准备/编译，不保留旧模块别名或旧请求字段。
 
 ## 共享栅格正式链路（第三批 C）
 
-- `workflow/raster_bundle.py` 将同上下文的 ready 准备报告封装为正式 PreparedDataBundle；`generate-request.prepared_raster_bindings` 显式绑定已澄清报告，不根据文件名寻找结果或默认处理 0/255。
-- `compiler/raster_scene.py` 生成 `renderer_id=rasterio-matplotlib-page` 的 RenderScene，冻结 bundle、显示合同、物理版面和字体引用；向既有业务 execution 绑定 `raster_inputs` 和真实环境，不选择业务用途或执行 GIS 重投影。
+- `workflow/preparation_bundle.py` 将同上下文的 ready 准备报告封装为正式 PreparedDataBundle（几何内部分支：raster / vector）；`generate-request.prepared_raster_bindings` 显式绑定已澄清报告，不根据文件名寻找结果或默认处理 0/255。
+- `compiler/raster_scene.py` 生成 `renderer_id=rasterio-matplotlib-page` 的 RenderScene，冻结 bundle、显示合同、物理版面和字体引用；向既有业务 execution 绑定 `page_inputs` 和真实环境，不选择业务用途或执行 GIS 重投影。
 - RenderScene / RenderReceipt / execution 环境按后端严格区分。预览、G2 冻结、锁驱动正式渲染与重放只按冻结 ID 分派；保留 `maplibre-web`，未知后端拒绝，栅格不探测 Chromium、不伪造浏览器版本。
-- 正式栅格 RenderReceipt 由 `RasterFormalRenderer` 签发，包含 HMAC、代码/依赖环境、精确会话、资源集、页面报告和输出摘要；内部 `raster-page-output` 仍不是回执。当前是受项目路径约束的进程内后端，**不提供 OS/网络沙箱**，HMAC 不等于远程或硬件环境证明。
+- 正式栅格 RenderReceipt 由 `FormalRenderer`（几何分派）签发，包含 HMAC、代码/依赖环境、精确会话、资源集、页面报告和输出摘要；内部 `page-output` 仍不是回执。当前是受项目路径约束的进程内后端，**不提供 OS/网络沙箱**，HMAC 不等于远程或硬件环境证明。
 - 复用既有 MapSpecLock、RenderAttempt、FormalRenderEvidence、11 项成品检查、精确 G3 和原子本地交付。图例共性检查不替代业务检查；篡改产物不生成 Manifest。
-- 已有从测试候选边界开始的临时合成数据 G2/G3 链路与恢复测试，以及合成数据/合成审批的模板 T1 → validate（合成样张渲染）→ TP → 发布闭环测试。均**不表示真实用户数据、真实审批身份或用户地图已验收**；注册策略和实现白名单当前仅登记 `general-thematic-mapping`（实现 `general-thematic-raster`，含模板样张渲染组件），不新增审批旁路 CLI。
+- 已有从测试候选边界开始的临时合成数据 G2/G3 链路与恢复测试，以及合成数据/合成审批的模板 T1 → validate（合成样张渲染）→ TP → 发布闭环测试。均**不表示真实用户数据、真实审批身份或用户地图已验收**；注册策略和实现白名单当前仅登记 `general-thematic-mapping`（实现 `general-thematic`，`allowed_geometries: [raster]`，含模板样张渲染组件），不新增审批旁路 CLI。
 
 ## 通用内核与场景扩展
 
@@ -69,6 +94,7 @@ version: 0.5.0
 - 来源数据声明不等于安全认证。场景须实现来源准入和验证数据安全检查；缺少检查组件必须拒绝，不能借删除示例约束而默认接纳未知数据。
 - MapIntent 同时绑定意图目录、用户意图输入与模板能力策略摘要；候选/锁固定目录及能力策略引用，渲染、检查及交付重新核验。缺失或漂移的旧绑定不自动迁移，不新增旧格式兼容分支。
 - 新场景需补充严格协议、合法/非法协议用例及自动测试，再用用户授权的真实数据验收；仅修改注册策略或生产标志不能开放能力。
+- 准入拒绝分两类：安全禁止（forbidden，永久）与路线图未实现（not_implemented，须在 `policies/capability-roadmap.yaml` 声明且未 delivered，错误带 `details.admission_class/feature/status`）；未声明或已 delivered 的特征不得返回 not_implemented。profile 摘要语义化：`notice`/`licenses` 等披露字段不计入 digest，改披露不废冻结执行。场景列可经 `_COMPONENTS` 的 `__defaults__` 声明共享其他列组件，完整性按 own+defaults 校验，消除 re-export 样板列。
 
 ## 业务场景、主题与模板身份
 
@@ -78,13 +104,13 @@ version: 0.5.0
 - 生成时先解析用户意图，再验证用户明确选择的模板是否兼容；模板能力的 `intent_constraints` 只能限制可接受的场景、主题和任务，不得替用户补写或改写意图。当前不实现自动模板检索/选择。
 - `MapScenario.scenario_id` 是模板方案身份，`RenderScene.scene_id` 是渲染实例身份，二者不是业务分类。Brief、Plan 与 execution 保留同一业务场景、主题标签和任务，并绑定原意图摘要。
 - 不接纳旧 `scene_hint`、单值 `theme` 或 `fields.theme`；不自动迁移旧输入、候选或锁。详见 `workflows/intent-contract.md`。
-- 识别词表不等于可执行能力：现有分类保留为目录词汇；业务能力注册表和代码实现白名单当前只登记 `general-thematic-mapping`（实现 `general-thematic-raster`），其余场景与组件一律默认拒绝。
+- 识别词表不等于可执行能力：现有分类保留为目录词汇；业务能力注册表和代码实现白名单当前只登记 `general-thematic-mapping`（实现 `general-thematic`），其余场景与组件一律默认拒绝。
 
 ## 布局契约消费（第一阶段）
 
 - `scenario.embedded.layout.frames[].content_id` 显式绑定 view/overlay，公共 `compiler/layout.py` 将毫米 frame 解析为像素位置；场景构建器不再硬编码模块的页面位置。
-- 类型化 `resolved_layout` 同时进入 RenderScene 和 execution，预览、锁驱动渲染及终检重新验证同一布局快照；缺少快照的旧候选/锁不得自动补齐。
-- 当前仅支持毫米画布、DPR=1、单地图与互不重叠的页面框；地图使用 `clip`，叠加内容使用 `reject`。其他溢出策略、多地图和 inset 明确拒绝。
+- 类型化 `resolved_layout` 同时保存模板源合同、显式参数及实例框，并进入 RenderScene 和 execution，预览、锁驱动渲染及终检重新验证同一布局快照；缺少快照的旧候选/锁不得自动补齐。
+- 当前支持毫米画布、DPR=1、单图及模板声明的有限网格，页面框互不重叠；地图使用 `clip`，其他内容使用 `reject`。多图由静态后端消费；浏览器仍只接受单图，其他溢出策略和 inset 明确拒绝。
 - 浏览器后端先按地图框视口截图再合成整页；静态栅格后端直接消费同一物理版面。纸张与 DPI 均受场景策略限制。
 - 浏览器/SVG 路径仍使用固定图元保守包络；静态栅格整页使用实际字体测量、显式换行和溢出拒绝。两者均未实现自动布局候选搜索或复合布局求解。
 - 不可覆盖已发布模板或冻结锁；采用新版契约须重新验证、发布、编译、预览并获取相应精确审批。

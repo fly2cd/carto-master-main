@@ -99,6 +99,25 @@ class SchemaTests(unittest.TestCase):
                 with self.assertRaises(ProtocolError):
                     self.registry.validate("template-validation-evidence", invalid)
 
+    def test_vector_validation_evidence_requires_its_scene_and_own_runtime(self):
+        value = deepcopy(VALID_CASES["template-validation-evidence"])
+        value["renderer"] = {
+            "renderer_id": "matplotlib-vector-page", "renderer_profile_digest": D,
+            "adapter_version": "1.0.0", "renderer_version": "1.0.0", "renderer_code_digest": D,
+            "runtime": {name: "1.0.0" for name in ("python", "rasterio", "gdal", "numpy", "matplotlib",
+                       "pillow", "freetype", "fonttools", "zlib", "fiona", "shapely", "vector_gdal")},
+            "environment_fingerprint": D}
+        value["render_scene_ref"] = deepcopy(A)
+        self.registry.validate("template-validation-evidence", value)
+        mutations = [lambda v: v.pop("render_scene_ref"),
+                     lambda v: v["renderer"]["runtime"].pop("vector_gdal"),
+                     lambda v: v["renderer"].update(frontend_build="browser-only"),
+                     lambda v: v["renderer"].update(renderer_id="unregistered-renderer")]
+        for index, mutate in enumerate(mutations):
+            bad = deepcopy(value); mutate(bad)
+            with self.subTest(index=index), self.assertRaises(ProtocolError):
+                self.registry.validate("template-validation-evidence", bad)
+
     def test_final_check_report_requires_complete_frozen_evidence(self) -> None:
         report = deepcopy(VALID_CASES["validation-report"])
         report.update({
@@ -185,13 +204,15 @@ class SchemaTests(unittest.TestCase):
     def test_map_expression_catalog_contains_vector_and_categorical_raster_expressions(self) -> None:
         catalog = load_document(self.policies_root / "map-expression-catalog.yaml")
         self.assertEqual(catalog["schema_version"], 1)
-        self.assertEqual(catalog["version"], "1.1.0")
+        self.assertEqual(catalog["version"], "2.0.0")
         self.registry.validate("map-expression-catalog", catalog)
         entries = catalog["entries"]
         self.assertEqual(
             {(entry["expression_id"], entry["version"]) for entry in entries},
             {("choropleth/sequential", "1.0.0"), ("proportional-symbol/count", "1.0.0"),
-             ("raster/categorical", "1.0.0")},
+             ("raster/categorical", "1.0.0"), ("vector/explicit", "1.0.0"),
+             ("categorical", "2.0.0"), ("graduated-color", "2.0.0"),
+             ("proportional-symbol", "2.0.0")},
         )
         for entry in entries:
             self.registry.validate("map-expression", entry)
@@ -202,6 +223,41 @@ class SchemaTests(unittest.TestCase):
         invalid_receipt["package_ref"] = template_ref
         with self.assertRaises(ProtocolError):
             self.registry.validate("publication-receipt", invalid_receipt)
+
+    def test_expression_identity_geometry_and_algorithm_select_closed_branches(self):
+        entries = {e["expression_id"]: e for e in load_document(self.policies_root / "map-expression-catalog.yaml")["entries"]}
+        raster, vector = entries["raster/categorical"], entries["vector/explicit"]
+        self.assertEqual(raster["legend"]["type"], vector["legend"]["type"])
+        self.assertEqual(raster["legend"]["label_source"], vector["legend"]["label_source"])
+        for entry in (raster, vector):
+            self.registry.validate("map-expression", entry)
+            for key, value in (("geometry_types", ["polygon"]), ("expression_id", "unregistered/expression"),
+                               ("visual_variables", entries["choropleth/sequential"]["visual_variables"])):
+                changed = deepcopy(entry); changed[key] = deepcopy(value)
+                with self.subTest(expression=entry["expression_id"], key=key), self.assertRaises(ProtocolError):
+                    self.registry.validate("map-expression", changed)
+        for entry in (raster, vector):
+            changed = deepcopy(entry)
+            changed["geometry_types"] = ["raster", "vector"]
+            with self.assertRaises(ProtocolError):self.registry.validate("map-expression", changed)
+        changed = deepcopy(vector); changed["visual_variables"][0]["algorithm_id"] = "javascript-eval"
+        with self.assertRaises(ProtocolError):self.registry.validate("map-expression", changed)
+
+    def test_delivery_composition_claims_are_paired_not_independent_enums(self):
+        for format_ in ("pdf", "svg", "png"):
+            for composition in ("raster-map-vector-overlay", "vector-map", "flattened-raster"):
+                for claim in ("overlay-only", "whole-map", "none"):
+                    case = deepcopy(VALID_CASES["delivery"])
+                    case["targets"] = [deepcopy(case["targets"][0])]
+                    case["targets"][0].update(format=format_, composition=composition, vector_claim=claim)
+                    allowed = ((composition, claim) == ("flattened-raster", "none") if format_ == "png" else
+                               (composition, claim) in {("raster-map-vector-overlay", "overlay-only"), ("vector-map", "whole-map")})
+                    with self.subTest(format=format_, composition=composition, claim=claim):
+                        if allowed:self.registry.validate("delivery", case)
+                        else:
+                            with self.assertRaises(ProtocolError):self.registry.validate("delivery", case)
+        case["targets"][0].update(format="pdf", composition="vector-map", vector_claim="whole-map", production_ready=True)
+        with self.assertRaises(ProtocolError):self.registry.validate("delivery", case)
 
     def test_map_expression_catalog_is_declarative_only(self) -> None:
         executable = deepcopy(VALID_CASES["map-expression"])

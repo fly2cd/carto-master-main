@@ -1,0 +1,551 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/page-output.schema.json",
+  "title": "page-output",
+  "description": "Unified page contract. geometry selects the conditional body; identical layout/font/text/appearance/bindings fields are shared.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "capability_boundary",
+    "checks",
+    "environment",
+    "font_embedding_flags",
+    "font_family",
+    "font_snapshot",
+    "geometry",
+    "kind",
+    "measurements",
+    "outputs",
+    "renderer_code_digest",
+    "renderer_id",
+    "renderer_version",
+    "request_ref",
+    "schema_version"
+  ],
+  "properties": {
+    "capability_boundary": {
+      "const": "internal-page-output-not-formal-render-receipt"
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frame-binding",
+        "glyph-coverage",
+        "font-embedding",
+        "content-fit",
+        "png-dimensions"
+      ],
+      "properties": {
+        "frame-binding": {
+          "const": "passed"
+        },
+        "glyph-coverage": {
+          "const": "passed"
+        },
+        "font-embedding": {
+          "const": "passed"
+        },
+        "content-fit": {
+          "const": "passed"
+        },
+        "png-dimensions": {
+          "const": "passed"
+        }
+      }
+    },
+    "font_embedding_flags": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 65535
+    },
+    "font_family": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+    },
+    "font_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_ref",
+        "size_bytes"
+      ],
+      "properties": {
+        "artifact_ref": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 67108864
+        }
+      }
+    },
+    "measurements": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4096,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "element_id",
+          "frame_id",
+          "bounds_px"
+        ],
+        "properties": {
+          "element_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          },
+          "frame_id": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+          },
+          "bounds_px": {
+            "type": "array",
+            "minItems": 4,
+            "maxItems": 4,
+            "items": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pdf",
+        "png",
+        "svg"
+      ],
+      "properties": {
+        "pdf": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "artifact_ref",
+            "size_bytes"
+          ],
+          "properties": {
+            "artifact_ref": {
+              "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+            },
+            "size_bytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 67108864
+            }
+          }
+        },
+        "png": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "artifact_ref",
+            "size_bytes"
+          ],
+          "properties": {
+            "artifact_ref": {
+              "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+            },
+            "size_bytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 67108864
+            }
+          }
+        },
+        "svg": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "artifact_ref",
+            "size_bytes"
+          ],
+          "properties": {
+            "artifact_ref": {
+              "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+            },
+            "size_bytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 67108864
+            }
+          }
+        }
+      }
+    },
+    "renderer_code_digest": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+    },
+    "environment": {
+      "type": "object"
+    },
+    "renderer_id": {},
+    "renderer_version": {},
+    "request_ref": {},
+    "body_refs": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "view_id",
+          "frame_id",
+          "ref"
+        ],
+        "properties": {
+          "view_id": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+          },
+          "frame_id": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+          },
+          "ref": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+          }
+        }
+      }
+    },
+    "panel_evidence": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "view_id",
+          "frame_id",
+          "portrayal_ref",
+          "extent",
+          "feature_count",
+          "drawn_count"
+        ],
+        "properties": {
+          "view_id": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+          },
+          "frame_id": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+          },
+          "portrayal_ref": {
+            "allOf": [
+              {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+              },
+              {
+                "required": [
+                  "uri"
+                ]
+              }
+            ]
+          },
+          "extent": {
+            "type": "array",
+            "minItems": 4,
+            "maxItems": 4,
+            "items": {
+              "type": "number"
+            }
+          },
+          "feature_count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000
+          },
+          "drawn_count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000
+          }
+        }
+      }
+    },
+    "geometry": {
+      "enum": [
+        "raster",
+        "vector"
+      ]
+    },
+    "schema_version": {
+      "const": 4
+    },
+    "kind": {
+      "const": "page-output"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "geometry": {
+            "const": "raster"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "body_refs",
+          "capability_boundary",
+          "checks",
+          "environment",
+          "font_embedding_flags",
+          "font_family",
+          "font_snapshot",
+          "geometry",
+          "measurements",
+          "outputs",
+          "renderer_code_digest",
+          "renderer_id",
+          "renderer_version",
+          "request_ref"
+        ],
+        "not": {
+          "required": [
+            "panel_evidence"
+          ]
+        },
+        "properties": {
+          "environment": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "python",
+              "rasterio",
+              "gdal",
+              "numpy",
+              "matplotlib",
+              "pillow",
+              "freetype",
+              "fonttools",
+              "zlib"
+            ],
+            "properties": {
+              "python": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "rasterio": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "gdal": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "numpy": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "matplotlib": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "pillow": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "freetype": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "fonttools": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "zlib": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              }
+            }
+          },
+          "renderer_id": {
+            "const": "rasterio-matplotlib-page"
+          },
+          "renderer_version": {
+            "const": "3.0.0"
+          },
+          "request_ref": {
+            "allOf": [
+              {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+              },
+              {
+                "required": [
+                  "uri"
+                ],
+                "properties": {
+                  "id": {
+                    "const": "page-request"
+                  },
+                  "version": {
+                    "const": "4.0.0"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "else": {
+        "required": [
+          "capability_boundary",
+          "checks",
+          "environment",
+          "font_embedding_flags",
+          "font_family",
+          "font_snapshot",
+          "geometry",
+          "measurements",
+          "outputs",
+          "panel_evidence",
+          "renderer_code_digest",
+          "renderer_id",
+          "renderer_version",
+          "request_ref"
+        ],
+        "not": {
+          "required": [
+            "body_refs"
+          ]
+        },
+        "properties": {
+          "environment": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "python",
+              "rasterio",
+              "gdal",
+              "numpy",
+              "matplotlib",
+              "pillow",
+              "freetype",
+              "fonttools",
+              "zlib",
+              "fiona",
+              "shapely",
+              "vector_gdal"
+            ],
+            "properties": {
+              "python": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "rasterio": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "gdal": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "numpy": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "matplotlib": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "pillow": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "freetype": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "fonttools": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "zlib": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "fiona": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "shapely": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "vector_gdal": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              }
+            }
+          },
+          "renderer_id": {
+            "const": "matplotlib-vector-page"
+          },
+          "renderer_version": {
+            "const": "1.0.0"
+          },
+          "request_ref": {
+            "allOf": [
+              {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+              },
+              {
+                "required": [
+                  "uri"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}
