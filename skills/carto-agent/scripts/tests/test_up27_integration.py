@@ -243,11 +243,20 @@ class RouteClosureTests(unittest.TestCase):
         now = datetime.now(UTC)
         digest = sha256_digest({"brief": "one"})
         unsigned = ApprovalReceipt(
-            "approval-one",
-            "approve-template-brief",
-            digest,
-            (now - timedelta(minutes=1)).isoformat(),
-            (now + timedelta(minutes=10)).isoformat(),
+            schema_version=1,
+            receipt_id="approval-one",
+            issuer="test-issuer",
+            subject_id="test-reviewer",
+            tenant_id="test-tenant",
+            action="approve-template-brief",
+            object_type="template-brief",
+            object_digest=digest,
+            scope="project:test",
+            policy_id="carto-security",
+            environment="local",
+            nonce="test-nonce-template-00000000001",
+            issued_at=(now - timedelta(minutes=1)).isoformat(),
+            expires_at=(now + timedelta(minutes=10)).isoformat(),
         )
         receipt = sign_receipt(unsigned, KEY)
         coordinator = ApprovalGateCoordinator(KEY)

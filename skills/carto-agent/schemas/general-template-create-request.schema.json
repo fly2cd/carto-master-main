@@ -1,10 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schemas.carto-agent.local/v1/general-template-create-request.schema.json",
-  "description": "Strict create-template overlay for the registered general_thematic_mapping scenario. Supports raster (3.0.0) and vector (4.0.0) variants.",
+  "description": "Strict thematic template overlay. Geometry is explicit; template versions identify assets, never dispatch rules.",
   "properties": {
     "geometry": {
-      "enum": ["raster", "vector"]
+      "enum": [
+        "raster",
+        "vector"
+      ]
     }
   },
   "allOf": [
@@ -64,29 +67,37 @@
           "const": false
         },
         "geometry": {
-          "enum": ["raster", "vector"]
+          "enum": [
+            "raster",
+            "vector"
+          ]
         },
         "role_bindings": {
           "minProperties": 1,
-          "maxProperties": 1,
-          "propertyNames": {
-            "const": "classified_surface"
-          }
+          "maxProperties": 1
         }
       }
     }
   ],
   "if": {
     "properties": {
-      "version": {
-        "const": "3.0.0"
+      "geometry": {
+        "const": "raster"
       }
-    }
+    },
+    "required": [
+      "geometry"
+    ]
   },
   "then": {
     "properties": {
       "profile": {
         "const": "general-thematic-authoring"
+      },
+      "role_bindings": {
+        "propertyNames": {
+          "const": "classified_surface"
+        }
       }
     }
   },
@@ -94,7 +105,15 @@
     "properties": {
       "profile": {
         "const": "general-vector-authoring"
+      },
+      "role_bindings": {
+        "propertyNames": {
+          "const": "thematic_features"
+        }
       }
     }
-  }
+  },
+  "required": [
+    "geometry"
+  ]
 }

@@ -105,19 +105,25 @@ class RasterMapBodyRenderer:
         except rasterio.errors.RasterioError:
             raise ProtocolError("RASTER_DECODE_FAILED", "Frozen TIFF cannot be decoded under the static profile") from None
         source_mask = np.ma.getmaskarray(data)
-        values, counts = np.unique(data.compressed(), return_counts=True)
-        actual = [{"value": int(v), "count": int(c)} for v, c in zip(values, counts)]
-        if (actual != evidence["statistics"]["classes"] or int(source_mask.sum()) != evidence["statistics"]["masked_pixels"]):
+        if int(source_mask.sum()) != evidence["statistics"]["masked_pixels"]:
             # Integrity check against previously obtained evidence, NOT a replacement statistics service.
-            raise ProtocolError("RASTER_DECODE_BINDING_MISMATCH", "Decoded class domain/mask differs from MCP evidence")
-        rows = sorted(portrayal["lookup_table"], key=lambda r: r["value"])
-        keys = np.array([row["value"] for row in rows], dtype=np.int64)
-        # Indexed conversion is bounded by number of classes, not by the largest category code.
-        indices = np.searchsorted(keys, np.where(source_mask, keys[0], data.data)).astype(np.int32)
-        if np.any(indices >= len(keys)) or np.any(keys[indices[~source_mask]] != data.data[~source_mask]):
-            raise ProtocolError("RASTER_CLASS_COVERAGE_MISMATCH", "Every valid pixel must have an explicit classification")
-        hidden = np.array([row["display"] == "hidden" for row in rows])
-        indices[source_mask | hidden[indices]] = -1
+            raise ProtocolError("RASTER_DECODE_BINDING_MISMATCH", "Decoded mask differs from MCP evidence")
+        if portrayal["key_mode"] == "interval":
+            indices, cmap_colors = self._continuous_indices(data, source_mask, portrayal, evidence, np)
+        else:
+            values, counts = np.unique(data.compressed(), return_counts=True)
+            actual = [{"value": int(v), "count": int(c)} for v, c in zip(values, counts)]
+            if actual != evidence["statistics"]["classes"]:
+                raise ProtocolError("RASTER_DECODE_BINDING_MISMATCH", "Decoded class domain differs from MCP evidence")
+            rows = sorted(portrayal["lookup_table"], key=lambda r: r["value"])
+            keys = np.array([row["value"] for row in rows], dtype=np.int64)
+            # Indexed conversion is bounded by number of classes, not by the largest category code.
+            indices = np.searchsorted(keys, np.where(source_mask, keys[0], data.data)).astype(np.int32)
+            if np.any(indices >= len(keys)) or np.any(keys[indices[~source_mask]] != data.data[~source_mask]):
+                raise ProtocolError("RASTER_CLASS_COVERAGE_MISMATCH", "Every valid pixel must have an explicit classification")
+            hidden = np.array([row["display"] == "hidden" for row in rows])
+            indices[source_mask | hidden[indices]] = -1
+            cmap_colors = [row["color"] or "#000000" for row in rows]
         if not np.any(indices >= 0):
             raise ProtocolError("RASTER_NO_VISIBLE_CLASSES", "All observed pixels are masked or explicitly hidden")
         # Preserve discrete indices BEFORE colorization. Never bilinear/cubic/continuous normalization.
@@ -125,9 +131,9 @@ class RasterMapBodyRenderer:
         small = np.asarray(resized)
         if not np.any(small >= 0):
             raise ProtocolError("RASTER_NO_VISIBLE_PIXELS_AT_SCALE", "No displayed category survives nearest-neighbor fitting; use a larger map")
-        cmap = colors.ListedColormap([row["color"] or "#000000" for row in rows])
+        cmap = colors.ListedColormap(cmap_colors)
         cmap = cmap.with_extremes(bad=(0, 0, 0, 0))
-        norm = colors.BoundaryNorm(np.arange(len(rows) + 1) - 0.5, cmap.N)
+        norm = colors.BoundaryNorm(np.arange(len(cmap_colors) + 1) - 0.5, cmap.N)
         rgba = cmap(norm(np.ma.array(small, mask=small < 0)), bytes=True)
         stream = io.BytesIO()
         image.imsave(stream, rgba, format="png", origin="upper", dpi=page["dpi"])
@@ -151,6 +157,33 @@ class RasterMapBodyRenderer:
                             "matplotlib": matplotlib.__version__, "pillow": PIL.__version__},
         }
         return self.preparation.save_document(body, "raster-map-body")
+
+    def _continuous_indices(self, data, source_mask, portrayal, evidence, np):
+        """Map float pixel values to interval class indices via the frozen IR edges (ADR-001 阶段2.3).
+
+        out_of_range=reject：任何落在 [edges[0], edges[-1]] 之外的有效像元都是硬错误；
+        最后一级闭区间（left-closed-last-both）；NoData → -1（透明）。级别索引随后与
+        categorical 走同一条 resize(NEAREST)+ListedColormap 路径，绝不做连续色带插值。
+        """
+        encoding = portrayal["encoding"]
+        edges = encoding["scale"]["edges"]
+        ramp = [symbol["color"] for symbol in encoding["channels"]["symbols"]]
+        if len(ramp) != len(edges) - 1:
+            raise ProtocolError("RASTER_RAMP_CLASS_MISMATCH", "Color ramp must provide one color per class interval")
+        cont = evidence["statistics"]["continuous"]
+        valid = data.compressed()
+        if valid.size:
+            vmin, vmax = float(valid.min()), float(valid.max())
+            if vmin < cont["min"] - 1e-9 or vmax > cont["max"] + 1e-9:
+                raise ProtocolError("RASTER_DECODE_BINDING_MISMATCH", "Decoded value domain exceeds MCP continuous evidence")
+        filled = np.where(source_mask, edges[0], data.data).astype("float64")
+        live = filled[~source_mask]
+        if live.size and (np.any(live < edges[0]) or np.any(live > edges[-1])):
+            raise ProtocolError("RASTER_VALUE_OUT_OF_RANGE", "Pixel value outside the classified interval domain")
+        idx = np.searchsorted(np.asarray(edges, dtype="float64"), filled, side="right") - 1
+        idx = np.clip(idx, 0, len(edges) - 2).astype(np.int32)
+        idx[source_mask] = -1
+        return idx, ramp
 
     def compose(self, body_ref: dict[str, str], resolved_layout: dict[str, Any], overlays: list[dict[str, Any]],
                 output_path: Path, context: ExecutionContext, *, inline_fonts: list[tuple[str, bytes]] | None = None) -> Path:

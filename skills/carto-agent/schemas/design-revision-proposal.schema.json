@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/design-revision-proposal.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "proposal_id",
+    "run_id",
+    "parent_revision",
+    "changes",
+    "justification"
+  ],
+  "properties": {
+    "schema_version": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"
+    },
+    "proposal_id": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+    },
+    "run_id": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+    },
+    "parent_revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "changes": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "maxProperties": 8,
+      "properties": {
+        "layout_parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "new_value"
+          ],
+          "properties": {
+            "new_value": {
+              "type": "object",
+              "minProperties": 1
+            }
+          }
+        },
+        "cartography": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "new_value"
+          ],
+          "properties": {
+            "new_value": {
+              "type": "object",
+              "minProperties": 1,
+              "properties": {
+                "typography": {
+                  "type": "object"
+                },
+                "color_scheme": {
+                  "type": "object"
+                },
+                "legend_style": {
+                  "type": "object"
+                },
+                "scale_bar_style": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "map_title": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "new_value"
+          ],
+          "properties": {
+            "new_value": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        },
+        "panel_designs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "new_value"
+          ],
+          "properties": {
+            "new_value": {
+              "type": "object",
+              "minProperties": 1,
+              "maxProperties": 4,
+              "additionalProperties": {
+                "$ref": "https://schemas.carto-agent.local/v1/thematic-design.schema.json"
+              }
+            }
+          }
+        }
+      }
+    },
+    "justification": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+    }
+  }
+}

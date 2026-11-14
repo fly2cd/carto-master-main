@@ -89,6 +89,9 @@
     },
     "render_receipt_ref": {
       "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+    },
+    "design_review_ref": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
     }
   }
 }

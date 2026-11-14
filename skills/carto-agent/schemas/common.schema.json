@@ -94,8 +94,20 @@
       "properties": {
         "id": {
           "anyOf": [
-            {"type": "string", "pattern": "^[a-z][a-z0-9-]*/[a-z][a-z0-9-]*$", "maxLength": 120},
-            {"type": "string", "enum": ["categorical", "graduated-color", "proportional-symbol"], "maxLength": 120}
+            {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]*/[a-z][a-z0-9-]*$",
+              "maxLength": 120
+            },
+            {
+              "type": "string",
+              "enum": [
+                "categorical",
+                "graduated-color",
+                "proportional-symbol"
+              ],
+              "maxLength": 120
+            }
           ]
         },
         "version": {
@@ -107,7 +119,7 @@
       }
     },
     "resourceRef": {
-      "oneOf": [
+      "anyOf": [
         {
           "$ref": "#/$defs/artifactRef"
         },
@@ -379,6 +391,13 @@
           "uniqueItems": true
         },
         "transformation_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/artifactRef"
+          },
+          "uniqueItems": true
+        },
+        "material_facts_refs": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/artifactRef"
@@ -870,6 +889,9 @@
               ]
             }
           }
+        },
+        "thematic_plan_ref": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
         }
       },
       "allOf": [

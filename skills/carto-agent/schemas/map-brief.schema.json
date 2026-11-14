@@ -169,6 +169,12 @@
       "items": {
         "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
       }
+    },
+    "request_ref": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+    },
+    "revision_proposal_ref": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
     }
   }
 }

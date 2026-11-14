@@ -57,7 +57,11 @@ def build_parser() -> argparse.ArgumentParser:
     verify.add_argument("--allowed-root", action="append", required=True)
     verify.add_argument("--key-env", default="CARTO_APPROVAL_HMAC_KEY")
     verify.add_argument("--action", required=True)
+    verify.add_argument("--object-type", required=True)
     verify.add_argument("--object-digest", required=True)
+    verify.add_argument("--subject-id")
+    verify.add_argument("--tenant-id")
+    verify.add_argument("--scope")
 
     intent = sub.add_parser("intent", help="Resolve a typed map intent")
     intent_sub = intent.add_subparsers(dest="intent_command", required=True)
@@ -153,8 +157,11 @@ def build_parser() -> argparse.ArgumentParser:
         ("preview", "Render and attest the candidate preview"),
         ("freeze", "Verify G2 approval and create an immutable MapSpecLock"),
         ("render", "Render immutable formal PDF/PNG outputs from MapSpecLock"),
-        ("check", "Check formal outputs and freeze the G3 delivery manifest"),
+        ("check", "Auto final-check: validate rendered outputs, classify failures"),
+        ("review", "Production review: approve check results and generate delivery manifest"),
         ("deliver", "Verify G3 and atomically commit the local delivery package"),
+        ("revise", "Submit a design revision proposal and prepare for re-compile"),
+        ("revision-brief", "Build the exact revised map brief for G1 approval"),
     ):
         item = generate_sub.add_parser(name, help=help_text)
         item.add_argument("request")
@@ -163,13 +170,18 @@ def build_parser() -> argparse.ArgumentParser:
         item.add_argument("--repository-root", required=True)
         item.add_argument("--repository-scope", required=True)
         item.add_argument("--allowed-root", action="append", required=True)
-        if name in {"compile", "freeze", "deliver"}:
+        if name in {"compile", "freeze", "deliver", "revise", "review"}:
             item.add_argument("--approval", required=True)
             item.add_argument("--key-env", default="CARTO_APPROVAL_HMAC_KEY")
-        if name in {"preview", "freeze", "render", "check"}:
+        if name in {"revise", "revision-brief"}:
+            item.add_argument("--proposal", required=True, help="Path to the design revision proposal YAML")
+        if name in {"preview", "freeze", "render", "check", "review"}:
             item.add_argument("--attestation-key-env", default="CARTO_RENDER_ATTESTATION_KEY")
             item.add_argument("--browser")
-        if name == "check":
+        if name == "freeze":
+            item.add_argument("--design-review",
+                              help="Path to an approve-design-review receipt bound to the candidate")
+        if name == "review":
             item.add_argument("--recipient-id", required=True)
             item.add_argument("--recipient-type", choices=("project-user", "project-team"), required=True)
             item.add_argument("--destination", required=True)
@@ -188,6 +200,15 @@ def build_parser() -> argparse.ArgumentParser:
         item.add_argument("--allowed-root", action="append", required=True)
         if name == "delivery-status":
             item.add_argument("--idempotency-key", required=True)
+    select = generate_sub.add_parser("select-candidate",
+                                     help="Promote one compiled candidate to the active design (multi-candidate)")
+    select.add_argument("request")
+    select.add_argument("--candidate-id", required=True)
+    select.add_argument("--project-root", required=True)
+    select.add_argument("--workdir", required=True)
+    select.add_argument("--repository-root", required=True)
+    select.add_argument("--repository-scope", required=True)
+    select.add_argument("--allowed-root", action="append", required=True)
     return parser
 
 
@@ -213,7 +234,11 @@ def main(argv: list[str] | None = None) -> int:
             verify_receipt(
                 ApprovalReceipt.from_dict(value), key,
                 expected_action=args.action,
+                expected_object_type=args.object_type,
                 expected_object_digest=args.object_digest,
+                expected_subject_id=args.subject_id,
+                expected_tenant_id=args.tenant_id,
+                expected_scope=args.scope,
             )
             return _success({"receipt": str(path), "verified": True})
         if args.command == "intent" and args.intent_command == "resolve":
@@ -320,6 +345,7 @@ def main(argv: list[str] | None = None) -> int:
                     approval_key=os.environ.get(args.key_env, "").encode("utf-8"),
                     attestation_key=os.environ.get(args.attestation_key_env, "").encode("utf-8"),
                     browser=args.browser,
+                    design_review_approval_path=getattr(args, "design_review", None),
                 ))
             if args.generate_command == "render":
                 return _success(workflow.render(
@@ -332,6 +358,13 @@ def main(argv: list[str] | None = None) -> int:
                     args.request,
                     attestation_key=os.environ.get(args.attestation_key_env, "").encode("utf-8"),
                     browser=args.browser,
+                ))
+            if args.generate_command == "review":
+                return _success(workflow.review(
+                    args.request, args.approval,
+                    approval_key=os.environ.get(args.key_env, "").encode("utf-8"),
+                    attestation_key=os.environ.get(args.attestation_key_env, "").encode("utf-8"),
+                    browser=args.browser,
                     recipient_id=args.recipient_id,
                     recipient_type=args.recipient_type,
                     destination=args.destination,
@@ -342,6 +375,15 @@ def main(argv: list[str] | None = None) -> int:
                     args.request, args.approval,
                     approval_key=os.environ.get(args.key_env, "").encode("utf-8"),
                 ))
+            if args.generate_command == "revision-brief":
+                return _success(workflow.revision_brief(args.request, args.proposal))
+            if args.generate_command == "revise":
+                return _success(workflow.revise(
+                    args.request, args.proposal, args.approval,
+                    approval_key=os.environ.get(args.key_env, "").encode("utf-8"),
+                ))
+            if args.generate_command == "select-candidate":
+                return _success(workflow.select_candidate(args.request, args.candidate_id))
             if args.generate_command == "delivery-status":
                 return _success(workflow.delivery_status(args.idempotency_key))
             if args.generate_command == "status":

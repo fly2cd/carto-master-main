@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "key_mode": "scaling",
+  "geometry_role": "raster-cell",
+  "domain": { "field": "value", "measurement": "count", "unit": "x", "normalization": null },
+  "scale": {
+    "domain_max": 100,
+    "range_mm": [0, 5],
+    "size_scale": "sqrt",
+    "zero_policy": "omit",
+    "negative_policy": "reject",
+    "out_of_range": "reject",
+    "legend_values": [25, 100]
+  },
+  "channels": {
+    "symbols": [{ "color": "#2288CC", "stroke": "#222222", "stroke_width_pt": 0.4, "radius_mm": 2 }],
+    "shape": "auto"
+  },
+  "missing": { "policy": "reject", "label": "No data", "symbol": null },
+  "legend": { "policy": "all" }
+}

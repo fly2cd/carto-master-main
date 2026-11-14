@@ -117,6 +117,11 @@ class BundlePreparer:
                 'bbox': info['bounds'], 'crs': source['crs'],
                 'width': info['width'], 'height': info['height'],
                 'category_counts': category_counts(report),
+                'facts_digest': sha256_digest({
+                    'source': source, 'raster_info': info,
+                    'artifact_digest': asset['digest'],
+                }),
+                'semantic_fields': self._raster_semantic_fields(report),
             })
         if len(nature) != 1 or len(crs_set) != 1:
             raise ProtocolError('BUNDLE_PROFILE_MISMATCH', 'All sources must share nature and CRS; no implicit reprojection')
@@ -160,6 +165,8 @@ class BundlePreparer:
                 'dataset_ref': deepcopy(ref), 'prepared_ref': deepcopy(ref),
                 'geometry_types': [report['geometry']], 'feature_count': len(report['features']),
                 'bbox': report['bounds'], 'crs': crs_contract(report),
+                'semantic_fields': report['source'].get('semantic_fields', {}),
+                'facts_digest': BundlePreparer._vector_facts_digest(report),
             })
         task = self.preparation.save('bundle-inputs', {
             'schema_version': 1,
@@ -223,6 +230,45 @@ class BundlePreparer:
             self._validate_request_vector(request, bundle, context)
         else:
             self._validate_request_raster(request, bundle, context)
+
+    # ------------------------------------------------------------------
+    # Semantic helper
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _raster_semantic_fields(report: dict[str, Any]) -> dict[str, str]:
+        """Extract semantic field mappings from a raster preparation report.
+
+        Each classified row maps a pixel value (int) to a category label (str).
+        These become the semantic_fields for the raster role binding.
+        """
+        rows = report.get('rows', [])
+        fields: dict[str, str] = {}
+        for row in rows:
+            value = row.get('value')
+            label = row.get('label')
+            if value is not None and label:
+                fields[f"value_{value}"] = label
+        return fields
+
+    @staticmethod
+    def _vector_facts_digest(report: dict[str, Any]) -> str:
+        """Compute facts digest from vector preparation geometry and attributes."""
+        from ..canonical import sha256_digest
+        crs = crs_contract(report)
+        return sha256_digest({
+            'geometry_type': report.get('geometry'),
+            'feature_count': len(report.get('features', [])),
+            'bounds': report.get('bounds'),
+            'crs': crs,
+            'source_manifest_digest': report.get('source_manifest_digest'),
+            'attributes': [f['properties'] for f in report.get('features', [])],
+            'attribute_evidence': report.get('attribute_evidence'),
+        })
+
+    # ------------------------------------------------------------------
+    # Geometry-specific request verification
+    # ------------------------------------------------------------------
 
     def _validate_request_raster(self, request, bundle, context):
         sources: dict[str, Any] = {}

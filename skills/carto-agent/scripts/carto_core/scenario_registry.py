@@ -54,6 +54,35 @@ def provided_components(implementation: str) -> set[str]:
     return set(_COMPONENTS.get(implementation, {}))
 
 
+# The geometry-adaptation fields a variant contributes to the effective definition.
+VARIANT_FIELDS = ("template", "authoring_profile", "renderer_id")
+
+
+def effective_definitions(profiles: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Flatten each policy profile into one effective definition per geometry variant.
+
+    ADR-001 §9.5 项④: the versioned policy declares the shared business semantics,
+    intent, output and layout envelope exactly once and lists geometry as a
+    data-adaptation attribute. Consumers keep reading one flat contract
+    (``template`` / ``authoring_profile`` / ``renderer_id`` / ``template_geometry`` /
+    ``allowed_geometries``), so the convergence stays in the policy instead of leaking
+    a second definition shape into the code.
+    """
+    flattened: list[dict[str, Any]] = []
+    for profile in profiles:
+        shared = {key: value for key, value in profile.items() if key != "geometry_variants"}
+        for variant in profile["geometry_variants"]:
+            definition = deepcopy(shared)
+            for field in VARIANT_FIELDS:
+                definition[field] = deepcopy(variant[field])
+            definition["template_geometry"] = variant["geometry"]
+            # The variant list is the geometry admission lever: a geometry is admitted
+            # exactly when its variant is declared, so the allowed set is that geometry.
+            definition["allowed_geometries"] = [variant["geometry"]]
+            flattened.append(definition)
+    return flattened
+
+
 def required_components_for_routes(routes: list[str]) -> set[str]:
     """Union of REQUIRED_COMPONENTS for the given route names plus the admission baseline."""
     required: set[str] = set(REQUIRED_COMPONENTS.get("admission", ()))
@@ -175,10 +204,12 @@ class ScenarioRegistry:
         self.registry.validate("scenario-capabilities", policy)
         self.intent_resolver = _intent_resolver(self.registry)
         self._templates: dict[tuple[str, str, str], ScenarioCapability] = {}
-        identities: set[tuple[str, str]] = set()
+        identities: set[tuple[str, str, str]] = set()
         authoring: set[str] = set()
-        for definition in policy["profiles"]:
-            identity = (definition["id"], definition["version"])
+        for definition in effective_definitions(policy["profiles"]):
+            # One profile now yields one identity per geometry variant; the geometry is
+            # part of the identity so a duplicated variant stays ambiguous registration.
+            identity = (definition["id"], definition["version"], definition["template_geometry"])
             template = definition["template"]
             key = tuple(template[name] for name in ("kind", "id", "version"))
             if key in self._templates or identity in identities or definition["authoring_profile"] in authoring:
@@ -218,8 +249,11 @@ class ScenarioRegistry:
         if request["profile"] != profile.definition["authoring_profile"]:
             raise ProtocolError("CAPABILITY_NOT_AVAILABLE", "Authoring profile does not match the template")
         self.registry.validate(profile.definition["request_schemas"]["create-template"], request)
-        from .scenarios.general_dispatch import geometry_of_template
-        self.require_geometry(profile, geometry_of_template(request["version"]))
+        from .scenarios.general_dispatch import geometry_of_request
+        # One geometry gate: a capability's allowed set is exactly the geometry of the
+        # variant that registered the requested template asset, so a second
+        # template_geometry comparison could never disagree with this one.
+        self.require_geometry(profile, geometry_of_request(request))
         return profile
 
     def resolve_generate(self, request: dict[str, Any]) -> tuple[ScenarioCapability, dict[str, Any]]:

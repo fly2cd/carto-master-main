@@ -1,7 +1,8 @@
 """Bounded vector inputs with closed sidecar sets and immutable provenance.
 
-No coordinate transformation, field joining, metric calculation or business
-interpretation. Fiona/Shapely are optional explicit dependencies, never installed.
+No implicit coordinate transformation or business interpretation. Optional exact
+CSV joins are authorized and evidenced; numeric expression resolution belongs to
+the thematic planner. Dependencies are explicit and never auto-installed.
 """
 from __future__ import annotations
 
@@ -38,7 +39,7 @@ def dependencies():
 def reader_digest():
     return sha256_digest({'version': '1.0.0', 'files': {
         path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in
-        [Path(__file__), *[Path(__file__).resolve().parents[3] / 'schemas' / (name + '.schema.json')
+        [Path(__file__), Path(__file__).with_name('thematic.py'), Path(__file__).with_name('material_extraction.py'), *[Path(__file__).resolve().parents[3] / 'schemas' / (name + '.schema.json')
                           for name in ('vector-input', 'vector-prepared-data')]]}})
 
 
@@ -186,8 +187,8 @@ class VectorPreparationService(StaticAssetStore):
                 raise SecurityError('VECTOR_FEATURE_LIMIT', 'Unsupported vector record count')
             features, geometries, count = [], [], 0
             for index, (geometry, props) in enumerate(raw):
-                if not isinstance(geometry, dict) or geometry.get('type') not in {'Point', 'Polygon', 'MultiPolygon'}:
-                    raise ProtocolError('VECTOR_GEOMETRY_UNSUPPORTED', 'Only point and polygon sources are enabled')
+                if not isinstance(geometry, dict) or geometry.get('type') not in {'Point', 'Polygon', 'MultiPolygon', 'LineString', 'MultiLineString'}:
+                    raise ProtocolError('VECTOR_GEOMETRY_UNSUPPORTED', 'Only point, line and polygon sources are enabled')
                 if set(geometry) - {'type', 'coordinates', 'geometries'} or geometry.get('geometries'):
                     raise ProtocolError('VECTOR_GEOMETRY_INVALID', 'Geometry collections are unsupported')
                 for position in _positions(geometry['coordinates']):
@@ -206,7 +207,7 @@ class VectorPreparationService(StaticAssetStore):
                 # Normalize tuples to plain JSON without guessing IDs or numeric fields.
                 features.append({'id': f'feature-{index}', 'geometry': json.loads(json.dumps(mapping(geom))), 'properties': props})
                 geometries.append(geom)
-            kinds = {'point' if g.geom_type == 'Point' else 'polygon' for g in geometries}
+            kinds = {'point' if g.geom_type == 'Point' else 'line' if g.geom_type in ('LineString', 'MultiLineString') else 'polygon' for g in geometries}
             if len(kinds) != 1:
                 raise ProtocolError('VECTOR_GEOMETRY_MIXED', 'A source must have one geometry family')
             bounds = [min(g.bounds[0] for g in geometries), min(g.bounds[1] for g in geometries),
@@ -228,6 +229,11 @@ class VectorPreparationService(StaticAssetStore):
         body = {'schema_version': 1, 'kind': 'vector-prepared-data', 'context': identity,
                 'source': deepcopy(source), 'source_manifest_digest': digest, 'source_assets': assets,
                 **self._read(source, assets), 'reader_digest': reader_digest()}
+        if source.get('attribute_join'):
+            if 'join' not in context.authorized_capabilities:
+                raise SecurityError('CAPABILITY_NOT_AUTHORIZED', 'Attribute join was not authorized')
+            from .thematic import join_attributes
+            body['attribute_evidence'] = join_attributes(self, body, source['attribute_join'])
         return self.save('vector-prepared-data', body)
 
     def load_verified(self, ref, context):
@@ -251,6 +257,13 @@ class VectorPreparationService(StaticAssetStore):
                     or 'sha256:' + hashlib.sha256(path.read_bytes()).hexdigest() != asset['ref']['digest']):
                 raise ProtocolError('VECTOR_SNAPSHOT_CHANGED', 'Frozen sidecar changed')
         rebuilt = self._read(value['source'], value['source_assets'])
+        if value['source'].get('attribute_join'):
+            from .thematic import join_attributes
+            if 'attribute_evidence' not in value:
+                raise ProtocolError('THEMATIC_EVIDENCE_MISSING', 'Joined data must retain its source evidence')
+            evidence = join_attributes(self, rebuilt, value['source']['attribute_join'], value['attribute_evidence']['asset'])
+            if evidence != value['attribute_evidence']:
+                raise ProtocolError('THEMATIC_EVIDENCE_DRIFT', 'Join evidence differs')
         if any(value[key] != item for key, item in rebuilt.items()):
             raise ProtocolError('VECTOR_PREPARATION_CHANGED', 'Prepared geometry, attributes or runtime differ')
         return value

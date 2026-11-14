@@ -49,6 +49,7 @@ class IntentSemanticsTests(unittest.TestCase):
         # Metadata-only double: deliberately not installed into policy or the code allowlist.
         return ScenarioCapability({
             "id": "unit-capability", "version": "1.0.0", "implementation": "not-enabled",
+            "template_geometry": "raster", "renderer_id": "rasterio-matplotlib-page",
             "template": {"kind": "map-scenario", "id": "test-scenario", "version": "1.0.0"},
             "request_schemas": {"generate-map": "generate-request"},
             "intent_constraints": {"business_scene": "government_thematic",
@@ -64,6 +65,7 @@ class IntentSemanticsTests(unittest.TestCase):
         capability = self.capability()
         registry._templates[("map-scenario", "test-scenario", "1.0.0")] = capability
         request = deepcopy(VALID_CASES["generate-request"])
+        request["geometry"] = "raster"
         request["intent"] = self.request()["selection"]
         return registry, capability, request
 
@@ -186,7 +188,7 @@ class IntentSemanticsTests(unittest.TestCase):
             self.schemas.validate("map-brief", self.projection("map-brief", intent))
         # The temporary intent catalog never touches the packaged scenario policy:
         # it still admits only the registered general-thematic scenario.
-        self.assertEqual({("map-scenario", "general-thematic-map", "3.0.0")},
+        self.assertEqual({("map-scenario", "general-thematic-map", "3.0.0"), ("map-scenario", "general-thematic-map", "4.0.0")},
                          set(ScenarioRegistry(self.schemas)._templates))
 
     def test_standalone_and_generate_share_the_same_intent(self):

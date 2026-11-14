@@ -457,6 +457,7 @@
                       "shape": {
                         "enum": [
                           "circle",
+                          "line",
                           "square"
                         ]
                       }

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -7,7 +8,7 @@ from ..canonical import sha256_digest
 from ..scenario_registry import ScenarioRegistry
 from ..errors import ProtocolError
 from ..repository.map_expression_catalog import MapExpressionCatalog
-from ..artifacts import file_digest
+from ..artifacts import file_digest, utc_now
 from ..schema_registry import SchemaRegistry, load_document
 from ..security.paths import PathGuard
 from ..validation.map_checks import MapQualityChecks
@@ -87,10 +88,9 @@ class MapCandidateCompiler:
 
 
     def _validate_expression_bindings(self, portrayal: dict[str, Any], lock: dict[str, Any]) -> None:
-        MapExpressionCatalog(self.registry).validate_portrayal(portrayal)
-        locked = {(item["id"], item["version"], item["digest"]) for item in lock["resources"]}
-        refs = {(item["map_expression_ref"]["id"], item["map_expression_ref"]["version"],
-                 item["map_expression_ref"]["digest"]) for item in portrayal["layers"]}
+        catalog = MapExpressionCatalog(self.registry)
+        refs = {(ref["id"], ref["version"], ref["digest"]) for ref in catalog.references(portrayal)}
+        locked = {(ref["id"], ref["version"], ref["digest"]) for ref in lock["resources"]}
         if refs != locked:
             raise ProtocolError("MAP_EXPRESSION_LOCK_MISMATCH", str(sorted(refs ^ locked)))
 
@@ -128,6 +128,18 @@ class MapCandidateCompiler:
 
     def check_candidate(self, request, candidate, scene, contracts, *, bundle=None):
         """Recompute the preflight so G2/replay bind actual gates, policy and inputs."""
+        overrides = request.get("revised_cartography") or request.get("output_profile")
+        if overrides:
+            contracts = deepcopy(contracts)
+            if request.get("revised_cartography"):
+                contracts["scenario"]["embedded"]["cartography"] = deepcopy(request["revised_cartography"])
+            if request.get("output_profile"):
+                contracts.setdefault("scenario", {}).setdefault("embedded", {}).setdefault("layout", {}).setdefault("canvas", {})
+                op = request["output_profile"]
+                if "width_mm" in op:
+                    contracts["scenario"]["embedded"]["layout"]["canvas"]["width"] = op["width_mm"]
+                if "height_mm" in op:
+                    contracts["scenario"]["embedded"]["layout"]["canvas"]["height"] = op["height_mm"]
         profile = ScenarioRegistry(self.registry).for_execution(candidate["execution"])
         profile.require_contract(contracts["scenario"])
         profile.require_scene(scene)
@@ -137,8 +149,11 @@ class MapCandidateCompiler:
             raise ProtocolError("CANDIDATE_EXECUTION_DIGEST_MISMATCH", candidate["candidate_id"])
         if candidate["execution"].get("render_scene_ref", {}).get("digest") != sha256_digest(scene):
             raise ProtocolError("CANDIDATE_SCENE_DIGEST_MISMATCH", candidate["candidate_id"])
+        from ..workflow.material_evidence import verify_material_facts
+        verify_material_facts(candidate["execution"], self.path_guard, self.project_root, self.registry)
+        from ..adapters.backend_registry import RASTER_PAGE, VECTOR_PAGE
         inputs = None
-        if scene["renderer_id"] == "rasterio-matplotlib-page":
+        if scene["renderer_id"] == RASTER_PAGE.renderer_id:
             if self.project_root is None or self.context is None:
                 raise ProtocolError("RASTER_EXECUTION_CONTEXT_REQUIRED", "Raster candidates require trusted project context")
             from .raster_scene import RasterSceneCompiler
@@ -154,10 +169,11 @@ class MapCandidateCompiler:
                 raise ProtocolError('PORTRAYAL_TEMPLATE_MISMATCH','Expression differs from installed template')
             if inputs["page"]["appearance"]["cartography"] != template_style:
                 raise ProtocolError("APPEARANCE_TEMPLATE_MISMATCH", "Page appearance differs from the installed template")
-            if bundle is not None and inputs["bundle"] != bundle:
+            from ..workflow.map_data_preparation import bundle_core as _bundle_core
+            if bundle is not None and _bundle_core(inputs["bundle"]) != _bundle_core(bundle):
                 raise ProtocolError("RASTER_CANDIDATE_BUNDLE_MISMATCH", "Candidate must preserve the prepared bundle")
         vector = None
-        if scene["renderer_id"] == "matplotlib-vector-page":
+        if scene["renderer_id"] == VECTOR_PAGE.renderer_id:
             from .vector_scene import VectorSceneCompiler
             from ..workflow.vector_preparation import VectorPreparationService
             service = VectorPreparationService(project_root=self.project_root,
@@ -166,7 +182,8 @@ class MapCandidateCompiler:
             if (scene["resolved_layout"]["template_contract"] != contracts["scenario"]["embedded"]["layout"]
                     or vector["page"]["cartography"] != contracts["scenario"]["embedded"]["cartography"]):
                 raise ProtocolError("VECTOR_TEMPLATE_MISMATCH", "Page layout or appearance differs from the installed template")
-            if bundle is not None and bundle != vector["bundle"]:
+            from ..workflow.map_data_preparation import bundle_core as _bundle_core
+            if bundle is not None and _bundle_core(bundle) != _bundle_core(vector["bundle"]):
                 raise ProtocolError("VECTOR_BUNDLE_MISMATCH", "Page does not preserve the prepared bundle")
         return MapQualityChecks(self.registry).inspect(
             candidate, scene, contracts["quality_gates"], profile=profile, raster=inputs, vector=vector)
@@ -179,3 +196,79 @@ class MapCandidateCompiler:
                 or execution.get("intent_ref", {}).get("digest") != sha256_digest(intent)
                 or execution.get("profile_refs") != [intent["evidence_refs"][0], intent["evidence_refs"][-1]]):
             raise ProtocolError("CANDIDATE_INTENT_MISMATCH", "Execution must preserve the resolved user intent")
+
+    @staticmethod
+    def _apply_design_overrides(contracts, variant):
+        # Inject one externally supplied variant's cartography/output_profile into a copy
+        # of the contracts, mirroring the single-candidate override path. Deterministic;
+        # never ranks or selects among variants.
+        contracts = deepcopy(contracts)
+        cartography = variant.get("revised_cartography")
+        output_profile = variant.get("output_profile")
+        if cartography:
+            contracts.setdefault("scenario", {}).setdefault("embedded", {})
+            contracts["scenario"]["embedded"]["cartography"] = deepcopy(cartography)
+        if output_profile:
+            canvas = contracts.setdefault("scenario", {}).setdefault("embedded", {})
+            canvas = canvas.setdefault("layout", {}).setdefault("canvas", {})
+            if "width_mm" in output_profile:
+                canvas["width"] = output_profile["width_mm"]
+            if "height_mm" in output_profile:
+                canvas["height"] = output_profile["height_mm"]
+        return contracts
+
+    def compile_variants(self, request, intent, plan, bundle, installation, contracts,
+                         font_path, variants):
+        # Deterministically compile each externally supplied design variant into its own
+        # candidate and assemble a candidate-set. The program compiles, formally validates
+        # (preflight) and presents the comparison only; it never ranks or selects among
+        # variants -- creative choice stays with the LLM/human (design-principles).
+        if not isinstance(variants, list) or not variants:
+            raise ProtocolError("CANDIDATE_VARIANTS_REQUIRED", "At least one design variant is required")
+        if len(variants) > 8:
+            raise ProtocolError("CANDIDATE_VARIANTS_LIMIT", "At most 8 variants per candidate set")
+        seen = set()
+        entries = []
+        compiled_by_variant = {}
+        for variant in variants:
+            variant_id = variant.get("variant_id")
+            if not isinstance(variant_id, str) or variant_id in seen:
+                raise ProtocolError("CANDIDATE_VARIANT_DUPLICATE", "Variant ids must be unique strings")
+            seen.add(variant_id)
+            variant_request = deepcopy(request)
+            if variant.get("revised_cartography"):
+                variant_request["revised_cartography"] = deepcopy(variant["revised_cartography"])
+            else:
+                variant_request.pop("revised_cartography", None)
+            if variant.get("output_profile"):
+                variant_request["output_profile"] = deepcopy(variant["output_profile"])
+            else:
+                variant_request.pop("output_profile", None)
+            variant_contracts = self._apply_design_overrides(contracts, variant)
+            compiled = self.compile(variant_request, intent, plan, bundle, installation,
+                                    variant_contracts, font_path)
+            candidate = compiled["candidate"]
+            candidate["candidate_id"] = "candidate-" + request["run_id"] + "-" + variant_id
+            # Re-run preflight so its subject_digest binds the rewritten candidate_id;
+            # otherwise the frozen candidate and its report drift apart at G2 replay.
+            compiled["preflight"] = self.check_candidate(
+                variant_request, candidate, compiled["scene"], variant_contracts, bundle=bundle)
+            compiled_by_variant[variant_id] = compiled
+            entries.append({
+                "variant_id": variant_id,
+                "candidate_id": candidate["candidate_id"],
+                "resolved_map_digest": sha256_digest(candidate),
+                "render_scene_digest": sha256_digest(compiled["scene"]),
+                "preflight_status": "passed" if compiled["preflight"]["status"] == "passed" else "failed",
+                "preflight_report_digest": sha256_digest(compiled["preflight"]),
+            })
+        candidate_set = {
+            "schema_version": 1,
+            "set_id": "candidate-set-" + request["run_id"],
+            "run_id": request["run_id"],
+            "project_id": request["project_id"],
+            "candidates": entries,
+            "created_at": utc_now(),
+        }
+        self.registry.validate("candidate-set", candidate_set)
+        return {"candidate_set": candidate_set, "compiled": compiled_by_variant}

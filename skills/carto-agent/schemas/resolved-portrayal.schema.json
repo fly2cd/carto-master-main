@@ -40,6 +40,61 @@
     "compiler_digest": {
       "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
     },
+    "label_source": {
+      "description": "The panel label declaration the labels were resolved from; frozen so verification recomputes labels deterministically.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "field"
+      ],
+      "properties": {
+        "field": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+        },
+        "max_labels": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        }
+      }
+    },
+    "labels": {
+      "description": "Optional feature labels resolved from the declared label field (vector geometry). Compiled and digest-bound; anchors are label-position facts, placement happens at draw time.",
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 1000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "feature_id",
+          "text",
+          "anchor"
+        ],
+        "properties": {
+          "feature_id": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+          },
+          "anchor": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "number"
+            }
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          }
+        }
+      }
+    },
     "prepared_ref": {
       "allOf": [
         {
@@ -127,7 +182,7 @@
       "const": "nearest"
     },
     "encoding": {
-      "$ref": "https://schemas.carto-agent.local/v1/vector-encoding.schema.json"
+      "$ref": "https://schemas.carto-agent.local/v1/encoding-ir.schema.json"
     },
     "feature_styles": {
       "$ref": "#/$defs/featureStyles"
@@ -162,15 +217,13 @@
           "expression_ref",
           "source_snapshot",
           "context",
-          "lookup_table",
           "legend_items",
           "source_mask_policy",
-          "unknown_value_policy",
           "resampling"
         ],
         "properties": {
           "key_mode": {
-            "const": "discrete"
+            "enum": ["discrete", "interval"]
           },
           "prepared_ref": {
             "properties": {
@@ -183,13 +236,22 @@
             "$ref": "#/$defs/rasterLegendItems"
           }
         },
-        "not": {
-          "required": [
-            "encoding",
-            "feature_styles",
-            "counts"
-          ]
-        }
+        "allOf": [
+          {
+            "if": { "properties": { "key_mode": { "const": "discrete" } } },
+            "then": {
+              "required": ["lookup_table", "unknown_value_policy"],
+              "not": { "required": ["encoding", "feature_styles", "counts"] }
+            }
+          },
+          {
+            "if": { "properties": { "key_mode": { "const": "interval" } } },
+            "then": {
+              "required": ["encoding"],
+              "not": { "required": ["lookup_table", "unknown_value_policy", "feature_styles", "counts"] }
+            }
+          }
+        ]
       },
       "else": {
         "required": [
@@ -220,78 +282,6 @@
             "unknown_value_policy",
             "resampling"
           ]
-        }
-      }
-    },
-    {
-      "if": {
-        "required": [
-          "encoding"
-        ],
-        "properties": {
-          "encoding": {
-            "properties": {
-              "kind": {
-                "enum": [
-                  "single",
-                  "categorical"
-                ]
-              }
-            }
-          }
-        }
-      },
-      "then": {
-        "properties": {
-          "key_mode": {
-            "const": "discrete"
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "required": [
-          "encoding"
-        ],
-        "properties": {
-          "encoding": {
-            "properties": {
-              "kind": {
-                "const": "choropleth"
-              }
-            }
-          }
-        }
-      },
-      "then": {
-        "properties": {
-          "key_mode": {
-            "const": "interval"
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "required": [
-          "encoding"
-        ],
-        "properties": {
-          "encoding": {
-            "properties": {
-              "kind": {
-                "const": "proportional"
-              }
-            }
-          }
-        }
-      },
-      "then": {
-        "properties": {
-          "key_mode": {
-            "const": "scaling"
-          }
         }
       }
     }
@@ -498,6 +488,7 @@
           "shape": {
             "enum": [
               "circle",
+              "line",
               "square"
             ]
           }

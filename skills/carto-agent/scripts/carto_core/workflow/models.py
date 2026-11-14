@@ -20,7 +20,7 @@ class ExecutionBudget:
     revisions: int = 0
     cost_units: float = 0.0
     context_bytes: int = 0
-    started_monotonic: float = field(default_factory=time.monotonic)
+    started_at: float = field(default_factory=time.time)
 
     def consume(self, resource: str, amount: float = 1.0) -> None:
         if amount < 0:
@@ -42,7 +42,7 @@ class ExecutionBudget:
             exceeded = self.context_bytes > self.max_context_bytes
         else:
             raise ProtocolError("BUDGET_RESOURCE_UNKNOWN", resource)
-        if exceeded or time.monotonic() - self.started_monotonic > self.max_elapsed_seconds:
+        if exceeded or time.time() - self.started_at > self.max_elapsed_seconds:
             raise ProtocolError("EXECUTION_BUDGET_EXCEEDED", resource)
 
 

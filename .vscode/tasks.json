@@ -95,16 +95,13 @@
       "group": "test"
     },
     {
-      "label": "Carto: Run tests",
+      "label": "Carto: Run tests (fast tier)",
       "type": "process",
       "command": "${command:python.interpreterPath}",
       "args": [
-        "-m",
-        "unittest",
-        "discover",
-        "-s",
-        "${workspaceFolder}/skills/carto-agent/scripts/tests",
-        "-v"
+        "${workspaceFolder}/skills/carto-agent/scripts/tests/run_tests.py",
+        "--tier",
+        "fast"
       ],
       "options": {
         "cwd": "${workspaceFolder}",
@@ -117,8 +114,79 @@
         "reveal": "always",
         "panel": "dedicated"
       },
-      "detail": "完整开发回归；渲染用例可能启动无头浏览器并创建临时产物。",
+      "detail": "内循环：438 个 ≤5s 用例（协议/Schema/单元/组件），实测约 1.7 分钟。不含真实渲染，不能替代全量门禁。",
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "Carto: Run tests (slow tier)",
+      "type": "process",
+      "command": "${command:python.interpreterPath}",
+      "args": [
+        "${workspaceFolder}/skills/carto-agent/scripts/tests/run_tests.py",
+        "--tier",
+        "slow"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "PYTHONUTF8": "1"
+        }
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "detail": "32 个 >5s 的真实渲染端到端用例（模板 validate/publish 六组合、preview→G2→render→check→G3→deliver），实测约 14.6 分钟。",
       "group": "test"
+    },
+    {
+      "label": "Carto: Run tests",
+      "type": "process",
+      "command": "${command:python.interpreterPath}",
+      "args": [
+        "${workspaceFolder}/skills/carto-agent/scripts/tests/run_tests.py",
+        "--tier",
+        "full"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "PYTHONUTF8": "1"
+        }
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "detail": "完整开发回归（470 用例，实测约 16.2 分钟）；合并与发布前的门禁。渲染用例可能启动无头浏览器并创建临时产物。跳过的用例不等于通过。",
+      "group": "test"
+    },
+    {
+      "label": "Carto: Re-measure test baseline",
+      "type": "process",
+      "command": "${command:python.interpreterPath}",
+      "args": [
+        "${workspaceFolder}/skills/carto-agent/scripts/tests/run_tests.py",
+        "--measure",
+        "--quiet"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "PYTHONUTF8": "1"
+        }
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "detail": "重跑全量并逐用例计时，重写 tests/regression-baseline.json（fast/slow 分层依据）。测试集形态变化或换机器后执行。"
     }
   ]
 }

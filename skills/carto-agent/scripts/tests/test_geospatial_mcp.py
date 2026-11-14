@@ -170,6 +170,30 @@ class GeospatialAdapterTests(unittest.TestCase):
         _, result = self.invoke()
         self.assertEqual([], result["statistics"]["classes"])
 
+    def test_continuous_statistics_from_float_band_flow_through_adapter(self):
+        # ADR-001 2.3: a float32 band makes the real MCP emit continuous (never classes).
+        # carto must accept it through the wire + result schemas and map statistics.continuous.
+        self.metadata["bands"][0]["dtype"] = "float32"
+        self.session = FakeSession(self.source, self.metadata)
+        stats = self.session.responses["geo_raster_statistics"]
+        del stats["classes"]
+        stats["continuous"] = {"min": 0.5, "max": 5.5, "mean": 3.0, "stddev": 1.707825127659933,
+                               "histogram": {"min": 0.5, "max": 5.5, "bucket_count": 5, "counts": [1, 1, 1, 1, 2]}}
+        receipt, result = self.invoke()
+        self.assertEqual("gis-raster-statistics", receipt.capability_id)
+        self.assertNotIn("classes", result["statistics"])
+        self.assertEqual([1, 1, 1, 1, 2], result["statistics"]["continuous"]["histogram"]["counts"])
+        self.assertEqual(6, result["statistics"]["valid_pixels"])
+        self.assertEqual(6, sum(result["statistics"]["continuous"]["histogram"]["counts"]))
+
+    def test_float_band_without_continuous_statistic_is_rejected_not_crashed(self):
+        # A structurally valid classes-only response on a float band is inconsistent; it must
+        # raise a clean ProtocolError, never a KeyError (regression guard for the dtype XOR family).
+        self.metadata["bands"][0]["dtype"] = "float32"
+        self.session = FakeSession(self.source, self.metadata)
+        self.assert_code("MCP_STATISTICS_INCONSISTENT", self.invoke)
+        self.assert_no_result()
+
     def test_gateway_scope_and_budget_fail_before_remote_calls(self):
         for change, code in [("capability", "CAPABILITY_SCOPE_DENIED"), ("namespace", "PROJECT_SCOPE_DENIED"),
                              ("tenant", "MCP_PROJECT_SCOPE_DENIED"), ("project", "MCP_PROJECT_SCOPE_DENIED"),

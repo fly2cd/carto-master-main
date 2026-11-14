@@ -1,122 +1,94 @@
 # generate-map 工作流
 
-## S1 参数化网格请求
+更新：2026-11-13，A3.1 专题核心重构。本文描述当前可执行边界，不代表全部目标能力已经实现。
 
-明确选择已验证发布的 `map-scenario/general-thematic-map@3.0.0`，而不是按布局复制模板。请求还必须满足原有意图、数据许可、字体及审批要求。以下仅为关系字段示意，不是可执行完整请求：
-
-```json
-{
-  "layout_parameters": {"rows": 1, "columns": 2, "legend_mode": "shared"},
-  "panels": [
-    {"id": "view-r0-c0", "source_id": "source-a", "title": "第一幅图"},
-    {"id": "view-r0-c1", "source_id": "source-b", "title": "第二幅图"}
-  ]
-}
-```
-
-- `sources[].id`、`source_bindings[].source_ref.id`、`prepared_raster_bindings[].source_id` 必须按源一一对应；准备绑定还包含角色与精确 `prepared_ref`。面板可重复引用同一 source_id，但不能有未使用源、重复面板或缺失地图框。
-- 单图使用 `main-view`，其标题等于 goal；多图使用 `view-r{row}-c{column}`，每格显式标题。只支持 1×1、1×2、2×2，不接受 2×1 或任意行列。
-- 每个面板独立保持源范围，共享图例不意味着统一范围。所有源 CRS 须一致并匹配模板；不隐式重投影。
-- `independent` 保留各面板图例；`shared` 严格比较完整类别定义和 legend_policy，observed 取已确认项并集，all 还比较纳入标志。容量与实际字形溢出均可拒绝，不自动改色、删类、缩字或回退。
-- 模板布局源合同、参数、实例框、全部源及图例关系进入候选/冻结。预览、正式渲染、终检、G3 和交付重验全部面板。
-- 自动查找模板及无匹配时创建模板属于后续能力；本期仍要求明确选择模板，创建/发布仍须独立 T1/TP。
-
-## 宿主检查与本工作流的关系
-
-首次核对 Hermes 接入或更换宿主工具时，按 `host-preflight.md` 做辅助检查。缺少能力如实报告；`probe-host` 成功不意味着本工作流可以处理真实 TIFF，不替代 G1/G2/G3，也不代表第二批结果回传已实现。
-
-## 场景分派约束
-
-- 通用请求 Schema 只负责结构；运行入口还必须验证注册能力及该场景明确注册的请求约束。
-- 数据准备、规划、候选编译和业务图例检查由注册的场景组件承担，实现入口保留在 `scripts/carto-agent/scripts/carto_core/scenarios/` 的单一 `general-thematic` bundle（几何 strategy 分派），当前仅准入 raster 几何的单图/有限网格实现。
-- 先以 `goal + intent` 解析实际用户意图，再检查明确选定模板的 `intent_constraints` 是否兼容；绝不从模板策略反填业务场景、主题或默认任务。Intent 与 Brief/Plan 的业务场景、主题和任务一致，execution 使用同一语义。
-- Intent 的 `evidence_refs` 按顺序绑定意图目录、用户意图输入、模板能力策略；execution 的 `profile_refs` 为 `[意图目录引用, 能力策略引用]`，并通过 `intent_ref` 绑定完整 Intent。旧格式或任一摘要漂移均拒绝。
-- 输入与术语规范见 `intent-contract.md`；本阶段仍要求显式模板引用，没有自动模板检索或候选排序。
-- 正式渲染与交付使用绑定策略的输出规格、声明和许可；合法的任意字符串不能替代该场景的强制声明。旧锁缺少策略绑定或策略发生漂移时应开始新运行并重新审批，不自动迁移。
-- 仍未开放生产数据、任意输入格式、真实 CRS 转换或任意版式；结构参数化不代表已实现这些能力。
-
-## 当前能力
-
-- `policies/intent-profiles.yaml` 是意图识别目录，`policies/scenario-capabilities.yaml` 是独立的执行能力准入策略；后者与代码白名单当前仅登记 general-thematic-mapping。意图未就绪先报意图错误；就绪后无匹配能力返回 `CAPABILITY_NOT_AVAILABLE`，不存在备用场景。
-- 工作流严格按 `intake → brief → compile → preview → freeze → render → check → deliver` 推进；不能跳过 G1、预览证据、G2、正式渲染证据、最终检查或 G3。
-- `intake` 先解析 `MapIntent` 并检查所选模板兼容性，再校验项目作用域、调用能力、精确模板引用、数据源引用和输出目标；缺场景、任务或该场景所需主题时不通过模板补齐。
-- `brief` 从权威模板索引发现精确版本，固定数据访问、字段语义、模板摘要和允许操作，随后等待 G1 `approve-map-brief`。
-- `compile` 验证 G1，安装已发布模板，调用注册场景的数据准备器，生成 `PreparedDataBundle`、`MapPlan`、`ResolvedMap`、`RenderScene` 和预检报告；该步骤不启动浏览器。
-- `preview` 按候选中冻结的 `renderer_id` 选择后端：`maplibre-web` 使用受控 Chromium，`rasterio-matplotlib-page` 使用 Rasterio + Matplotlib；验证正式 RenderReceipt、输出/资源/执行摘要和环境指纹，生成预览证据。栅格不经过浏览器，也不接受浏览器回执。
-- `freeze` 重新验证候选、场景、模板、资源、预览产物、回执和环境，验证精确 G2 `approve-freeze` 后创建 create-once `MapSpecLock`，推进到 `pending / render`。
-- `render` 只消费 `MapSpecLock` 及其摘要绑定输入，在 `output/<lock-id>/formal-map/<attempt-id>/` 创建不可覆盖 PDF/PNG、正式 RenderReceipt、`RenderAttempt` 和 `FormalRenderEvidence`；成功后进入 `pending / check`。
-- `check` 对成功 attempt 执行注册且版本化的最终检查，写入 Final ValidationReport；通过后冻结不可变 DeliveryManifest，返回精确 G3 上下文并进入 `waiting_approval / deliver`。
-- `deliver` 重新验证 Manifest、Final ValidationReport、锁、成功 attempt 和 PDF/PNG 摘要，验证并消费精确 G3，执行项目内可恢复交付事务，成功后进入 `succeeded / deliver`。
-- `delivery-status` 按 Manifest 中的幂等键查询 DeliveryTransaction 和已存在的 DeliveryReceipt，用于提交结果未知后的确定性查询。
-
-## 静态分类着色栅格接入
-
-共享实现及输入例子见 `raster-classification.md` 的“第三批 C”。这不是独立顶层路由。
-
-- 已准入场景的数据组件在 G1 后可调用 `BundlePreparer(preparation, "raster").prepare_request`；请求必须包含唯一 GeoTIFF source binding 和精确 `prepared_raster_bindings`。准备报告只证明数据/显示定义已澄清，不代替 G1。
-- 候选组件调用 `RasterSceneCompiler.compile` 和 `bind_execution`，保留业务意图、模板、策略引用；通用 `MapCandidateCompiler` 再核对请求、bundle、execution 和场景。共享模块不会生成业务模板或选择场景。
-- 候选和锁通过 bundle/page 引用冻结 TIFF、CSV、MCP 证据、类别表达、布局和 TTF；JSON 文档用规范摘要，二进制用原始字节摘要，模式由实现确定而非调用方任选。
-- 正式回执绑定真实运行依赖、渲染代码、session、资源集、页面报告和成果。HMAC 只证明持钥本地渲染器签发及绑定，不宣称硬件证明、OS/网络沙箱或逐像元遥感语义正确。
-- 终检继续要求场景图例检查器、声明与许可；增加静态分支的毫米页面、像素/DPI、真实字体、测量布局、共用分类表与 nearest/掩膜策略检查。失败不发 G3 Manifest。
-- G2/G3 仍校验精确对象、身份、scope、environment、issuer、policy、时效和 nonce；原子交付包仍仅含 PDF/PNG、说明和清单，不打包原始 TIFF/CSV、内部回执或审批。
-- 当前仅准入 general 的单图、1×2、2×2 分类栅格组合，仍为静态后端、A4 横向 PDF+PNG。测试只对候选边界注入合成场景/模板准入，验证真实预览到交付链；不声称已打通真实 T1/TP/G1 或已制作用户地图。
-
-## 场景语义
-
-- 输入角色、字段映射、表达方法和范围计算由场景组件定义，不由通用流程填入默认业务字段。
-- 分类断点、图例项、实际范围、数据摘要、目标参数和渲染环境属于候选与锁，不回写模板包。
-- 页面规格从冻结布局及场景输出策略获取；声明来自同一场景策略，通过 `scenario_notice` 和 `final.scenario-notice` 核验完整链路。
-- 共享协议描述的结构不等于读取器或场景已经支持相应数据；新格式和真实 CRS 转换须单独实现和验收。
-
-## 成品检查与 G3
-
-- 检查集合绑定 `checker-registry.yaml` 的规范摘要，未知 checker 拒绝。
-- Final ValidationReport 检查 PDF/PNG 的文件、媒体签名、大小、摘要、锁定的页面规格、PNG 尺寸/DPI、字体、版式元素、图例/无数据/比例符号语义、声明链、lock/attempt/receipt/evidence 绑定、敏感内容和 renderer warning 处置。
-- 任一 `blocker/error` 失败或 warning 未被接受，运行进入 `failed / check`，不生成 DeliveryManifest；普通 `retry` 不允许绕过成品失败。
-- G3 必须为 `approve-delivery / delivery-manifest`，`object_digest` 必须等于完整不可变 DeliveryManifest 的规范摘要，并严格绑定 approver、tenant、scope、environment、policy、issuer、时效和 nonce。
-- G3 消费前写入 workflow-local intent；nonce 已消费时，仅当该 intent 与当前审批文件完全一致才允许恢复。缺失或漂移均拒绝，普通 replay 不构成恢复。
-
-## 原子交付事务
-
-固定顺序为：
+## 1. 一条主流程，两种数据策略
 
 ```text
-验证 Manifest/报告/成果与 G3
-  → 创建 DeliveryTransaction intent
-  → 在最终目录同级隔离 staging 构建成果包
-  → 校验白名单、摘要、清单、许可和限制
-  → os.replace 原子提交最终目录
-  → 写不可变 DeliveryReceipt
-  → 写步骤回执并完成 succeeded/deliver
+intake → brief → [G1] compile → preview → [G2] freeze
+                         ↑       │
+                         └─ revision-brief → [新 G1] revise
+freeze → render → check → 成品 review → 冻结 DeliveryManifest → [G3] deliver
 ```
 
-- 事务 journal 位于 `<project>/.carto/delivery/transactions/`，回执位于 `<project>/.carto/delivery/receipts/`；运行时通过显式引用和幂等键查询，不依赖目录计数推断 ID。
-- 最终包白名单固定为 `map.pdf`、`map.png`、`README.md`、`delivery-manifest.yaml`、`checksums.sha256`。
-- 最终目录已存在时不覆盖；只有文件集合、Manifest、checksum 和成果摘要完全一致时才作为已提交事务恢复。
-- 同幂等键同对象返回已有事务/回执；同幂等键绑定不同 Manifest、接收方、目的地、项目或运行时返回 `IDEMPOTENCY_CONFLICT`。
-- staging、原子提交后、回执写入后和步骤回执前的中断均可依据不可变事务事实恢复；不得通过逐文件写入最终目录宣称原子成功。
+- `general_thematic_mapping` 是一个业务场景，栅格和矢量共用状态机、审批、预览、冻结、检查和交付。
+- 策略 `scenario-capabilities.yaml` v1.7.0 只登记一个能力档案 `general-thematic-mapping@5.0.0`；栅格与矢量是它的 `geometry_variants` 数据适配变体，共享段只声明一遍。请求声明 `geometry`，变体声明 `template_geometry` 和 `renderer_id`，不根据版本号猜几何类型。
+- 当前模板资产为 `general-thematic-map@3.0.0`（栅格变体）与 `@4.0.0`（矢量变体）。版本号只是已登记资产的身份，不是运行分派规则。两者均为非生产准入，`production_enabled: false`；撤销某几何的准入就是删除对应变体。
+- 模板提供可复用布局、样式和支持的表达，不替用户选择本次指标、单位、分级方法。已有适配模板直接复用，不要求每次先创建模板。自动模板检索、无模板项目设计仍未实现。
 
-## 安全与能力边界
+## 2. 输入分清事实、设计和执行
 
-- 所有项目输入、输出、回执、attempt、报告、Manifest、staging 和最终路径均经过 `PathGuard`，symlink/junction 和受保护目录被拒绝。
-- 交付包不包含原始数据、内部锁、审批文件或密钥、RenderReceipt、FormalRenderEvidence、内部 ValidationReport。
-- 当前只支持项目根/允许根内的本地目录交付；不支持外部连接器、网络发布或共享服务提交。
-- 当前无启用业务场景，不声明生产数据制图或三场景生产能力。
+`goal` 表示业务任务；`map_title` 表示实际页面标题，不再强制二者相同。每个面板必须有 `design`。旧 `vector_panels[].encoding` 请求不再接受，不自动补默认表达。
 
-## 尚未开放
+### 栅格
 
-- 真实 CRS 转换、生产数据、外部底图联网和外部发布。
-- `map-brand`、`map-style`、`map-layout` 的业务创建与组合。
-- 任意专题类型、任意字段表达式或任意动态代码执行。
+- 用户提供已分类 TIFF、精确源绑定、`prepared_raster_bindings` 和就绪分类合同。
+- 面板显式选择 `{"geometry":"raster","kind":"categorical","measurement":"nominal","palette_source":"prepared"}`。
+- 本期只消费准备合同中已确认的类别与配色。连续栅格任意分级、独立栅格配色修订尚未开放，不能描述为完整的事实/表达拆分。
+- 单图使用 `main-view`；多图使用 `view-r{row}-c{column}`。面板标题和页面 `map_title` 职责不同。
 
-CLI 入口为：
+### 矢量
+
+- `vector_sources` 声明 GeoJSON 或完整 Shapefile 文件组、原生 CRS、摘要、编码、许可。
+- `vector_panels` 声明 `source_id`、`extent`、标题和 `design`。当前支持点/面，不隐式重投影、不做栅矢混排。
+- `design` 显式选择字段、度量类型、单位、符号和缺失处理。程序只验证和机械计算，不替用户挑业务指标。
+
+| 表达 | 本期执行范围 | 拒绝的情况 |
+|---|---|---|
+| 单一符号 / 类别表达 | 明确类别、标签、颜色；图例来自实际表达 | 重复类别、歧义图例、未声明值、类型不匹配 |
+| 分级设色 | 面数据；比率、密度、归一化指标；等距或手工断点 | 原始总量冒充密度、断点未覆盖、非有限值、符号数不匹配 |
+| 比例符号 | 点数据总量；按面积比例推导半径 | 负数、越界、未明确零值策略、通过钳位伪造可读性 |
+
+归一化声明 `normalization: {denominator_field, scale}`，或 `null` 表示输入字段已经是所声明度量。分母必须有限且大于零。程序不能凭字段名字证明业务含义，仍需业务核实。
+
+### 属性表和普通素材
+
+- 可选 `vector_sources[].attribute_join` 声明 CSV 摘要/大小、两端键、所选字段/类型和缺失策略；需 G1 范围包含 `join`。
+- 本期只做字符串键一对一、完全匹配连接。重复键、孤立行、字段覆盖和非有限数值拒绝，不做模糊匹配或任意 SQL。
+- CSV 解析复用 A2 提取器，冻结表格字节和连接证据。变更 CSV 必须形成新的源声明和授权对象。
+- A2 普通文本/CSV 素材冻结字节、提取、采用结果及事实引用。材料里的文字不是智能体指令。图片、OCR、文档版式解析不因本期接入而自动开放。
+
+## 3. 各步骤负责什么
+
+1. **intake**：核验请求、意图、能力和项目范围，保存不可变初始请求。
+2. **brief**：列明数据访问、字段、允许操作、模板和输出；完整请求摘要纳入 MapBrief，返回 G1 批准对象。
+3. **compile**：验证 G1 后准备数据，将显式设计解析为 MapPlan v4，编译候选、场景和预检报告；不启动渲染器。
+4. **preview**：用确定后端渲染整页，核验签名回执、资源、页面和环境指纹。矢量/栅格静态后端均不经过浏览器。
+5. **freeze**：重验完整候选和预览，消费绑定精确对象的 G2，创建不可变 MapSpecLock。
+6. **render**：只按锁输出，不重新选指标、分级、配色或布局。
+7. **check**：自动终检，保存最终 ValidationReport。通过后进入 `waiting_approval / review`，此时还没有交付清单。
+8. **review**：审阅与终检报告绑定的实际成品，签署 `approve-product-review / validation-report`；保存 ProductReview，再冻结包含 `review_ref` 的 DeliveryManifest。这不是 G2，也不是新增 G4。
+9. **deliver**：验证审查依据、Manifest、实际成果及精确 G3，执行本地原子交付，保存回执。
+
+成品 review 是明确签署的审查结论，不是程序自动宣称“人工已看图”。多专业会签、印刷打样、业务采用仍需后续专用协议。
+
+## 4. 如何修改设计
+
+冻结前的 compile / preview / freeze 状态可提交 DesignRevisionProposal，允许修改页面标题、面板 design、网格参数、显式 cartography。
+
+1. `revision-brief` 输出完整修订 MapBrief 及摘要，不代签审批、不修改状态。
+2. 对该 MapBrief 签新 G1，再调用 `revise`；G1 只签提案摘要会被拒绝。
+3. `revise` 返回新的 `request_path`；后续 compile / preview / freeze 使用新路径和新 G1。
+4. 新请求、简报、计划、候选和预览写入 `revisions/rN/`。旧路径与旧回执保持有效；当前版本由状态事务确定，不通过覆盖工作文件切换。
+5. 受累计修订预算约束；同一暂存修订中断恢复不重复计费，冲突提案拒绝。旧 G2 不批准新预览。
+6. 冻结后不在原运行上修改设计。新建运行并重新形成候选、G2、锁和交付依据，不能用 retry 当设计修订。
+
+CLI 只有一个入口，公共参数以 `--help` 为准：
 
 ```text
-carto generate-map <intake|brief|compile|preview|freeze|render|check|deliver|status|retry|receipts|delivery-status>
+carto generate-map <intake|brief|compile|preview|revision-brief|revise|freeze|render|check|review|deliver|status|retry|receipts|delivery-status>
 ```
 
-运行时只读取 Skill 内协议、策略、索引和项目产物，不读取 `doc/` 设计稿。
+## 5. 布局、渲染和交付边界
 
-## S2 矢量候选（未准入）
+- A4 横版 300 dpi、PDF+PNG；网格 1×1 / 1×2 / 2×2，独立或共享图例。任意自由布局、自动删类/缩字或偷偷改色不开放。
+- 共享图例须有一致的完整表达、度量和比例，不能把不同密度区间当成同一图例。各图范围可不同，但必须匹配请求。
+- 模板创建/发布仍需独立 T1/TP；结构合法不等于场景准入，终端命令许可不等于业务审批。
+- 回执的 subject_id 必须匹配独立审批人 approver_subject_id，不能等于操作者。G1/G2 回执保存内容寻址快照，锁引用真实文件，不依赖用户原始回执文件持续存在。
+- G1/G2/G3 核验身份、tenant、scope、environment、动作、对象摘要及时效；运行内 nonce 精确绑定审批事务。相同事务可恢复，换对象/运行/回执拒绝。
+- 外部路径经 PathGuard。密钥、原始业务行、敏感位置不能进入普通日志、模板或交付包。
+- 最终包仅包含 `map.pdf`、`map.png`、`README.md`、`delivery-manifest.yaml`、`checksums.sha256`；内部审查记录由清单的精确引用绑定。
+- 隔离 staging、校验、同文件系统原子提交、不可变回执；冲突目的地和同幂等键换对象拒绝。提交结果未知先查询 delivery-status。
+- 不开放生产任务、在线底图/路线、真实 CRS 转换、海报/调研业务、任意字段表达式或外部发布。
 
-新代码以 `vector_sources` 声明文件组、CRS、编码和许可，以 `vector_panels` 声明 source_id、标题、显式 extent 和 encoding；支持 single/categorical/choropleth/proportional。不同 CRS 或栅矢混合不随此开放。现行能力策略未登记该档案，不能用新后端或 Schema 绕过业务门禁。2026-11-10 合成统一回归已通过，但仍须候选能力正式登记和真实任务验收，才能通过正式生成入口使用；新建用户项目仍须正常 G1/G2/G3。
+运行时只读取 Skill 协议、策略、索引及项目产物，不读取 doc 或测试代码。

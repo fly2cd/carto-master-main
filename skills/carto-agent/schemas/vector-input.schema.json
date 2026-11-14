@@ -103,6 +103,9 @@
         "public",
         "project-approved"
       ]
+    },
+    "attribute_join": {
+      "$ref": "https://schemas.carto-agent.local/v1/thematic-attribute-join.schema.json"
     }
   }
 }

@@ -25,6 +25,7 @@ class MapSpecLockCompiler:
         *,
         brief_approval_ref: str,
         freeze_approval_ref: str,
+        design_review_ref: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         lock = {
             **self._expected_snapshot(
@@ -35,6 +36,7 @@ class MapSpecLockCompiler:
                 preflight,
                 brief_approval_ref=brief_approval_ref,
                 freeze_approval_ref=freeze_approval_ref,
+                design_review_ref=design_review_ref,
             ),
             "created_at": utc_now(),
         }
@@ -52,9 +54,13 @@ class MapSpecLockCompiler:
         *,
         brief_approval_ref: str,
         freeze_approval_ref: str,
+        design_review_ref: dict[str, Any] | None = None,
     ) -> None:
         """Verify that an existing immutable lock is exactly the expected freeze result."""
         self.registry.validate("map-spec-lock", lock)
+        # A lock that recorded a design review cannot be re-verified without replaying it.
+        if design_review_ref is None and "design_review_ref" in lock:
+            raise ProtocolError("DESIGN_REVIEW_REQUIRED", lock.get("lock_id", "unknown"))
         expected = self._expected_snapshot(
             request,
             candidate,
@@ -63,6 +69,7 @@ class MapSpecLockCompiler:
             preflight,
             brief_approval_ref=brief_approval_ref,
             freeze_approval_ref=freeze_approval_ref,
+            design_review_ref=design_review_ref,
         )
         actual = {key: lock.get(key) for key in expected}
         if actual != expected:
@@ -78,12 +85,13 @@ class MapSpecLockCompiler:
         *,
         brief_approval_ref: str,
         freeze_approval_ref: str,
+        design_review_ref: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         execution = deepcopy(candidate["execution"])
         execution_digest = candidate["execution_digest"]
         if execution != candidate["execution"] or sha256_digest(execution) != execution_digest:
             raise ProtocolError("LOCK_EXECUTION_DIGEST_MISMATCH", f"lock-{request['run_id']}")
-        return {
+        snapshot = {
             "schema_version": 1,
             "lock_id": f"lock-{request['run_id']}",
             "project_id": request["project_id"],
@@ -120,3 +128,6 @@ class MapSpecLockCompiler:
             },
             "environment_fingerprint": evidence["environment_fingerprint"],
         }
+        if design_review_ref is not None:
+            snapshot["design_review_ref"] = deepcopy(design_review_ref)
+        return snapshot

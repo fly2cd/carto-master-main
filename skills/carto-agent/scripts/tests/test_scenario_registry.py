@@ -15,10 +15,10 @@ if str(SCRIPTS_ROOT) not in sys.path:
 
 from carto_core.errors import ProtocolError, SecurityError
 from carto_core.scenario_registry import ScenarioCapability, ScenarioRegistry
-from carto_core.schema_registry import SchemaRegistry
+from carto_core.schema_registry import SchemaRegistry, load_document
 from carto_core.security.paths import PathGuard
 from carto_core.workflow.template_analysis import ControlledSourceAnalyzer
-from tests.fixtures.schema_cases import VALID_CASES
+from tests.fixtures.schema_cases import VALID_CASES, VARIANT_CAPABILITIES_POLICY
 
 
 class ScenarioRegistryTests(unittest.TestCase):
@@ -35,7 +35,7 @@ class ScenarioRegistryTests(unittest.TestCase):
     def test_packaged_registry_admits_only_the_registered_scenario(self):
         with patch("carto_core.scenario_registry.import_module") as importer:
             registry = ScenarioRegistry(self.schemas)
-            self.assertEqual({("map-scenario", "general-thematic-map", "3.0.0")},
+            self.assertEqual({("map-scenario", "general-thematic-map", "3.0.0"), ("map-scenario", "general-thematic-map", "4.0.0")},
                              set(registry._templates))
             profile = registry.for_create(
                 deepcopy(VALID_CASES["general-template-create-request"]))
@@ -122,6 +122,91 @@ class ScenarioRegistryTests(unittest.TestCase):
                                          SimpleNamespace(validate_source_profile=validator))
             self.assertEqual("SOURCE_ADMISSION_DENIED", raised.exception.code)
             validator.assert_called_once_with(source, {})
+
+
+class GeometryVariantPolicyTests(unittest.TestCase):
+    """ADR-001 §9.5 项④: one capability profile, geometry as a data-adaptation variant."""
+
+    POLICY_PATH = Path(__file__).resolve().parents[2] / "policies" / "scenario-capabilities.yaml"
+
+    def setUp(self):
+        self.schemas = SchemaRegistry()
+
+    def assert_code(self, code, action):
+        with self.assertRaises(ProtocolError) as raised:
+            action()
+        self.assertEqual(code, raised.exception.code)
+
+    def registry_for(self, policy):
+        with patch("carto_core.scenario_registry.load_document", return_value=policy), patch(
+                "carto_core.scenario_registry.import_module"):
+            return ScenarioRegistry(self.schemas)
+
+    def test_packaged_policy_declares_the_shared_segment_once(self):
+        text = self.POLICY_PATH.read_text(encoding="utf-8")
+        policy = load_document(self.POLICY_PATH)
+        self.schemas.validate("scenario-capabilities", policy)
+        self.assertEqual(1, len(policy["profiles"]))
+        profile = policy["profiles"][0]
+        self.assertEqual(["raster", "vector"],
+                         [variant["geometry"] for variant in profile["geometry_variants"]])
+        # The convergence has to be textual, not only structural: a shared declaration
+        # copied per geometry is what let the two profiles drift apart before.
+        for fragment in ("administrative-division", "land-cover", "max_width_mm",
+                         "allowed_shapes", "user-declared-source-license"):
+            self.assertEqual(1, text.count(fragment), fragment)
+        # Per-geometry fields live only inside a variant.
+        for field in ("template", "authoring_profile", "renderer_id",
+                      "template_geometry", "allowed_geometries"):
+            self.assertNotIn(field, profile, field)
+
+    def test_variants_flatten_into_one_capability_per_geometry(self):
+        policy = deepcopy(VARIANT_CAPABILITIES_POLICY)
+        self.schemas.validate("scenario-capabilities", policy)
+        registry = self.registry_for(policy)
+        self.assertEqual({("map-scenario", "unit-scenario-map", "9.9.0"),
+                          ("map-scenario", "unit-scenario-map", "9.8.0")}, set(registry._templates))
+        raster = registry.for_template({"kind": "map-scenario", "id": "unit-scenario-map",
+                                        "version": "9.9.0"})
+        vector = registry.for_template({"kind": "map-scenario", "id": "unit-scenario-map",
+                                        "version": "9.8.0"})
+        for cap, geometry, renderer, authoring in (
+                (raster, "raster", "rasterio-matplotlib-page", "unit-raster-authoring"),
+                (vector, "vector", "matplotlib-vector-page", "unit-vector-authoring")):
+            with self.subTest(geometry=geometry):
+                # The shared segment reaches every variant unchanged.
+                self.assertEqual("unit-scenario", cap.definition["id"])
+                self.assertEqual("general_thematic_mapping",
+                                 cap.definition["intent_constraints"]["business_scene"])
+                self.assertEqual(["thematic-map"], cap.definition["intent_constraints"]["allowed_tasks"])
+                # Only the geometry-adaptation fields differ, and they stay explicit.
+                self.assertEqual(geometry, cap.definition["template_geometry"])
+                self.assertEqual([geometry], cap.definition["allowed_geometries"])
+                self.assertEqual(renderer, cap.definition["renderer_id"])
+                self.assertEqual(authoring, cap.definition["authoring_profile"])
+        # One profile identity, two distinguishable capability refs.
+        self.assertEqual(raster.ref["id"], vector.ref["id"])
+        self.assertEqual(raster.ref["version"], vector.ref["version"])
+        self.assertNotEqual(raster.ref["digest"], vector.ref["digest"])
+        # Each geometry remains its own admission lever.
+        self.assert_code("CAPABILITY_NOT_AVAILABLE", lambda: registry.require_geometry(raster, "vector"))
+        self.assert_code("CAPABILITY_NOT_AVAILABLE", lambda: registry.require_geometry(vector, "raster"))
+
+    def test_two_variants_of_one_geometry_stay_ambiguous(self):
+        policy = deepcopy(VARIANT_CAPABILITIES_POLICY)
+        variants = policy["profiles"][0]["geometry_variants"]
+        variants[1] = deepcopy(variants[0])
+        variants[1]["template"]["version"] = "9.7.0"
+        self.assert_code("SCENARIO_PROFILE_DUPLICATE", lambda: self.registry_for(policy))
+
+    def test_two_profiles_sharing_one_authoring_profile_stay_ambiguous(self):
+        policy = deepcopy(VARIANT_CAPABILITIES_POLICY)
+        second = deepcopy(policy["profiles"][0])
+        second["id"] = "unit-scenario-two"
+        second["geometry_variants"] = [deepcopy(second["geometry_variants"][1])]
+        second["geometry_variants"][0]["template"]["version"] = "9.7.0"
+        policy["profiles"].append(second)
+        self.assert_code("SCENARIO_PROFILE_DUPLICATE", lambda: self.registry_for(policy))
 
 
 if __name__ == "__main__":

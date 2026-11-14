@@ -18,12 +18,12 @@ version: 0.8.0
 ## 当前阶段边界
 
 - 保留通用框架：Schema 与安全底座、状态与回执、审批协调、ToolGateway、知识服务、模板创建发布编排、候选编译与冻结、锁驱动渲染、成品检查和原子本地交付。
-- **当前只注册了一个业务场景**：`general_thematic_mapping`（标准专题图编制；`policies/scenario-capabilities.yaml` v1.5.0 的 `general-thematic-mapping` 档案，代码实现白名单 `general-thematic`（几何 strategy：raster 已准入、vector 代码就绪未准入），模板 `map-scenario/general-thematic-map@3.0.0`）。它只接受用户提供的已分类栅格（`data_nature: user-provided`、禁敏感坐标、禁生产数据），在一个参数化网格模板内选择 1×1、1×2 或 2×2，独立/整页共享图例；A4 横版 300dpi 输出 PDF+PNG，`production_enabled: false`，成果强制携带场景 NOTICE 与用户声明的源许可。其余一切能力仍默认拒绝：结构合法且意图就绪后，创建和生成入口对未注册能力返回 `CAPABILITY_NOT_AVAILABLE`；生成入口的缺项或歧义先返回意图错误，不能用通用 Schema 通过代替能力准入。
+- **当前只注册一个业务场景**：`general_thematic_mapping`。`scenario-capabilities.yaml` v1.7.0 为 `general-thematic` 实现登记**一个**能力档案 `general-thematic-mapping@5.0.0`；栅格与矢量是该档案下的 `geometry_variants` 数据适配变体，各自只声明几何、模板资产（`general-thematic-map@3.0.0` / `@4.0.0`）、作者 profile 与渲染后端，业务语义/意图约束/输出与版式上限只声明一遍。按显式 `geometry` 与变体 `template_geometry` 分派，撤销某几何即删除对应变体。支持已分类栅格、点/面矢量及显式一对一 CSV 属性连接；网格 1×1 / 1×2 / 2×2，独立/共享图例，A4 横版 PDF+PNG。均为 `production_enabled: false`，禁止敏感坐标和生产数据，强制 NOTICE 与源许可；其余能力仍默认拒绝。
 - 该场景的分类栅格模板样张渲染分支已注册：`validate` 在静态检查全部通过后，于受信验证上下文内由包内图例样本派生确定性合成栅格，经授权 MCP 网关测量统计，并用 `rasterio-matplotlib-page` 后端渲染 PDF+PNG 样张、冻结渲染场景与带签名 RenderReceipt；`publish` 按冻结场景重新核验证据（不依赖作者宿主字体）并消费精确 TP。宿主缺少栅格渲染依赖、无可嵌入字体或展示 CRS 为地理坐标系时仍失败关闭，不得伪造渲染证据绕过。
 - 仓库不附带业务示例数据、示例模板包或默认测试项目。后续由用户提供真实数据和场景需求，完成对应实现、注册和验收后才能启用。
 - 模板发布仍必须验证闭合包、依赖锁、场景验证输入、检查器集合、RenderReceipt、冻结样张场景（`render_scene_ref`）和环境绑定，并消费精确 TP。验证数据是否适合进入模板包由场景安全检查明确判定，不能把原始敏感业务数据打包。
 - 工作流严格保留 T1 / TP / G1 / G2 / G3、运行级单写锁、revision/CAS、不可变步骤回执、受限重试及恢复证明；不得伪造审批或放松门禁以继续。
-- `render` 只消费锁与摘要绑定输入；`check` 验证冻结的输出规格、布局、图例、场景声明链、字体、环境和敏感内容；`deliver` 重新验证全部绑定后，按精确 G3 进行同文件系统原子提交。
+- `render` 只消费锁与摘要绑定输入；`check` 验证冻结输出；`review` 签署独立成品审查并冻结含 `review_ref` 的交付清单；`deliver` 重新验证全部绑定后，按精确 G3 进行同文件系统原子提交。
 - 交付包白名单为 `map.pdf`、`map.png`、`README.md`、`delivery-manifest.yaml`、`checksums.sha256`；不包含原始数据、内部锁、审批密钥或内部回执。
 - 不声明生产制图、地图工作流中的真实 CRS 转换、任意输入格式、三场景覆盖、共享服务或公网发布；`production_tasks` 为空。`map-brand`、`map-style`、`map-layout` 的业务创建路由仍未开放。
 - CLI 入口：`python skills/carto-agent/scripts/carto.py --help`。
@@ -31,7 +31,7 @@ version: 0.8.0
 
 ## S1：合同归一与有限参数化多图
 
-- general 作者只输出一个 `general-thematic-map@3.0.0` 模板，不复制多份固定模板。Layout 声明可用形状、图例模式、空间区域和间距；`layout_parameters` 显式选择 `1×1 / 1×2 / 2×2` 与 `independent / shared`。不支持 2×1、任意行列数或自动模板检索/生成。
+- 栅格/矢量模板分别使用一个参数化网格资产，不按每种布局复制模板。Layout 声明合法形状、区域与间距；请求的 `design`、`map_title`、`layout_parameters` 表示本次设计。自动模板检索/生成、任意网格仍未开放。
 - 模板升级须重新验证发布，旧页面/候选/锁不能自动迁移，也不能沿用旧审批。`map-plan`、`page-request/output` 为 v4；`cartography`、`page-bindings`、`resolved-appearance`、`resolved-layout`、`raster-map-body` 为 v2；准备报告与分类 portrayal 版本不变。
 - `source_id`、view、layer、panel、legend 显式关联。同源可复用，多源可同角色；每个视图保留对应数据范围。源 CRS 必须一致且匹配模板，不做隐式重投影或范围并集。
 - 独立图例使用对应面板的已确认类别；共享图例要求完整类别定义（编码、语义、显示、名称、颜色、顺序）及 legend_policy 一致。observed 使用已确认图例项并集；all 还要求逐类纳入标志一致。冲突拒绝，不改色、不重新分类、不降级。
@@ -42,13 +42,13 @@ version: 0.8.0
 ## S2 工程候选：合成回归通过，尚未正式准入
 
 - 已新增有界 GeoJSON/成组 Shapefile、点/面单符号与类别、显式面分级、点圆面积比例，以及共享物理页面、矢量场景/正式适配器和测试代码。
-- `general-thematic-map@4.0.0` 矢量作者和 `matplotlib-vector-page` 为待验证实现；正式能力策略未登记，不能把新 Schema/表达目录/后端存在理解为可执行业务准入。
+- A3.1 矢量能力已登记为受限工程能力；`design` 显式选择类别、等距/手工分级或总量比例符号，MapPlan v4 保存实际执行表达。旧 `vector_panels[].encoding` 请求不接受；不根据模板版本决定几何，不把工程准入当生产验收。
 - 2026-11-10 已在现有 geo313（Python 3.13.18、Fiona/Shapely）完成修复和统一回归：81 个 Schema 有效，420 项测试中 407 通过、13 项外部环境测试跳过，零失败/错误；S2 单元 15 项及工作流 2 项全部通过。本次未安装依赖、未执行真实制图；不把跳过项或合成审批等同于真实场景验收。
 - 真实输入指定为 `projects/dataset/shp`，目前只核对文件清单；不得据目录名推断指标、生成业务数据 Fixture 或签发审批。
 
 ## P3.6 协议层统一
 
-- **请求 Schema 合并**：`general-thematic-generate-request` 与 `general-vector-generate-request` 合并为 `general-generate-request`；`general-thematic-template-create-request` 与 `general-vector-template-create-request` 合并为 `general-template-create-request`。统一 Schema 通过 `oneOf`/`if-then` 按 `version`（3.0.0 / 4.0.0）区分 raster / vector 变体，不做向后兼容 wrapper。
+- **请求 Schema**：统一 `general-generate-request` 和 `general-template-create-request`，按显式 `geometry` 分支；版本只识别已登记模板资产，不提供旧请求兼容 wrapper。
 - **Bundle-inputs 统一**：`raster-bundle-inputs` 与 `vector-bundle-inputs`（字节级相同）合并为单一 `bundle-inputs`。
 - **Render-scene 收敛**：三个 `oneOf` 变体（maplibre-web / raster-page / vector-page）收敛为两个，后两者因结构相同合并为一个 unified static page scene（`page-request`），通过 `renderer_id` 枚举区分。
 - **应急制图并入标准专题**：`emergency_mapping` 不再作为独立业务场景，洪涝/滑坡/森林火灾作为 `general_thematic_mapping` 的主题标签（`theme_tags`）。`intent-profiles.yaml` 中删除 `emergency_mapping` profile，`[应急,灾情,救援]` 并入 `general_thematic_mapping` 的 `purpose_terms`。
@@ -85,7 +85,7 @@ version: 0.8.0
 - RenderScene / RenderReceipt / execution 环境按后端严格区分。预览、G2 冻结、锁驱动正式渲染与重放只按冻结 ID 分派；保留 `maplibre-web`，未知后端拒绝，栅格不探测 Chromium、不伪造浏览器版本。
 - 正式栅格 RenderReceipt 由 `FormalRenderer`（几何分派）签发，包含 HMAC、代码/依赖环境、精确会话、资源集、页面报告和输出摘要；内部 `page-output` 仍不是回执。当前是受项目路径约束的进程内后端，**不提供 OS/网络沙箱**，HMAC 不等于远程或硬件环境证明。
 - 复用既有 MapSpecLock、RenderAttempt、FormalRenderEvidence、11 项成品检查、精确 G3 和原子本地交付。图例共性检查不替代业务检查；篡改产物不生成 Manifest。
-- 已有从测试候选边界开始的临时合成数据 G2/G3 链路与恢复测试，以及合成数据/合成审批的模板 T1 → validate（合成样张渲染）→ TP → 发布闭环测试。均**不表示真实用户数据、真实审批身份或用户地图已验收**；注册策略和实现白名单当前仅登记 `general-thematic-mapping`（实现 `general-thematic`，`allowed_geometries: [raster]`，含模板样张渲染组件），不新增审批旁路 CLI。
+- 已有从测试候选边界开始的临时合成数据 G2/G3 链路与恢复测试，以及合成数据/合成审批的模板 T1 → validate（合成样张渲染）→ TP → 发布闭环测试。均**不表示真实用户数据、真实审批身份或用户地图已验收**；注册策略和实现白名单当前仅登记 `general-thematic-mapping`（实现 `general-thematic`，栅格变体 `template_geometry: raster`，含模板样张渲染组件），不新增审批旁路 CLI。
 
 ## 通用内核与场景扩展
 
@@ -142,3 +142,11 @@ Codex / Claude Code 在 VS Code 中以“读取仓库指令 + 宿主终端调用
 - `RenderScene`：一次渲染的实例描述，不是业务场景分类。
 - 规则语义：`hard_rule`、`forbidden`、`mandatory`、`binding`、`default`、`reference`。
 - 结果严重度：`blocker`、`error`、`warning`、`info`。
+
+## A3.1 设计修订与证据
+
+- `revision-brief` 生成完整修订 MapBrief；`revise` 验证新 G1 后提交不可变 `revisions/rN/` 并返回新的 `request_path`。旧候选、预览和回执不覆盖，旧 G2 不批准新版本。
+- 冻结后设计变更走新运行，不修改旧锁。累计预算和状态事务约束修订及中断恢复。
+- 成品审查动作是 `approve-product-review / validation-report`，不是 G2。ProductReview 先持久化，再生成绑定它的 Manifest 和 G3 对象。
+- 属性 CSV 和普通文本/CSV 素材冻结字节与处理证据。栅格配色仍来自就绪分类合同；OCR、图片解析、项目内任意设计尚未开放。
+- 当前执行步骤以 `workflows/generate-map.md` 和 CLI `--help` 为准；合成数据与测试签名不是实际业务审批。

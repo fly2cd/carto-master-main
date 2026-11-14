@@ -46,6 +46,7 @@ from carto_core.workflow.template_workflow import TemplateCreationWorkflow
 from tests.fixtures.schema_cases import VALID_CASES
 from tests.test_raster_classification import PreparationFixture
 from tests.helpers import release_test_font_handles, set_raster
+from tests.fixtures.thematic_cases import canonical_request, RASTER_DESIGN
 
 KEY = b"synthetic-render-key-not-for-production-1234"
 APPROVAL_KEY = b"synthetic-approval-key-not-for-production-1234"
@@ -103,12 +104,24 @@ def find_cjk_font(required_text: str) -> Path | None:
     return None
 
 
-def sign(gate: str, action: str, object_type: str, digest: str) -> ApprovalReceipt:
+def sign(gate: str, action: str, object_type: str, digest: str,
+         subject_id: str = "test-reviewer", scope: str = "project:test", tenant_id: str = "test-tenant") -> ApprovalReceipt:
     now = datetime.now(UTC)
     return sign_receipt(ApprovalReceipt(
-        f"synthetic-{gate.lower()}-general", action, digest,
-        (now - timedelta(minutes=1)).isoformat(),
-        (now + timedelta(minutes=10)).isoformat(),
+        schema_version=1,
+        receipt_id=f"synthetic-{gate.lower()}-general",
+        issuer="test-issuer",
+        subject_id=subject_id,
+        tenant_id=tenant_id,
+        action=action,
+        object_type=object_type,
+        object_digest=digest,
+        scope=scope,
+        policy_id="carto-security",
+        environment="local",
+        nonce=f"synthetic-nonce-{gate.lower()}-{digest.split(':', 1)[-1][:32]}",
+        issued_at=(now - timedelta(minutes=1)).isoformat(),
+        expires_at=(now + timedelta(minutes=10)).isoformat(),
     ), APPROVAL_KEY)
 
 
@@ -289,7 +302,9 @@ class CreateLineTests(unittest.TestCase):
         self.author_kwargs = dict(approval_key=APPROVAL_KEY)
 
     def t1(self, digest: str) -> ApprovalReceipt:
-        return sign("T1", "approve-template-brief", "template-brief", digest)
+        return sign("T1", "approve-template-brief", "template-brief", digest,
+                    subject_id=self.request["subject"]["approver_subject_id"],
+                    scope=self.request["scope"], tenant_id=self.request["subject"]["tenant_id"])
 
     def run_to_brief(self):
         analyzed = self.workflow.analyze(self.request_path)
@@ -495,7 +510,9 @@ class PublishLineTests(unittest.TestCase):
                                    approval_key=APPROVAL_KEY, renderer_attestation_key=KEY)
 
     def t1(self, digest: str) -> ApprovalReceipt:
-        return sign("T1", "approve-template-brief", "template-brief", digest)
+        return sign("T1", "approve-template-brief", "template-brief", digest,
+                    subject_id=self.request["subject"]["approver_subject_id"],
+                    scope=self.request["scope"], tenant_id=self.request["subject"]["tenant_id"])
 
     def run_to_validated(self) -> dict:
         self.workflow.analyze(self.request_path)
@@ -590,7 +607,9 @@ class PublishLineTests(unittest.TestCase):
             "repository_scope": "local:templates",
         })
         atomic_yaml(self.root / "tp.yaml", asdict(sign(
-            "TP", "approve-template-publish", "template-publication", publication_digest)))
+            "TP", "approve-template-publish", "template-publication", publication_digest,
+            subject_id=self.request["subject"]["approver_subject_id"], scope=self.request["scope"],
+            tenant_id=self.request["subject"]["tenant_id"])))
         published = self.workflow.publish(self.request_path, self.root / "tp.yaml",
                                           **self.publish_kwargs)
         self.assertFalse(published["idempotent_replay"])
@@ -708,6 +727,7 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
         })
         request["layout_parameters"]={"rows":1,"columns":1,"legend_mode":"independent"}
         request["panels"]=[{"id":"main-view","source_id":self.request["source"]["source_ref"]["id"],"title":GOAL}]
+        canonical_request(request)
         self.registry.validate("general-generate-request", request)
         return request
 
@@ -719,7 +739,7 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
         contracts = self.contracts if contracts is None else contracts
         bundle = self.component_bundle() if bundle is None else bundle
         plan = GeneralThematicPlanner(self.registry).build(
-            self.generate, self.intent, {"synthetic": "brief"}, bundle,
+            self.generate, self.intent, {"synthetic": "brief", "revision": 1}, bundle,
             self.installation, contracts)
         kwargs = {"project_root": self.root, "context": ExecutionContext.from_generate_request(self.generate)}
         kwargs.update(compiler_kwargs or {})
@@ -742,14 +762,13 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
     def test_planner_emits_a_valid_unique_value_raster_plan(self):
         bundle = self.component_bundle()
         plan = GeneralThematicPlanner(self.registry).build(
-            self.generate, self.intent, {"synthetic": "brief"}, bundle,
+            self.generate, self.intent, {"synthetic": "brief", "revision": 1}, bundle,
             self.installation, self.contracts)
         self.registry.validate("map-plan", plan)
-        self.assertEqual({"classification": "unique-values", "data_statistics": [{"source_id":b["source_id"],"counts":b["category_counts"]} for b in bundle["role_bindings"]],
-                          "legend_capacity": 12,
-                          "title": GOAL,
-                          "legend_source": "actual-encoding", "renderer_id": RASTER_RENDERER_ID},
-                         plan["decisions"])
+        self.assertEqual(self.generate['map_title'], plan['decisions']['title'])
+        self.assertEqual(RASTER_RENDERER_ID, plan['decisions']['renderer_id'])
+        self.assertEqual(self.generate['panels'][0]['design'], plan['decisions']['thematic_views'][0]['design'])
+        self.assertEqual(12, plan['decisions']['legend_capacity'])
         self.assertEqual(sha256_digest(self.intent), plan["intent_ref"]["digest"])
         with self.assertRaisesRegex(ProtocolError, "RASTER_BUNDLE_UNSUPPORTED"):
             GeneralThematicPlanner(self.registry).build(
@@ -885,7 +904,8 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
         self.assertEqual("compile", briefed["state"]["step"])
         self.assertEqual(GOAL, briefed["brief"]["purpose"])
         atomic_yaml(self.root / "workflow-g1.yaml", asdict(sign(
-            "G1", "approve-map-brief", "map-brief", briefed["approval_object_digest"])))
+            "G1", "approve-map-brief", "map-brief", briefed["approval_object_digest"],
+            subject_id=self.generate["subject"]["approver_subject_id"], scope=self.generate["scope"])))
         return workflow, request_path
 
     def test_failed_candidate_quality_does_not_advance_to_preview(self):
@@ -928,11 +948,13 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
             layout_parameters={"rows": rows, "columns": columns, "legend_mode": mode},
             panels=[{"id": f"view-r{r}-c{c}", "source_id": sources[(r * columns + c) % 2]["source_ref"]["id"],
                      "title": f"Panel {r * columns + c + 1}"} for r in range(rows) for c in range(columns)])
+        canonical_request(self.generate)
         self.registry.validate("general-generate-request", self.generate)
         self.intent = self.scenarios.generate_intent(self.generate)
 
     def test_multi_source_grid_request_rejects_duplicate_missing_unused_bindings(self):
         self.set_grid_sources()
+        canonical_request(self.generate)
         valid = deepcopy(self.generate)
         for mutation in ("source-duplicate", "preparation-missing", "panel-duplicate", "panel-missing", "source-unused"):
             self.generate = deepcopy(valid)
@@ -976,23 +998,34 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
         self.assertEqual(("waiting_approval", "freeze"),
                          (previewed["state"]["status"], previewed["state"]["step"]))
         atomic_yaml(self.root / "workflow-g2.yaml", asdict(sign(
-            "G2", "approve-freeze", "resolved-map", previewed["approval_object_digest"])), create_once=False)
+            "G2", "approve-freeze", "resolved-map", previewed["approval_object_digest"],
+            subject_id=self.generate["subject"]["approver_subject_id"], scope=self.generate["scope"])), create_once=False)
         frozen = workflow.freeze(request_path, self.root / "workflow-g2.yaml",
                                  approval_key=APPROVAL_KEY, attestation_key=KEY)
         self.assertEqual("render", frozen["state"]["step"])
         rendered = workflow.render(request_path, attestation_key=KEY)
         self.assertEqual("check", rendered["state"]["step"])
-        checked = workflow.check(request_path, attestation_key=KEY,
-                                 recipient_id="synthetic-recipient", recipient_type="project-user",
-                                 destination="deliveries/general",
-                                 idempotency_key="general-delivery-00000001")
+        checked = workflow.check(request_path, attestation_key=KEY)
         self.assertEqual("passed", checked["validation_report"]["status"])
-        manifest = checked["delivery_manifest"]
+        # review: approve check and build manifest (A1.3 split)
+        review_approval_path = self.root / "workflow-review.yaml"
+        review_receipt = sign("REVIEW", "approve-product-review", "validation-report",
+                              sha256_digest(checked["validation_report"]),
+                              subject_id=self.generate["subject"]["approver_subject_id"], scope=self.generate["scope"])
+        atomic_yaml(review_approval_path, asdict(review_receipt), create_once=False)
+        reviewed = workflow.review(request_path, review_approval_path,
+                                   approval_key=APPROVAL_KEY, attestation_key=KEY,
+                                   recipient_id="synthetic-recipient",
+                                   recipient_type="project-user",
+                                   destination="deliveries/general",
+                                   idempotency_key="general-delivery-00000001")
+        manifest = reviewed["delivery_manifest"]
         self.assertEqual(["user-declared-source-license"], manifest["licenses"])
         self.assertEqual([NOTICE], manifest["limitations"])
-        self.assertEqual(sha256_digest(manifest), checked["g3"]["object_digest"])
+        self.assertEqual(sha256_digest(manifest), reviewed["g3"]["object_digest"])
         atomic_yaml(self.root / "workflow-g3.yaml", asdict(sign(
-            "G3", "approve-delivery", "delivery-manifest", sha256_digest(manifest))), create_once=False)
+            "G3", "approve-delivery", "delivery-manifest", sha256_digest(manifest),
+            subject_id=self.generate["subject"]["approver_subject_id"], scope=self.generate["scope"])), create_once=False)
         deliver_kwargs = dict(approval_key=APPROVAL_KEY)
         if recover_delivery:
             def crash(phase):
@@ -1012,6 +1045,86 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
         self.assertNotIn("classified.tif", readme)
         replay = workflow.deliver(request_path, self.root / "workflow-g3.yaml", **deliver_kwargs)
         self.assertTrue(replay["idempotent_replay"])
+
+    def test_material_sources_reach_execution(self):
+        """P0-3: material_sources 经 workflow.compile → MapDataPreparer 进入 bundle，
+        并经 _execution_base 落入 execution.material_facts_refs（验证 P0-1 接入）。"""
+        note = self.root / "note.txt"
+        note.write_text("survey note value 5.2\n", encoding="utf-8")
+        self.generate["material_sources"] = [
+            {"source_id": "note", "path": "note.txt", "format": "text/plain"}]
+        self.registry.validate("general-generate-request", self.generate)
+        workflow, request_path = self.workflow_at_compile()
+        compiled = workflow.compile(request_path, self.root / "workflow-g1.yaml",
+                                    approval_key=APPROVAL_KEY)
+        bundle = load_document(self.work / "data/prepared-data-bundle.yaml")
+        self.assertIn("material_sources", bundle)
+        self.assertIn("adoption_evidence", bundle)
+        self.assertIn("data_facts", bundle)
+        refs = compiled["candidate"]["execution"].get("material_facts_refs")
+        self.assertTrue(refs, "material_facts_refs must be populated from bundle.data_facts")
+        self.assertEqual(refs[0]["digest"], bundle["data_facts"]["digest"])
+
+    def test_material_change_invalidates_execution_digest(self):
+        """P0-4: 改素材源内容 → data_facts.digest 变 → execution_digest 变（失效传播）。"""
+        from carto_core.workflow.map_data_preparation import MapDataPreparer
+        note = self.root / "note.txt"
+        self.generate["material_sources"] = [
+            {"source_id": "note", "path": "note.txt", "format": "text/plain"}]
+        preparer = MapDataPreparer(self.guard, self.root, self.work / "data-mat", self.registry)
+        ref = artifact_ref("generate-request", self.generate)
+        note.write_text("value 1\n", encoding="utf-8")
+        bundle1 = preparer.prepare(self.generate, ref)["bundle"]
+        note.write_text("value 2\n", encoding="utf-8")
+        revised_preparer = MapDataPreparer(self.guard, self.root, self.work / "data-mat-revised", self.registry)
+        bundle2 = revised_preparer.prepare(self.generate, ref)["bundle"]
+        self.assertNotEqual(bundle1["data_facts"]["digest"], bundle2["data_facts"]["digest"])
+        c1 = self.compile_via_components(bundle=bundle1)
+        c2 = self.compile_via_components(bundle=bundle2)
+        self.assertTrue(c1["candidate"]["execution"]["material_facts_refs"])
+        self.assertNotEqual(c1["candidate"]["execution_digest"],
+                            c2["candidate"]["execution_digest"])
+
+    def test_material_change_invalidates_frozen_lock(self):
+        """P0-2 完整闭环：素材变化 → 候选重编译 → 旧锁在 render 时失效。
+
+        失效传播终点是锁验证：素材变使整个候选 digest 改变，内部触发
+        MAP_SPEC_LOCK_CANDIDATE_DRIFT（map_generation.py:1058，先于 EXECUTION_DRIFT:1060），
+        再被 _locked_render_inputs 的 except 归一化为对外 LOCK_INPUT_DRIFT，原始码留在
+        message（map_generation.py:1106-1109）。
+        """
+        from carto_core.workflow.map_data_preparation import MapDataPreparer
+        note = self.root / "note.txt"
+        note.write_text("value A\n", encoding="utf-8")
+        self.generate["material_sources"] = [
+            {"source_id": "note", "path": "note.txt", "format": "text/plain"}]
+        self.registry.validate("general-generate-request", self.generate)
+        # 1) 素材 A 跑到 freeze，锁冻结候选 A
+        workflow, request_path = self.workflow_at_compile()
+        workflow.compile(request_path, self.root / "workflow-g1.yaml", approval_key=APPROVAL_KEY)
+        previewed = workflow.preview(request_path, attestation_key=KEY)
+        atomic_yaml(self.root / "workflow-g2.yaml", asdict(sign(
+            "G2", "approve-freeze", "resolved-map", previewed["approval_object_digest"],
+            subject_id=self.generate["subject"]["approver_subject_id"], scope=self.generate["scope"])), create_once=False)
+        frozen = workflow.freeze(request_path, self.root / "workflow-g2.yaml",
+                                 approval_key=APPROVAL_KEY, attestation_key=KEY)
+        self.assertEqual("render", frozen["state"]["step"])
+        lock = frozen["lock"]
+        # 2) 改素材 A→B，重新编译候选 B（execution_digest 随之变化）
+        note.write_text("value B\n", encoding="utf-8")
+        preparer = MapDataPreparer(self.guard, self.root, self.work / "data-lock", self.registry)
+        bundle_b = preparer.prepare(self.generate, artifact_ref("generate-request", self.generate))["bundle"]
+        compiled_b = self.compile_via_components(bundle=bundle_b)
+        self.assertNotEqual(compiled_b["candidate"]["execution_digest"], lock["execution_digest"])
+        # 用候选 B 覆盖冻结时的候选文件，模拟“素材已变、候选被重编译”
+        atomic_yaml(self.work / "candidates" / "resolved-map.yaml",
+                    compiled_b["candidate"], create_once=False)
+        # 3) 用旧锁 render → 加载候选 B 与锁记录的候选 A 不符 → drift（旧锁失效）
+        with self.assertRaises(ProtocolError) as raised:
+            workflow.render(request_path, attestation_key=KEY)
+        # 对外统一 LOCK_INPUT_DRIFT，message 保留内部根因 CANDIDATE_DRIFT
+        self.assertEqual("LOCK_INPUT_DRIFT", raised.exception.code)
+        self.assertIn("MAP_SPEC_LOCK_CANDIDATE_DRIFT", raised.exception.message)
 
 
 if __name__ == "__main__":

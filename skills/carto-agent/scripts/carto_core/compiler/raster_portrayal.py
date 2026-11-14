@@ -191,6 +191,8 @@ class RasterPortrayalCompiler:
             raise ProtocolError("CLASSIFICATION_CLARIFICATION_REQUIRED", "Resolve category questions before compiling portrayal")
         if layer["data_role"] != report["request"]["source"]["role"]:
             raise ProtocolError("RASTER_PORTRAYAL_ROLE_MISMATCH", "Layer must bind the prepared raster's declared role")
+        if report["kind"] == "raster-continuous-preparation":
+            return self._build_continuous(portrayal, layer, layer_id, prepared_ref, report)
         rows = [{key: row[key] for key in ("value", "display", "label", "color", "order", "include_in_legend")}
                 for row in report["rows"]]
         # A display-only semantic such as 'nodata' never changes source metadata.
@@ -203,6 +205,24 @@ class RasterPortrayalCompiler:
                 "lookup_table": rows, "legend_items": legend_items(rows),
                 "source_mask_policy": layer["source_mask_policy"], "resampling": layer["resampling"],
                 "unknown_value_policy": layer["category_mapping"]["unknown_value_policy"]}
+
+    def _build_continuous(self, portrayal, layer, layer_id, prepared_ref, report):
+        """ADR-001 阶段2.3：continuous 栅格 → interval resolved-portrayal，直接复用 prepared 的 encoding IR。"""
+        encoding = report["encoding"]
+        if encoding["key_mode"] != "interval" or encoding["geometry_role"] != "raster-cell":
+            raise ProtocolError("RASTER_PORTRAYAL_MODE_MISMATCH", "Continuous raster preparation requires a raster-cell interval encoding")
+        labels = encoding["scale"]["labels"]; symbols = encoding["channels"]["symbols"]
+        if len(labels) != len(symbols):
+            raise ProtocolError("RASTER_PORTRAYAL_MODE_MISMATCH", "Interval labels and ramp colors must align")
+        legend = [{"value": i, "label": labels[i], "color": symbols[i]["color"], "order": i} for i in range(len(labels))]
+        return {"schema_version": 1, "kind": "resolved-portrayal",
+                "geometry": "raster", "key_mode": "interval",
+                "compiler_version": VERSION, "compiler_digest": portrayal_compiler_digest(),
+                "portrayal": deepcopy(portrayal), "layer_id": layer_id,
+                "prepared_ref": deepcopy(prepared_ref), "expression_ref": deepcopy(layer["map_expression_ref"]),
+                "source_snapshot": deepcopy(report["source_snapshot"]), "context": deepcopy(report["context"]),
+                "encoding": deepcopy(encoding), "legend_items": legend,
+                "source_mask_policy": layer["source_mask_policy"], "resampling": layer["resampling"]}
 
     def compile(self, portrayal: dict[str, Any], layer_id: str,
                 prepared_ref: dict[str, str], context: ExecutionContext) -> StoredArtifact:

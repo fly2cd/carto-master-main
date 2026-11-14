@@ -6,6 +6,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Callable
 
 
+from ..adapters.backend_registry import VECTOR_PAGE, is_static
 from ..adapters.controlled_renderer import FRONTEND_BUILD, MAPLIBRE_VERSION, OVERLAY_ENGINE_VERSION, RENDERER_VERSION, BrowserLimits, ControlledBrowserRenderer, browser_version, discover_browser
 from ..adapters.webmap_renderer import (
     RendererCapabilityProfile, RendererCapabilityRegistry, WebMapRendererAdapter,
@@ -30,15 +31,11 @@ VALIDATOR_VERSION = "1.5.0"
 ADAPTER_VERSION = "1.1.0"
 
 
-def _raster_renderer_id() -> str:
-    # raster_scene imports workflow modules at import time while the workflow package
-    # imports this module, so the renderer id resolves lazily instead of at import time.
-    from ..compiler.raster_scene import RASTER_RENDERER_ID
-    return RASTER_RENDERER_ID
-
-
 def _is_static_backend(renderer_id):
-    return renderer_id in {_raster_renderer_id(), "matplotlib-vector-page"}
+    # 家族判断收敛到 backend_registry 单点权威（ADR-001 阶段1）；此前这里硬编码
+    # {_raster_renderer_id(), "matplotlib-vector-page"}，与 map_generation 的判断重复，
+    # 且需懒加载 raster_scene 规避循环——registry 为零依赖叶子，无此顾虑。
+    return is_static(renderer_id)
 
 
 def _validation_cases(snapshot):
@@ -328,17 +325,19 @@ class TemplatePackageValidator:
                     or scene["resolved_layout"]["parameters"] != item["parameters"]):
                 raise ProtocolError("GRID_VALIDATION_CASE_MISMATCH",
                                     "Scene does not represent the declared grid case")
-            if scene["renderer_id"] == "matplotlib-vector-page":
+            if scene["renderer_id"] == VECTOR_PAGE.renderer_id:
                 from .vector_preparation import VectorPreparationService
                 vector = VectorPreparationService(project_root=self.fixture_workspace,
                     allowed_roots=[str(self.fixture_workspace)], registry=self.registry)
                 page = vector.document(scene["page_request_ref"], "page-request")
                 from ..compiler.vector_portrayal import VectorPortrayalCompiler
-                if any(VectorPortrayalCompiler(vector).load_verified(p["portrayal_ref"], self.context)[0]["encoding"]["kind"] != item["expression"] for p in page["panels"]):
+                from ..compiler.portrayal_resolver import ir_to_kind
+                if any(ir_to_kind(VectorPortrayalCompiler(vector).load_verified(p["portrayal_ref"], self.context)[0]["encoding"]) != item["expression"] for p in page["panels"]):
                     raise ProtocolError("GRID_VALIDATION_CASE_MISMATCH", "Vector expression coverage differs")
             else:
                 page = preparation._json_ref(scene["page_request_ref"], "page-request")
-            if page["appearance"]["cartography"] != snapshot["documents"]["scenario"]["embedded"]["cartography"]:
+            actual_style = page["cartography"] if scene["renderer_id"] == VECTOR_PAGE.renderer_id else page["appearance"]["cartography"]
+            if actual_style != snapshot["documents"]["scenario"]["embedded"]["cartography"]:
                 raise ProtocolError("APPEARANCE_TEMPLATE_MISMATCH", "Fixture style differs from template")
             expected_session = f"template-validation-{snapshot['package_digest'][7:23]}-{sha256_digest(scene)[7:23]}"
             if receipt["session_id"] != expected_session:
@@ -431,13 +430,12 @@ class TemplatePackageValidator:
             raise ProtocolError("DEPENDENCY_LOCK_PACKAGE_MISMATCH", manifest["package"]["id"])
         if lock["dependencies"] != manifest.get("dependencies", []):
             raise ProtocolError("DEPENDENCY_LOCK_SET_MISMATCH", manifest["package"]["id"])
-        portrayal_refs = sorted((layer["map_expression_ref"] for layer in docs["portrayal"]["layers"]),
-                                key=lambda item: (item["id"], item["version"], item["digest"]))
+        from ..repository.map_expression_catalog import MapExpressionCatalog
+        catalog = MapExpressionCatalog(self.registry)
+        portrayal_refs = catalog.references(docs["portrayal"])
         lock_refs = sorted(lock["resources"], key=lambda item: (item["id"], item["version"], item["digest"]))
         if portrayal_refs != lock_refs:
             raise ProtocolError("MAP_EXPRESSION_LOCK_MISMATCH", manifest["package"]["id"])
-        from ..repository.map_expression_catalog import MapExpressionCatalog
-        catalog = MapExpressionCatalog(self.registry)
         catalog.validate_portrayal(docs["portrayal"])
         for reference in lock_refs:
             catalog.require(reference)

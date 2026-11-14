@@ -28,7 +28,8 @@
     "display_crs",
     "role_bindings",
     "decisions",
-    "requested_at"
+    "requested_at",
+    "geometry"
   ],
   "properties": {
     "schema_version": {
@@ -234,7 +235,10 @@
       "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/timestamp"
     },
     "geometry": {
-      "enum": ["raster", "vector"]
+      "enum": [
+        "raster",
+        "vector"
+      ]
     }
   }
 }

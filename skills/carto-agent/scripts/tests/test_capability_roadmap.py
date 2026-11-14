@@ -85,15 +85,23 @@ class RoadmapTaxonomyTest(unittest.TestCase):
 
 class SemanticDigestTest(unittest.TestCase):
     def test_disclosure_edits_do_not_change_ref(self):
-        base = deepcopy(load_document(POLICY))["profiles"][0]
+        # The trusted capability is the flattened per-geometry definition, not the raw
+        # policy profile (which declares geometry as data-adaptation variants).
+        base = scenario_registry.effective_definitions(load_document(POLICY)["profiles"])[0]
         cap = scenario_registry.ScenarioCapability(deepcopy(base))
         edited = deepcopy(base)
         edited["notice"] = "仅改披露措辞"
         edited["licenses"] = ["other-license"]
         self.assertEqual(cap.ref, scenario_registry.ScenarioCapability(edited).ref)
-        semantic = deepcopy(base)
-        semantic["allowed_geometries"] = ["raster", "vector"]
-        self.assertNotEqual(cap.ref, scenario_registry.ScenarioCapability(semantic).ref)
+        # Every geometry-adaptation field is execution semantics, never disclosure.
+        for field, value in (("allowed_geometries", ["raster", "vector"]),
+                             ("template_geometry", "vector"),
+                             ("renderer_id", "matplotlib-vector-page"),
+                             ("authoring_profile", "general-vector-authoring")):
+            semantic = deepcopy(base)
+            semantic[field] = value
+            with self.subTest(field=field):
+                self.assertNotEqual(cap.ref, scenario_registry.ScenarioCapability(semantic).ref)
         self.assertEqual(cap.ref["digest"],
                          sha256_digest(scenario_registry.semantic_definition(base)))
 
@@ -116,13 +124,11 @@ class SingleBundleGeometryDispatchTest(unittest.TestCase):
         self.assertEqual("raster", general_dispatch.geometry_of_request({"geometry": "raster", "panels": [1]}))
         self.assertEqual("vector", general_dispatch.geometry_of_request({"geometry": "vector", "vector_panels": [1]}))
         # Unknown explicit geometry rejects
-        with self.assertRaisesRegex(ProtocolError, "SCENARIO_GEOMETRY_UNKNOWN"):
+        with self.assertRaisesRegex(ProtocolError, "SCENARIO_GEOMETRY_REQUIRED"):
             general_dispatch.geometry_of_request({"geometry": "unknown"})
-        # Backward-compatible heuristic fallback (no explicit geometry field)
-        self.assertEqual("raster", general_dispatch.geometry_of_request({"panels": [1]}))
-        self.assertEqual("vector", general_dispatch.geometry_of_request({"vector_panels": [1]}))
-        for request in ({}, {"panels": [1], "vector_panels": [1]}):
-            with self.assertRaisesRegex(ProtocolError, "SCENARIO_GEOMETRY_AMBIGUOUS"):
+        # Missing geometry is always rejected: there is no heuristic fallback.
+        for request in ({}, {"panels": [1]}, {"vector_panels": [1]}, {"panels": [1], "vector_panels": [1]}):
+            with self.assertRaisesRegex(ProtocolError, "SCENARIO_GEOMETRY_REQUIRED"):
                 general_dispatch.geometry_of_request(request)
 
     def test_vector_geometry_withheld_by_policy(self):

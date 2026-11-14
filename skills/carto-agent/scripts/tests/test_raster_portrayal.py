@@ -99,12 +99,16 @@ class MapExpressionCatalogTests(unittest.TestCase):
         # profile is the purpose-named general_thematic_mapping scene, admitted through the
         # versioned policy plus the closed code allowlist.
         policy = load_document(SKILL / "policies/scenario-capabilities.yaml")
+        # One capability profile per business purpose; geometry is a data-adaptation
+        # variant inside it, never a second registration of the same purpose.
         self.assertEqual(["general-thematic-mapping"], [item["id"] for item in policy["profiles"]])
         self.assertEqual(["general_thematic_mapping"],
                          [item["intent_constraints"]["business_scene"] for item in policy["profiles"]])
+        self.assertEqual(["raster", "vector"],
+                         [variant["geometry"] for variant in policy["profiles"][0]["geometry_variants"]])
         self.assertEqual({"general-thematic"}, set(scenario_registry._COMPONENTS))
         with self.assertRaisesRegex(CartoError, "CAPABILITY_NOT_AVAILABLE"):
-            scenario_registry.ScenarioRegistry().for_template({"kind": "map-scenario", "id": "general-thematic-map", "version": "4.0.0"})
+            scenario_registry.ScenarioRegistry().for_template({"kind": "map-scenario", "id": "general-thematic-map", "version": "99.0.0"})
         for key in ("business_scene", "backend", "source_path", "lookup_table"):
             contract = raster_contract(); contract[key] = "not-a-template-expression-field"
             with self.subTest(key=key), self.assertRaises(CartoError):

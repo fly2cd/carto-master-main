@@ -136,6 +136,7 @@ class GeneralThematicPlanner:
         self.registry = registry or SchemaRegistry()
 
     def build(self,request,intent,brief,bundle,installation,contracts):
+        from ..workflow.thematic import raster_views
         if not bundle.get("role_bindings"):
             raise ProtocolError("RASTER_BUNDLE_UNSUPPORTED","No bound data")
         profile=ScenarioRegistry(self.registry).for_template(request['template'])
@@ -143,15 +144,15 @@ class GeneralThematicPlanner:
             profile.definition['output_profile']['dpi'],
             parameters=request['layout_parameters'])
         bindings=build_page_bindings(layout['contract'],contracts['portrayal'],bundle,request['panels'],self.registry)
-        return {'schema_version':3,'plan_id':f"plan-{request['run_id']}",'revision':1,'project_id':request['project_id'],
+        return {'schema_version':4,'plan_id':f"plan-{request['run_id']}",'revision':brief['revision'],'project_id':request['project_id'],
             'intent_ref':artifact_ref('map-intent',intent),'brief_ref':artifact_ref('map-brief',brief),
             'business_scene':intent['business_scene'],'tasks':list(intent['tasks']),
             'template_refs':[deepcopy(installation['template_ref'])],
             'data_bindings':[{'role':b['role'],'dataset_ref':deepcopy(b['dataset_ref'])} for b in bundle['role_bindings']],
-            'decisions':{'classification':contracts['portrayal']['layers'][0]['category_mapping']['method'],
-                         'data_statistics':[{'source_id':b['source_id'],'counts':deepcopy(b['category_counts'])} for b in bundle['role_bindings']],
-                         'legend_capacity':layout['contract']['capacity']['legend_items'],'title':request['goal'],
-                         'legend_source':'actual-encoding','renderer_id':profile.definition.get('renderer_id',RASTER_RENDERER_ID)},
+            'decisions':{'title':request['map_title'], 'legend_source':'actual-encoding',
+                         'renderer_id':profile.definition['renderer_id'],
+                         'legend_capacity':layout['contract']['capacity']['legend_items'],
+                         'thematic_views':raster_views(request,bundle,self.registry)},
             'bindings':bindings,'layout_parameters':deepcopy(request['layout_parameters']),'open_issues':[],
             'theme_tags':list(intent['theme_tags'])}
 
@@ -168,6 +169,7 @@ class GeneralThematicCandidateCompiler:
 
     def compile(self,request,intent,plan,bundle,installation,contracts,font_path):
         from ..adapters.static_page_renderer import FONT_LIMIT
+        from ..workflow.thematic import raster_views
         if self.project_root is None or self.context is None:
             raise SecurityError('RASTER_EXECUTION_CONTEXT_REQUIRED','Trusted project context required')
         context=ExecutionContext.from_generate_request(request)
@@ -176,7 +178,8 @@ class GeneralThematicCandidateCompiler:
         self.registry.validate('map-plan',plan)
         preparation=RasterPreparationService(project_root=self.project_root,allowed_roots=list(self.path_guard.allowed_roots),registry=self.registry)
         prepared=BundlePreparer(preparation, "raster").prepare_request(request,context)
-        if bundle!=prepared['bundle']:raise ProtocolError('RASTER_CANDIDATE_BUNDLE_MISMATCH','Bundle differs from exact inputs')
+        from ..workflow.map_data_preparation import bundle_core
+        if bundle_core(bundle)!=bundle_core(prepared['bundle']):raise ProtocolError('RASTER_CANDIDATE_BUNDLE_MISMATCH','Bundle differs from exact inputs')
         profile=ScenarioRegistry(self.registry).for_template(request['template']);output=profile.definition['output_profile']
         if any(b['crs']!=contracts['spatial_behavior']['display_crs'] for b in bundle['role_bindings']):
             raise ProtocolError('RASTER_DISPLAY_CRS_MISMATCH','No implicit reprojection')
@@ -185,24 +188,25 @@ class GeneralThematicCandidateCompiler:
         for sid,b in sources.items():
             refs[sid]=RasterPortrayalCompiler(preparation).compile(deepcopy(contracts['portrayal']),LAYER_ID,b['prepared_ref'],context).ref()
         font_bytes=preparation.read_bytes(Path(font_path),FONT_LIMIT)
-        texts=[{'content_id':'title','text':request['goal']},{'content_id':'source','text':profile.notice}]
+        texts=[{'content_id':'title','text':request['map_title']},{'content_id':'source','text':profile.notice}]
         if len(panels)>1:
             for vid,panel in sorted(panels.items()):texts.append({'content_id':vid.replace('view-','caption-',1),'text':panel['title']})
-        elif next(iter(panels.values()))['title']!=request['goal']:
-            raise ProtocolError('PANEL_TITLE_MISMATCH','Single-panel title must equal the page title')
-        raw={'schema_version':3,'portrayals':[{'view_id':vid,'ref':refs[panel['source_id']]} for vid,panel in sorted(panels.items())],
+        raw={'schema_version':4,'portrayals':[{'view_id':vid,'ref':refs[panel['source_id']]} for vid,panel in sorted(panels.items())],
              'resolved_layout':resolved,'font':{'path':str(font_path),'digest':preparation.digest_bytes(font_bytes),'size_bytes':len(font_bytes)},
              'texts':texts,'legends':[{'content_id':f['content_id'],'title':resolved['contract'].get('legend_title',LEGEND_TITLE)} for f in resolved['frames'] if f['type']=='legend'],
              'scale_bar':None,'grid_north':None}
         page=compile_page_request(preparation,raw,contracts['scenario']['embedded']['cartography'],context)
         stats=[{'source_id':b['source_id'],'counts':b['category_counts']} for b in bundle['role_bindings']]
         if (plan['bindings']!=page['bindings'] or plan['layout_parameters']!=request['layout_parameters']
-            or plan['decisions']['data_statistics']!=stats or plan['decisions']['title']!=request['goal']
+            or plan['decisions']['thematic_views'] != raster_views(request,bundle,self.registry)
+            or plan['decisions']['title'] != request['map_title']
             or plan['decisions']['legend_capacity']!=resolved['contract']['capacity']['legend_items']):
             raise ProtocolError('PLAN_BINDING_MISMATCH','Plan differs from verified template and data')
         compiler=RasterSceneCompiler(preparation)
         scene=compiler.compile(bundle_ref=prepared['bundle_ref'],page_request=page,context=context,scene_id=f"scene-{request['run_id']}",targets=tuple(sorted(request['requested_outputs'])))
-        execution=compiler.bind_execution(self._execution_base(intent,installation,bundle,profile,contracts),scene,context)
+        base=self._execution_base(intent,installation,bundle,profile,contracts)
+        base['thematic_plan_ref']=artifact_ref('map-plan',plan)
+        execution=compiler.bind_execution(base,scene,context)
         candidate={'schema_version':1,'candidate_id':f"candidate-{request['run_id']}",'project_id':request['project_id'],'run_id':request['run_id'],
                    'execution_digest':sha256_digest(execution),'execution':execution,'open_issues':[],'created_at':request['requested_at']}
         return {'candidate':candidate,'scene':scene}
@@ -220,6 +224,7 @@ class GeneralThematicCandidateCompiler:
             "ownership": {"scenario": "map-scenario"},
             "shared_semantics": {"theme_tags": list(intent["theme_tags"]),
                                  "data_nature": bundle["summary"]["data_nature"]},
+            "material_facts_refs": [deepcopy(bundle["data_facts"])] if bundle.get("data_facts") else [],
         }
 
 
@@ -321,273 +326,345 @@ class GeneralThematicSourceContract:
 SOURCE_CONTRACT = GeneralThematicSourceContract()
 
 
+# --------------------------------------------------------------------------
+# Template contract declarations: one geometry-free source for both authors
+# --------------------------------------------------------------------------
+# ADR-001 §9.5 项②: business semantics, layout and expression declarations are
+# single-sourced here. The raster and vector authors differ only through the
+# explicit geometry-adaptation parameters (version, data_role, geometry_types,
+# fields, portrayal layer, delivery composition, quality-gate set), so neither
+# author inherits the other's payloads. Key order is part of the package digest
+# — ``staging_package._serialize`` dumps YAML with ``sort_keys=False`` — and is
+# therefore frozen here for both geometries.
+
+GATE_PROTOCOL = {"id": "protocol.schema-valid", "version": "1.0.0", "params": {}}
+GATE_LEGEND = {"id": "cartography.legend-consistency", "version": "1.0.0", "params": {}}
+GATE_RASTER_CLASSIFICATION = {"id": "raster.classification-clarified", "version": "1.0.0",
+                              "params": {}}
+RASTER_DATA_FIELDS = (
+    {"name": "category_value", "type": "integer", "nullable": False,
+     "semantic_role": "category-value"},
+    {"name": "category_label", "type": "string", "nullable": True,
+     "semantic_role": "category-label"},
+)
+RASTER_LIMITATIONS = (
+    "样张渲染使用合成栅格与固定调色板，仅验证模板协议、渲染链路与版式，不代表真实业务数据。",
+)
+# Scale-band identity is part of the authored contract, so each geometry names its own
+# band instead of the vector template inheriting a raster-flavoured identifier.
+RASTER_SCALE_BAND_ID = "native-raster"
+
+
+def package_identity(version: str = VERSION) -> dict[str, Any]:
+    """Package identity shared by both geometries; only the version differs."""
+    return {"namespace": NAMESPACE, "kind": KIND, "id": SCENARIO_ID, "version": version}
+
+
+def require_admitted(request: dict[str, Any], brief: dict[str, Any], *,
+                     version: str = VERSION, profile: str = AUTHORING_PROFILE) -> None:
+    """Four fail-closed authoring gates: identity, targets, preserve-CRS, brief."""
+    if (request.get("kind") != KIND or request.get("namespace") != NAMESPACE
+            or request.get("template_id") != SCENARIO_ID or request.get("version") != version
+            or request.get("profile") != profile):
+        raise ProtocolError("CAPABILITY_NOT_AVAILABLE",
+                            "Only the registered authoring profile may use this author")
+    if sorted(request.get("targets", [])) != ["pdf", "png"]:
+        raise ProtocolError("RENDER_TARGET_UNSUPPORTED", "Admitted targets are exactly pdf and png")
+    if request["source_crs"] != request["display_crs"]:
+        raise ProtocolError("SOURCE_CRS_UNSUPPORTED",
+                            "The preserve policy requires display_crs to equal source_crs")
+    if (brief.get("kind") != KIND or brief.get("namespace") != NAMESPACE
+            or brief.get("template_id") != SCENARIO_ID or brief.get("version") != version):
+        raise ProtocolError("TEMPLATE_BRIEF_MISMATCH", "Brief does not describe this template")
+
+
+def identity_contract(*, version: str = VERSION) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "identity_id": IDENTITY_ID,
+        "version": version,
+        "organization": ORGANIZATION,
+        "colors": [{
+            "role": "primary",
+            "hex": "#1F4E79",
+            "provenance": {"source_type": "internal",
+                           "source_ref": f"template:{SCENARIO_ID}@{version}",
+                           "classification": "internal"},
+        }],
+        "typography": [{"role": "title", "family": FONT_FAMILY, "weight": 700},
+                       {"role": "body", "family": FONT_FAMILY, "weight": 400}],
+        "attribution": {"organization_format": "制图：{organization}",
+                        "data_source_format": "数据来源：{source}"},
+        "rules": [],
+    }
+
+
+def cartography_contract(*, version: str = VERSION) -> dict[str, Any]:
+    return {
+        "schema_version": 2,
+        "style_id": STYLE_ID,
+        "version": version,
+        "visual_language": "technical",
+        "symbolization": {"color_system": "qualitative",
+                          "symbol_catalogs": ["ramps/categorical-raster@1.0.0"],
+                          "default_opacity": 1.0},
+        "labeling": {"density": "low", "collision_policy": "avoid", "font_role": "body"},
+        "generalization": {"scale_dependent": False, "strategy": "none"},
+        "defaults": {"opacity": 1.0},
+        "typography": {"title_pt": 18, "body_pt": 9, "legend_pt": 10,
+                       "legend_heading_pt": 11, "line_spacing": 1.25},
+        "rules": [],
+    }
+
+
+def layout_contract(*, version: str = VERSION) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "layout_id": LAYOUT_ID,
+        "version": version,
+        "content_padding_mm": 2,
+        "category": "report",
+        "canvas": {"width": 297, "height": 210, "unit": "mm",
+                   "orientation": "landscape", "safe_margin": 10},
+        "frames": [
+            {"id": "map", "content_id": "main-view", "type": "map",
+             "bounds": [10, 25, 215, 175], "coordinate_space": "page",
+             "overflow_policy": "clip"},
+            {"id": "title", "content_id": "title", "type": "title",
+             "bounds": [10, 10, 277, 10], "coordinate_space": "page",
+             "overflow_policy": "reject"},
+            {"id": "legend", "content_id": "legend", "type": "legend",
+             "bounds": [230, 40, 57, 130], "coordinate_space": "page",
+             "overflow_policy": "reject"},
+            {"id": "source", "content_id": "source", "type": "marginalia",
+             "bounds": [230, 180, 57, 15], "coordinate_space": "page",
+             "overflow_policy": "reject"},
+        ],
+        "placeholders": ["{{MAP_TITLE}}", "{{MAP_FRAME}}", "{{LEGEND}}"],
+        "grid": {"allowed_shapes": [[1,1],[1,2],[2,2]], "legend_modes": ["independent","shared"],
+                 "panel_area": [10,27,277,160], "shared_panel_area": [10,27,277,126],
+                 "shared_legend_bounds": [10,159,277,30], "source_bounds": [10,190,277,10],
+                 "column_gap_mm": 8, "row_gap_mm": 8, "caption_height_mm": 9, "caption_gap_mm": 2,
+                 "legend_width_mm": 41, "legend_gap_mm": 3, "shared_legend_columns": 4},
+        "capacity": {"legend_items": 12, "title_characters": 60},
+        "rules": [],
+    }
+
+
+def scenario_contract(request: dict[str, Any], *, version: str = VERSION,
+                      data_role: str = DATA_ROLE) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "scenario_id": SCENARIO_ID,
+        "version": version,
+        "business_scene": BUSINESS_SCENE,
+        "tasks": [TASK],
+        "owned_segments": ["scenario", "data", "spatial-behavior", "portrayal",
+                           "delivery", "quality-gates"],
+        "embedded": {"identity": identity_contract(version=version),
+                     "cartography": cartography_contract(version=version),
+                     "layout": layout_contract(version=version)},
+        "replaceable_segments": [],
+        "data_role_refs": [data_role],
+        "target_ids": list(TARGET_IDS),
+        "application": {"supported_uses": sorted(request["supported_uses"]),
+                        "excluded_uses": sorted(request["excluded_uses"])},
+        "compatibility": {"target_profiles": [LAYOUT_ID],
+                          "placeholders": ["{{MAP_TITLE}}", "{{MAP_FRAME}}", "{{LEGEND}}"]},
+        "rules": [],
+    }
+
+
+def data_schema_contract(*, data_role: str = DATA_ROLE, geometry_types=("raster",),
+                         fields=RASTER_DATA_FIELDS) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "roles": [{
+            "id": data_role,
+            "required": True,
+            "geometry_types": list(geometry_types),
+            "fields": [deepcopy(field) for field in fields],
+            "license_policy": "project-approved",
+        }],
+    }
+
+
+def spatial_behavior_contract(request: dict[str, Any], *,
+                              scale_band_id: str = RASTER_SCALE_BAND_ID) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "source_crs_policy": "preserve",
+        "display_crs": deepcopy(request["display_crs"]),
+        "extent_policy": "data",
+        "scale_bands": [{"id": scale_band_id, "min_denominator": 1,
+                         "max_denominator": 100000000, "generalization": "none"}],
+        "topology": {"preserve_adjacency": True, "preserve_route_order": False},
+        "rules": [],
+    }
+
+
+def raster_portrayal_contract(registry: SchemaRegistry) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "layers": [{
+            "id": LAYER_ID,
+            "data_role": DATA_ROLE,
+            "geometry": "raster",
+            "z_order": 10,
+            "map_expression_ref": _catalog_reference(registry),
+            "value_role": "category-value",
+            "category_mapping": {"method": "unique-values",
+                                 "definition_source": "prepared-display-contract",
+                                 "unknown_value_policy": "reject"},
+            "source_mask_policy": "preserve",
+            "resampling": "nearest",
+            "no_data": "transparent",
+        }],
+        "legend": {"generated_from_layers": True, "show_no_data": False,
+                   "overflow_policy": "reject"},
+        "rules": [],
+    }
+
+
+def delivery_contract(*, composition: str = "raster-map-vector-overlay",
+                      vector_claim: str = "overlay-only") -> dict[str, Any]:
+    page = {"width_mm": 297, "height_mm": 210, "orientation": "landscape",
+            "dpi": 300, "safe_margin_mm": 10}
+    return {
+        "schema_version": 1,
+        "targets": [
+            {"id": TARGET_IDS[0], "delivery_class": "engineering-preview", "format": "pdf",
+             "composition": composition, "vector_claim": vector_claim,
+             "page": dict(page), "color_mode": "rgb", "font_policy": "embed-approved",
+             "production_ready": False},
+            {"id": TARGET_IDS[1], "delivery_class": "engineering-preview", "format": "png",
+             "composition": "flattened-raster", "vector_claim": "none",
+             "page": dict(page), "color_mode": "rgb", "font_policy": "embed-approved",
+             "production_ready": False},
+        ],
+        "rules": [],
+    }
+
+
+def quality_gates_contract(*, version: str = VERSION, checks=None,
+                           baseline_digest: str | None = None) -> dict[str, Any]:
+    if checks is None:
+        checks = (GATE_PROTOCOL, GATE_LEGEND, GATE_RASTER_CLASSIFICATION)
+    if baseline_digest is None:
+        baseline_digest = sha256_digest({"scenario_id": SCENARIO_ID, "version": version,
+                                         "business_scene": BUSINESS_SCENE})
+    return {
+        "schema_version": 1,
+        "baseline": {"id": BASELINE_ID, "version": version, "digest": baseline_digest},
+        "checks": [deepcopy(check) for check in checks],
+    }
+
+
+def fixture_csv(header=FIXTURE_HEADER, rows=FIXTURE_ROWS) -> str:
+    buffer = io.StringIO(newline="")
+    writer = csv.writer(buffer, lineterminator="\n")
+    writer.writerow(header)
+    writer.writerows(rows)
+    return buffer.getvalue()
+
+
+def prototype_contract(*, prototype_id: str, layout_id: str, layer_ids, limitations,
+                       fixture_ref: str = FIXTURE_PATH) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "prototype_id": prototype_id,
+        "status": "pending-validation",
+        "render_required": True,
+        "renderer_execution": "not-run",
+        "layout_id": layout_id,
+        "target_ids": list(TARGET_IDS),
+        "layer_ids": list(layer_ids),
+        "fixture_ref": fixture_ref,
+        "limitations": list(limitations),
+    }
+
+
+def dependency_lock(identity: dict[str, Any], request: dict[str, Any],
+                    registry: SchemaRegistry, *, lock_id: str = LOCK_ID,
+                    resources=None) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "lock_id": lock_id,
+        "package": {**identity, "digest": sha256_digest(identity)},
+        "dependencies": [],
+        "resources": [_catalog_reference(registry)] if resources is None else list(resources),
+        "resolver_version": "1.0.0",
+        "generated_at": request["requested_at"],
+    }
+
+
+def package_manifest(identity: dict[str, Any], request: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "package": {**identity, "status": "draft", "summary": request["purpose"][:500]},
+        "business_contracts": dict(DependencyResolver.MAP_SCENARIO_CONTRACTS),
+        "dependencies": [],
+        "dependency_lock": "dependencies.lock.yaml",
+        "targets": sorted(request["targets"]),
+    }
+
+
+def author_context(path_guard: PathGuard, work_root: Path,
+                   registry: SchemaRegistry | None = None) -> tuple[PathGuard, Path, SchemaRegistry]:
+    """Resolve the trusted work root once; shared by both geometry authors."""
+    return path_guard, path_guard.resolve(work_root, must_exist=True), registry or SchemaRegistry()
+
+
+def write_package(path_guard: PathGuard, work_root: Path, registry: SchemaRegistry,
+                  manifest: dict[str, Any], documents: dict[str, Any]) -> dict[str, str]:
+    return StagingPackageWriter(path_guard, work_root, registry).write(manifest, documents)
+
+
+def verify_package(path_guard: PathGuard, work_root: Path, registry: SchemaRegistry,
+                   manifest: dict[str, Any], documents: dict[str, Any]) -> dict[str, str]:
+    return StagingPackageWriter(path_guard, work_root, registry).verify_existing(
+        manifest, documents)
+
+
 class GeneralThematicAuthor:
-    """Deterministically author the closed staging package for this scenario."""
+    """Deterministically author the closed staging package for this scenario.
+
+    Every declaration comes from the geometry-free ``*_contract`` functions above;
+    this class only pins the raster geometry-adaptation parameters.
+    """
 
     def __init__(self, path_guard: PathGuard, work_root: Path,
                  registry: SchemaRegistry | None = None) -> None:
-        self.path_guard = path_guard
-        self.work_root = path_guard.resolve(work_root, must_exist=True)
-        self.registry = registry or SchemaRegistry()
+        self.path_guard, self.work_root, self.registry = author_context(
+            path_guard, work_root, registry)
 
     def author(self, request: dict[str, Any], brief: dict[str, Any]) -> dict[str, str]:
         manifest_base, documents = self._payloads(request, brief)
-        return StagingPackageWriter(self.path_guard, self.work_root, self.registry).write(
-            manifest_base, documents)
+        return write_package(self.path_guard, self.work_root, self.registry,
+                             manifest_base, documents)
 
     def verify_existing(self, request: dict[str, Any], brief: dict[str, Any]) -> dict[str, str]:
         manifest_base, documents = self._payloads(request, brief)
-        return StagingPackageWriter(self.path_guard, self.work_root, self.registry).verify_existing(
-            manifest_base, documents)
+        return verify_package(self.path_guard, self.work_root, self.registry,
+                              manifest_base, documents)
 
     def _payloads(self, request: dict[str, Any], brief: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
-        self._require_admitted(request, brief)
-        identity = {"namespace": NAMESPACE, "kind": KIND, "id": SCENARIO_ID, "version": VERSION}
+        require_admitted(request, brief)
+        identity = package_identity()
         documents = {
-            "contracts/scenario.yaml": self._scenario(request),
-            "contracts/data.schema.yaml": self._data_schema(),
-            "contracts/spatial-behavior.yaml": self._spatial_behavior(request),
-            "contracts/portrayal.yaml": self._portrayal(),
-            "contracts/delivery.yaml": self._delivery(),
-            "contracts/quality-gates.yaml": self._quality_gates(),
-            "dependencies.lock.yaml": {
-                "schema_version": 1,
-                "lock_id": LOCK_ID,
-                "package": {**identity, "digest": sha256_digest(identity)},
-                "dependencies": [],
-                "resources": [_catalog_reference(self.registry)],
-                "resolver_version": "1.0.0",
-                "generated_at": request["requested_at"],
-            },
-            "prototypes/general-thematic.yaml": {
-                "schema_version": 1,
-                "prototype_id": PROTOTYPE_ID,
-                "status": "pending-validation",
-                "render_required": True,
-                "renderer_execution": "not-run",
-                "layout_id": LAYOUT_ID,
-                "target_ids": list(TARGET_IDS),
-                "layer_ids": [LAYER_ID],
-                "fixture_ref": FIXTURE_PATH,
-                "limitations": [
-                    "样张渲染使用合成栅格与固定调色板，仅验证模板协议、渲染链路与版式，不代表真实业务数据。",
-                ],
-            },
-            FIXTURE_PATH: self._fixture_csv(),
+            "contracts/scenario.yaml": scenario_contract(request),
+            "contracts/data.schema.yaml": data_schema_contract(),
+            "contracts/spatial-behavior.yaml": spatial_behavior_contract(request),
+            "contracts/portrayal.yaml": raster_portrayal_contract(self.registry),
+            "contracts/delivery.yaml": delivery_contract(),
+            "contracts/quality-gates.yaml": quality_gates_contract(),
+            "dependencies.lock.yaml": dependency_lock(identity, request, self.registry),
+            "prototypes/general-thematic.yaml": prototype_contract(
+                prototype_id=PROTOTYPE_ID, layout_id=LAYOUT_ID, layer_ids=(LAYER_ID,),
+                limitations=RASTER_LIMITATIONS),
+            FIXTURE_PATH: fixture_csv(),
         }
-        manifest_base = {
-            "schema_version": 1,
-            "package": {**identity, "status": "draft", "summary": request["purpose"][:500]},
-            "business_contracts": dict(DependencyResolver.MAP_SCENARIO_CONTRACTS),
-            "dependencies": [],
-            "dependency_lock": "dependencies.lock.yaml",
-            "targets": sorted(request["targets"]),
-        }
-        return manifest_base, documents
-
-    @staticmethod
-    def _require_admitted(request: dict[str, Any], brief: dict[str, Any]) -> None:
-        if (request.get("kind") != KIND or request.get("namespace") != NAMESPACE
-                or request.get("template_id") != SCENARIO_ID or request.get("version") != VERSION
-                or request.get("profile") != AUTHORING_PROFILE):
-            raise ProtocolError("CAPABILITY_NOT_AVAILABLE",
-                                "Only the registered general-thematic authoring profile may use this author")
-        if sorted(request.get("targets", [])) != ["pdf", "png"]:
-            raise ProtocolError("RENDER_TARGET_UNSUPPORTED", "Admitted targets are exactly pdf and png")
-        if request["source_crs"] != request["display_crs"]:
-            raise ProtocolError("SOURCE_CRS_UNSUPPORTED",
-                                "The preserve policy requires display_crs to equal source_crs")
-        if (brief.get("kind") != KIND or brief.get("namespace") != NAMESPACE
-                or brief.get("template_id") != SCENARIO_ID or brief.get("version") != VERSION):
-            raise ProtocolError("TEMPLATE_BRIEF_MISMATCH", "Brief does not describe this template")
-
-    def _scenario(self, request: dict[str, Any]) -> dict[str, Any]:
-        return {
-            "schema_version": 1,
-            "scenario_id": SCENARIO_ID,
-            "version": VERSION,
-            "business_scene": BUSINESS_SCENE,
-            "tasks": [TASK],
-            "owned_segments": ["scenario", "data", "spatial-behavior", "portrayal",
-                               "delivery", "quality-gates"],
-            "embedded": {"identity": self._identity(), "cartography": self._cartography(),
-                         "layout": self._layout()},
-            "replaceable_segments": [],
-            "data_role_refs": [DATA_ROLE],
-            "target_ids": list(TARGET_IDS),
-            "application": {"supported_uses": sorted(request["supported_uses"]),
-                            "excluded_uses": sorted(request["excluded_uses"])},
-            "compatibility": {"target_profiles": [LAYOUT_ID],
-                              "placeholders": ["{{MAP_TITLE}}", "{{MAP_FRAME}}", "{{LEGEND}}"]},
-            "rules": [],
-        }
-
-    @staticmethod
-    def _identity() -> dict[str, Any]:
-        return {
-            "schema_version": 1,
-            "identity_id": IDENTITY_ID,
-            "version": VERSION,
-            "organization": ORGANIZATION,
-            "colors": [{
-                "role": "primary",
-                "hex": "#1F4E79",
-                "provenance": {"source_type": "internal",
-                               "source_ref": f"template:{SCENARIO_ID}@{VERSION}",
-                               "classification": "internal"},
-            }],
-            "typography": [{"role": "title", "family": FONT_FAMILY, "weight": 700},
-                           {"role": "body", "family": FONT_FAMILY, "weight": 400}],
-            "attribution": {"organization_format": "制图：{organization}",
-                            "data_source_format": "数据来源：{source}"},
-            "rules": [],
-        }
-
-    @staticmethod
-    def _cartography() -> dict[str, Any]:
-        return {
-            "schema_version": 2,
-            "style_id": STYLE_ID,
-            "version": VERSION,
-            "visual_language": "technical",
-            "symbolization": {"color_system": "qualitative",
-                              "symbol_catalogs": ["ramps/categorical-raster@1.0.0"],
-                              "default_opacity": 1.0},
-            "labeling": {"density": "low", "collision_policy": "avoid", "font_role": "body"},
-            "generalization": {"scale_dependent": False, "strategy": "none"},
-            "defaults": {"opacity": 1.0},
-            "typography": {"title_pt": 18, "body_pt": 9, "legend_pt": 10,
-                           "legend_heading_pt": 11, "line_spacing": 1.25},
-            "rules": [],
-        }
-
-    @staticmethod
-    def _layout() -> dict[str, Any]:
-        return {
-            "schema_version": 1,
-            "layout_id": LAYOUT_ID,
-            "version": VERSION,
-            "content_padding_mm": 2,
-            "category": "report",
-            "canvas": {"width": 297, "height": 210, "unit": "mm",
-                       "orientation": "landscape", "safe_margin": 10},
-            "frames": [
-                {"id": "map", "content_id": "main-view", "type": "map",
-                 "bounds": [10, 25, 215, 175], "coordinate_space": "page",
-                 "overflow_policy": "clip"},
-                {"id": "title", "content_id": "title", "type": "title",
-                 "bounds": [10, 10, 277, 10], "coordinate_space": "page",
-                 "overflow_policy": "reject"},
-                {"id": "legend", "content_id": "legend", "type": "legend",
-                 "bounds": [230, 40, 57, 130], "coordinate_space": "page",
-                 "overflow_policy": "reject"},
-                {"id": "source", "content_id": "source", "type": "marginalia",
-                 "bounds": [230, 180, 57, 15], "coordinate_space": "page",
-                 "overflow_policy": "reject"},
-            ],
-            "placeholders": ["{{MAP_TITLE}}", "{{MAP_FRAME}}", "{{LEGEND}}"],
-            "grid": {"allowed_shapes": [[1,1],[1,2],[2,2]], "legend_modes": ["independent","shared"],
-                     "panel_area": [10,27,277,160], "shared_panel_area": [10,27,277,126],
-                     "shared_legend_bounds": [10,159,277,30], "source_bounds": [10,190,277,10],
-                     "column_gap_mm": 8, "row_gap_mm": 8, "caption_height_mm": 9, "caption_gap_mm": 2,
-                     "legend_width_mm": 41, "legend_gap_mm": 3, "shared_legend_columns": 4},
-            "capacity": {"legend_items": 12, "title_characters": 60},
-            "rules": [],
-        }
-
-    @staticmethod
-    def _data_schema() -> dict[str, Any]:
-        return {
-            "schema_version": 1,
-            "roles": [{
-                "id": DATA_ROLE,
-                "required": True,
-                "geometry_types": ["raster"],
-                "fields": [
-                    {"name": "category_value", "type": "integer", "nullable": False,
-                     "semantic_role": "category-value"},
-                    {"name": "category_label", "type": "string", "nullable": True,
-                     "semantic_role": "category-label"},
-                ],
-                "license_policy": "project-approved",
-            }],
-        }
-
-    @staticmethod
-    def _spatial_behavior(request: dict[str, Any]) -> dict[str, Any]:
-        return {
-            "schema_version": 1,
-            "source_crs_policy": "preserve",
-            "display_crs": deepcopy(request["display_crs"]),
-            "extent_policy": "data",
-            "scale_bands": [{"id": "native-raster", "min_denominator": 1,
-                             "max_denominator": 100000000, "generalization": "none"}],
-            "topology": {"preserve_adjacency": True, "preserve_route_order": False},
-            "rules": [],
-        }
-
-    def _portrayal(self) -> dict[str, Any]:
-        return {
-            "schema_version": 1,
-            "layers": [{
-                "id": LAYER_ID,
-                "data_role": DATA_ROLE,
-                "geometry": "raster",
-                "z_order": 10,
-                "map_expression_ref": _catalog_reference(self.registry),
-                "value_role": "category-value",
-                "category_mapping": {"method": "unique-values",
-                                     "definition_source": "prepared-display-contract",
-                                     "unknown_value_policy": "reject"},
-                "source_mask_policy": "preserve",
-                "resampling": "nearest",
-                "no_data": "transparent",
-            }],
-            "legend": {"generated_from_layers": True, "show_no_data": False,
-                       "overflow_policy": "reject"},
-            "rules": [],
-        }
-
-    @staticmethod
-    def _delivery() -> dict[str, Any]:
-        page = {"width_mm": 297, "height_mm": 210, "orientation": "landscape",
-                "dpi": 300, "safe_margin_mm": 10}
-        return {
-            "schema_version": 1,
-            "targets": [
-                {"id": TARGET_IDS[0], "delivery_class": "engineering-preview", "format": "pdf",
-                 "composition": "raster-map-vector-overlay", "vector_claim": "overlay-only",
-                 "page": dict(page), "color_mode": "rgb", "font_policy": "embed-approved",
-                 "production_ready": False},
-                {"id": TARGET_IDS[1], "delivery_class": "engineering-preview", "format": "png",
-                 "composition": "flattened-raster", "vector_claim": "none",
-                 "page": dict(page), "color_mode": "rgb", "font_policy": "embed-approved",
-                 "production_ready": False},
-            ],
-            "rules": [],
-        }
-
-    @staticmethod
-    def _quality_gates() -> dict[str, Any]:
-        return {
-            "schema_version": 1,
-            "baseline": {"id": BASELINE_ID, "version": VERSION,
-                         "digest": sha256_digest({"scenario_id": SCENARIO_ID, "version": VERSION,
-                                                  "business_scene": BUSINESS_SCENE})},
-            "checks": [
-                {"id": "protocol.schema-valid", "version": "1.0.0", "params": {}},
-                {"id": "cartography.legend-consistency", "version": "1.0.0", "params": {}},
-                {"id": "raster.classification-clarified", "version": "1.0.0", "params": {}},
-            ],
-        }
-
-    @staticmethod
-    def _fixture_csv() -> str:
-        buffer = io.StringIO(newline="")
-        writer = csv.writer(buffer, lineterminator="\n")
-        writer.writerow(FIXTURE_HEADER)
-        writer.writerows(FIXTURE_ROWS)
-        return buffer.getvalue()
+        return package_manifest(identity, request), documents
 
 
 def validation_data_checker(package_root: Path, snapshot: dict[str, Any],
@@ -711,8 +788,26 @@ def _fixture_gateway(preparation: RasterPreparationService, workspace: Path) -> 
         except Exception as exc:
             raise ProtocolError("RASTER_FIXTURE_PROFILE_UNSUPPORTED",
                                 "Synthetic fixture raster could not be measured") from exc
-        values, counts = np.unique(data.compressed(), return_counts=True)
-        total, valid = int(data.size), int(data.count())
+        total = int(data.size)
+        dtype = info["bands"][0]["dtype"]
+        if dtype in ("float32", "float64"):
+            # ADR-001 阶段2.3：float 栅格 → continuous 统计（min/max/mean/stddev + histogram）。
+            valid_arr = data.compressed().astype("float64")
+            valid = int(valid_arr.size)
+            vmin, vmax = float(valid_arr.min()), float(valid_arr.max())
+            bucket_count = max(1, min(256, valid))
+            hist = np.histogram(valid_arr, bins=bucket_count, range=(vmin, vmax))[0]
+            statistic = {"total_pixels": total, "valid_pixels": valid, "masked_pixels": total - valid,
+                         "continuous": {"min": vmin, "max": vmax, "mean": float(valid_arr.mean()),
+                                        "stddev": float(valid_arr.std()),
+                                        "histogram": {"min": vmin, "max": vmax, "bucket_count": bucket_count,
+                                                      "counts": [int(c) for c in hist]}}}
+        else:
+            values, counts = np.unique(data.compressed(), return_counts=True)
+            valid = int(data.count())
+            statistic = {"total_pixels": total, "valid_pixels": valid, "masked_pixels": total - valid,
+                         "classes": [{"value": int(value), "count": int(count)}
+                                     for value, count in zip(values, counts)]}
         return {
             "schema_version": 1, "operation": "statistics",
             "source_ref": deepcopy(source["source_ref"]),
@@ -724,10 +819,7 @@ def _fixture_gateway(preparation: RasterPreparationService, workspace: Path) -> 
                        "tool_catalog_digest": sha256_digest({"capability": "gis-raster-statistics",
                                                              "operation": "statistics"})},
             "raster_info": info,
-            "statistics": {"total_pixels": total, "valid_pixels": valid,
-                           "masked_pixels": total - valid,
-                           "classes": [{"value": int(value), "count": int(count)}
-                                       for value, count in zip(values, counts)]},
+            "statistics": statistic,
             "warnings": [],
         }
 
@@ -846,7 +938,7 @@ def validation_scene(package_root: Path, snapshot: dict[str, Any], targets: list
                             "Layout differs from the enabled output profile")
     font_bytes = preparation.read_bytes(font, FONT_LIMIT)
     page_request = {
-        "schema_version": 3,
+        "schema_version": 4,
         "portrayals": [{"view_id":f["content_id"], "ref":deepcopy(portrayal_ref)} for f in resolved_layout["frames"] if f["type"]=="map"],
         "resolved_layout": deepcopy(resolved_layout),
         "font": {"path": str(font), "digest": preparation.digest_bytes(font_bytes),

@@ -2,8 +2,8 @@
 
 The eight component hooks keep one signature each; the geometry (raster | vector) is
 decided from an explicit request/template discriminator and delegated to the matching
-strategy module. Registering a geometry here is NOT admission: ``allowed_geometries``
-in ``policies/scenario-capabilities.yaml`` remains the policy lever that withholds a
+strategy module. Registering a geometry here is NOT admission: the ``geometry_variants``
+list in ``policies/scenario-capabilities.yaml`` remains the policy lever that withholds a
 geometry from production routes.
 """
 from __future__ import annotations
@@ -22,40 +22,25 @@ GEOMETRIES = ("raster", "vector")
 
 
 def geometry_of_request(request: dict[str, Any]) -> str:
-    """Exactly one geometry must be declared; ambiguity is rejected, never guessed.
-
-    The explicit ``geometry`` field is the primary discriminator (raster | vector).
-    A heuristic fallback on panel/source blocks is retained for backward compatibility
-    during the transition, but the schema now requires the explicit field on generate
-    requests.
-    """
-    explicit = request.get("geometry")
-    if explicit is not None:
-        if explicit not in GEOMETRIES:
-            raise ProtocolError("SCENARIO_GEOMETRY_UNKNOWN",
-                                f"Explicit geometry must be one of {GEOMETRIES}")
-        return explicit
-    # Backward-compatible heuristic fallback
-    has_vector = bool(request.get("vector_panels") or request.get("vector_sources"))
-    has_raster = bool(request.get("panels") or request.get("source_bindings")
-                      or request.get("prepared_raster_bindings"))
-    if has_vector and not has_raster:
-        return "vector"
-    if has_raster and not has_vector:
-        return "raster"
-    if not has_vector and not has_raster and request.get("role_bindings") is not None:
-        return geometry_of_template(str(request.get("version", "")))
-    raise ProtocolError("SCENARIO_GEOMETRY_AMBIGUOUS",
-                        "Declare exactly one geometry: set an explicit geometry field or "
-                        "provide exactly one panel/source family")
+    geometry = request.get("geometry")
+    if geometry not in GEOMETRIES:
+        raise ProtocolError("SCENARIO_GEOMETRY_REQUIRED", "Declare an admitted geometry explicitly")
+    return geometry
 
 
-def geometry_of_template(version: str) -> str:
-    return "vector" if version == vector.VERSION else "raster"
+def geometry_of_profile(definition: dict[str, Any]) -> str:
+    geometry = definition.get("template_geometry")
+    if geometry not in GEOMETRIES:
+        raise ProtocolError("SCENARIO_GEOMETRY_REQUIRED", "Template capability must declare geometry")
+    return geometry
 
 
 def geometry_of_snapshot(snapshot: dict[str, Any]) -> str:
-    return geometry_of_template(snapshot["manifest"]["package"]["version"])
+    layers = snapshot.get("documents", {}).get("portrayal", {}).get("layers", [])
+    geometries = {layer.get("geometry") for layer in layers}
+    if len(geometries) != 1 or not geometries <= set(GEOMETRIES):
+        raise ProtocolError("SCENARIO_GEOMETRY_AMBIGUOUS", "Template portrayal must declare one geometry family")
+    return geometries.pop()
 
 
 def _contract(request: dict[str, Any]):
@@ -67,7 +52,7 @@ class UnifiedSourceContract:
 
     def suggestions(self, profile_definition: dict[str, Any]) -> list[dict[str, Any]]:
         impl = (vector.SOURCE_CONTRACT
-                if geometry_of_template(profile_definition["template"]["version"]) == "vector"
+                if geometry_of_profile(profile_definition) == "vector"
                 else raster.SOURCE_CONTRACT)
         return impl.suggestions(profile_definition)
 
@@ -79,9 +64,7 @@ class UnifiedSourceContract:
 
     @staticmethod
     def validate_source_profile(source: dict[str, Any], request: dict[str, Any]) -> None:
-        declared = {item["source_id"] for item in request.get("vector_sources", [])}
-        impl = vector.SOURCE_CONTRACT if source["source_id"] in declared else raster.SOURCE_CONTRACT
-        impl.validate_source_profile(source, request)
+        _contract(request).validate_source_profile(source, request)
 
 
 SOURCE_CONTRACT = UnifiedSourceContract()
@@ -99,14 +82,16 @@ class GeneralDataPreparer:
 
 
 class GeneralPlanner:
-    def __init__(self, registry: SchemaRegistry | None = None) -> None:
+    def __init__(self, registry: SchemaRegistry | None = None, *, project_root=None) -> None:
         self._registry = registry
+        self._project_root = project_root
 
     def build(self, request: dict[str, Any], intent: dict[str, Any], brief: dict[str, Any],
               bundle: dict[str, Any], installation: dict[str, Any], contracts: dict[str, Any]) -> dict[str, Any]:
         impl = (vector.GeneralVectorPlanner if geometry_of_request(request) == "vector"
                 else raster.GeneralThematicPlanner)
-        return impl(self._registry).build(request, intent, brief, bundle, installation, contracts)
+        planner = impl(self._registry, project_root=self._project_root) if geometry_of_request(request)=="vector" else impl(self._registry)
+        return planner.build(request, intent, brief, bundle, installation, contracts)
 
 
 class GeneralCandidateCompiler:
@@ -130,7 +115,7 @@ class GeneralAuthor:
         self._args = (path_guard, work_root, registry)
 
     def _impl(self, request: dict[str, Any]):
-        impl = (vector.GeneralVectorAuthor if geometry_of_template(request["version"]) == "vector"
+        impl = (vector.GeneralVectorAuthor if geometry_of_request(request) == "vector"
                 else raster.GeneralThematicAuthor)
         return impl(*self._args)
 
@@ -151,10 +136,13 @@ def validation_scene(package_root: Path, snapshot: dict[str, Any], targets: list
                      context: ExecutionContext | None = None,
                      workspace: Path | None = None,
                      registry: SchemaRegistry | None = None,
-                     layout_parameters: dict[str, Any] | None = None) -> dict[str, Any]:
+                     layout_parameters: dict[str, Any] | None = None,
+                     validation_expression: str | None = None) -> dict[str, Any]:
     kwargs = {"context": context, "workspace": workspace, "registry": registry,
               "layout_parameters": layout_parameters}
     if geometry_of_snapshot(snapshot) == "vector":
+        if validation_expression is not None:
+            kwargs["validation_expression"] = validation_expression
         return vector.validation_scene(package_root, snapshot, targets, font, validator_version, **kwargs)
     return raster.validation_scene(package_root, snapshot, targets, font, validator_version, **kwargs)
 

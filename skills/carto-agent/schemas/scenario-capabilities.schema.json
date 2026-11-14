@@ -29,8 +29,7 @@
           "id",
           "version",
           "implementation",
-          "template",
-          "authoring_profile",
+          "geometry_variants",
           "request_schemas",
           "intent_constraints",
           "data_nature",
@@ -49,43 +48,23 @@
           "implementation": {
             "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
           },
-          "template": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "kind",
-              "id",
-              "version"
-            ],
-            "properties": {
-              "kind": {
-                "const": "map-scenario"
-              },
-              "id": {
-                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
-              },
-              "version": {
-                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"
-              }
+          "geometry_variants": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2,
+            "items": {
+              "$ref": "#/$defs/geometryVariant"
             }
-          },
-          "authoring_profile": {
-            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
           },
           "routes": {
             "type": "array",
             "minItems": 1,
             "uniqueItems": true,
             "items": {
-              "enum": ["create-template", "generate-map"]
-            }
-          },
-          "allowed_geometries": {
-            "type": "array",
-            "minItems": 1,
-            "uniqueItems": true,
-            "items": {
-              "enum": ["raster", "vector"]
+              "enum": [
+                "create-template",
+                "generate-map"
+              ]
             }
           },
           "request_schemas": {
@@ -191,7 +170,11 @@
                 "minItems": 1,
                 "uniqueItems": true,
                 "items": {
-                  "enum": ["pdf", "png", "svg"]
+                  "enum": [
+                    "pdf",
+                    "png",
+                    "svg"
+                  ]
                 }
               },
               "cmyk_supported": {
@@ -208,7 +191,10 @@
                 "minItems": 1,
                 "uniqueItems": true,
                 "items": {
-                  "enum": ["grid", "freeform"]
+                  "enum": [
+                    "grid",
+                    "freeform"
+                  ]
                 }
               },
               "grid": {
@@ -256,7 +242,18 @@
                     "minItems": 1,
                     "uniqueItems": true,
                     "items": {
-                      "enum": ["map", "chart", "table", "image", "diagram", "title", "source", "legend", "decorative", "marginalia"]
+                      "enum": [
+                        "map",
+                        "chart",
+                        "table",
+                        "image",
+                        "diagram",
+                        "title",
+                        "source",
+                        "legend",
+                        "decorative",
+                        "marginalia"
+                      ]
                     }
                   }
                 }
@@ -300,6 +297,65 @@
               }
             }
           }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "geometry": {
+      "enum": [
+        "raster",
+        "vector"
+      ]
+    },
+    "rendererId": {
+      "enum": [
+        "rasterio-matplotlib-page",
+        "matplotlib-vector-page"
+      ]
+    },
+    "templateIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id",
+        "version"
+      ],
+      "properties": {
+        "kind": {
+          "const": "map-scenario"
+        },
+        "id": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+        },
+        "version": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"
+        }
+      }
+    },
+    "geometryVariant": {
+      "description": "Geometry is a data-adaptation attribute of one capability, never a second registration of the same business purpose. Each variant carries only what actually differs per geometry.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "geometry",
+        "template",
+        "authoring_profile",
+        "renderer_id"
+      ],
+      "properties": {
+        "geometry": {
+          "$ref": "#/$defs/geometry"
+        },
+        "template": {
+          "$ref": "#/$defs/templateIdentity"
+        },
+        "authoring_profile": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+        },
+        "renderer_id": {
+          "$ref": "#/$defs/rendererId"
         }
       }
     }

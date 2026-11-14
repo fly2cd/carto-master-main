@@ -11,6 +11,7 @@ import unittest
 REPO_ROOT = Path(__file__).resolve().parents[4]
 CLI = "${workspaceFolder}/skills/carto-agent/scripts/carto.py"
 TESTS = "${workspaceFolder}/skills/carto-agent/scripts/tests"
+RUNNER = "${workspaceFolder}/skills/carto-agent/scripts/tests/run_tests.py"
 
 
 class IdeIntegrationTests(unittest.TestCase):
@@ -67,11 +68,17 @@ class IdeIntegrationTests(unittest.TestCase):
             "Carto: Test IDE integration": [
                 "-m", "unittest", "discover", "-s", TESTS, "-p", "test_ide_integration.py", "-v",
             ],
-            "Carto: Run tests": ["-m", "unittest", "discover", "-s", TESTS, "-v"],
+            # Tiered regression runner: fast inner loop, slow real-rendering tier, the
+            # full merge gate, and the pass that rewrites the timing baseline.
+            "Carto: Run tests (fast tier)": [RUNNER, "--tier", "fast"],
+            "Carto: Run tests (slow tier)": [RUNNER, "--tier", "slow"],
+            "Carto: Run tests": [RUNNER, "--tier", "full"],
+            "Carto: Re-measure test baseline": [RUNNER, "--measure", "--quiet"],
         }
         self.assertEqual({label: task["args"] for label, task in self.tasks.items()}, expected)
         self.assertTrue((REPO_ROOT / "skills/carto-agent/scripts/carto.py").is_file())
         self.assertTrue((REPO_ROOT / "skills/carto-agent/scripts/tests").is_dir())
+        self.assertTrue((REPO_ROOT / "skills/carto-agent/scripts/tests/run_tests.py").is_file())
 
     def test_extensions_are_recommendations_not_machine_settings(self) -> None:
         config = json.loads((REPO_ROOT / ".vscode/extensions.json").read_text(encoding="utf-8"))

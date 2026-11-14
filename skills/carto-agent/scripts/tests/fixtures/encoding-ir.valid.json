@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "key_mode": "interval",
+  "geometry_role": "polygon",
+  "domain": {
+    "field": "population",
+    "measurement": "density",
+    "unit": "people/km2",
+    "normalization": { "denominator_field": "area", "scale": 1 }
+  },
+  "scale": {
+    "edges": [5, 7.5, 10],
+    "labels": ["Class 1", "Class 2"],
+    "interval_policy": "left-closed-last-both",
+    "out_of_range": "reject"
+  },
+  "channels": {
+    "symbols": [
+      { "color": "#6BAED6", "stroke": "#222222", "stroke_width_pt": 0.4, "radius_mm": 2 },
+      { "color": "#08519C", "stroke": "#222222", "stroke_width_pt": 0.4, "radius_mm": 2 }
+    ],
+    "shape": "auto"
+  },
+  "missing": { "policy": "reject", "label": "No data", "symbol": null },
+  "legend": { "policy": "all" }
+}

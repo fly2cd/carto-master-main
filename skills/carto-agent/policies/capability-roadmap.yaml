@@ -54,13 +54,13 @@ items:
     target: 待定
     note: 浏览器后端多图;当前浏览器仅接受单图。
   - id: vector-template-4-authoring
-    status: planned
-    target: U-P4
-    note: general-thematic-map@4.0.0 矢量作者与 matplotlib-vector-page 准入;代码就绪、策略未登记。
+    status: delivered
+    target: A3.1
+    note: general-thematic-map@4.0.0 矢量作者与 matplotlib-vector-page 已准入;scenario-capabilities v1.6.0 登记 general-thematic-vector@4.0.0 profile,test_a31_thematic 25 项(专题数据核验/矢量模板发布/端到端工作流)通过。
   - id: variant-geometry-adapter-unification
     status: planned
     target: U-P4
-    note: 双 bundle 已合并为单一 general-thematic(S1 键统一与 S4 bundle/准入杆已落地,2026-11-11);剩余为内部协议统一:resolved-portrayal union(S2)与准备链 statistics strategy(S3),见 doc/dev-log/20261111-variant-geometry-adapter-unification.md。
+    note: 双 bundle 已合并为单一 general-thematic(S1 键统一与 S4 bundle/准入杆已落地,2026-11-11);S2 resolved-portrayal union 已落地(单一 schema:geometry 枚举 raster/vector + 共享 header + 几何条件 body + legend_items oneOf);剩余 S3 准备链 statistics strategy 与渲染表 renderer merge。
   - id: comparison-grid-shared-legend
     status: delivered
     target: U-P3.6

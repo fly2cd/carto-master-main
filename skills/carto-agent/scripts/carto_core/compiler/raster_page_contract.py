@@ -1,4 +1,4 @@
-"""Compile and revalidate v3 raster pages, including strict shared legends."""
+"""Compile and revalidate v4 raster pages, including strict shared legends."""
 from __future__ import annotations
 from copy import deepcopy
 from ..errors import ProtocolError

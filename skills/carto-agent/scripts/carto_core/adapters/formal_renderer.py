@@ -64,6 +64,7 @@ def _formal_renderer_digest_vector(page_digest: str) -> str:
         root / "scripts/carto_core/workflow/static_assets.py",
         root / "scripts/carto_core/compiler/vector_page.py",
         root / "scripts/carto_core/compiler/vector_portrayal.py",
+        root / "scripts/carto_core/compiler/portrayal_resolver.py",
         root / "scripts/carto_core/workflow/vector_preparation.py",
         root / "scripts/carto_core/compiler/grid_layout.py",
         root / "scripts/carto_core/compiler/layout.py",
@@ -71,7 +72,7 @@ def _formal_renderer_digest_vector(page_digest: str) -> str:
     ]
     paths += [root / "schemas" / (name + ".schema.json") for name in
               ("render-scene", "render-receipt", "common", "prepared-data-bundle", "bundle-inputs",
-               "page-bindings", "vector-input", "vector-encoding", "vector-prepared-data",
+               "page-bindings", "vector-input", "encoding-ir", "vector-prepared-data",
                "resolved-portrayal", "resolved-layout", "layout", "cartography", "resolved-appearance")]
     return sha256_digest({"page_renderer": page_digest,
                           "files": {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}})

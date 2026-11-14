@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/encoding-ir.schema.json",
+  "title": "encoding-ir",
+  "description": "Backend-independent thematic encoding intermediate representation (ADR-001 stage 2). key_mode (discrete/interval/scaling) is a first-class citizen decoupled from geometry_role; channels carry per-key Bertin visual symbols so the explicit-per-panel model is preserved losslessly. Contains no rendering instructions. geometry_role constrains ONLY physically-infeasible combinations (e.g. scaling needs a point carrier; raster-cell cannot scale size), never the measurement->key_mode mapping. Symbol-count alignment with categories/edges is a referential-integrity check performed by validate_encoding, not expressible as static schema cardinality.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "key_mode", "geometry_role", "domain", "scale", "channels", "missing", "legend"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "key_mode": { "enum": ["discrete", "interval", "scaling"] },
+    "geometry_role": { "enum": ["point", "line", "polygon", "raster-cell"] },
+    "domain": { "$ref": "#/$defs/domain" },
+    "scale": {
+      "oneOf": [
+        { "$ref": "#/$defs/discreteScale" },
+        { "$ref": "#/$defs/intervalScale" },
+        { "$ref": "#/$defs/scalingScale" }
+      ]
+    },
+    "channels": { "$ref": "#/$defs/channels" },
+    "missing": { "$ref": "#/$defs/missing" },
+    "legend": { "$ref": "#/$defs/legend" }
+  },
+  "$defs": {
+    "hexColor": { "type": "string", "pattern": "^#[0-9A-F]{6}$" },
+    "label": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[^\\x00-\\x1f\\x7f]+$" },
+    "fieldName": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[^\\x00-\\x1f\\x7f]+$" },
+    "symbol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["color", "stroke", "stroke_width_pt", "radius_mm"],
+      "properties": {
+        "color": { "$ref": "#/$defs/hexColor" },
+        "stroke": { "$ref": "#/$defs/hexColor" },
+        "stroke_width_pt": { "type": "number", "minimum": 0, "maximum": 5 },
+        "radius_mm": { "type": "number", "minimum": 1e-06, "maximum": 20 }
+      }
+    },
+    "normalization": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object", "additionalProperties": false, "required": ["denominator_field", "scale"],
+          "properties": {
+            "denominator_field": { "$ref": "#/$defs/fieldName" },
+            "scale": { "type": "number", "exclusiveMinimum": 0 }
+          }
+        }
+      ]
+    },
+    "domain": {
+      "type": "object", "additionalProperties": false,
+      "required": ["field", "measurement", "unit", "normalization"],
+      "properties": {
+        "field": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/fieldName" }] },
+        "measurement": { "enum": ["nominal", "ordinal", "count", "rate", "ratio", "density", "normalized-index"] },
+        "unit": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/fieldName" }] },
+        "normalization": { "$ref": "#/$defs/normalization" }
+      }
+    },
+    "discreteScale": {
+      "type": "object", "additionalProperties": false, "required": ["categories"],
+      "properties": {
+        "categories": {
+          "type": "array", "maxItems": 32,
+          "items": {
+            "type": "object", "additionalProperties": false, "required": ["value", "label"],
+            "properties": {
+              "value": { "oneOf": [{ "$ref": "#/$defs/label" }, { "type": "integer" }] },
+              "label": { "$ref": "#/$defs/label" }
+            }
+          }
+        }
+      }
+    },
+    "intervalScale": {
+      "type": "object", "additionalProperties": false,
+      "required": ["edges", "labels", "interval_policy", "out_of_range"],
+      "properties": {
+        "edges": { "type": "array", "minItems": 3, "maxItems": 13, "items": { "type": "number" } },
+        "labels": { "type": "array", "minItems": 2, "maxItems": 12, "items": { "$ref": "#/$defs/label" } },
+        "interval_policy": { "const": "left-closed-last-both" },
+        "out_of_range": { "const": "reject" }
+      }
+    },
+    "scalingScale": {
+      "type": "object", "additionalProperties": false,
+      "required": ["domain_max", "range_mm", "size_scale", "zero_policy", "negative_policy", "out_of_range", "legend_values"],
+      "properties": {
+        "domain_max": { "type": "number", "exclusiveMinimum": 0 },
+        "range_mm": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "number", "minimum": 0, "maximum": 20 } },
+        "size_scale": { "enum": ["sqrt", "linear"] },
+        "zero_policy": { "const": "omit" },
+        "negative_policy": { "const": "reject" },
+        "out_of_range": { "const": "reject" },
+        "legend_values": { "type": "array", "minItems": 1, "maxItems": 5, "items": { "type": "number", "exclusiveMinimum": 0 } }
+      }
+    },
+    "channels": {
+      "type": "object", "additionalProperties": false, "required": ["symbols", "shape"],
+      "properties": {
+        "symbols": { "type": "array", "minItems": 1, "maxItems": 32, "items": { "$ref": "#/$defs/symbol" } },
+        "shape": { "enum": ["auto", "circle", "square", "triangle"] }
+      }
+    },
+    "missing": {
+      "type": "object", "additionalProperties": false, "required": ["policy", "label"],
+      "properties": {
+        "policy": { "enum": ["reject", "symbol"] },
+        "label": { "$ref": "#/$defs/label" },
+        "symbol": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/symbol" }] }
+      }
+    },
+    "legend": {
+      "type": "object", "additionalProperties": false, "required": ["policy"],
+      "properties": {
+        "policy": { "enum": ["observed", "all"] },
+        "uniform_label": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/label" }] }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "key_mode": { "const": "discrete" } }, "required": ["key_mode"] },
+      "then": { "properties": { "scale": { "$ref": "#/$defs/discreteScale" } } }
+    },
+    {
+      "if": { "properties": { "key_mode": { "const": "interval" } }, "required": ["key_mode"] },
+      "then": {
+        "properties": {
+          "scale": { "$ref": "#/$defs/intervalScale" },
+          "domain": { "properties": { "measurement": { "enum": ["ordinal", "rate", "ratio", "density", "normalized-index"] } } }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "key_mode": { "const": "scaling" } }, "required": ["key_mode"] },
+      "then": {
+        "properties": {
+          "scale": { "$ref": "#/$defs/scalingScale" },
+          "geometry_role": { "const": "point" },
+          "domain": { "properties": { "measurement": { "const": "count" }, "normalization": { "const": null } } }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "domain": { "required": ["measurement"], "properties": { "measurement": { "const": "nominal" } } } },
+        "required": ["domain"]
+      },
+      "then": { "properties": { "key_mode": { "const": "discrete" } } }
+    },
+    {
+      "if": { "properties": { "geometry_role": { "const": "raster-cell" } }, "required": ["geometry_role"] },
+      "then": {
+        "properties": {
+          "key_mode": { "enum": ["discrete", "interval"] },
+          "channels": { "properties": { "shape": { "const": "auto" } } }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "domain": { "required": ["field"], "properties": { "field": { "type": "null" } } } },
+        "required": ["domain"]
+      },
+      "then": {
+        "properties": {
+          "key_mode": { "const": "discrete" },
+          "legend": { "required": ["uniform_label"], "properties": { "uniform_label": { "$ref": "#/$defs/label" } } },
+          "scale": { "properties": { "categories": { "maxItems": 0 } } }
+        }
+      }
+    }
+  ]
+}

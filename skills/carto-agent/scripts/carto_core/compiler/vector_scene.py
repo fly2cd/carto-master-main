@@ -35,6 +35,8 @@ class VectorSceneCompiler:
             add(panel['portrayal_ref'], 'contract', 'canonical-json')
             add(layer['portrayal']['prepared_ref'], 'contract', 'canonical-json')
             for asset in layer['report']['source_assets']:add(asset['ref'], 'data', 'bytes')
+            if layer['report'].get('attribute_evidence'):
+                add(layer['report']['attribute_evidence']['asset']['artifact_ref'], 'data', 'bytes')
         return {'page': page, 'layers': layers, 'bundle': bundle, 'font': font,
                 'resources': [resources[key] for key in sorted(resources)]}
 
@@ -93,16 +95,15 @@ class VectorSceneCompiler:
             raise ProtocolError('VECTOR_GENERATION_CHANGED', 'Panel selection differs')
         for panel in inputs['page']['panels']:
             source = requested[panel['view_id']]; layer = inputs['layers'][panel['view_id']]
-            if (source['source_id'] != layer['report']['source']['source_id'] or source['encoding'] != layer['portrayal']['encoding']
+            from ..workflow.thematic import resolve_design
+            expected_encoding,_=resolve_design(source['design'],layer['report'],self.registry)
+            if (source['source_id'] != layer['report']['source']['source_id'] or expected_encoding != layer['portrayal']['encoding']
                     or source['extent'] != panel['extent']):
                 raise ProtocolError('VECTOR_GENERATION_CHANGED', 'Panel source, encoding or extent differs')
         from ..scenario_registry import ScenarioRegistry
         notice = ScenarioRegistry(self.registry).for_generate(request).notice
-        expected_texts = {'title': request['goal'], 'source': notice}
-        if len(requested) == 1:
-            if next(iter(requested.values()))['title'] != request['goal']:
-                raise ProtocolError('VECTOR_GENERATION_CHANGED', 'Single panel title differs')
-        else:
+        expected_texts = {'title': request['map_title'], 'source': notice}
+        if len(requested) > 1:
             expected_texts.update({p['id'].replace('view-', 'caption-', 1): p['title'] for p in request['vector_panels']})
         if {p['content_id']: p['text'] for p in inputs['page']['texts']} != expected_texts:
             raise ProtocolError('VECTOR_GENERATION_CHANGED', 'Frozen titles or notice differ from the request')

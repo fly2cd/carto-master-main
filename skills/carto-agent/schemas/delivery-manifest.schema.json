@@ -24,7 +24,8 @@
     "licenses",
     "limitations",
     "idempotency_key",
-    "created_at"
+    "created_at",
+    "review_ref"
   ],
   "properties": {
     "schema_version": {
@@ -198,6 +199,9 @@
     },
     "created_at": {
       "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/timestamp"
+    },
+    "review_ref": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
     }
   }
 }

@@ -221,6 +221,7 @@ class FinalMapCheckService:
         recipient_type: str,
         destination: str | Path,
         idempotency_key: str,
+        review_ref: dict[str, str],
     ) -> dict[str, Any]:
         if report["status"] != "passed":
             raise ProtocolError("FINAL_CHECK_NOT_PASSED", report["report_id"])
@@ -252,6 +253,7 @@ class FinalMapCheckService:
                 "digest": sha256_digest(attempt), "uri": str(attempt_path),
             },
             "renderer_execution_digest": attempt["renderer_execution_digest"],
+            "review_ref": review_ref,
             "validation_report_ref": {
                 "id": report["report_id"], "version": "1.0.0",
                 "digest": sha256_digest(report), "uri": str(report_path),

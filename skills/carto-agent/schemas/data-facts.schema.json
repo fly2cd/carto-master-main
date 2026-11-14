@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/data-facts.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "facts_id", "source_kind", "facts_digest", "material_refs", "observed_dimensions"],
+  "properties": {
+    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
+    "facts_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "source_kind": {"type": "string", "enum": ["raster", "vector", "document", "table", "image"]},
+    "facts_digest": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"},
+    "material_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"}
+    },
+    "observed_dimensions": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "pixel_width": {"type": "integer", "minimum": 1},
+        "pixel_height": {"type": "integer", "minimum": 1},
+        "band_count": {"type": "integer", "minimum": 1},
+        "feature_count": {"type": "integer", "minimum": 0},
+        "vertex_count": {"type": "integer", "minimum": 0},
+        "row_count": {"type": "integer", "minimum": 0},
+        "column_count": {"type": "integer", "minimum": 0},
+        "byte_size": {"type": "integer", "minimum": 0},
+        "dtype": {"type": "string", "minLength": 1}
+      }
+    },
+    "crs": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/crs"},
+    "bbox": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/bbox"},
+    "checksum_algorithm": {"type": "string", "enum": ["sha256"]}
+  }
+}

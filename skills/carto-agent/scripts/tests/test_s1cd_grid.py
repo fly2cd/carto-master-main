@@ -14,7 +14,7 @@ from carto_core.compiler.layout import LayoutResolver
 from carto_core.compiler.raster_page_contract import compile_page_request, validate_page_request
 from carto_core.compiler.raster_scene import RasterSceneCompiler
 from carto_core.errors import CartoError, ProtocolError
-from carto_core.scenarios.general_thematic import GeneralThematicAuthor
+from carto_core.scenarios.general_thematic import layout_contract
 from carto_core.workflow.preparation_bundle import BundlePreparer
 from tests.fixtures.schema_cases import VALID_CASES
 from tests.test_raster_classification import PreparationFixture
@@ -23,7 +23,7 @@ from tests.helpers import page_request, release_test_font_handles, set_raster, c
 
 class GridContractTests(unittest.TestCase):
     def setUp(self):
-        self.layout = GeneralThematicAuthor._layout()
+        self.layout = layout_contract()
         self.resolver = LayoutResolver()
 
     def test_all_six_cases_use_one_immutable_template(self):
@@ -130,14 +130,14 @@ class GridPageTests(PreparationFixture, unittest.TestCase):
             self.sources.append(deepcopy(self.request['source']))
             self.prepared.append(prepared)
             self.portrayals.append(compile_portrayal(self.service, prepared, self.context).ref())
-        self.renderer = RasterPageRenderer(self.service)
+        self.renderer = PageRenderer(self.service)
 
     def page(self, rows=1, columns=2, mode='shared', dpi=72):
         base = page_request(self.service, self.prepared[0], self.context, dpi=dpi)
         base.pop('appearance')
         base.pop('bindings')
         base['resolved_layout'] = LayoutResolver().resolve(
-            GeneralThematicAuthor._layout(), dpi,
+            layout_contract(), dpi,
             parameters={'rows': rows, 'columns': columns, 'legend_mode': mode})
         frames = base['resolved_layout']['contract']['frames']
         maps = [f for f in frames if f['type'] == 'map']
@@ -227,7 +227,7 @@ class GridPageTests(PreparationFixture, unittest.TestCase):
         self.evidence['raster_info']['crs'] = 'EPSG:26912'
         self.sync_inputs()
         other = self.analyze()
-        with self.assertRaisesRegex(ProtocolError, 'RASTER_BUNDLE_PROFILE_MISMATCH'):
+        with self.assertRaisesRegex(ProtocolError, 'BUNDLE_PROFILE_MISMATCH'):
             BundlePreparer(self.service, "raster").build_many([self.prepared[0].ref(), other.ref()], self.context)
 
     def test_long_shared_legend_labels_fail_actual_measurement(self):

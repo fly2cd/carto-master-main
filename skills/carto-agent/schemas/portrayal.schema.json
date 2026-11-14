@@ -25,6 +25,9 @@
             "$ref": "#/$defs/rasterLayer"
           },
           {
+            "$ref": "#/$defs/rasterContinuousLayer"
+          },
+          {
             "$ref": "#/$defs/explicitVectorLayer"
           }
         ]
@@ -227,7 +230,10 @@
               "map_expression_ref": {
                 "properties": {
                   "id": {
-                    "enum": ["choropleth/sequential", "graduated-color"]
+                    "enum": [
+                      "choropleth/sequential",
+                      "graduated-color"
+                    ]
                   }
                 }
               }
@@ -255,7 +261,10 @@
               "map_expression_ref": {
                 "properties": {
                   "id": {
-                    "enum": ["proportional-symbol/count", "proportional-symbol"]
+                    "enum": [
+                      "proportional-symbol/count",
+                      "proportional-symbol"
+                    ]
                   }
                 }
               }
@@ -317,10 +326,16 @@
             {
               "properties": {
                 "id": {
-                  "enum": ["raster/categorical", "categorical"]
+                  "enum": [
+                    "raster/categorical",
+                    "categorical"
+                  ]
                 },
                 "version": {
-                  "enum": ["1.0.0", "2.0.0"]
+                  "enum": [
+                    "1.0.0",
+                    "2.0.0"
+                  ]
                 }
               }
             }
@@ -360,6 +375,84 @@
         }
       }
     },
+    "rasterContinuousLayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "data_role",
+        "geometry",
+        "z_order",
+        "map_expression_ref",
+        "classification",
+        "source_mask_policy",
+        "resampling",
+        "no_data"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+        },
+        "data_role": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+        },
+        "geometry": {
+          "const": "raster"
+        },
+        "z_order": {
+          "type": "integer",
+          "minimum": -1000,
+          "maximum": 1000
+        },
+        "map_expression_ref": {
+          "allOf": [
+            {
+              "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/mapExpressionRef"
+            },
+            {
+              "properties": {
+                "id": {
+                  "enum": [
+                    "graduated-color"
+                  ]
+                },
+                "version": {
+                  "const": "2.0.0"
+                }
+              }
+            }
+          ]
+        },
+        "classification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "method"
+          ],
+          "properties": {
+            "method": {
+              "enum": [
+                "equal-interval",
+                "manual"
+              ]
+            }
+          }
+        },
+        "source_mask_policy": {
+          "const": "preserve"
+        },
+        "resampling": {
+          "const": "nearest"
+        },
+        "no_data": {
+          "enum": [
+            "explicit-symbol",
+            "transparent",
+            "omit-with-note"
+          ]
+        }
+      }
+    },
     "explicitVectorLayer": {
       "type": "object",
       "additionalProperties": false,
@@ -390,7 +483,10 @@
             {
               "properties": {
                 "id": {
-                  "enum": ["vector/explicit", "categorical"]
+                  "enum": [
+                    "vector/explicit",
+                    "categorical"
+                  ]
                 }
               }
             }
@@ -409,6 +505,15 @@
             "choropleth",
             "proportional"
           ]
+        },
+        "expression_options": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/mapExpressionRef"
+          }
         }
       }
     }

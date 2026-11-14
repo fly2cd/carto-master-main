@@ -70,7 +70,7 @@ def atomic_json(path: Path, value: dict[str, Any], *, create_once: bool = True) 
 
 
 def protocol_version(identifier: str) -> str:
-    return {"cartography":"2.0.0", "map-plan":"3.0.0", "page-request":"4.0.0",
+    return {"cartography":"2.0.0", "map-plan":"4.0.0", "page-request":"4.0.0",
             "page-output":"4.0.0", "resolved-layout":"2.0.0", "raster-map-body":"2.0.0",
             "page-bindings":"2.0.0", "resolved-appearance":"2.0.0"}.get(identifier, "1.0.0")
 

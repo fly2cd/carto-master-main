@@ -37,6 +37,40 @@
         "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
       }
     },
+    "material_sources": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_id",
+          "path"
+        ],
+        "properties": {
+          "source_id": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "text/plain",
+              "text/csv",
+              "text/markdown",
+              "application/json",
+              "image/png",
+              "image/jpeg",
+              "image/tiff",
+              "application/pdf"
+            ]
+          }
+        }
+      }
+    },
     "requested_outputs": {
       "type": "array",
       "minItems": 1,
@@ -323,7 +357,10 @@
       "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/intentSelection"
     },
     "geometry": {
-      "enum": ["raster", "vector"]
+      "enum": [
+        "raster",
+        "vector"
+      ]
     },
     "prepared_raster_bindings": {
       "type": "array",
@@ -387,7 +424,8 @@
         "required": [
           "id",
           "source_id",
-          "title"
+          "title",
+          "design"
         ],
         "properties": {
           "id": {
@@ -401,6 +439,9 @@
             "minLength": 1,
             "maxLength": 60,
             "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          },
+          "design": {
+            "$ref": "https://schemas.carto-agent.local/v1/thematic-design.schema.json"
           }
         }
       }
@@ -425,7 +466,7 @@
           "source_id",
           "title",
           "extent",
-          "encoding"
+          "design"
         ],
         "properties": {
           "id": {
@@ -442,8 +483,93 @@
           "extent": {
             "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/bbox"
           },
-          "encoding": {
-            "$ref": "https://schemas.carto-agent.local/v1/vector-encoding.schema.json"
+          "design": {
+            "$ref": "https://schemas.carto-agent.local/v1/thematic-design.schema.json"
+          },
+          "labels": {
+            "description": "Optional feature-label annotation: name the property field whose values are drawn as labels. Absent means no feature labels.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "field"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "max_labels": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000
+              }
+            }
+          }
+        }
+      }
+    },
+    "revised_cartography": {
+      "description": "Design revision cartography overrides applied during re-compile (R6). Only present on revised requests.",
+      "$ref": "https://schemas.carto-agent.local/v2/cartography.schema.json"
+    },
+    "output_profile": {
+      "description": "Optional page size override. When absent, the template's declared A4 landscape (297×210 mm) is used. Width/height must be within the scenario's output_constraints envelope (max 420×297 mm).",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "width_mm": {
+          "type": "number",
+          "minimum": 100,
+          "maximum": 420
+        },
+        "height_mm": {
+          "type": "number",
+          "minimum": 100,
+          "maximum": 297
+        }
+      }
+    },
+    "map_title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 60,
+      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+    },
+    "design_variants": {
+      "description": "Optional externally supplied design variants for multi-candidate comparison. The program compiles each deterministically and never ranks or selects among them; selection is a separate external decision (select-candidate). Absent means single-candidate compilation.",
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "variant_id"
+        ],
+        "properties": {
+          "variant_id": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+          },
+          "revised_cartography": {
+            "$ref": "https://schemas.carto-agent.local/v2/cartography.schema.json"
+          },
+          "output_profile": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "width_mm": {
+                "type": "number",
+                "minimum": 100,
+                "maximum": 420
+              },
+              "height_mm": {
+                "type": "number",
+                "minimum": 100,
+                "maximum": 297
+              }
+            }
           }
         }
       }
@@ -453,17 +579,33 @@
     {
       "if": {
         "properties": {
-          "geometry": {"const": "raster"}
+          "geometry": {
+            "const": "raster"
+          }
         },
-        "required": ["geometry"]
+        "required": [
+          "geometry"
+        ]
       },
       "then": {
-        "required": ["panels"],
-        "not": {"required": ["vector_panels"]}
+        "required": [
+          "panels"
+        ],
+        "not": {
+          "required": [
+            "vector_panels"
+          ]
+        }
       },
       "else": {
-        "required": ["vector_panels"],
-        "not": {"required": ["panels"]}
+        "required": [
+          "vector_panels"
+        ],
+        "not": {
+          "required": [
+            "panels"
+          ]
+        }
       }
     }
   ]

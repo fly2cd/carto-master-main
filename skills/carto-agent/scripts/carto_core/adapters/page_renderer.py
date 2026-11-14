@@ -59,9 +59,10 @@ def page_renderer_digest(geometry: str = "raster") -> str:
         extra = [
             path.parents[1] / "compiler" / "vector_page.py",
             path.parents[1] / "compiler" / "vector_portrayal.py",
+            path.parents[1] / "compiler" / "portrayal_resolver.py",
             path.parents[1] / "workflow" / "vector_preparation.py",
             root / "schemas" / "vector-input.schema.json",
-            root / "schemas" / "vector-encoding.schema.json",
+            root / "schemas" / "encoding-ir.schema.json",
             root / "schemas" / "vector-prepared-data.schema.json",
             root / "schemas" / "resolved-portrayal.schema.json",
         ]
@@ -328,6 +329,20 @@ class PageRenderer(MeasuredPageRenderer):
                     radius = symbol["radius_mm"] * dpi / 25.4
                     artist = Ellipse(position(geometry["coordinates"]), 2 * radius / width, 2 * radius / height, **kwargs)
                     fig.add_artist(artist)
+                elif geometry["type"] in ("LineString", "MultiLineString"):
+                    # W3: draw lines using the symbol color as the line color and
+                    # stroke_width_pt as the line width; radius_mm is unused for lines.
+                    from matplotlib.lines import Line2D
+                    lines = [geometry["coordinates"]] if geometry["type"] == "LineString" else geometry["coordinates"]
+                    for coordinates in lines:
+                        points = [position(pt) for pt in coordinates]
+                        if len(points) >= 2:
+                            xs = [pt[0] * width for pt in points]
+                            ys = [pt[1] * height for pt in points]
+                            artist = Line2D(xs, ys, color=symbol["color"],
+                                            linewidth=symbol["stroke_width_pt"],
+                                            transform=fig.transFigure, clip_on=False)
+                            fig.add_artist(artist)
                 else:
                     polygons = [geometry["coordinates"]] if geometry["type"] == "Polygon" else geometry["coordinates"]
                     for polygon in polygons:
@@ -336,6 +351,43 @@ class PageRenderer(MeasuredPageRenderer):
                             vertices.extend(position(point) for point in ring)
                             codes.extend([MplPath.MOVETO] + [MplPath.LINETO] * (len(ring) - 2) + [MplPath.CLOSEPOLY])
                         fig.add_artist(PathPatch(MplPath(vertices, codes), **kwargs))
+            self._draw_feature_labels(fig, body, position, width, height, dpi)
+
+    def _draw_feature_labels(self, fig: Any, body: dict[str, Any], position: Any,
+                             width: float, height: float, dpi: float) -> None:
+        # W2: draw frozen feature labels with a halo, then greedily drop any label
+        # that overlaps an earlier one (collision_policy=avoid) or leaves the map
+        # frame. The program never moves or rewrites labels.
+        from matplotlib.patheffects import withStroke
+        from matplotlib.font_manager import FontProperties
+        labels = (body.get("portrayal") or {}).get("labels") or []
+        if not labels:
+            return
+        annotation = getattr(self, "_annotation", None) or {}
+        labeling = annotation.get("labeling") or {}
+        halo = labeling.get("halo") or {"color": "#FFFFFF", "width_mm": 0.5}
+        stroke = max(halo["width_mm"] * dpi / 25.4 * 2, 0.5)
+        size = annotation.get("typography", {}).get("body_pt", 9)
+        font_path = getattr(self, "_font_path", None)
+        props = FontProperties(fname=font_path, size=size) if font_path else FontProperties(size=size)
+        effects = [withStroke(linewidth=stroke, foreground=halo["color"])]
+        frame = body["frame"]["bounds_px"]
+        renderer = fig.canvas.get_renderer()
+        placed: list[Any] = []
+        for label in labels:
+            anchor = position(label["anchor"])
+            artist = fig.text(anchor[0], 1 - anchor[1], label["text"],
+                              fontproperties=props, ha="center", va="center",
+                              color="#17212B", path_effects=effects,
+                              transform=fig.transFigure, parse_math=False, usetex=False)
+            box = artist.get_window_extent(renderer)
+            overlap = any(box.overlaps(other) for other in placed)
+            outside = (box.x0 < frame[0] or box.y0 < frame[1]
+                       or box.x1 > frame[0] + frame[2] or box.y1 > frame[1] + frame[3])
+            if overlap or outside:
+                artist.remove()
+            else:
+                placed.append(box)
 
     @staticmethod
     def _legend_swatch_mm(legend: dict[str, Any]) -> float:

@@ -3,7 +3,7 @@
 | 路由 | 请求目标 | 当前状态 |
 |---|---|---|
 | `create-template` | 创建可复用地图模板包 | 保留 `analyze → brief → author → validate → publish` 编排；仅准入已注册的 `general_thematic_mapping` 场景（`general-thematic-map` 模板）。静态检查通过后 `validate` 在受信验证上下文内渲染合成样张并冻结场景/回执/预览证据，`publish` 重新核验冻结证据并消费精确 TP；缺少栅格渲染依赖、可嵌入字体或投影展示 CRS 时失败关闭；其余默认拒绝 |
-| `generate-map` | 从业务意图和数据生成地图成果 | 保留 `intake → brief → compile → preview → freeze → render → check → deliver` 编排及状态查询；仅准入已注册的 `general_thematic_mapping` 场景（用户提供已分类栅格 → 单图/1×2/2×2，独立或共享图例 → A4 横版 PDF+PNG），其余默认拒绝 |
+| `generate-map` | 从业务意图和数据生成地图成果 | 保留 `intake → brief → compile → preview → freeze → render → check → review → deliver` 编排及状态查询；仅准入已注册的 `general_thematic_mapping` 场景（已分类栅格或受限点/面矢量，显式 design → 单图/1×2/2×2 → A4 横版 PDF+PNG；非生产准入），其余默认拒绝 |
 | `edit-native-map` | 保留原生 GIS 工程并编辑 | 未开放，返回 `CAPABILITY_NOT_AVAILABLE` |
 | `curate-catalog` | 治理符号、标准和目录 | 未开放，返回 `CAPABILITY_NOT_AVAILABLE` |
 
@@ -13,11 +13,13 @@
 
 两条工作流使用独立 run 目录和状态历史。可变步骤持有运行级单写锁；状态更新使用单调 revision、不可变步骤回执和可恢复 transition journal。`status`、`retry`、`receipts` 和 `delivery-status` 只通过现有 `carto` CLI 暴露。
 
-`generate-map` 的正式渲染只消费不可变 MapSpecLock；最终检查冻结不可变 DeliveryManifest；G3 精确批准该 Manifest；交付在项目内 journal 中记录 DeliveryTransaction，先写同级隔离 staging，完整校验后以原子目录替换提交，最后写不可变 DeliveryReceipt。消费 G3 后的恢复必须持有完全匹配的 workflow-local intent；交付恢复必须重新验证最终包和事务绑定。
+`generate-map` 的正式渲染只消费不可变 MapSpecLock；最终检查通过后由成品 review 形成审查记录，冻结包含 review_ref 的不可变 DeliveryManifest；G3 精确批准该 Manifest；交付在项目内 journal 中记录 DeliveryTransaction，先写同级隔离 staging，完整校验后以原子目录替换提交，最后写不可变 DeliveryReceipt。消费 G3 后的恢复必须持有完全匹配的 workflow-local intent；交付恢复必须重新验证最终包和事务绑定。
 
 ## 能力声明
 
-当前执行能力策略（`policies/scenario-capabilities.yaml` v1.5.0）和代码实现白名单只注册 `general-thematic-mapping`（`general_thematic_mapping` / 实现 `general-thematic` / `allowed_geometries: [raster]` / 模板 `map-scenario/general-thematic-map@3.0.0`）；输入结构有效且意图就绪后，其余未注册能力返回 `CAPABILITY_NOT_AVAILABLE`，不选择默认场景。生成入口先验证并解析实际用户意图，缺项、歧义或不支持的意图先返回对应错误。`intent resolve` 只识别业务场景、主题与任务，不授权执行；其目录条目不代表业务场景已开放。输入边界见 `intent-contract.md`。通用编排存在不等于场景已启用。它不代表地图工作流内的真实 CRS 转换、生产数据处理、三场景业务验收、共享服务或公网发布能力。`formal_capability_boundary.production_tasks` 保持为空。
+当前策略为 `scenario-capabilities.yaml` v1.7.0；`general_thematic_mapping` / `general-thematic` 只登记**一个**能力档案 `general-thematic-mapping@5.0.0`，栅格与矢量是它的 `geometry_variants` 数据适配变体，业务语义、意图约束、输出与版式上限只声明一遍。几何由请求与变体元数据显式声明，不按模板版本推断；撤销某几何即删除对应变体。矢量包括一对一 CSV 属性连接、类别、等距/手工分级设色、面积比例符号。`production_enabled: false`，`formal_capability_boundary.production_tasks` 仍为空。
+
+意图缺项/歧义先返回澄清错误，未注册场景失败关闭。`intent resolve` 不授权执行。模板复用优先；项目设计、自动模板检索、海报、调研、OCR、真实 CRS 转换和外部发布不能由已存在的通用接口推定开放。详见 `generate-map.md`。
 
 ## 宿主辅助检查
 

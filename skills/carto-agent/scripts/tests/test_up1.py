@@ -202,24 +202,42 @@ class ProtocolAndGateTests(unittest.TestCase):
         SchemaRegistry().validate("validation-report", report.to_dict())
 
     def test_g1_g2_g3_verify_exact_context(self) -> None:
-        key = b"test-only-secret-that-is-at-least-16-bytes"
+        key = b"test-only-secret-that-is-at-least-32-bytes!"
         coordinator = ApprovalGateCoordinator(key)
         now = datetime.now(UTC)
         for gate_id, gate in GATES.items():
             digest = sha256_digest({"gate": gate_id})
             unsigned = ApprovalReceipt(
-                f"receipt-{gate_id.lower()}", gate.action, digest,
-                (now - timedelta(minutes=1)).isoformat(),
-                (now + timedelta(minutes=10)).isoformat(),
+                schema_version=1,
+                receipt_id=f"receipt-{gate_id.lower()}",
+                issuer="test-issuer",
+                subject_id="test-reviewer",
+                tenant_id="test-tenant",
+                action=gate.action,
+                object_type=gate.object_type,
+                object_digest=digest,
+                scope="project:test",
+                policy_id="carto-security",
+                environment="local",
+                nonce=f"test-nonce-gate-{gate_id.lower()}-00000001",
+                issued_at=(now - timedelta(minutes=1)).isoformat(),
+                expires_at=(now + timedelta(minutes=10)).isoformat(),
             )
-            coordinator.require(gate_id, sign_receipt(unsigned, key), digest)
+            coordinator.require(gate_id, sign_receipt(unsigned, key), digest,
+                                subject_id="test-reviewer", tenant_id="test-tenant", scope="project:test")
         wrong = ApprovalReceipt(
-            "receipt-wrong", GATES["G3"].action, sha256_digest({"wrong": True}),
-            (now - timedelta(minutes=1)).isoformat(),
-            (now + timedelta(minutes=10)).isoformat(),
+            schema_version=1, receipt_id="receipt-wrong", issuer="test-issuer",
+            subject_id="test-reviewer", tenant_id="test-tenant",
+            action=GATES["G3"].action, object_type=GATES["G3"].object_type,
+            object_digest=sha256_digest({"wrong": True}), scope="project:test",
+            policy_id="carto-security", environment="local",
+            nonce="test-nonce-gate-g3-wrong-0000001",
+            issued_at=(now - timedelta(minutes=1)).isoformat(),
+            expires_at=(now + timedelta(minutes=10)).isoformat(),
         )
         with self.assertRaises(SecurityError):
-            coordinator.require("G3", sign_receipt(wrong, key), sha256_digest({"expected": True}))
+            coordinator.require("G3", sign_receipt(wrong, key), sha256_digest({"expected": True}),
+                                subject_id="test-reviewer", tenant_id="test-tenant", scope="project:test")
 
     def test_deterministic_data_preparation_returns_valid_bundle(self) -> None:
         bundle = DeterministicDataPreparer(POLICIES / "data-preparation-policy.yaml").prepare_data(VALID_CASES["data-preparation-task"], context())

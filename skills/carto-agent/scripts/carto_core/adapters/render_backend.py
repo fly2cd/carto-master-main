@@ -6,6 +6,7 @@ from pathlib import Path
 from ..canonical import sha256_digest
 from ..compiler.layout import LayoutResolver
 from ..errors import ProtocolError
+from .backend_registry import IMPL_BROWSER, MAPLIBRE_WEB, resolve
 from .controlled_renderer import (FRONTEND_BUILD, MAPLIBRE_VERSION, OVERLAY_ENGINE_VERSION,
     RENDERER_VERSION, BrowserLimits, ControlledBrowserRenderer, browser_version, discover_browser)
 from .webmap_renderer import (RendererCapabilityProfile, RendererCapabilityRegistry,
@@ -19,7 +20,7 @@ class BrowserRenderBackend:
         if selected is None or not selected.is_file():
             raise ProtocolError("RENDER_BROWSER_UNAVAILABLE", "A controlled Chromium browser is required")
         self.profile = RendererCapabilityProfile(
-            renderer_id="maplibre-web", frontend_build=FRONTEND_BUILD, renderer_version=RENDERER_VERSION,
+            renderer_id=MAPLIBRE_WEB.renderer_id, frontend_build=FRONTEND_BUILD, renderer_version=RENDERER_VERSION,
             maplibre_version=MAPLIBRE_VERSION, overlay_engine_version=OVERLAY_ENGINE_VERSION,
             browser_engine=browser_version(selected), webgl_available=True,
             supported_export_formats=("svg", "png", "pdf"), max_canvas_width=4096, max_canvas_height=4096,
@@ -37,7 +38,7 @@ class BrowserRenderBackend:
                 "overlay_engine_version": self.profile.overlay_engine_version, "fingerprint": self.environment_fingerprint}
 
     def validate_scene(self, scene, execution=None):
-        if scene.get("renderer_id") != "maplibre-web":
+        if scene.get("renderer_id") != MAPLIBRE_WEB.renderer_id:
             raise ProtocolError("RENDER_BACKEND_MISMATCH", "Browser backend requires a browser scene")
         if execution is not None:
             LayoutResolver(self.registry).validate_execution(scene, execution)
@@ -72,11 +73,12 @@ class BrowserRenderBackend:
 
 
 def create_render_backend(renderer_id, **kwargs):
-    if renderer_id == "maplibre-web":
+    # 后端身份与实现分派由 backend_registry 单点权威决定（ADR-001 阶段1）；
+    # 未知 id 由 resolve 抛 RENDER_BACKEND_NOT_AVAILABLE，与历史行为一致。
+    backend = resolve(renderer_id)
+    if backend.impl == IMPL_BROWSER:
         return BrowserRenderBackend(**kwargs)
-    if renderer_id in ("rasterio-matplotlib-page", "matplotlib-vector-page"):
-        from .formal_renderer import FormalRenderer
-        kwargs.pop("browser", None)
-        kwargs.pop("limits", None)
-        return FormalRenderer(renderer_id=renderer_id, **kwargs)
-    raise ProtocolError("RENDER_BACKEND_NOT_AVAILABLE", str(renderer_id))
+    from .formal_renderer import FormalRenderer
+    kwargs.pop("browser", None)
+    kwargs.pop("limits", None)
+    return FormalRenderer(renderer_id=renderer_id, **kwargs)

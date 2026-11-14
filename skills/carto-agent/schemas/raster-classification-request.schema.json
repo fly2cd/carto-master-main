@@ -1,92 +1,218 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schemas.carto-agent.local/v1/raster-classification-request.schema.json",
-  "type": "object",
-  "additionalProperties": false,
-  "required": [
-    "schema_version",
-    "source",
-    "legend",
-    "palette",
-    "legend_policy"
-  ],
-  "properties": {
-    "schema_version": {
-      "const": 1
-    },
-    "source": {
-      "$ref": "https://schemas.carto-agent.local/v1/raster-input.schema.json"
-    },
-    "legend": {
+  "description": "Raster thematic preparation request. Two mutually-exclusive variants: categorical (integer class codes + legend CSV + clarification, unchanged) and continuous (float values + classification breaks + sequential ramp, ADR-001 stage 2.3). The continuous variant reuses the choropleth classification shape so raster and vector interval encoding converge on the same IR.",
+  "oneOf": [
+    {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "path",
-        "digest",
-        "size_bytes",
-        "encoding",
-        "value_column",
-        "label_column",
-        "color_column"
+        "schema_version",
+        "source",
+        "legend",
+        "palette",
+        "legend_policy"
       ],
       "properties": {
-        "path": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024,
-          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+        "schema_version": {
+          "const": 1
         },
-        "digest": {
-          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+        "source": {
+          "$ref": "https://schemas.carto-agent.local/v1/raster-input.schema.json"
         },
-        "size_bytes": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 1048576
+        "legend": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "digest",
+            "size_bytes",
+            "encoding",
+            "value_column",
+            "label_column",
+            "color_column"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024,
+              "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+            },
+            "digest": {
+              "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+            },
+            "size_bytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1048576
+            },
+            "encoding": {
+              "enum": [
+                "utf-8-sig"
+              ]
+            },
+            "value_column": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+            },
+            "label_column": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+            },
+            "color_column": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
         },
-        "encoding": {
+        "palette": {
           "enum": [
-            "utf-8-sig"
+            null,
+            "carto-categorical-v1"
           ]
         },
-        "value_column": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128,
-          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+        "legend_policy": {
+          "enum": [
+            "observed",
+            "all"
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "source",
+        "measurement",
+        "unit",
+        "classification",
+        "color_ramp"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
         },
-        "label_column": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128,
-          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+        "source": {
+          "$ref": "https://schemas.carto-agent.local/v1/raster-input.schema.json"
         },
-        "color_column": {
+        "measurement": {
+          "enum": [
+            "density",
+            "rate",
+            "ratio",
+            "normalized-index"
+          ]
+        },
+        "unit": {
           "anyOf": [
             {
               "type": "string",
               "minLength": 1,
-              "maxLength": 128,
+              "maxLength": 64,
               "pattern": "^[^\\x00-\\x1f\\x7f]+$"
             },
             {
               "type": "null"
             }
           ]
+        },
+        "classification": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "method",
+                "class_count"
+              ],
+              "properties": {
+                "method": {
+                  "const": "equal-interval"
+                },
+                "class_count": {
+                  "type": "integer",
+                  "minimum": 2,
+                  "maximum": 12
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "method",
+                "edges",
+                "labels"
+              ],
+              "properties": {
+                "method": {
+                  "const": "manual"
+                },
+                "edges": {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 13,
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "labels": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 12,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256,
+                    "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "color_ramp": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scheme",
+            "colors"
+          ],
+          "properties": {
+            "scheme": {
+              "enum": [
+                "sequential",
+                "diverging"
+              ]
+            },
+            "colors": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 12,
+              "items": {
+                "type": "string",
+                "pattern": "^#[0-9A-F]{6}$"
+              }
+            }
+          }
         }
       }
-    },
-    "palette": {
-      "enum": [
-        null,
-        "carto-categorical-v1"
-      ]
-    },
-    "legend_policy": {
-      "enum": [
-        "observed",
-        "all"
-      ]
     }
-  }
+  ]
 }

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/budget-state.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "saved_at",
+    "max_tool_calls", "max_model_calls", "max_revisions",
+    "max_elapsed_seconds", "max_cost_units", "max_context_bytes",
+    "tool_calls", "model_calls", "revisions",
+    "cost_units", "context_bytes", "started_at"
+  ],
+  "properties": {
+    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
+    "saved_at": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/timestamp"},
+    "max_tool_calls": {"type": "integer", "minimum": 0},
+    "max_model_calls": {"type": "integer", "minimum": 0},
+    "max_revisions": {"type": "integer", "minimum": 0},
+    "max_elapsed_seconds": {"type": "number", "minimum": 0},
+    "max_cost_units": {"type": "number", "minimum": 0},
+    "max_context_bytes": {"type": "integer", "minimum": 0},
+    "tool_calls": {"type": "integer", "minimum": 0},
+    "model_calls": {"type": "integer", "minimum": 0},
+    "revisions": {"type": "integer", "minimum": 0},
+    "cost_units": {"type": "number", "minimum": 0},
+    "context_bytes": {"type": "integer", "minimum": 0},
+    "started_at": {"type": "number"}
+  }
+}

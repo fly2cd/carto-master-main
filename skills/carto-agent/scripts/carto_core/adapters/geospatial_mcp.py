@@ -32,6 +32,9 @@ TOOLS = {
 DTYPE_RANGES = {"uint8": (0, 255), "int8": (-128, 127), "uint16": (0, 65535),
                 "int16": (-32768, 32767), "uint32": (0, 4294967295),
                 "int32": (-2147483648, 2147483647)}
+# ADR-001 阶段2.3：float 栅格走 continuous 统计与 interval 分级；整数栅格保持 categorical(classes) 路径不变。
+FLOAT_DTYPES = frozenset({"float32", "float64"})
+SUPPORTED_DTYPES = frozenset(DTYPE_RANGES) | FLOAT_DTYPES
 TIFF_SIGNATURES = (b"II\x2a\x00", b"MM\x00\x2a", b"II\x2b\x00", b"MM\x00\x2b")
 
 
@@ -182,8 +185,8 @@ class GeospatialMcpAdapter:
         self._wire("metadata", value)
         if (value["width"] * value["height"] > self.limits["max_raster_pixels"]
                 or value["band_count"] != 1 or len(value["bands"]) != 1
-                or value["bands"][0]["band"] != 1 or value["bands"][0]["dtype"] not in DTYPE_RANGES):
-            raise ProtocolError("RASTER_PROFILE_UNSUPPORTED", "Expected a bounded single-band 8/16/32-bit integer TIFF")
+                or value["bands"][0]["band"] != 1 or value["bands"][0]["dtype"] not in SUPPORTED_DTYPES):
+            raise ProtocolError("RASTER_PROFILE_UNSUPPORTED", "Expected a bounded single-band integer or float TIFF")
         if value["crs"] != crs:
             raise ProtocolError("RASTER_CRS_MISMATCH", "Actual raster CRS differs from the explicit input/output contract")
         if crs is not None and value["crs_type"] not in {"geographic", "projected"}:
@@ -243,8 +246,13 @@ class GeospatialMcpAdapter:
                 self._wire("statistics", stats)
                 self._metadata(stats["raster_info"], self._crs(source))
                 self._statistics(stats, source)
-                output.update(raster_info=stats["raster_info"], warnings=stats["warnings"],
-                              statistics={key: stats[key] for key in ("total_pixels", "valid_pixels", "masked_pixels", "classes")})
+                statistics = {key: stats[key] for key in ("total_pixels", "valid_pixels", "masked_pixels")}
+                # float 栅格提取 continuous 统计；整数栅格提取 categorical classes（ADR-001 阶段2.3）。
+                if stats["raster_info"]["bands"][0]["dtype"] in FLOAT_DTYPES:
+                    statistics["continuous"] = stats["continuous"]
+                else:
+                    statistics["classes"] = stats["classes"]
+                output.update(raster_info=stats["raster_info"], warnings=stats["warnings"], statistics=statistics)
             else:
                 await self._reproject(session, request, output)
             self._verify_source(source)
@@ -255,12 +263,26 @@ class GeospatialMcpAdapter:
         if (stats["source"]["dataset_id"] != source["dataset_id"] or stats["sha256"] != source["source_ref"]["digest"][7:]
                 or stats["size_bytes"] != source["size_bytes"]):
             raise ProtocolError("MCP_INPUT_IDENTITY_MISMATCH", "Statistics are for a different input snapshot")
-        classes = stats["classes"]
+        info = stats["raster_info"]
+        if (stats["total_pixels"] != info["width"] * info["height"]
+                or stats["total_pixels"] != stats["valid_pixels"] + stats["masked_pixels"]):
+            raise ProtocolError("MCP_STATISTICS_INCONSISTENT", "Pixel totals do not match raster dimensions")
+        if info["bands"][0]["dtype"] in FLOAT_DTYPES:
+            cont = stats.get("continuous")
+            if cont is None:
+                raise ProtocolError("MCP_STATISTICS_INCONSISTENT", "Float band must carry continuous statistics")
+            hist = cont["histogram"]
+            if (cont["min"] > cont["max"] or hist["min"] > hist["max"]
+                    or len(hist["counts"]) != hist["bucket_count"]
+                    or sum(hist["counts"]) != stats["valid_pixels"]):
+                raise ProtocolError("MCP_STATISTICS_INCONSISTENT", "Continuous statistics do not match raster totals")
+            return
+        classes = stats.get("classes")
+        if classes is None:
+            raise ProtocolError("MCP_STATISTICS_INCONSISTENT", "Integer band must carry class counts")
         values = [item["value"] for item in classes]
-        low, high = DTYPE_RANGES[stats["raster_info"]["bands"][0]["dtype"]]
-        if (stats["total_pixels"] != stats["raster_info"]["width"] * stats["raster_info"]["height"]
-                or stats["total_pixels"] != stats["valid_pixels"] + stats["masked_pixels"]
-                or sum(item["count"] for item in classes) != stats["valid_pixels"]
+        low, high = DTYPE_RANGES[info["bands"][0]["dtype"]]
+        if (sum(item["count"] for item in classes) != stats["valid_pixels"]
                 or len(classes) > self.limits["max_raster_classes"] or values != sorted(set(values))
                 or any(not low <= value <= high for value in values)):
             raise ProtocolError("MCP_STATISTICS_INCONSISTENT", "Class counts/domain do not match raster totals")

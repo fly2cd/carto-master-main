@@ -145,6 +145,8 @@ PROTOTYPE_DESCRIPTION = {
 CARTOGRAPHY.update(schema_version=2, version="2.0.0", typography={'title_pt': 18, 'body_pt': 9, 'legend_pt': 10, 'legend_heading_pt': 11, 'line_spacing': 1.25})
 LAYOUT["content_padding_mm"] = 2
 
+TEMPLATE_CREATE_REQUEST["geometry"] = "raster"
+
 VALID_CASES = {
     "manifest": {"schema_version": 1, "package": {"namespace": "local", "kind": "map-scenario", "id": "test-scenario", "version": "1.0.0", "status": "draft", "summary": "Schema 测试对象"}, "business_contracts": BUSINESS_CONTRACTS, "dependencies": [], "dependency_lock": "dependencies.lock.yaml", "targets": ["svg", "pdf", "png"], "files": PACKAGE_FILES, "checksums": {path: D for path in PACKAGE_FILES}},
     "template-create-request": TEMPLATE_CREATE_REQUEST,
@@ -184,7 +186,7 @@ VALID_CASES = {
     "delivery-manifest": {"schema_version": 1, "manifest_id": "manifest-one", "project_id": "test-project", "tenant_id": "tenant-one", "run_id": "run-one", "lock_ref": A, "lock_digest": D, "execution_digest": EXECUTION_DIGEST, "render_attempt_ref": A, "renderer_execution_digest": D, "validation_report_ref": A, "artifacts": [{"path": "output/map.pdf", "format": "pdf", "digest": D, "size_bytes": 1024}, {"path": "output/map.png", "format": "png", "digest": D, "size_bytes": 2048}], "recipient": {"recipient_id": "reviewer-one", "recipient_type": "project-user"}, "destination": {"kind": "local-allowed-root", "relative_path": "deliveries/delivery-one"}, "scope": "project:test-project", "environment": "local", "licenses": ["unit-test-only"], "limitations": ["场景使用限制"], "idempotency_key": "delivery-one-00000001", "created_at": "2026-09-21T00:00:00Z"},
     "delivery-receipt": {"schema_version": 1, "receipt_id": "delivery-receipt-one", "delivery_id": "delivery-one", "transaction_id": "transaction-one", "manifest_ref": A, "manifest_digest": D, "idempotency_key": "delivery-one-00000001", "final_path": "deliveries/delivery-one", "artifacts": [{"path": "package/map.pdf", "format": "pdf", "digest": D, "size_bytes": 1024}, {"path": "package/map.png", "format": "png", "digest": D, "size_bytes": 2048}], "g3_approval_ref": A, "status": "committed", "delivered_at": "2026-09-21T00:00:00Z"},
     "delivery-transaction": {"schema_version": 1, "transaction_id": "transaction-one", "delivery_id": "delivery-one", "project_id": "test-project", "tenant_id": "tenant-one", "run_id": "run-one", "manifest_ref": A, "manifest_digest": D, "idempotency_key": "delivery-one-00000001", "recipient": {"recipient_id": "reviewer-one", "recipient_type": "project-user"}, "destination": {"kind": "local-allowed-root", "relative_path": "deliveries/delivery-one"}, "staging_path": "deliveries/.delivery-one.staging-0000000000000000", "final_path": "deliveries/delivery-one", "approval_ref": A, "status": "receipt-written", "phase": "receipt", "artifacts": [{"path": "map.pdf", "format": "pdf", "digest": D, "size_bytes": 1024}, {"path": "map.png", "format": "png", "digest": D, "size_bytes": 2048}], "receipt_ref": A, "created_at": "2026-09-21T00:00:00Z", "updated_at": "2026-09-21T00:00:02Z", "committed_at": "2026-09-21T00:00:01Z"},
-    "approval-receipt": {"receipt_id": "receipt-one", "action": "approve-freeze", "object_digest": D, "issued_at": "2026-09-14T00:00:00Z", "expires_at": "2026-09-15T00:00:00Z", "signature_algorithm": "hmac-sha256", "signature": "0" * 64},
+    "approval-receipt": {"schema_version": 1, "receipt_id": "receipt-one", "issuer": "test-issuer", "subject_id": "test-reviewer", "tenant_id": "test-tenant", "action": "approve-freeze", "object_type": "resolved-map", "object_digest": D, "scope": "project:test-project", "policy_id": "carto-security", "environment": "local", "nonce": "test-nonce-0000000000000001", "issued_at": "2026-09-14T00:00:00Z", "expires_at": "2026-09-15T00:00:00Z", "signature_algorithm": "hmac-sha256", "signature": "0" * 64},
     "job-state": {"schema_version": 1, "revision": 1, "status": "running", "step": "validate", "attempt": 1, "run_id": "run-one", "input_fingerprint": D, "last_receipt": "receipts/validate-1.json"},
     "step-receipt": {"schema_version": 1, "receipt_id": "receipt-step-one", "run_id": "run-one", "step": "validate", "attempt": 1, "status": "succeeded", "input_fingerprint": D, "prerequisite_fingerprints": {"policy": D}, "tool_versions": {"schema-validate": "1.0.0"}, "output_refs": [A], "started_at": "2026-09-15T00:00:00Z", "completed_at": "2026-09-15T00:00:01Z"},
     "state-transition": {"schema_version": 1, "transition_id": "transition-one", "run_id": "run-one", "expected_revision": 1, "receipt_path": "receipts/validate-1.json", "receipt_digest": D, "previous_state": {"schema_version": 1, "revision": 1, "status": "running", "step": "validate", "attempt": 1, "run_id": "run-one", "input_fingerprint": D, "last_receipt": "receipts/prior.json"}, "next_state": {"schema_version": 1, "revision": 2, "status": "pending", "step": "publish", "attempt": 1, "run_id": "run-one", "input_fingerprint": D, "last_receipt": "receipts/validate-1.json"}, "created_at": "2026-09-15T00:00:01Z"},
@@ -262,6 +264,42 @@ _general_create.update({
     "geometry": "raster",
 })
 VALID_CASES["general-template-create-request"] = _general_create
+
+# A1.2 / A2 contracts: design revision, persistent budget, and material
+# extraction / adoption. INVALID_CASES are auto-derived below (unknown-field).
+VALID_CASES["design-revision-proposal"] = {
+    "schema_version": 1, "proposal_id": "proposal-test-001", "run_id": "run-test-001",
+    "parent_revision": 1, "changes": {"goal": {"new_value": "Updated map title"}},
+    "justification": "Reflect the updated scope",
+}
+VALID_CASES["budget-state"] = {
+    "schema_version": 1, "saved_at": "2026-11-12T00:00:00Z",
+    "max_tool_calls": 20, "max_model_calls": 10, "max_revisions": 2,
+    "max_elapsed_seconds": 600.0, "max_cost_units": 100.0, "max_context_bytes": 1000000,
+    "tool_calls": 0, "model_calls": 0, "revisions": 0,
+    "cost_units": 0.0, "context_bytes": 0, "started_at": 0.0,
+}
+VALID_CASES["material-source"] = {
+    "schema_version": 1, "source_id": "material-001", "format": "text/plain",
+    "origin": {"path_digest": D}, "content_ref": A,
+    "extraction_tool": "plain-text-extractor", "extraction_version": "1.0.0",
+    "extraction_digest": D,
+}
+VALID_CASES["extraction-result"] = {
+    "schema_version": 1, "result_id": "extract-001", "source_ref": A,
+    "extracted_at": "2026-11-12T00:00:00Z", "content_type": "text",
+    "source_format": "text/plain",
+    "fields": [{"name": "line", "data_type": "string", "nullable": False}],
+    "row_count": 1, "byte_length": 5,
+    "rows": [{"index": 0, "cells": {"line": "hello"},
+              "source_location": {"line_start": 1, "line_end": 1, "byte_offset": 0, "byte_length": 5}}],
+    "text_content": "hello", "issues": [], "digest": D,
+}
+VALID_CASES["data-facts"] = {
+    "schema_version": 1, "facts_id": "facts-001", "source_kind": "document",
+    "facts_digest": D, "material_refs": [A],
+    "observed_dimensions": {"row_count": 1, "byte_size": 5},
+}
 
 INVALID_CASES = {}
 for name, case in VALID_CASES.items():
@@ -429,6 +467,82 @@ SEMANTIC_INVALID_CASES["scenario-capabilities-default-allow-forbidden"] = (
     "scenario-capabilities", json.loads((Path(__file__).parent / "scenario-capabilities.invalid.json").read_text(encoding="utf-8"))
 )
 
+# ADR-001 §9.5 项④: geometry is a data-adaptation variant of one capability profile.
+# Synthetic single-profile policy: the shared segment is declared once and every variant
+# carries only what actually differs per geometry.
+VARIANT_CAPABILITIES_POLICY = {
+    "schema_version": 1, "version": "9.9.0", "default": "deny",
+    "profiles": [{
+        "id": "unit-scenario", "version": "9.9.0", "implementation": "general-thematic",
+        "routes": ["create-template", "generate-map"],
+        "request_schemas": {"create-template": "general-template-create-request",
+                            "generate-map": "general-generate-request"},
+        "intent_constraints": {"business_scene": "general_thematic_mapping",
+                               "allowed_tasks": ["thematic-map"],
+                               "allowed_theme_tags": ["land-cover"], "required_theme_tags": []},
+        "data_nature": "user-provided", "production_enabled": False,
+        "notice": "单元测试能力档案，不代表任何真实业务准入",
+        "licenses": ["user-declared-source-license"],
+        "internal_field_names": [],
+        "geometry_variants": [
+            {"geometry": "raster",
+             "template": {"kind": "map-scenario", "id": "unit-scenario-map", "version": "9.9.0"},
+             "authoring_profile": "unit-raster-authoring",
+             "renderer_id": "rasterio-matplotlib-page"},
+            {"geometry": "vector",
+             "template": {"kind": "map-scenario", "id": "unit-scenario-map", "version": "9.8.0"},
+             "authoring_profile": "unit-vector-authoring",
+             "renderer_id": "matplotlib-vector-page"},
+        ],
+    }],
+}
+
+
+def _variant_policy(mutate):
+    policy = deepcopy(VARIANT_CAPABILITIES_POLICY)
+    mutate(policy)
+    return policy
+
+
+def _unknown_geometry(policy):
+    policy["profiles"][0]["geometry_variants"][0]["geometry"] = "point-cloud"
+
+
+def _variant_missing_renderer(policy):
+    policy["profiles"][0]["geometry_variants"][1].pop("renderer_id")
+
+
+def _variant_legacy_geometry_field(policy):
+    # The pre-项④ per-geometry field must not be re-declared inside a variant.
+    policy["profiles"][0]["geometry_variants"][0]["template_geometry"] = "raster"
+
+
+def _profile_level_legacy_fields(policy):
+    # Nor at profile level: the old shape is not admitted in parallel with the new one.
+    profile = policy["profiles"][0]
+    variant = profile["geometry_variants"][0]
+    profile["template"] = deepcopy(variant["template"])
+    profile["authoring_profile"] = variant["authoring_profile"]
+    profile["template_geometry"] = variant["geometry"]
+    profile["renderer_id"] = variant["renderer_id"]
+    profile["allowed_geometries"] = [variant["geometry"]]
+
+
+def _no_geometry_variant(policy):
+    policy["profiles"][0]["geometry_variants"] = []
+
+
+SEMANTIC_INVALID_CASES["scenario-capabilities-variant-unknown-geometry"] = (
+    "scenario-capabilities", _variant_policy(_unknown_geometry))
+SEMANTIC_INVALID_CASES["scenario-capabilities-variant-missing-renderer"] = (
+    "scenario-capabilities", _variant_policy(_variant_missing_renderer))
+SEMANTIC_INVALID_CASES["scenario-capabilities-variant-legacy-geometry-field"] = (
+    "scenario-capabilities", _variant_policy(_variant_legacy_geometry_field))
+SEMANTIC_INVALID_CASES["scenario-capabilities-profile-level-legacy-geometry-fields"] = (
+    "scenario-capabilities", _variant_policy(_profile_level_legacy_fields))
+SEMANTIC_INVALID_CASES["scenario-capabilities-profile-without-geometry-variant"] = (
+    "scenario-capabilities", _variant_policy(_no_geometry_variant))
+
 _legacy_theme = deepcopy(VALID_CASES["intent-request"])
 _legacy_theme["selection"]["theme"] = "untyped topic"
 SEMANTIC_INVALID_CASES["intent-request-legacy-theme"] = ("intent-request", _legacy_theme)
@@ -483,6 +597,12 @@ for _name in ('vector-input', 'vector-encoding', 'vector-prepared-data'):
     VALID_CASES[_name] = json.loads((Path(__file__).parent / f"{_name}.valid.json").read_text(encoding="utf-8"))
     INVALID_CASES[_name] = json.loads((Path(__file__).parent / f"{_name}.invalid.json").read_text(encoding="utf-8"))
 
+# ADR-001 stage 2: backend-independent encoding IR (key_mode-based, geometry-decoupled).
+# The invalid fixture is a scaling encoding on a raster-cell carrier — rejected by the
+# combination matrix (scaling requires a point carrier), not by a structural defect.
+VALID_CASES['encoding-ir'] = json.loads((Path(__file__).parent / "encoding-ir.valid.json").read_text(encoding="utf-8"))
+INVALID_CASES['encoding-ir'] = json.loads((Path(__file__).parent / "encoding-ir.invalid.json").read_text(encoding="utf-8"))
+
 # Geometry-vs-panels conflict: explicit geometry field must match the panel/source family.
 # These are rejected by the allOf constraint in generate-request.schema.json.
 _raster_geom_vector_panels = deepcopy(VALID_CASES["general-generate-request"])
@@ -510,9 +630,10 @@ VARIANT_CASES = {}
 VARIANT_INVALID_CASES = {}
 
 _vector_tc = deepcopy(VALID_CASES["general-template-create-request"])
-_vector_tc.update(version="4.0.0", profile="general-vector-authoring", geometry="vector")
+_vector_tc.update(version="4.0.0", profile="general-vector-authoring", geometry="vector", role_bindings={"thematic_features":"legend-sample"})
+_vector_tc["geometry"] = "vector"
 VARIANT_CASES["general-template-create-request.vector"] = _vector_tc
-VARIANT_INVALID_CASES["general-template-create-request.vector"] = {**deepcopy(_vector_tc), "version": "3.0.0"}
+VARIANT_INVALID_CASES["general-template-create-request.vector"] = {**deepcopy(_vector_tc), "geometry": "raster"}
 
 _vector_gr = deepcopy(VALID_CASES["general-generate-request"])
 for _field in ("source_bindings", "prepared_raster_bindings", "panels", "geometry"):
@@ -529,3 +650,46 @@ VARIANT_INVALID_CASES["general-generate-request.vector"] = {**deepcopy(_vector_g
 for _name in ("page-request.vector", "page-output.vector"):
     VARIANT_CASES[_name] = json.loads((Path(__file__).parent / f"{_name}.valid.json").read_text(encoding="utf-8"))
     VARIANT_INVALID_CASES[_name] = json.loads((Path(__file__).parent / f"{_name}.invalid.json").read_text(encoding="utf-8"))
+
+# A3.1 fixtures use explicit business designs; old request shapes are rejected.
+from tests.fixtures.thematic_cases import canonical_request, RASTER_DESIGN
+for _name in ('generate-request','general-generate-request'):
+    canonical_request(VALID_CASES[_name])
+for _name, _value in VARIANT_CASES.items():
+    if 'request_id' in _value and 'goal' in _value:canonical_request(_value)
+_plan=VALID_CASES['map-plan']
+_plan['schema_version']=4
+_plan['decisions']={'title':'Protocol title','legend_source':'actual-encoding','renderer_id':'rasterio-matplotlib-page','legend_capacity':12,
+    'thematic_views':[{'view_id':'main-view','source_id':'ref-a','data_ref':deepcopy(A),'design':deepcopy(RASTER_DESIGN),'encoding':None,'statistics':None}]}
+VALID_CASES['thematic-design']=deepcopy(RASTER_DESIGN)
+VALID_CASES['thematic-attribute-join']={'source_id':'table-one','path':'table.csv','digest':A['digest'],'size_bytes':50,
+    'geometry_key':'region','table_key':'region','fields':[{'column':'value','field':'population','value_type':'number'}],
+    'coverage':'exact','missing_policy':'reject'}
+for _n in ('thematic-design','thematic-attribute-join'):
+    INVALID_CASES[_n]={**deepcopy(VALID_CASES[_n]),'unexpected':True}
+if 'design-revision-proposal' in VALID_CASES:
+    _c=VALID_CASES['design-revision-proposal']['changes']
+    if 'goal' in _c:_c['map_title']=_c.pop('goal')
+
+VALID_CASES["map-plan"]["bindings"] = deepcopy(VALID_CASES["page-bindings"])
+VALID_CASES["map-plan"]["layout_parameters"] = {"rows":1,"columns":1,"legend_mode":"independent"}
+
+from carto_core.workflow.thematic import expression_reference
+VALID_CASES["map-plan"]["decisions"]["thematic_views"][0]["expression_ref"] = expression_reference("categorical")
+
+VALID_CASES['product-review']={'schema_version':1,'review_id':'review-one','run_id':'run-one','project_id':'project-one',
+    'report_ref':deepcopy(A),'approval':deepcopy(VALID_CASES['approval-receipt']),'reviewed_at':'2026-11-13T00:00:00Z'}
+INVALID_CASES['product-review']={**deepcopy(VALID_CASES['product-review']),'unexpected':True}
+VALID_CASES['design-review-record']={'schema_version':1,'review_id':'design-review-one','run_id':'run-one','project_id':'project-one',
+    'candidate_ref':deepcopy(A),'preview_evidence_ref':deepcopy(A),'approval':deepcopy(VALID_CASES['approval-receipt']),'reviewed_at':'2026-11-13T00:00:00Z'}
+INVALID_CASES['design-review-record']={**deepcopy(VALID_CASES['design-review-record']),'unexpected':True}
+VALID_CASES['candidate-set']={'schema_version':1,'set_id':'candidate-set-one','run_id':'run-one','project_id':'project-one',
+    'candidates':[{'variant_id':'variant-a','candidate_id':'candidate-run-one-variant-a','resolved_map_digest':deepcopy(D),
+        'render_scene_digest':deepcopy(D),'preflight_status':'passed','preflight_report_digest':deepcopy(D)}],
+    'created_at':'2026-11-13T00:00:00Z'}
+INVALID_CASES['candidate-set']={**deepcopy(VALID_CASES['candidate-set']),'unexpected':True}
+VALID_CASES['revision-dependency-graph']={'schema_version':1,'revision':2,'run_id':'run-one','proposal_id':'proposal-one',
+    'invalidated_nodes':['candidate','preflight','preview','scene'],'data_evidence_reusable':True,
+    'bundle_input_digest':deepcopy(D),'earliest_step':'compile','created_at':'2026-11-13T00:00:00Z'}
+INVALID_CASES['revision-dependency-graph']={**deepcopy(VALID_CASES['revision-dependency-graph']),'unexpected':True}
+VALID_CASES['delivery-manifest']['review_ref']=deepcopy(A)

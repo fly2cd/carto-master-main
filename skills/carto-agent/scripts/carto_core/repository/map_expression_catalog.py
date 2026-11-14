@@ -95,7 +95,20 @@ class MapExpressionCatalog:
         if len(identifiers) != len(set(identifiers)):
             raise ProtocolError("PORTRAYAL_LAYER_DUPLICATE", "Layer IDs must be unambiguous")
         for layer in portrayal["layers"]:
-            entry = self.require(layer["map_expression_ref"])
-            supported = self._supported_geometries(entry)
-            if layer["geometry"] not in supported:
-                raise ProtocolError("MAP_EXPRESSION_GEOMETRY_MISMATCH", "Layer is not supported by the expression")
+            for ref in [layer["map_expression_ref"], *layer.get("expression_options", [])]:
+                entry = self.require(ref)
+                supported = set(self._supported_geometries(entry))
+                matches_family = (layer["geometry"] == "vector"
+                                  and layer.get("encoding_policy") == "explicit-per-panel"
+                                  and bool(supported & {"vector", "point", "line", "polygon"}))
+                if layer["geometry"] not in supported and not matches_family:
+                    raise ProtocolError("MAP_EXPRESSION_GEOMETRY_MISMATCH", "Layer is not supported by the expression")
+
+    def references(self, portrayal: dict[str, Any]) -> list[dict[str, str]]:
+        """The exact union of base and selectable expressions, shared by both workflows."""
+        self.validate_portrayal(portrayal)
+        refs = {}
+        for layer in portrayal["layers"]:
+            for ref in [layer["map_expression_ref"], *layer.get("expression_options", [])]:
+                refs[(ref["id"], ref["version"], ref["digest"])] = deepcopy(ref)
+        return [refs[key] for key in sorted(refs)]

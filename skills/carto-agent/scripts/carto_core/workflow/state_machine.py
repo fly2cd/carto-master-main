@@ -177,6 +177,8 @@ class WorkflowStateStore:
         tool_versions: dict[str, str] | None = None,
         next_step: str | None = None,
         error: dict[str, Any] | None = None,
+        next_input_fingerprint: str | None = None,
+        receipt_step: str | None = None,
     ) -> tuple[JobState, StepReceipt]:
         with self.operation():
             self._recover_unlocked()
@@ -186,7 +188,7 @@ class WorkflowStateStore:
             started_at = getattr(self._local, "started_at", None) or completed_at
             body = {
                 "run_id": state.run_id,
-                "step": state.step,
+                "step": receipt_step or state.step,
                 "attempt": state.attempt,
                 "status": status,
                 "input_fingerprint": state.input_fingerprint,
@@ -211,6 +213,7 @@ class WorkflowStateStore:
             new_state = replace(
                 state,
                 revision=state.revision + 1,
+                input_fingerprint=next_input_fingerprint or state.input_fingerprint,
                 status=next_status,
                 step=next_step or state.step,
                 attempt=1 if next_step else state.attempt,

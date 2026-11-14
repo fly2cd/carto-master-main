@@ -197,6 +197,7 @@ entries:
   applicable_geometry:
   - raster
   - vector
+  - line
   field_requirements:
   - semantic_role: category-value
     value_type: number
@@ -249,6 +250,7 @@ entries:
   status: active
   applicable_geometry:
   - polygon
+  - raster
   field_requirements:
   - semantic_role: thematic-value
     value_type: number

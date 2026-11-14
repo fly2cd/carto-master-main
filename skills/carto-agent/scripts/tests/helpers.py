@@ -82,12 +82,26 @@ def set_raster(test, array, *, mask=None, nodata=None, xsize=30, ysize=30):
                     transform=list(src.transform)[:6], pixel_size=[xsize, ysize],
                     pixel_size_meters=[xsize, ysize])
         info["bands"][0].update(dtype=src.dtypes[0], nodata=src.nodata)
-    values, counts = np.unique(data.compressed(), return_counts=True)
-    test.evidence["statistics"] = {
-        "total_pixels": data.size, "valid_pixels": int(data.count()),
-        "masked_pixels": int(np.ma.getmaskarray(data).sum()),
-        "classes": [{"value": int(v), "count": int(c)} for v, c in zip(values, counts)],
-    }
+    if str(array.dtype) in ("float32", "float64"):
+        valid_arr = data.compressed().astype("float64")
+        vmin, vmax = float(valid_arr.min()), float(valid_arr.max())
+        bucket_count = max(1, min(256, int(valid_arr.size)))
+        hist = np.histogram(valid_arr, bins=bucket_count, range=(vmin, vmax))[0]
+        test.evidence["statistics"] = {
+            "total_pixels": data.size, "valid_pixels": int(data.count()),
+            "masked_pixels": int(np.ma.getmaskarray(data).sum()),
+            "continuous": {"min": vmin, "max": vmax, "mean": float(valid_arr.mean()),
+                           "stddev": float(valid_arr.std()),
+                           "histogram": {"min": vmin, "max": vmax, "bucket_count": bucket_count,
+                                         "counts": [int(c) for c in hist]}},
+        }
+    else:
+        values, counts = np.unique(data.compressed(), return_counts=True)
+        test.evidence["statistics"] = {
+            "total_pixels": data.size, "valid_pixels": int(data.count()),
+            "masked_pixels": int(np.ma.getmaskarray(data).sum()),
+            "classes": [{"value": int(v), "count": int(c)} for v, c in zip(values, counts)],
+        }
     test.sync_inputs()
 
 
@@ -161,36 +175,34 @@ def adorned_layout(dpi=300):
 # ── From test_s2_vector.py (vector fixture helpers) ─────────────────────────
 
 def vector_encoding(kind, geometry=None):
-    """Build a synthetic vector encoding fixture for the given kind."""
-    base = deepcopy(VALID_CASES["vector-encoding"])
-    sym = base.pop("symbol"); base.pop("label")
-    base.update(
-        kind=kind,
-        geometry=geometry or ("point" if kind == "proportional" else "polygon"),
-        field=None if kind == "single" else "value",
-        unit="index" if kind in {"choropleth", "proportional"} else None,
-    )
+    """Build a synthetic encoding-IR fixture for the given legacy kind (ADR-001 stage 2)."""
+    geometry_role = geometry or ("point" if kind == "proportional" else "polygon")
+    sym = {"color": "#226688", "stroke": "#222222", "stroke_width_pt": 0.4, "radius_mm": 2}
+    missing = {"policy": "reject", "label": "Missing", "symbol": {**sym, "color": "#BBBBBB"}}
     if kind == "single":
-        base.update(label="Features", symbol=sym)
+        return {"schema_version": 1, "key_mode": "discrete", "geometry_role": geometry_role,
+                "domain": {"field": None, "measurement": "nominal", "unit": None, "normalization": None},
+                "scale": {"categories": []}, "channels": {"symbols": [sym], "shape": "auto"},
+                "missing": missing, "legend": {"policy": "all", "uniform_label": "Features"}}
     if kind == "categorical":
-        base.update(legend_policy="observed", categories=[
-            {"value": i, "label": f"Class {i}", "symbol": {**sym, "color": color}}
-            for i, color in [(1, "#FF0000"), (2, "#00AA00"), (3, "#0000FF")]
-        ])
+        return {"schema_version": 1, "key_mode": "discrete", "geometry_role": geometry_role,
+                "domain": {"field": "value", "measurement": "nominal", "unit": None, "normalization": None},
+                "scale": {"categories": [{"value": i, "label": f"Class {i}"} for i in (1, 2, 3)]},
+                "channels": {"symbols": [{**sym, "color": c} for c in ("#FF0000", "#00AA00", "#0000FF")], "shape": "auto"},
+                "missing": missing, "legend": {"policy": "observed"}}
     if kind == "choropleth":
-        base.update(
-            edges=[0, 2, 4], labels=["[0,2)", "[2,4]"],
-            symbols=[sym, {**sym, "color": "#AADDEE"}],
-            quantity_kind="normalized-index", interval_policy="left-closed-last-both",
-            out_of_range="reject",
-        )
-    if kind == "proportional":
-        base.update(
-            maximum_value=4, maximum_radius_mm=4, minimum_radius_mm=0,
-            zero_policy="omit", negative_policy="reject", out_of_range="reject",
-            legend_values=[1, 4], symbol=sym,
-        )
-    return base
+        return {"schema_version": 1, "key_mode": "interval", "geometry_role": geometry_role,
+                "domain": {"field": "value", "measurement": "normalized-index", "unit": "index", "normalization": None},
+                "scale": {"edges": [0, 2, 4], "labels": ["[0,2)", "[2,4]"],
+                          "interval_policy": "left-closed-last-both", "out_of_range": "reject"},
+                "channels": {"symbols": [sym, {**sym, "color": "#AADDEE"}], "shape": "auto"},
+                "missing": missing, "legend": {"policy": "all"}}
+    return {"schema_version": 1, "key_mode": "scaling", "geometry_role": geometry_role,
+            "domain": {"field": "value", "measurement": "count", "unit": "index", "normalization": None},
+            "scale": {"domain_max": 4, "range_mm": [0, 4], "size_scale": "sqrt", "zero_policy": "omit",
+                      "negative_policy": "reject", "out_of_range": "reject", "legend_values": [1, 4]},
+            "channels": {"symbols": [sym], "shape": "auto"},
+            "missing": missing, "legend": {"policy": "all"}}
 
 
 def vector_report(values, geometry="polygon"):
@@ -274,12 +286,12 @@ class VectorFixture:
 
     def page(self, modes=("single", "categorical", "choropleth", "proportional"), shared=False):
         from carto_core.compiler.layout import LayoutResolver
-        from carto_core.scenarios.general_thematic import GeneralThematicAuthor
+        from carto_core.scenarios.general_thematic import cartography_contract, layout_contract
         from carto_core.compiler.vector_portrayal import VectorPortrayalCompiler
         from carto_core.compiler.vector_page import compile_page
         from carto_core.artifacts import file_digest
         layout = LayoutResolver().resolve(
-            GeneralThematicAuthor._layout(), 72,
+            layout_contract(), 72,
             parameters={
                 "rows": 2 if len(modes) == 4 else 1,
                 "columns": 2 if len(modes) > 1 else 1,
@@ -298,7 +310,7 @@ class VectorFixture:
             })
         return compile_page(
             self.service, layout=layout,
-            cartography=GeneralThematicAuthor._cartography(), panels=panels,
+            cartography=cartography_contract(), panels=panels,
             font={"path": str(self.font), "digest": file_digest(self.font),
                   "size_bytes": self.font.stat().st_size},
             texts=[{"content_id": f["content_id"], "text": "Synthetic map"}

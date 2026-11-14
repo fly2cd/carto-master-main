@@ -1,17 +1,21 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, TYPE_CHECKING
 
 from ..canonical import sha256_digest
 from ..errors import ProtocolError, SecurityError
 from ..repository.delivery_repository import DeliveryRepository
 from ..scenario_registry import ScenarioRegistry
 from ..schema_registry import SchemaRegistry, load_document
-from ..security.approval import ApprovalReceipt
+from ..security.approval import ApprovalReceipt, verify_receipt
+from datetime import datetime
 from ..security.paths import PathGuard
 from .approvals import ApprovalGateCoordinator
 from ..artifacts import file_digest
+
+if TYPE_CHECKING:
+    from ..security.nonce_store import NonceStore
 
 FailureHook = Callable[[str], None]
 
@@ -20,11 +24,21 @@ class MapDeliveryService:
     """Validate G3 and drive the recoverable local delivery transaction."""
 
     def __init__(self, *, path_guard: PathGuard, project_root: Path, work_root: Path,
-                 registry: SchemaRegistry | None = None) -> None:
+                 registry: SchemaRegistry | None = None,
+                 nonce_store: "NonceStore | None" = None,
+                 trusted_subject_id: str | None = None,
+                 trusted_tenant_id: str | None = None,
+                 trusted_scope: str | None = None,
+                 trusted_environment: str | None = None) -> None:
         self.path_guard = path_guard
         self.project_root = project_root
         self.work_root = work_root
         self.registry = registry or SchemaRegistry()
+        self._nonce_store = nonce_store
+        self._trusted_subject_id = trusted_subject_id
+        self._trusted_tenant_id = trusted_tenant_id
+        self._trusted_scope = trusted_scope
+        self._trusted_environment = trusted_environment
         self.repository = DeliveryRepository(
             path_guard=path_guard, project_root=project_root, work_root=work_root,
             registry=self.registry,
@@ -35,15 +49,24 @@ class MapDeliveryService:
                 approval_key: bytes,
                 failure_hook: FailureHook | None = None) -> dict[str, Any]:
         self.validate_inputs(request=request, manifest=manifest, manifest_ref=manifest_ref, report=report)
+        self.validate_review(request, manifest, approval_key)
         approval_file = self.path_guard.resolve(approval_path, base_root=self.project_root, must_exist=True)
         approval_value = load_document(approval_file)
         if not isinstance(approval_value, dict):
             raise ProtocolError("DELIVERY_APPROVAL_REQUIRED", "G3 approval must be an object")
         self.registry.validate("approval-receipt", approval_value)
         approval = ApprovalReceipt.from_dict(approval_value)
-        coordinator = ApprovalGateCoordinator(approval_key)
+        coordinator = ApprovalGateCoordinator(
+            approval_key,
+            nonce_store=self._nonce_store,
+            trusted_subject_id=self._trusted_subject_id or request["subject"]["approver_subject_id"],
+            trusted_tenant_id=self._trusted_tenant_id or request["subject"]["tenant_id"],
+            trusted_scope=self._trusted_scope or request["scope"],
+            trusted_environment=self._trusted_environment or request["environment"],
+        )
         manifest_digest = sha256_digest(manifest)
-        coordinator.require("G3", approval, manifest_digest)
+        coordinator.require("G3", approval, manifest_digest,
+                            run_id=request.get("run_id", approval.receipt_id))
         if failure_hook:
             failure_hook("after-approval-consumed")
         approval_ref = {
@@ -59,6 +82,21 @@ class MapDeliveryService:
         result["approval"] = approval_value
         result["approval_ref"] = approval_ref
         return result
+
+    def validate_review(self, request, manifest, approval_key):
+        review = self._load_bound_ref(manifest["review_ref"], "product-review", "PRODUCT_REVIEW_DRIFT")
+        if (review["run_id"] != request["run_id"] or review["project_id"] != request["project_id"]
+                or review["report_ref"]["digest"] != manifest["validation_report_ref"]["digest"]):
+            raise ProtocolError("PRODUCT_REVIEW_BINDING", "Review belongs to another output or run")
+        # This verifies a recorded attestation, not a new approval consumption.
+        verify_receipt(ApprovalReceipt.from_dict(review["approval"]), approval_key,
+                       expected_action="approve-product-review", expected_object_type="validation-report",
+                       expected_object_digest=review["report_ref"]["digest"],
+                       expected_subject_id=request["subject"]["approver_subject_id"],
+                       expected_tenant_id=request["subject"]["tenant_id"], expected_scope=request["scope"],
+                       expected_environment=request["environment"],
+                       now=datetime.fromisoformat(review["reviewed_at"].replace("Z", "+00:00")))
+        return review
 
     def validate_inputs(self, *, request: dict[str, Any], manifest: dict[str, Any],
                         manifest_ref: dict[str, str], report: dict[str, Any]) -> None:

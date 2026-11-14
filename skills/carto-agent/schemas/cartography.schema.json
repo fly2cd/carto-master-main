@@ -91,6 +91,26 @@
         },
         "font_role": {
           "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+        },
+        "halo": {
+          "description": "Optional label halo stroke drawn behind feature labels.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "color",
+            "width_mm"
+          ],
+          "properties": {
+            "color": {
+              "type": "string",
+              "pattern": "^#[0-9A-F]{6}$"
+            },
+            "width_mm": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 2
+            }
+          }
         }
       }
     },

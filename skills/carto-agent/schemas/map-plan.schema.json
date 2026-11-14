@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.carto-agent.local/v3/map-plan.schema.json",
+  "$id": "https://schemas.carto-agent.local/v4/map-plan.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -16,11 +16,13 @@
     "data_bindings",
     "decisions",
     "open_issues",
-    "theme_tags"
+    "theme_tags",
+    "bindings",
+    "layout_parameters"
   ],
   "properties": {
     "schema_version": {
-      "const": 3
+      "const": 4
     },
     "plan_id": {
       "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
@@ -79,27 +81,13 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "classification",
         "title",
         "legend_source",
-        "renderer_id"
+        "renderer_id",
+        "legend_capacity",
+        "thematic_views"
       ],
       "properties": {
-        "classification": {
-          "enum": [
-            "quantile",
-            "unique-values",
-            "explicit-vector"
-          ]
-        },
-        "class_count": {
-          "type": "integer",
-          "minimum": 2,
-          "maximum": 256
-        },
-        "extent": {
-          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/bbox"
-        },
         "title": {
           "type": "string",
           "minLength": 1,
@@ -115,18 +103,12 @@
             "matplotlib-vector-page"
           ]
         },
-        "point_scaling": {
-          "const": "area-proportional"
-        },
-        "category_counts": {
-          "$ref": "https://schemas.carto-agent.local/v1/category-counts.schema.json"
-        },
         "legend_capacity": {
           "type": "integer",
           "minimum": 1,
           "maximum": 256
         },
-        "data_statistics": {
+        "thematic_views": {
           "type": "array",
           "minItems": 1,
           "maxItems": 4,
@@ -134,72 +116,78 @@
             "type": "object",
             "additionalProperties": false,
             "required": [
+              "view_id",
               "source_id",
-              "counts"
+              "data_ref",
+              "design",
+              "encoding",
+              "statistics",
+              "expression_ref"
             ],
             "properties": {
+              "view_id": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+              },
               "source_id": {
                 "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
               },
-              "counts": {
-                "$ref": "https://schemas.carto-agent.local/v1/category-counts.schema.json"
+              "data_ref": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+              },
+              "design": {
+                "$ref": "https://schemas.carto-agent.local/v1/thematic-design.schema.json"
+              },
+              "encoding": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "https://schemas.carto-agent.local/v1/encoding-ir.schema.json"
+                  }
+                ]
+              },
+              "statistics": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "count",
+                      "minimum",
+                      "maximum"
+                    ],
+                    "properties": {
+                      "count": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "minimum": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "maximum": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              },
+              "expression_ref": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/mapExpressionRef"
               }
             }
           }
         }
-      },
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "classification": {
-                "const": "unique-values"
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "data_statistics",
-              "legend_capacity"
-            ],
-            "properties": {
-              "class_count": false,
-              "category_counts": false,
-              "extent": false
-            }
-          },
-          "else": {
-            "if": {
-              "properties": {
-                "classification": {
-                  "const": "explicit-vector"
-                }
-              }
-            },
-            "then": {
-              "required": [
-                "legend_capacity"
-              ],
-              "properties": {
-                "class_count": false,
-                "category_counts": false,
-                "data_statistics": false,
-                "extent": false
-              }
-            },
-            "else": {
-              "required": [
-                "class_count",
-                "extent"
-              ],
-              "properties": {
-                "category_counts": false,
-                "legend_capacity": false
-              }
-            }
-          }
-        }
-      ]
+      }
     },
     "open_issues": {
       "type": "array",
@@ -216,26 +204,5 @@
     "layout_parameters": {
       "$ref": "https://schemas.carto-agent.local/v1/grid-parameters.schema.json"
     }
-  },
-  "allOf": [
-    {
-      "if": {
-        "properties": {
-          "decisions": {
-            "properties": {
-              "classification": {
-                "const": "unique-values"
-              }
-            }
-          }
-        }
-      },
-      "then": {
-        "required": [
-          "bindings",
-          "layout_parameters"
-        ]
-      }
-    }
-  ]
+  }
 }

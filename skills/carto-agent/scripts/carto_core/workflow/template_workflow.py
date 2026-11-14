@@ -10,6 +10,7 @@ from ..errors import ProtocolError, SecurityError
 from ..schema_registry import SchemaRegistry, load_document
 from ..repository.template_repository import TemplateRepository
 from ..security.approval import ApprovalReceipt
+from ..security.nonce_store import NonceStore
 from ..security.paths import PathGuard
 from .approvals import ApprovalGateCoordinator
 from .models import ExecutionContext
@@ -42,6 +43,17 @@ class TemplateCreationWorkflow:
         self.work_root.mkdir(parents=True, exist_ok=True)
         self.analyzer = ControlledSourceAnalyzer(self.path_guard, self.project_root, self.registry)
         self.state_store = WorkflowStateStore(self.work_root, self.registry)
+        self._nonce_store = NonceStore(self.work_root / ".nonce-ledger.db")
+
+    def _gate_coordinator(self, key, request):
+        if request["subject"]["approver_subject_id"] == request["subject"]["requester_subject_id"]:
+            raise SecurityError("APPROVER_NOT_INDEPENDENT", "The template author cannot approve their own work")
+        return ApprovalGateCoordinator(
+            key, nonce_store=self._nonce_store,
+            trusted_subject_id=request["subject"]["approver_subject_id"],
+            trusted_tenant_id=request["subject"]["tenant_id"],
+            trusted_scope=request["scope"],
+            trusted_environment=request["subject"]["environment"])
 
     @serialized_workflow_step
     def analyze(self, request_path: str | Path) -> dict[str, Any]:
@@ -135,8 +147,9 @@ class TemplateCreationWorkflow:
             raise ProtocolError("BRIEF_NOT_CONFIRMED", "Approval receipt must be an object")
         self.registry.validate("approval-receipt", approval_value)
         receipt = ApprovalReceipt.from_dict(approval_value)
-        coordinator = ApprovalGateCoordinator(approval_key)
-        coordinator.require("T1", receipt, sha256_digest(brief))
+        coordinator = self._gate_coordinator(approval_key, request)
+        coordinator.require("T1", receipt, sha256_digest(brief),
+                            run_id=state.run_id)
         author = MapScenarioAuthor(self.path_guard, self.work_root, self.registry)
         package = (
             author.verify_existing(request, brief)
@@ -253,7 +266,7 @@ class TemplateCreationWorkflow:
             path_guard=self.path_guard, root=repository_path,
             repository_scope=repository_scope, registry=self.registry,
         )
-        coordinator = ApprovalGateCoordinator(approval_key)
+        coordinator = self._gate_coordinator(approval_key, request)
         publication_object = {
             "package_digest": snapshot["package_digest"],
             "evidence_digest": evidence["evidence_digest"],
@@ -274,6 +287,7 @@ class TemplateCreationWorkflow:
                 raise ProtocolError("JOB_RECOVERY_NOT_ALLOWED", f"status={state.status}")
             coordinator.require(
                 "TP", ApprovalReceipt.from_dict(approval_value), publication_digest,
+                run_id=state.run_id,
             )
             publication_ref = {
                 "id": "publication-receipt", "version": "1.0.0",
@@ -297,6 +311,7 @@ class TemplateCreationWorkflow:
         self.registry.validate("approval-receipt", approval_value)
         coordinator.require(
             "TP", ApprovalReceipt.from_dict(approval_value), publication_digest,
+            run_id=state.run_id,
         )
         publication = repository.publish(
             package_root=package_root, snapshot=snapshot, evidence=evidence,

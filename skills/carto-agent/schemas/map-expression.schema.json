@@ -64,6 +64,7 @@
       "uniqueItems": true,
       "items": {
         "enum": [
+          "line",
           "point",
           "polygon",
           "raster",

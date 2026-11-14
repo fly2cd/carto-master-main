@@ -1,69 +1,80 @@
 schema_version: 1
-version: 1.5.0
+version: 1.7.0
 default: deny
-# Admission is default-deny: only profiles listed here (with a whitelisted code
-# implementation) enable create-template/generate-map. Data types, expressions and
-# backends are not business scenes; this profile registers one statable purpose
-# (standard thematic mapping) at the same level as the catalogued purpose scenes.
+# ADR-001 §9.5 项④：一个业务能力只登记一次，几何降为数据适配属性。
+# 业务语义、意图约束、输出与版式上限在 profile 上声明一遍；每个 geometry_variants
+# 条目只携带真正随几何变化的四项（几何、模板资产身份、作者 profile、渲染后端）。
+# 撤销某个几何的准入 = 删除对应变体；不存在与几何成对复制的共享段。
 profiles:
-  - id: general-thematic-mapping
-    version: 3.0.0
-    implementation: general-thematic
-    routes:
-      - create-template
-      - generate-map
-    # Geometry is a data-axis strategy inside one bundle, not a second scenario.
-    # The vector strategy is code-ready but withheld from production until a
-    # profile admits it (capability-roadmap: variant-geometry-adapter-unification).
-    allowed_geometries:
-      - raster
+- id: general-thematic-mapping
+  version: 5.0.0
+  implementation: general-thematic
+  routes:
+  - create-template
+  - generate-map
+  request_schemas:
+    create-template: general-template-create-request
+    generate-map: general-generate-request
+  intent_constraints:
+    business_scene: general_thematic_mapping
+    allowed_tasks:
+    - thematic-map
+    allowed_theme_tags:
+    - administrative-division
+    - economic-development
+    - technology-innovation
+    - modern-industry
+    - opening-up
+    - culture-tourism
+    - transportation
+    - landslide
+    - flood
+    - forest-fire
+    - land-cover
+    required_theme_tags: []
+  data_nature: user-provided
+  production_enabled: false
+  notice: 通用专题图：依据用户提供的数据编制，未经业务审定
+  licenses:
+  - user-declared-source-license
+  output_profile:
+    width_mm: 297
+    height_mm: 210
+    dpi: 300
+    width_px: 3508
+    height_px: 2480
+  output_constraints:
+    max_width_mm: 420
+    max_height_mm: 297
+    min_dpi: 150
+    max_dpi: 300
+    allowed_formats:
+    - pdf
+    - png
+    cmyk_supported: false
+  layout_constraints:
+    allowed_models:
+    - grid
+    grid:
+      max_rows: 2
+      max_columns: 2
+      allowed_shapes:
+      - 1×1
+      - 1×2
+      - 2×2
+  internal_field_names: []
+  geometry_variants:
+  - geometry: raster
     template:
       kind: map-scenario
       id: general-thematic-map
       version: 3.0.0
     authoring_profile: general-thematic-authoring
-    request_schemas:
-      create-template: general-template-create-request
-      generate-map: general-generate-request
-    intent_constraints:
-      business_scene: general_thematic_mapping
-      allowed_tasks:
-        - thematic-map
-      allowed_theme_tags:
-        - administrative-division
-        - economic-development
-        - technology-innovation
-        - modern-industry
-        - opening-up
-        - culture-tourism
-        - transportation
-        - landslide
-        - flood
-        - forest-fire
-        - land-cover
-      required_theme_tags: []
-    data_nature: user-provided
-    production_enabled: false
-    notice: "通用专题图：依据用户提供的数据编制，未经业务审定"
-    licenses:
-      - user-declared-source-license
-    output_profile:
-      width_mm: 297
-      height_mm: 210
-      dpi: 300
-      width_px: 3508
-      height_px: 2480
-    output_constraints:
-      max_width_mm: 420
-      max_height_mm: 297
-      min_dpi: 150
-      max_dpi: 300
-      allowed_formats: [pdf, png]
-      cmyk_supported: false
-    layout_constraints:
-      allowed_models: [grid]
-      grid:
-        max_rows: 2
-        max_columns: 2
-        allowed_shapes: [1×1, 1×2, 2×2]
-    internal_field_names: []
+    renderer_id: rasterio-matplotlib-page
+  - geometry: vector
+    template:
+      kind: map-scenario
+      id: general-thematic-map
+      version: 4.0.0
+    authoring_profile: general-vector-authoring
+    renderer_id: matplotlib-vector-page

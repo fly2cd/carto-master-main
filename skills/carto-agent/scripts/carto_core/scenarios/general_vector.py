@@ -13,18 +13,32 @@ from ..schema_registry import SchemaRegistry
 from ..scenario_registry import ScenarioRegistry
 from ..compiler.layout import LayoutResolver
 from ..compiler.page_bindings import index_by, validate_bindings
-from ..compiler.dependencies import DependencyResolver
 from ..compiler.vector_portrayal import VectorPortrayalCompiler
+from ..compiler.portrayal_resolver import ir_to_kind
 from ..compiler.vector_page import compile_page
 from ..compiler.vector_scene import VectorSceneCompiler, RENDERER_ID
 from ..repository.map_expression_catalog import MapExpressionCatalog
 from ..workflow.vector_preparation import VectorPreparationService
 from ..workflow.preparation_bundle import BundlePreparer
 from ..workflow.models import ExecutionContext
-from .general_thematic import GeneralThematicAuthor, TARGET_IDS
+from .general_thematic import (
+    FIXTURE_PATH, GATE_LEGEND, GATE_PROTOCOL, LAYOUT_ID, author_context,
+    data_schema_contract, delivery_contract, dependency_lock, fixture_csv,
+    package_identity, package_manifest, prototype_contract, quality_gates_contract,
+    require_admitted, scenario_contract, spatial_behavior_contract, verify_package,
+    write_package,
+)
 
 VERSION = '4.0.0'
 ROLE = 'thematic-features'
+AUTHORING_PROFILE = 'general-vector-authoring'
+LAYER_ID = 'vector-layer'
+LOCK_ID = 'general-vector-lock'
+PROTOTYPE_ID = 'general-vector-prototype'
+PROTOTYPE_PATH = 'prototypes/general-vector.yaml'
+LIMITATIONS = ('Synthetic vector validation only; not user data or production approval.',)
+SCALE_BAND_ID = 'native-vector'
+EXPRESSION_KINDS = ('categorical', 'choropleth', 'proportional')
 class GeneralVectorSourceContract:
     """Source contract for vector geometry; standalone (no longer a subclass of GeneralThematicSourceContract).
 
@@ -36,10 +50,10 @@ class GeneralVectorSourceContract:
 
     def suggestions(self, profile_definition):
         return [{"path": "/portrayal/map-expressions", "value_origin": "system_suggestion",
-                 "value": ["vector/explicit@1.0.0"], "rationale": "Explicit vector encodings; project values and units are never inferred."}]
+                 "value": ["categorical@2.0.0", "graduated-color@2.0.0", "proportional-symbol@2.0.0"], "rationale": "Explicit vector encodings; project values and units are never inferred."}]
 
     def brief_roles(self, request):
-        return [{"role_id": ROLE, "source_id": request["role_bindings"]["classified_surface"],
+        return [{"role_id": ROLE, "source_id": request["role_bindings"]["thematic_features"],
                  "geometry_types": ["none"], "value_field": "category_value", "semantic_role": "thematic-value"}]
 
     def validate_source_profile(self, source, request):
@@ -64,15 +78,15 @@ class GeneralVectorSourceContract:
                                 "Legend sample must declare the template source CRS")
 
     def validate_role_bindings(self, request, summaries):
-        """Validate that exactly one classified_surface role is bound to a CSV source."""
+        """Validate that exactly one thematic_features role is bound to a CSV source."""
         bindings = request.get("role_bindings", {})
-        if set(bindings) != {"classified_surface"}:
+        if set(bindings) != {"thematic_features"}:
             raise ProtocolError("ROLE_BINDING_UNSUPPORTED",
-                                "Exactly one classified_surface role binding is admitted")
+                                "Exactly one thematic_features role binding is admitted")
         if len(summaries) != 1:
             raise ProtocolError("ROLE_BINDING_UNSUPPORTED", "Exactly one legend-sample source is admitted")
         summary = summaries[0]
-        if bindings["classified_surface"] != summary["source_id"]:
+        if bindings["thematic_features"] != summary["source_id"]:
             raise ProtocolError("ROLE_BINDING_SOURCE_MISMATCH", summary["source_id"])
         if summary["kind"] != "csv":
             raise ProtocolError("SOURCE_TYPE_UNSUPPORTED", summary["source_id"])
@@ -87,13 +101,14 @@ def expression_ref(registry):return MapExpressionCatalog(registry).reference('ca
 
 
 def make_bindings(request, layout, bundle, contracts, registry):
+    from ..workflow.thematic import expression_reference
     sources = index_by(bundle['role_bindings'], 'source_id')
     panels = index_by(request['vector_panels'], 'id')
     maps = {f['content_id']: f for f in layout['contract']['frames'] if f['type'] == 'map'}
     if set(maps) != set(panels) or {p['source_id'] for p in panels.values()} != set(sources):
         raise ProtocolError('VECTOR_PAGE_BINDING', 'Exact source/view/frame assignments required')
     layers = [{'id': 'layer-' + vid, 'data_binding_id': panel['source_id'],
-                'expression_ref': deepcopy(contracts['portrayal']['layers'][0]['map_expression_ref'])}
+                'expression_ref': expression_reference(ir_to_kind(panel['encoding']),registry)}
               for vid, panel in sorted(panels.items())]
     legends = []
     for frame in layout['contract']['frames']:
@@ -123,21 +138,34 @@ class GeneralVectorDataPreparer:
 
 
 class GeneralVectorPlanner:
-    def __init__(self, registry=None):self.registry = registry or SchemaRegistry()
+    def __init__(self, registry=None, *, project_root=None):
+        self.registry = registry or SchemaRegistry()
+        self.project_root = project_root
 
     def build(self, request, intent, brief, bundle, installation, contracts):
-        profile = ScenarioRegistry(self.registry).for_template(request['template'])
-        output_dpi = profile.definition['output_profile']['dpi']
-        layout = LayoutResolver(self.registry).resolve(contracts['scenario']['embedded']['layout'], output_dpi, parameters=request['layout_parameters'])
-        return {'schema_version': 3, 'plan_id': 'plan-' + request['run_id'], 'revision': 1, 'project_id': request['project_id'],
-                'intent_ref': artifact_ref('map-intent', intent), 'brief_ref': artifact_ref('map-brief', brief),
-                'business_scene': intent['business_scene'], 'tasks': intent['tasks'], 'theme_tags': intent['theme_tags'],
-                'template_refs': [installation['template_ref']], 'data_bindings': [{'role': b['role'], 'dataset_ref': b['dataset_ref']} for b in bundle['role_bindings']],
-                'decisions': {'classification': contracts['portrayal']['layers'][0].get('encoding_policy', 'explicit-per-panel'),
-                              'title': request['goal'], 'legend_source': 'actual-encoding',
-                              'renderer_id': profile.definition.get('renderer_id', RENDERER_ID),
-                              'legend_capacity': layout['contract']['capacity']['legend_items']},
-                'bindings': make_bindings(request, layout, bundle, contracts, self.registry), 'layout_parameters': request['layout_parameters'], 'open_issues': []}
+        from ..workflow.thematic import vector_views
+        # Preparation refs are immutable and identify the approved project root.
+        from ..security.paths import PathGuard
+        project = self.project_root
+        if project is None:
+            raise ProtocolError('THEMATIC_CONTEXT_REQUIRED', 'Planner needs trusted project context')
+        service=VectorPreparationService(project_root=project,allowed_roots=[str(project)],registry=self.registry)
+        context=ExecutionContext.from_generate_request(request)
+        views=vector_views(request,bundle,service,context)
+        profile=ScenarioRegistry(self.registry).for_template(request['template'])
+        layout=LayoutResolver(self.registry).resolve(contracts['scenario']['embedded']['layout'],profile.definition['output_profile']['dpi'],parameters=request['layout_parameters'])
+        proxy=deepcopy(request)
+        encodings={v['view_id']:v['encoding'] for v in views}
+        for p in proxy['vector_panels']:p['encoding']=encodings[p['id']]
+        return {'schema_version':4,'plan_id':'plan-'+request['run_id'],'revision':brief['revision'],'project_id':request['project_id'],
+                'intent_ref':artifact_ref('map-intent',intent),'brief_ref':artifact_ref('map-brief',brief),
+                'business_scene':intent['business_scene'],'tasks':list(intent['tasks']),'theme_tags':list(intent['theme_tags']),
+                'template_refs':[deepcopy(installation['template_ref'])],
+                'data_bindings':[{'role':v['role'],'dataset_ref':deepcopy(v['dataset_ref'])} for v in bundle['role_bindings']],
+                'decisions':{'title':request['map_title'],'legend_source':'actual-encoding','renderer_id':profile.definition['renderer_id'],
+                             'legend_capacity':layout['contract']['capacity']['legend_items'],'thematic_views':views},
+                'bindings':make_bindings(proxy,layout,bundle,contracts,self.registry),
+                'layout_parameters':deepcopy(request['layout_parameters']),'open_issues':[]}
 
 
 class GeneralVectorCandidateCompiler:
@@ -154,29 +182,42 @@ class GeneralVectorCandidateCompiler:
         preparer.validate_request(request, bundle, context)
         if any(b['crs'] != contracts['spatial_behavior']['display_crs'] for b in bundle['role_bindings']):
             raise ProtocolError('VECTOR_CRS_MISMATCH', 'Native source CRS must match template display CRS')
+        from ..workflow.thematic import vector_views
+        expected_views=vector_views(request,bundle,service,context)
+        if plan['decisions']['thematic_views']!=expected_views:
+            raise ProtocolError('THEMATIC_PLAN_DRIFT','Plan differs from the selected data and design')
+        allowed=contracts['portrayal']['layers'][0].get('expression_options',[])
+        if any(v['expression_ref'] not in allowed for v in expected_views):
+            raise ProtocolError('THEMATIC_METHOD_UNSUPPORTED','Template does not support the selected expression')
+        encodings={v['view_id']:v['encoding'] for v in expected_views}
         refs = {b['source_id']: b['prepared_ref'] for b in bundle['role_bindings']}
         inputs = [{'view_id': p['id'], 'extent': p['extent'],
-                   'portrayal_ref': VectorPortrayalCompiler(service).compile(refs[p['source_id']], p['encoding'], context).ref()}
+                   'portrayal_ref': VectorPortrayalCompiler(service).compile(
+                       refs[p['source_id']], encodings[p['id']], context, label_source=p.get('labels')).ref()}
                   for p in sorted(request['vector_panels'], key=lambda p: p['id'])]
         output_dpi = ScenarioRegistry(self.registry).for_template(request['template']).definition['output_profile']['dpi']
         layout = LayoutResolver(self.registry).resolve(contracts['scenario']['embedded']['layout'], output_dpi, parameters=request['layout_parameters'])
         font = service.read_bytes(font_path, 32 * 1024 * 1024)
-        texts = [{'content_id': 'title', 'text': request['goal']}, {'content_id': 'source', 'text': profile.notice}]
+        texts = [{'content_id': 'title', 'text': request['map_title']}, {'content_id': 'source', 'text': profile.notice}]
         if len(inputs) > 1:texts += [{'content_id': p['id'].replace('view-', 'caption-', 1), 'text': p['title']} for p in request['vector_panels']]
-        elif request['vector_panels'][0]['title'] != request['goal']:
-            raise ProtocolError('VECTOR_TITLE_MISMATCH', 'Single panel title must equal the page title')
+
         page = compile_page(service, layout=layout, cartography=contracts['scenario']['embedded']['cartography'],
                             panels=inputs, font={'path': str(font_path), 'digest': service.digest_bytes(font), 'size_bytes': len(font)},
                             texts=texts, legend_titles={f['content_id']: 'Legend' for f in layout['contract']['frames'] if f['type'] == 'legend'}, context=context)
-        if plan['bindings'] != page['bindings'] or plan['layout_parameters'] != request['layout_parameters'] or plan['decisions']['title'] != request['goal']:
+        if plan['bindings'] != page['bindings'] or plan['layout_parameters'] != request['layout_parameters'] or plan['decisions']['title'] != request['map_title']:
             raise ProtocolError('VECTOR_PLAN_MISMATCH', 'Plan does not describe the compiled page')
         compiler = VectorSceneCompiler(service)
-        scene = compiler.compile(bundle_ref=service.save('prepared-data-bundle', bundle).ref(), page_request=page, context=context,
+        from ..workflow.map_data_preparation import bundle_core
+        # The scene verifies the GIS core; adopted material facts are separately bound
+        # into execution and verified by the shared generation workflow.
+        scene = compiler.compile(bundle_ref=service.save('prepared-data-bundle', bundle_core(bundle)).ref(), page_request=page, context=context,
                                  scene_id='scene-' + request['run_id'], targets=tuple(request['requested_outputs']))
         base = {'intent_ref': artifact_ref('map-intent', intent), 'profile_refs': [intent['evidence_refs'][0], intent['evidence_refs'][-1]],
                 'business_scene': intent['business_scene'], 'map_tasks': intent['tasks'], 'template_refs': [installation['template_ref']],
-                'dependency_refs': [deepcopy(contracts['portrayal']['layers'][0]['map_expression_ref'])], 'policy_refs': [profile.ref], 'ownership': {'scenario': 'map-scenario'},
-                'shared_semantics': {'theme_tags': intent['theme_tags'], 'data_nature': bundle['summary']['data_nature']}}
+                'dependency_refs': list({v['expression_ref']['id']:v['expression_ref'] for v in expected_views}.values()), 'policy_refs': [profile.ref], 'ownership': {'scenario': 'map-scenario'},
+                'shared_semantics': {'theme_tags': intent['theme_tags'], 'data_nature': bundle['summary']['data_nature']},
+                'material_facts_refs': [deepcopy(bundle['data_facts'])] if bundle.get('data_facts') else []}
+        base['thematic_plan_ref'] = artifact_ref('map-plan', plan)
         execution = compiler.bind_execution(base, scene, context)
         return {'scene': scene, 'candidate': {'schema_version': 1, 'candidate_id': 'candidate-' + request['run_id'],
                     'project_id': request['project_id'], 'run_id': request['run_id'], 'execution_digest': sha256_digest(execution),
@@ -190,53 +231,50 @@ def legend_checker(context):
     return valid, {'panel_count': len(inputs['layers']), 'legend_item_count': sum(len(l['items']) for l in inputs['page']['legends'])}, None
 
 
-# TODO(R5-followup): Break the GeneralVectorAuthor(GeneralThematicAuthor) subclass.
-# GeneralVectorAuthor overrides only _payloads() but inherits ~11 private helper
-# methods (author, verify_existing, _scenario, _quality_gates, _delivery,
-# _spatial_behavior, _fixture_csv, _require_admitted, _identity, _cartography,
-# _layout, _data_schema, _portrayal).  To make it standalone:
-#   1. Extract the inherited methods from GeneralThematicAuthor into module-level
-#      functions in general_thematic.py.
-#   2. Add author() and verify_existing() directly to GeneralVectorAuthor.
-#   3. Have _payloads() call the extracted module-level helpers instead of self._*.
-#   4. Remove the (GeneralThematicAuthor) parent and the import.
-class GeneralVectorAuthor(GeneralThematicAuthor):
+class GeneralVectorAuthor:
+    """Author the vector variant of the one general-thematic template contract.
+
+    Standalone since ADR-001 §9.5 项②: every declaration comes from the shared
+    geometry-free ``*_contract`` functions in ``general_thematic``; this class only
+    pins the vector geometry-adaptation parameters (version, data role, geometry
+    types, portrayal layer, delivery composition, quality-gate set) and subjects the
+    request to the same four fail-closed authoring gates as the raster author.
+    """
+
+    def __init__(self, path_guard, work_root, registry=None):
+        self.path_guard, self.work_root, self.registry = author_context(path_guard, work_root, registry)
+
+    def author(self, request, brief):
+        manifest_base, documents = self._payloads(request, brief)
+        return write_package(self.path_guard, self.work_root, self.registry, manifest_base, documents)
+
+    def verify_existing(self, request, brief):
+        manifest_base, documents = self._payloads(request, brief)
+        return verify_package(self.path_guard, self.work_root, self.registry, manifest_base, documents)
+
     def _payloads(self, request, brief):
+        require_admitted(request, brief, version=VERSION, profile=AUTHORING_PROFILE)
         self.registry.validate('general-template-create-request', request)
-        for key in ('kind', 'namespace', 'template_id', 'version'):
-            if brief.get(key) != request[key]:raise ProtocolError('TEMPLATE_BRIEF_MISMATCH', 'Brief identity differs')
-        identity = {'namespace': 'local', 'kind': 'map-scenario', 'id': 'general-thematic-map', 'version': VERSION}
-        scenario = self._scenario(request)
-        scenario['version'] = VERSION
-        scenario['data_role_refs'] = [ROLE]
-        for component in scenario['embedded'].values():component['version'] = VERSION
-        portrayal = {'schema_version': 1, 'layers': [{'id': 'vector-layer', 'data_role': ROLE, 'geometry': 'vector', 'z_order': 0,
-                      'map_expression_ref': expression_ref(self.registry), 'encoding_policy': 'explicit-per-panel', 'validation_expressions': ['single', 'categorical', 'choropleth', 'proportional']}],
+        from ..workflow.thematic import expression_reference
+        options=[expression_reference(kind,self.registry) for kind in EXPRESSION_KINDS]
+        identity = package_identity(VERSION)
+        portrayal = {'schema_version': 1, 'layers': [{'id': LAYER_ID, 'data_role': ROLE, 'geometry': 'vector', 'z_order': 0,
+                      'map_expression_ref': expression_ref(self.registry), 'encoding_policy': 'explicit-per-panel', 'expression_options':options, 'validation_expressions': ['single', 'categorical', 'choropleth', 'proportional']}],
                      'legend': {'generated_from_layers': True, 'show_no_data': True, 'overflow_policy': 'reject'}, 'rules': []}
-        gates = self._quality_gates();gates['checks'] = [g for g in gates['checks'] if g['id'] != 'raster.classification-clarified']
-        gates['baseline']['version'] = VERSION;gates['baseline']['digest'] = sha256_digest(identity)
-        delivery = self._delivery()
-        delivery['targets'][0]['composition'] = 'vector-map'
-        delivery['targets'][0]['vector_claim'] = 'whole-map'
         # No all-vector production claim; text is embedded and the actual vector
         # composition is attested by the renderer, not by changing delivery policy.
-        documents = {'contracts/scenario.yaml': scenario,
-                     'contracts/data.schema.yaml': {'schema_version': 1, 'roles': [{'id': ROLE, 'required': True, 'geometry_types': ['point', 'polygon'], 'fields': [], 'license_policy': 'project-approved'}]},
-                     'contracts/spatial-behavior.yaml': self._spatial_behavior(request), 'contracts/portrayal.yaml': portrayal,
-                     'contracts/delivery.yaml': delivery, 'contracts/quality-gates.yaml': gates,
-                     'dependencies.lock.yaml': {'schema_version': 1, 'lock_id': 'general-vector-lock', 'package': {**identity, 'digest': sha256_digest(identity)},
-                        'dependencies': [], 'resources': [expression_ref(self.registry)], 'resolver_version': '1.0.0', 'generated_at': request['requested_at']},
-                     'prototypes/general-vector.yaml': {
-                         'schema_version': 1, 'prototype_id': 'general-vector-prototype',
-                         'status': 'pending-validation', 'render_required': True, 'renderer_execution': 'not-run',
-                         'layout_id': scenario['embedded']['layout']['layout_id'], 'target_ids': list(TARGET_IDS),
-                         'layer_ids': ['vector-layer'], 'fixture_ref': 'fixtures/validation-input.csv',
-                         'limitations': ['Synthetic vector validation only; not user data or production approval.']},
-                     'fixtures/validation-input.csv': self._fixture_csv()}
-        manifest = {'schema_version': 1, 'package': {**identity, 'status': 'draft', 'summary': request['purpose'][:500]},
-                    'business_contracts': dict(DependencyResolver.MAP_SCENARIO_CONTRACTS), 'dependencies': [],
-                    'dependency_lock': 'dependencies.lock.yaml', 'targets': sorted(request['targets'])}
-        return manifest, documents
+        documents = {'contracts/scenario.yaml': scenario_contract(request, version=VERSION, data_role=ROLE),
+                     'contracts/data.schema.yaml': data_schema_contract(data_role=ROLE, geometry_types=('point', 'polygon'), fields=()),
+                     'contracts/spatial-behavior.yaml': spatial_behavior_contract(request, scale_band_id=SCALE_BAND_ID),
+                     'contracts/portrayal.yaml': portrayal,
+                     'contracts/delivery.yaml': delivery_contract(composition='vector-map', vector_claim='whole-map'),
+                     'contracts/quality-gates.yaml': quality_gates_contract(version=VERSION, checks=(GATE_PROTOCOL, GATE_LEGEND),
+                                                                            baseline_digest=sha256_digest(identity)),
+                     'dependencies.lock.yaml': dependency_lock(identity, request, self.registry, lock_id=LOCK_ID, resources=options),
+                     PROTOTYPE_PATH: prototype_contract(prototype_id=PROTOTYPE_ID, layout_id=LAYOUT_ID,
+                                                        layer_ids=(LAYER_ID,), limitations=LIMITATIONS),
+                     FIXTURE_PATH: fixture_csv()}
+        return package_manifest(identity, request), documents
 
 
 def validation_scene(package_root, snapshot, targets, font, validator_version, *, context, workspace, registry,
@@ -267,18 +305,32 @@ def validation_scene(package_root, snapshot, targets, font, validator_version, *
     service = VectorPreparationService(project_root=workspace, allowed_roots=[str(workspace), str(Path(font).parent)], registry=registry)
     prepared = service.prepare(source, context)
     symbol = {'color': '#2277AA', 'stroke': '#222222', 'stroke_width_pt': .4, 'radius_mm': 2}
-    encoding = {'schema_version': 1, 'kind': validation_expression, 'geometry': 'point' if geometry == 'Point' else 'polygon',
-                'field': None if validation_expression == 'single' else ('category' if validation_expression == 'categorical' else 'value'),
-                'unit': 'index' if validation_expression in {'choropleth', 'proportional'} else None,
-                'missing': {'policy': 'reject', 'label': 'Missing', 'symbol': {**symbol, 'color': '#BBBBBB'}}}
-    if validation_expression == 'single':encoding.update(label='Features', symbol=symbol)
-    elif validation_expression == 'categorical':encoding.update(legend_policy='observed', categories=[
-        {'value': i + 1, 'label': 'Class ' + str(i + 1), 'symbol': {**symbol, 'color': color}}
-        for i, color in enumerate(['#226688', '#66AA99', '#EEAA44'])])
-    elif validation_expression == 'choropleth':encoding.update(edges=[0, 2, 4], labels=['[0,2)', '[2,4]'],
-        symbols=[symbol, {**symbol, 'color': '#AADDEE'}], quantity_kind='normalized-index', interval_policy='left-closed-last-both', out_of_range='reject')
-    else:encoding.update(maximum_value=4, maximum_radius_mm=3, minimum_radius_mm=0,
-        zero_policy='omit', negative_policy='reject', out_of_range='reject', legend_values=[1,4], symbol=symbol)
+    geometry_role = 'point' if geometry == 'Point' else 'polygon'
+    missing = {'policy': 'reject', 'label': 'Missing', 'symbol': {**symbol, 'color': '#BBBBBB'}}
+    if validation_expression == 'single':
+        encoding = {'schema_version': 1, 'key_mode': 'discrete', 'geometry_role': geometry_role,
+                    'domain': {'field': None, 'measurement': 'nominal', 'unit': None, 'normalization': None},
+                    'scale': {'categories': []}, 'channels': {'symbols': [symbol], 'shape': 'auto'},
+                    'missing': missing, 'legend': {'policy': 'all', 'uniform_label': 'Features'}}
+    elif validation_expression == 'categorical':
+        encoding = {'schema_version': 1, 'key_mode': 'discrete', 'geometry_role': geometry_role,
+                    'domain': {'field': 'category', 'measurement': 'nominal', 'unit': None, 'normalization': None},
+                    'scale': {'categories': [{'value': i + 1, 'label': 'Class ' + str(i + 1)} for i in range(3)]},
+                    'channels': {'symbols': [{**symbol, 'color': color} for color in ['#226688', '#66AA99', '#EEAA44']], 'shape': 'auto'},
+                    'missing': missing, 'legend': {'policy': 'observed'}}
+    elif validation_expression == 'choropleth':
+        encoding = {'schema_version': 1, 'key_mode': 'interval', 'geometry_role': geometry_role,
+                    'domain': {'field': 'value', 'measurement': 'normalized-index', 'unit': 'index', 'normalization': None},
+                    'scale': {'edges': [0, 2, 4], 'labels': ['[0,2)', '[2,4]'], 'interval_policy': 'left-closed-last-both', 'out_of_range': 'reject'},
+                    'channels': {'symbols': [symbol, {**symbol, 'color': '#AADDEE'}], 'shape': 'auto'},
+                    'missing': missing, 'legend': {'policy': 'all'}}
+    else:
+        encoding = {'schema_version': 1, 'key_mode': 'scaling', 'geometry_role': geometry_role,
+                    'domain': {'field': 'value', 'measurement': 'count', 'unit': 'index', 'normalization': None},
+                    'scale': {'domain_max': 4, 'range_mm': [0, 3], 'size_scale': 'sqrt', 'zero_policy': 'omit',
+                              'negative_policy': 'reject', 'out_of_range': 'reject', 'legend_values': [1, 4]},
+                    'channels': {'symbols': [symbol], 'shape': 'auto'},
+                    'missing': missing, 'legend': {'policy': 'all'}}
     portrayal = VectorPortrayalCompiler(service).compile(prepared.ref(), encoding, context)
     params = layout_parameters or grid_cases(template['embedded']['layout'])[0]
     layout = LayoutResolver(registry).resolve(template['embedded']['layout'], 300, parameters=params)

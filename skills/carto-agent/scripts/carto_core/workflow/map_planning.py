@@ -11,8 +11,9 @@ from ..schema_registry import SchemaRegistry
 class MapPlanner:
     """Plan through the enabled scenario's expression strategy."""
 
-    def __init__(self, registry: SchemaRegistry | None = None) -> None:
+    def __init__(self, registry: SchemaRegistry | None = None, *, project_root=None) -> None:
         self.registry = registry or SchemaRegistry()
+        self.project_root = project_root
 
     def build(self, request: dict[str, Any], intent: dict[str, Any], brief: dict[str, Any],
               bundle: dict[str, Any], installation: dict[str, Any],
@@ -21,7 +22,7 @@ class MapPlanner:
         profile.require_contract(contracts["scenario"])
         self.registry.validate("map-brief", brief)
         profile.require_intent_projection(brief, intent, kind="BRIEF")
-        plan = profile.component("planner")(self.registry).build(
+        plan = profile.component("planner")(self.registry, project_root=self.project_root).build(
             request, intent, brief, bundle, installation, contracts)
         self.registry.validate("map-plan", plan)
         profile.require_intent_projection(plan, intent, kind="PLAN")

@@ -98,7 +98,7 @@
             "properties": {
               "id": {
                 "type": "string",
-                "pattern": "^[a-z][a-z0-9-]*/[a-z][a-z0-9-]*$"
+                "pattern": "^[a-z][a-z0-9-]*(\\/[a-z][a-z0-9-]*)?$"
               },
               "version": {
                 "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"
