@@ -13,6 +13,7 @@ from ..schema_registry import SchemaRegistry, load_document
 from ..security.paths import PathGuard
 from ..validation.map_checks import MapQualityChecks
 from .dependencies import DependencyResolver
+from ..contracts.bundle import bundle_core as _bundle_core
 
 
 class MapCandidateCompiler:
@@ -169,7 +170,6 @@ class MapCandidateCompiler:
                 raise ProtocolError('PORTRAYAL_TEMPLATE_MISMATCH','Expression differs from installed template')
             if inputs["page"]["appearance"]["cartography"] != template_style:
                 raise ProtocolError("APPEARANCE_TEMPLATE_MISMATCH", "Page appearance differs from the installed template")
-            from ..workflow.map_data_preparation import bundle_core as _bundle_core
             if bundle is not None and _bundle_core(inputs["bundle"]) != _bundle_core(bundle):
                 raise ProtocolError("RASTER_CANDIDATE_BUNDLE_MISMATCH", "Candidate must preserve the prepared bundle")
         vector = None
@@ -182,7 +182,6 @@ class MapCandidateCompiler:
             if (scene["resolved_layout"]["template_contract"] != contracts["scenario"]["embedded"]["layout"]
                     or vector["page"]["cartography"] != contracts["scenario"]["embedded"]["cartography"]):
                 raise ProtocolError("VECTOR_TEMPLATE_MISMATCH", "Page layout or appearance differs from the installed template")
-            from ..workflow.map_data_preparation import bundle_core as _bundle_core
             if bundle is not None and _bundle_core(bundle) != _bundle_core(vector["bundle"]):
                 raise ProtocolError("VECTOR_BUNDLE_MISMATCH", "Page does not preserve the prepared bundle")
         return MapQualityChecks(self.registry).inspect(

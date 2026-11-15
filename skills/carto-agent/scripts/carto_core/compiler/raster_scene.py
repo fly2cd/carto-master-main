@@ -3,7 +3,8 @@ from __future__ import annotations
 from copy import deepcopy
 from ..canonical import sha256_digest
 from ..errors import ProtocolError, SecurityError
-from ..workflow.models import ExecutionContext
+from ..contracts.execution import ExecutionContext
+from ..contracts.bundle import context_snapshot
 from ..workflow.preparation_bundle import BundlePreparer
 from ..workflow.raster_preparation import RasterPreparationService
 from .layout import LayoutResolver
@@ -11,9 +12,8 @@ from .raster_page_contract import validate_page_request
 
 RASTER_RENDERER_ID='rasterio-matplotlib-page'
 
-def context_snapshot(context):
-    context.require_project_scope()
-    return {k:getattr(context,k) for k in ('run_id','tenant_id','project_id','subject_id')}
+# context_snapshot: imported from the neutral leaf contracts.bundle (single
+# authoritative definition). The former local duplicate was removed to prevent drift.
 
 class RasterSceneCompiler:
     def __init__(self,preparation:RasterPreparationService):

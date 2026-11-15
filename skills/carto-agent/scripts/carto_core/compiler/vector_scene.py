@@ -2,7 +2,7 @@
 from copy import deepcopy
 from ..canonical import sha256_digest
 from ..errors import ProtocolError, SecurityError
-from ..workflow.vector_preparation import context_snapshot
+from ..contracts.bundle import context_snapshot
 from ..workflow.preparation_bundle import BundlePreparer
 from .vector_page import validate_page
 from .layout import LayoutResolver
