@@ -70,7 +70,7 @@ def join_attributes(service, report, binding, asset=None):
         data = service.read_bytes(path,1048576)
         if len(data)!=binding["size_bytes"] or service.digest_bytes(data)!=binding["digest"]:
             raise ProtocolError("THEMATIC_TABLE_DRIFT", "Attribute source differs from its approved bytes")
-        asset=service._asset(data,"attribute-table",".csv")
+        asset=service.store_asset(data,"attribute-table",".csv")
     else:
         data=service.snapshot_bytes(asset,"attribute-table",".csv")
         if service.digest_bytes(data)!=binding["digest"] or len(data)!=binding["size_bytes"]:

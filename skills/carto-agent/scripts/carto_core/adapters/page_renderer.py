@@ -197,7 +197,7 @@ class PageRenderer(MeasuredPageRenderer):
         frozen_request = self.preparation.save_document(request, "page-request")
         payloads, measurements, environment = self._draw(request, bodies, font_asset)
         self.preparation.snapshot_bytes(font_asset, "font", ".ttf")
-        outputs = {kind: self.preparation._asset(data, f"page-{kind}", f".{kind}") for kind, data in payloads.items()}
+        outputs = {kind: self.preparation.store_asset(data, f"page-{kind}", f".{kind}") for kind, data in payloads.items()}
         result = {
             "schema_version": 4, "geometry": "raster", "kind": "page-output",
             "renderer_id": RASTER_RENDERER_ID, "renderer_version": RASTER_VERSION,
@@ -263,7 +263,7 @@ class PageRenderer(MeasuredPageRenderer):
             ],
             "font_snapshot": font, "font_family": family, "font_embedding_flags": flags,
             "environment": runtime,
-            "outputs": {kind: self.preparation._asset(data, "page-" + kind, "." + kind)
+            "outputs": {kind: self.preparation.store_asset(data, "page-" + kind, "." + kind)
                        for kind, data in payloads.items()},
             "measurements": measurements,
             "checks": {key: "passed" for key in ("frame-binding", "glyph-coverage", "font-embedding", "content-fit", "png-dimensions")},

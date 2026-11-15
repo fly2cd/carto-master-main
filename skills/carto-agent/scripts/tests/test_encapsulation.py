@@ -38,8 +38,6 @@ CORE = SCRIPTS_ROOT / "carto_core"
 # Frozen, shrink-only. Key = private member name, value = why it is still here and what
 # removes it. Adding a key requires justifying a new boundary break in review.
 ALLOWED_ATTRIBUTES = {
-    "_asset": "StaticAssetStore._asset: 5 cross-layer call sites (adapters x4, workflow.thematic). "
-              "Renamed to a public member in P1 Step B.",
     "_validate": "PageRenderer._validate called from compiler.raster_scene -- kernel reaching into an "
                  "adapter's private method. Fixed in P1 Step D (page freeze/validate port).",
     "_scale_label": "PageRenderer._scale_label called from workflow.map_final_check. Fixed in P1 Step D.",
@@ -51,9 +49,6 @@ ALLOWED_ATTRIBUTES = {
 }
 
 ALLOWED_IMPORTS = {
-    "_publish_bytes": "adapters.geospatial_mcp._publish_bytes imported by adapters.formal_renderer and by "
-                      "workflow.{raster_preparation,static_assets} -- a cross-layer private import. Moved to "
-                      "carto_core.artifacts as a public helper in P1 Step B.",
     "_dependencies": "adapters.raster_renderer._dependencies (the plotting-stack accessor), imported by 3 "
                      "other adapters modules. Intra-layer; sibling of the vector dependencies() relocation, "
                      "tracked as P2.",

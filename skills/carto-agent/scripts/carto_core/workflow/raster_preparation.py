@@ -10,11 +10,11 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
-from ..adapters.geospatial_mcp import DTYPE_RANGES, TIFF_SIGNATURES, _publish_bytes
+from ..adapters.geospatial_mcp import DTYPE_RANGES, TIFF_SIGNATURES
 from ..canonical import canonical_json_bytes, sha256_digest
 from ..compiler.raster_portrayal import algorithm_digest, parse_legend, resolve_classes
 from ..errors import ProtocolError, SecurityError
-from ..artifacts import protocol_version
+from ..artifacts import protocol_version, publish_bytes
 from ..repository.immutable_store import StoredArtifact
 from ..schema_registry import SchemaRegistry, load_document
 from ..security.paths import PathGuard
@@ -39,7 +39,7 @@ class RasterPreparationService(StaticAssetStore):
         self.registry.validate(schema, value)
         digest = sha256_digest(value)
         path = self.project_guard.resolve(self.root / schema / (digest[7:] + ".json"))
-        _publish_bytes(self.project_guard, path, canonical_json_bytes(value) + b"\n")
+        publish_bytes(self.project_guard, path, canonical_json_bytes(value) + b"\n")
         return StoredArtifact(schema, protocol_version(schema), digest, path)
 
     def document(self, reference: dict[str, str], schema: str) -> dict[str, Any]:
@@ -154,8 +154,8 @@ class RasterPreparationService(StaticAssetStore):
         base = {"schema_version": 1, "kind": "raster-classification-preparation", "algorithm_digest": algorithm_digest(),
                 "context": {key: getattr(context, key) for key in ("run_id", "tenant_id", "project_id", "subject_id")},
                 "request": deepcopy(request), "request_digest": sha256_digest(request),
-                "source_snapshot": self._asset(content, "source", ".tif"),
-                "legend_snapshot": self._asset(legend, "legend", ".csv"), "gis_result_ref": receipt.artifact_refs[0]}
+                "source_snapshot": self.store_asset(content, "source", ".tif"),
+                "legend_snapshot": self.store_asset(legend, "legend", ".csv"), "gis_result_ref": receipt.artifact_refs[0]}
         return self.save_document(self._resolve(base, legend, result, None), "raster-prepared-data")
 
     def _continuous_encoding(self, request: dict[str, Any], cont: dict[str, Any]) -> dict[str, Any]:
@@ -211,7 +211,7 @@ class RasterPreparationService(StaticAssetStore):
         report = {"schema_version": 1, "kind": "raster-continuous-preparation", "algorithm_digest": algorithm_digest(),
                   "context": {key: getattr(context, key) for key in ("run_id", "tenant_id", "project_id", "subject_id")},
                   "request": deepcopy(request), "request_digest": sha256_digest(request),
-                  "source_snapshot": self._asset(content, "source", ".tif"),
+                  "source_snapshot": self.store_asset(content, "source", ".tif"),
                   "gis_result_ref": receipt.artifact_refs[0], "status": "ready", "encoding": encoding}
         self.registry.validate("raster-prepared-data", report)
         return self.save_document(report, "raster-prepared-data")

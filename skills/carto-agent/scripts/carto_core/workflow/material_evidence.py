@@ -34,7 +34,7 @@ class MaterialEvidenceService(StaticAssetStore):
             extension = {"text/plain": ".txt", "text/csv": ".csv", "text/markdown": ".md"}.get(fmt)
             if extension is None:
                 raise ProtocolError("MATERIAL_EXTRACTOR_MISSING", "No admitted material extractor for this format")
-            asset = self._asset(self.read_bytes(original, MAX_SOURCE_BYTES), "material-source", extension)
+            asset = self.store_asset(self.read_bytes(original, MAX_SOURCE_BYTES), "material-source", extension)
             key = sha256_digest({"source_id": source["source_id"], "asset": asset,
                                  "format": fmt, "extractor": fingerprint})[7:]
             folder = self.project_guard.resolve(self.root / "evidence" / key)

@@ -15,11 +15,10 @@ from ..canonical import sha256_digest
 from ..compiler.raster_scene import RasterSceneCompiler, RASTER_RENDERER_ID
 from ..compiler.vector_scene import VectorSceneCompiler
 from ..errors import ProtocolError, SecurityError
-from ..artifacts import file_digest, utc_now
+from ..artifacts import file_digest, publish_bytes, utc_now
 from ..workflow.preparation_bundle import BundlePreparer
 from ..workflow.raster_preparation import RasterPreparationService
 from ..workflow.vector_preparation import VectorPreparationService
-from .geospatial_mcp import _publish_bytes
 from .raster_renderer import _dependencies
 from .webmap_renderer import compute_renderer_attestation
 from .page_renderer import (
@@ -260,7 +259,7 @@ class FormalRenderer:
             raise ProtocolError("RENDER_ENVIRONMENT_DRIFT", "Rendered page differs from the frozen request/runtime")
         for kind in scene["export"]["targets"]:
             data = self.preparation.snapshot_bytes(page["outputs"][kind], "page-" + kind, "." + kind)
-            _publish_bytes(self.path_guard, self._directory(session_id) / ("map." + kind), data)
+            publish_bytes(self.path_guard, self._directory(session_id) / ("map." + kind), data)
         return self._receipt(session_id, scene, artifact.ref(), page, started, utc_now())
 
     def validate_receipt(self, scene: dict[str, Any], receipt: dict[str, Any], *,

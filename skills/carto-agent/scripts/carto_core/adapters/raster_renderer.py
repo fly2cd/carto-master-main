@@ -146,7 +146,7 @@ class RasterMapBodyRenderer:
         body = {
             "schema_version": 2, "frame_id": selected_frame["id"], "kind": "raster-map-body", "renderer_id": "rasterio-matplotlib",
             "renderer_version": VERSION, "renderer_code_digest": renderer_digest(), "portrayal_ref": portrayal_ref,
-            "layout_digest": sha256_digest(resolved_layout), "image": self.preparation._asset(png, "map-body", ".png"),
+            "layout_digest": sha256_digest(resolved_layout), "image": self.preparation.store_asset(png, "map-body", ".png"),
             "width_px": width, "height_px": height, "dpi": page["dpi"], "frame_rect": frame, "image_rect": rect,
             "bounds": info["bounds"], "crs": info["crs"],
             # Affine maps projected coordinates to PNG-local pixels; add image_rect[:2] for page coordinates.

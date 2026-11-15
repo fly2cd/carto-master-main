@@ -13,6 +13,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any, Callable
 
+from ..artifacts import publish_bytes
 from ..canonical import canonical_json_bytes, sha256_digest
 from ..errors import ProtocolError, SecurityError
 from ..repository.immutable_store import ImmutableArtifactStore
@@ -50,32 +51,6 @@ def _file_identity(path: Path, limit: int) -> tuple[str, int]:
                 raise ProtocolError("RASTER_INPUT_TOO_LARGE", "Input exceeds the byte limit")
             digest.update(chunk)
     return "sha256:" + digest.hexdigest(), size
-
-
-def _publish_bytes(guard: PathGuard, path: Path, data: bytes) -> None:
-    """Atomic create-only file publication. Existing content is checked, never overwritten."""
-    path = guard.resolve(path)
-    guard.resolve(path.parent).mkdir(parents=True, exist_ok=True)
-    guard.resolve(path)
-    if path.exists():
-        if path.stat().st_size != len(data) or path.read_bytes() != data:
-            raise ProtocolError("IMMUTABLE_ARTIFACT_CONFLICT", "Existing local GIS artifact differs")
-        return
-    fd, name = tempfile.mkstemp(prefix=".gis-", suffix=".tmp", dir=path.parent)
-    temporary = guard.resolve(name, must_exist=True)
-    try:
-        with os.fdopen(fd, "wb") as stream:
-            stream.write(data)
-            stream.flush()
-            os.fsync(stream.fileno())
-        guard.resolve(path)
-        try:
-            os.link(temporary, path)
-        except FileExistsError:
-            if path.stat().st_size != len(data) or path.read_bytes() != data:
-                raise ProtocolError("IMMUTABLE_ARTIFACT_CONFLICT", "Concurrent local GIS artifact differs") from None
-    finally:
-        guard.resolve(temporary).unlink(missing_ok=True)
 
 
 class GeospatialMcpAdapter:
@@ -209,7 +184,7 @@ class GeospatialMcpAdapter:
             "kind": "raster", "path": path.relative_to(self.data_root).as_posix()}}}
         digest = sha256_digest(catalog).removeprefix("sha256:")
         snapshot = self.project_guard.resolve(self.output_root / "catalogs" / (digest + ".json"))
-        _publish_bytes(self.project_guard, snapshot, canonical_json_bytes(catalog) + b"\n")
+        publish_bytes(self.project_guard, snapshot, canonical_json_bytes(catalog) + b"\n")
         self.project_guard.resolve(self.workspace).mkdir(parents=True, exist_ok=True)
         self.guard.resolve(self.python, must_exist=True)
         return {
@@ -343,5 +318,5 @@ class GeospatialMcpAdapter:
                          "digest": task_digest, "uri": task_path.as_posix()},
         })
         self.registry.validate("geospatial-result", output)
-        _publish_bytes(self.project_guard, target, content)
-        _publish_bytes(self.project_guard, task_path, canonical_json_bytes(task) + b"\n")
+        publish_bytes(self.project_guard, target, content)
+        publish_bytes(self.project_guard, task_path, canonical_json_bytes(task) + b"\n")

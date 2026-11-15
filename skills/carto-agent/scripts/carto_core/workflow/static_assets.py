@@ -2,7 +2,7 @@
 from pathlib import Path
 import hashlib
 from typing import Any
-from ..adapters.geospatial_mcp import _publish_bytes
+from ..artifacts import publish_bytes
 from ..errors import ProtocolError
 
 class StaticAssetStore:
@@ -22,10 +22,17 @@ class StaticAssetStore:
         return "sha256:" + hashlib.sha256(content).hexdigest()
 
 
-    def _asset(self, content: bytes, kind: str, extension: str) -> dict[str, Any]:
+    def store_asset(self, content: bytes, kind: str, extension: str) -> dict[str, Any]:
+        """Publish raw bytes into the project content store and return their asset descriptor.
+
+        Public since P1 Step B (was ``_asset``): five cross-object call sites reach it from
+        the adapters and workflow layers, and four more are subclass self-calls. It is the
+        write counterpart of ``snapshot_bytes``, which reads the same descriptor back and
+        re-verifies the bytes.
+        """
         digest = self.digest_bytes(content)
         path = self.project_guard.resolve(self.root / kind / (digest[7:] + extension))
-        _publish_bytes(self.project_guard, path, content)
+        publish_bytes(self.project_guard, path, content)
         return {"artifact_ref": {"id": kind, "version": "1.0.0", "digest": digest, "uri": path.as_posix()},
                 "size_bytes": len(content)}
 

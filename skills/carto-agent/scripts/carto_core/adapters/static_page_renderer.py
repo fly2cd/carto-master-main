@@ -54,7 +54,7 @@ class MeasuredPageRenderer:
             raise
         except Exception:
             raise ProtocolError("RASTER_FONT_INVALID", "Cannot decode the selected TrueType font") from None
-        return self.preparation._asset(data, "font", ".ttf"), family, flags
+        return self.preparation.store_asset(data, "font", ".ttf"), family, flags
 
 
     @staticmethod

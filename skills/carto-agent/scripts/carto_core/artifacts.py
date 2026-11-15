@@ -7,13 +7,16 @@ import os
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 import yaml
 
 from .canonical import sha256_digest
 from .errors import ProtocolError
 from .schema_registry import load_document
+
+if TYPE_CHECKING:
+    from .security.paths import PathGuard
 
 
 def atomic_write_bytes(path: Path, payload: bytes) -> None:
@@ -34,6 +37,38 @@ def atomic_write_bytes(path: Path, payload: bytes) -> None:
         temporary = Path(name)
         if temporary.exists():
             temporary.unlink()
+
+
+def publish_bytes(guard: "PathGuard", path: Path, data: bytes) -> None:
+    """Atomic create-only publication under a PathGuard; existing content is never overwritten.
+
+    Relocated from ``adapters.geospatial_mcp._publish_bytes`` (P1 Step B): the helper is
+    geometry- and transport-agnostic, yet two workflow modules imported it -- under a private
+    name -- from an adapter. It belongs beside ``atomic_write_bytes``, which is the same idea
+    without the guard or the create-once guarantee.
+    """
+    path = guard.resolve(path)
+    guard.resolve(path.parent).mkdir(parents=True, exist_ok=True)
+    guard.resolve(path)
+    if path.exists():
+        if path.stat().st_size != len(data) or path.read_bytes() != data:
+            raise ProtocolError("IMMUTABLE_ARTIFACT_CONFLICT", "Existing immutable artifact differs")
+        return
+    fd, name = tempfile.mkstemp(prefix=".gis-", suffix=".tmp", dir=path.parent)
+    temporary = guard.resolve(name, must_exist=True)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        guard.resolve(path)
+        try:
+            os.link(temporary, path)
+        except FileExistsError:
+            if path.stat().st_size != len(data) or path.read_bytes() != data:
+                raise ProtocolError("IMMUTABLE_ARTIFACT_CONFLICT", "Concurrent immutable artifact differs") from None
+    finally:
+        guard.resolve(temporary).unlink(missing_ok=True)
 
 
 def utc_now() -> str:
