@@ -124,6 +124,7 @@ class BundlePreparerProtocol(Protocol):
         """Cross-check generate-request bindings against the frozen bundle."""
 
 
+@runtime_checkable
 class BundlePreparerFactory(Protocol):
     """Port that binds a preparation service and a geometry into a bundle preparer.
 
@@ -139,6 +140,7 @@ class BundlePreparerFactory(Protocol):
         """Return the bundle preparer for ``geometry`` (one of :data:`GEOMETRIES`)."""
 
 
+@runtime_checkable
 class PreparationServiceFactory(Protocol):
     """Composition-root port that builds the preparation service for a geometry.
 
@@ -153,6 +155,7 @@ class PreparationServiceFactory(Protocol):
         """Return the preparation service for ``geometry`` (one of :data:`GEOMETRIES`)."""
 
 
+@runtime_checkable
 class MaterialFactsVerifier(Protocol):
     """Port for the A2 material byte-chain verification.
 
