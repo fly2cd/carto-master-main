@@ -21,8 +21,12 @@ from ..roadmap import not_implemented
 
 if TYPE_CHECKING:
     from ..repository.immutable_store import StoredArtifact
-    from ..workflow.models import ExecutionContext
-    from ..workflow.raster_preparation import RasterPreparationService
+    # Kernel-side contracts only (Tier-2 去环 Step9): the compiler layer must not
+    # name the execution layer even in annotations, so the preparation port comes
+    # from contracts.protocols and ExecutionContext from its canonical home
+    # (workflow.models is only a re-export shim for it).
+    from ..contracts.execution import ExecutionContext
+    from ..contracts.protocols import RasterPreparationProtocol
 from ..schema_registry import SchemaRegistry
 
 VERSION = "1.0.0"
@@ -165,7 +169,7 @@ class RasterPortrayalCompiler:
     paths or renderer choices. The project-local result is backend-independent.
     """
 
-    def __init__(self, preparation: RasterPreparationService) -> None:
+    def __init__(self, preparation: RasterPreparationProtocol) -> None:
         self.preparation = preparation
 
     def _build(self, portrayal: dict[str, Any], layer_id: str,
