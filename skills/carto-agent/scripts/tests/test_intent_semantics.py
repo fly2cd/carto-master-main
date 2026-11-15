@@ -20,6 +20,7 @@ from carto_core.schema_registry import SchemaRegistry, load_document
 from carto_core.security.paths import PathGuard
 from carto_core.workflow.intent import IntentResolver, default_profiles_path
 from carto_core.workflow.map_planning import MapPlanner
+from carto_core.workflow.material_evidence import verify_material_facts
 from carto_core.workflow.map_generation import MapGenerationWorkflow
 from tests.fixtures.schema_cases import VALID_CASES
 
@@ -303,7 +304,8 @@ class IntentSemanticsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp, patch(
                 "carto_core.compiler.map_candidate.ScenarioRegistry", return_value=registry), patch.object(
                 ScenarioCapability, "component", return_value=Mock(return_value=component)):
-            compiler = MapCandidateCompiler(PathGuard([temp]), self.schemas)
+            compiler = MapCandidateCompiler(PathGuard([temp]), self.schemas,
+                                            material_facts=verify_material_facts)
             self.assertIs(envelope, compiler.compile(request, intent, plan, {}, {}, contracts, Path(temp) / "unused"))
             envelope["candidate"]["execution"]["shared_semantics"]["theme_tags"] = ["flood"]
             self.assert_code("CANDIDATE_INTENT_MISMATCH", lambda:

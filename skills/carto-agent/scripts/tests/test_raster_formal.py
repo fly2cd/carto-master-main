@@ -37,6 +37,8 @@ from carto_core.workflow.map_final_check import FinalMapCheckService
 from carto_core.workflow.map_preview import MapPreviewService, freeze_object_digest
 from carto_core.workflow.map_render import FormalMapRenderService
 from carto_core.workflow.preparation_bundle import BundlePreparer
+from carto_core.workflow.material_evidence import verify_material_facts
+from carto_core.workflow.preparation_services import preparation_service
 from tests.fixtures.schema_cases import VALID_CASES
 from tests.fixtures.thematic_cases import canonical_request
 from tests.test_raster_classification import PreparationFixture
@@ -236,7 +238,8 @@ class RasterFormalTests(PreparationFixture, unittest.TestCase):
             seam.start(); self.addCleanup(seam.stop)
         self.request_path = self.work/"request/generate-request.yaml"
         preflight = MapCandidateCompiler(self.service.guard, self.registry,
-            project_root=self.root, context=self.context).check_candidate(
+            project_root=self.root, context=self.context, preparations=preparation_service,
+            material_facts=verify_material_facts).check_candidate(
                 self.generate, self.candidate, self.scene, self.contracts)
         files = {"request/generate-request.yaml": self.generate, "intent/map-intent.yaml": intent,
                  "candidates/resolved-map.yaml": self.candidate, "candidates/render-scene.yaml": self.scene,
@@ -395,7 +398,8 @@ class RasterFormalTests(PreparationFixture, unittest.TestCase):
                           CandidateComponent if name == "candidate_compiler" else original_component(name)), \
              patch.object(self.capability, "require_contract", create=True), \
              patch.object(self.capability, "require_intent_projection", side_effect=projection, create=True):
-            compiler = MapCandidateCompiler(self.service.guard, self.registry, project_root=self.root, context=self.context)
+            compiler = MapCandidateCompiler(self.service.guard, self.registry, project_root=self.root,
+                context=self.context, preparations=preparation_service, material_facts=verify_material_facts)
             args = (self.generate, intent, plan, prepared["bundle"], {}, self.contracts, Path(self.page["font"]["path"]))
             self.assertIs(envelope, compiler.compile(*args))
             prepared["bundle"]["role_bindings"][0]["width"] += 1

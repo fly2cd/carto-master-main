@@ -42,6 +42,8 @@ from carto_core.workflow.models import ExecutionContext
 from carto_core.validation.map_checks import MapQualityChecks
 from carto_core.workflow.map_generation import MapGenerationWorkflow
 from carto_core.workflow.preparation_bundle import BundlePreparer
+from carto_core.workflow.material_evidence import verify_material_facts
+from carto_core.workflow.preparation_services import preparation_service
 from carto_core.workflow.template_workflow import TemplateCreationWorkflow
 from tests.fixtures.schema_cases import VALID_CASES
 from tests.test_raster_classification import PreparationFixture
@@ -741,7 +743,8 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
         plan = GeneralThematicPlanner(self.registry).build(
             self.generate, self.intent, {"synthetic": "brief", "revision": 1}, bundle,
             self.installation, contracts)
-        kwargs = {"project_root": self.root, "context": ExecutionContext.from_generate_request(self.generate)}
+        kwargs = {"project_root": self.root, "context": ExecutionContext.from_generate_request(self.generate),
+                  "preparations": preparation_service, "material_facts": verify_material_facts}
         kwargs.update(compiler_kwargs or {})
         compiler = MapCandidateCompiler(self.guard, self.registry, **kwargs)
         return compiler.compile(self.generate, self.intent, plan, bundle, self.installation,
@@ -824,7 +827,8 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
         candidate["execution_digest"] = sha256_digest(candidate["execution"])
         with self.assertRaisesRegex(ProtocolError, "APPEARANCE_TEMPLATE_MISMATCH"):
             MapCandidateCompiler(self.guard, self.registry, project_root=self.root,
-                                 context=self.context).check_candidate(
+                                 context=self.context, preparations=preparation_service,
+                                 material_facts=verify_material_facts).check_candidate(
                 self.generate, candidate, scene, self.contracts)
 
     def test_candidate_compiler_rejects_context_drift_and_input_tampering(self):

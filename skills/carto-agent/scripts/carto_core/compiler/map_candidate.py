@@ -14,6 +14,7 @@ from ..security.paths import PathGuard
 from ..validation.map_checks import MapQualityChecks
 from .dependencies import DependencyResolver
 from ..contracts.bundle import bundle_core as _bundle_core
+from ..contracts.protocols import MaterialFactsVerifier, PreparationServiceFactory
 
 
 class MapCandidateCompiler:
@@ -25,11 +26,27 @@ class MapCandidateCompiler:
     }
 
     def __init__(self, path_guard: PathGuard, registry: SchemaRegistry | None = None,
-                 *, project_root: Path | None = None, context=None) -> None:
+                 *, project_root: Path | None = None, context=None,
+                 preparations: PreparationServiceFactory | None = None,
+                 material_facts: MaterialFactsVerifier | None = None) -> None:
         self.path_guard = path_guard
         self.project_root, self.context = project_root, context
         self.registry = registry or SchemaRegistry()
         self.dependencies = DependencyResolver()
+        # Execution-layer ports (Tier-2 去环 Step6), injected by the composition root.
+        # They are optional only because load_contracts() / require_execution_intent()
+        # need neither; every path that does need one fails closed through
+        # _require_port instead of importing workflow from the kernel.
+        self.preparations, self.material_facts = preparations, material_facts
+
+    def _require_port(self, name: str):
+        """Return an injected execution-layer port, or fail closed naming it."""
+        port = getattr(self, name)
+        if port is None:
+            raise ProtocolError("COMPILER_PORT_NOT_INJECTED",
+                f"MapCandidateCompiler.{name} must be injected by the composition root; "
+                "the compiler layer does not import the execution layer")
+        return port
 
     def load_contracts(self, installation: dict[str, Any]) -> dict[str, Any]:
         root = self.path_guard.resolve(installation["package_path"], must_exist=True)
@@ -150,16 +167,16 @@ class MapCandidateCompiler:
             raise ProtocolError("CANDIDATE_EXECUTION_DIGEST_MISMATCH", candidate["candidate_id"])
         if candidate["execution"].get("render_scene_ref", {}).get("digest") != sha256_digest(scene):
             raise ProtocolError("CANDIDATE_SCENE_DIGEST_MISMATCH", candidate["candidate_id"])
-        from ..workflow.material_evidence import verify_material_facts
-        verify_material_facts(candidate["execution"], self.path_guard, self.project_root, self.registry)
+        self._require_port("material_facts")(
+            candidate["execution"], self.path_guard, self.project_root, self.registry)
         from ..adapters.backend_registry import RASTER_PAGE, VECTOR_PAGE
         inputs = None
         if scene["renderer_id"] == RASTER_PAGE.renderer_id:
             if self.project_root is None or self.context is None:
                 raise ProtocolError("RASTER_EXECUTION_CONTEXT_REQUIRED", "Raster candidates require trusted project context")
             from .raster_scene import RasterSceneCompiler
-            from ..workflow.raster_preparation import RasterPreparationService
-            preparation = RasterPreparationService(project_root=self.project_root,
+            preparation = self._require_port("preparations")(
+                "raster", project_root=self.project_root,
                 allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
             inputs = RasterSceneCompiler(preparation).validate_generation(
                 scene, candidate["execution"], request, self.context)
@@ -175,8 +192,8 @@ class MapCandidateCompiler:
         vector = None
         if scene["renderer_id"] == VECTOR_PAGE.renderer_id:
             from .vector_scene import VectorSceneCompiler
-            from ..workflow.vector_preparation import VectorPreparationService
-            service = VectorPreparationService(project_root=self.project_root,
+            service = self._require_port("preparations")(
+                "vector", project_root=self.project_root,
                 allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
             vector = VectorSceneCompiler(service).validate_generation(scene, candidate["execution"], request, self.context)
             if (scene["resolved_layout"]["template_contract"] != contracts["scenario"]["embedded"]["layout"]

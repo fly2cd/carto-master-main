@@ -227,8 +227,7 @@ class MapGenerationWorkflow:
             bundle = prepared["bundle"]
         bundle_target = self.path_guard.resolve(self._design_path("data/prepared-data-bundle.yaml"))
         atomic_yaml(bundle_target, bundle)
-        compiler = MapCandidateCompiler(self.path_guard, self.registry,
-                                        project_root=self.project_root, context=ExecutionContext.from_generate_request(request))
+        compiler = self._candidate_compiler(request)
         contracts = compiler.load_contracts(installation)
         # R6: merge revised_cartography from the request into contracts so
         #     design-revision cartography changes are applied at compile time.
@@ -290,8 +289,7 @@ class MapGenerationWorkflow:
             bundle = prepared["bundle"]
         bundle_target = self.path_guard.resolve(self._design_path("data/prepared-data-bundle.yaml"))
         atomic_yaml(bundle_target, bundle)
-        compiler = MapCandidateCompiler(self.path_guard, self.registry, project_root=self.project_root,
-                                        context=ExecutionContext.from_generate_request(request))
+        compiler = self._candidate_compiler(request)
         contracts = compiler.load_contracts(installation)
         plan = MapPlanner(self.registry, project_root=self.project_root).build(
             request, intent, brief, bundle, installation, contracts)
@@ -1472,6 +1470,14 @@ class MapGenerationWorkflow:
         if entry["manifest_digest"] != installation.get("manifest_digest"):
             raise ProtocolError("TEMPLATE_INSTALL_MANIFEST_DRIFT", template_ref["id"])
 
+    def _candidate_compiler(self, request: dict[str, Any]) -> MapCandidateCompiler:
+        """Composition root: inject the execution-layer ports the compiler may not import."""
+        from .material_evidence import verify_material_facts
+        from .preparation_services import preparation_service
+        return MapCandidateCompiler(self.path_guard, self.registry, project_root=self.project_root,
+            context=ExecutionContext.from_generate_request(request),
+            preparations=preparation_service, material_facts=verify_material_facts)
+
     def _verify_candidate_inputs(self, candidate: dict[str, Any], scene: dict[str, Any],
                                  contracts: dict[str, Any], preflight: dict[str, Any]) -> None:
         registry = ScenarioRegistry(self.registry)
@@ -1480,8 +1486,7 @@ class MapGenerationWorkflow:
         intent = self._load("intent/map-intent.yaml", "map-intent")
         registry.require_request_intent(request, intent)
         MapCandidateCompiler.require_execution_intent(candidate["execution"], intent)
-        compiler = MapCandidateCompiler(self.path_guard, self.registry,
-            project_root=self.project_root, context=ExecutionContext.from_generate_request(request))
+        compiler = self._candidate_compiler(request)
         current = compiler.check_candidate(request, candidate, scene, contracts)
         if current != preflight or current["status"] != "passed":
             raise ProtocolError("CANDIDATE_PREFLIGHT_DRIFT", "Quality gates or their evidence changed; recompile before G2")
