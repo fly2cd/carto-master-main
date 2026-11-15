@@ -254,6 +254,16 @@ encoding-ir:
 - **方法学更正（诚实记录）**：本轮曾尝试用"另开 worktree 检出旧提交"做摘要前后比对，得到大量假变化——根因是 `core.autocrlf=true` 且无 `.gitattributes`，同一提交在不同检出下字节不同（实测 227 个受版本文本源文件中 26 个在本工作树为 LF、新检出为 CRLF，其中 `workflow/material_extraction.py` 正是 `reader_digest` 的输入）。凡按字节哈希的量必须在同一工作树内比对，或先做 EOL 一致性核查。
 - **详细度量、P0-2/P0-3 与后续 P1/P2 清单**：[U-P3.7-p0-architecture-hardening.md](../dev-log/U-P3.7-p0-architecture-hardening.md)。
 
+### 8.11 内核与渲染栈的边界：页面契约与环境快照改为注入端口【已实施 · 2026-11-15 · P1-D】
+- **决定**：`compiler` / `contracts` / `validation` / `repository` / `security` 五个内核层**不得 import `carto_core.workflow` 或 `carto_core.adapters`**（Tier-2 只禁了前者，本轮扩为两者并由 `test_layer_ports` 强制）。内核需要的两类适配器能力改为构造注入端口：`PageContractPort` / `PageContractFactory`（冻结与形式校验页面请求）与 `EnvironmentSnapshotProvider`（运行时环境事实），端口声明全部住在 `contracts.protocols` 叶子。
+- **为什么不能像 §8.10 那样"搬家"了事**：`backend_registry` 能提为包根叶子，因为它是零内部依赖的常量表；`RendererProfile` **不能**——`current()` 需要 numpy/rasterio/matplotlib/fontTools 并计算 `formal_renderer` 摘要，任何下沉都会把绘图栈拖进 spine。故只剩注入一条路。
+- **`PageContractPort` 刻意不含任何绘制方法**：`PageRenderer` 同时承担"冻结+形式校验"（design-principles §2.2 形式验证层，属内核）与"光栅化/导出"（后端职责）。本轮不做完整拆分（把校验逻辑搬进 compiler），只把前半暴露为端口——端口窄于实现，使内核在**类型层面**就拿不到光栅化能力。完整拆分列为独立后续项。
+- **代价被显式记账，不隐藏**：`compiler→adapters` 5→**0**，但 `workflow→adapters` 16→**23**（+8 来自 `map_generation` 三个与 `map_final_check` 两个构造点取出 `PageRenderer` / `environment_snapshot` 后注入，−1 来自 P1-B 把 `publish_bytes` 归位 spine）。依赖没有消失，它从"内核自己向上抓"变成"组装根取出后向下递"——方向合法且现在有守卫。任何"内核干净了"的表述若不同时报组装根增量，都不成立。
+- **被否决的替代方案**：① 把 `PageRenderer` 整体下沉为叶子（做不到，见上）；② 让内核通过 `importlib` 动态解析渲染器（与 `scenario_registry._COMPONENTS` 闭白名单的安全取舍冲突：不接受由请求/策略提供的 import 路径）；③ 保留惰性 import 现状（惰性只推迟耦合、不消除它，还让它在静态依赖图上不可见——模块级 SCC 早已为 0 却仍存在这条倒置，正是这个原因）。
+- **同轮正名的接口事实**：跨层调用的私有成员已清零——`_json_ref`→`document`（上提到 `PreparationServiceProtocol` 公共基座，两个几何同名）、`_asset`→`store_asset`、`_publish_bytes`→`artifacts.publish_bytes`、`PageRenderer._validate`→`validate_request`、`_scale_label`→`scale_label`；`workflow.models` 垫片（36 处引用）删除。**公开端口内不得出现下划线成员**由 `test_encapsulation` 强制，跨对象私有访问与跨模块私有名 import 采**双向棘轮 allowlist**（新增违规会红，修好不删条目也会红）。
+- **门禁**：fast 逐步 576/608 → 580/612 全绿；P1 收口全量 **612 tests / failures=0 / errors=0 / skipped=9（17.3 min）**。摘要影响：两侧 `page_renderer_digest` 与 `formal_renderer_digest` 变化，但均处于 Tier-2/P0 已造成的同一失效窗口内，**边际重跑成本为零**——这也是把 P1 紧接 P0 执行的唯一排期理由（P1 不改变任何功能行为，本可无限期推迟）。
+- **详细度量与前后对账**：[U-P3.7-p0-architecture-hardening.md](../dev-log/U-P3.7-p0-architecture-hardening.md) §七。
+
 ---
 
 ## 9. 模板层架构判断：契约合并 / 执行分离 / 先补能力再合并
