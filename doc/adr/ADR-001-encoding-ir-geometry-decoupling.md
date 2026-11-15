@@ -244,6 +244,16 @@ encoding-ir:
 - **门禁（收口）**：全量 **485 tests / failures=0 / errors=0 / skipped=9（16.66 min）→ 本轮工作首次全量全绿**。对账：477（§8.6 基线）+ 4（§8.7 `TemplateContractMergeTests`）+ 4（§8.8 `GeometryVariantPolicyTests`）= 485；9 项 skip 全部为外部环境依赖（符号链接权限、可选 MCP SDK、独立 GIS 服务解释器），**skip ≠ 通过**。
 - **仍未做**：`tests/regression-baseline.json` 未用 `--measure` 刷新（新增 8 例不在计时基线内，runner 每次都会把它们放进所有 tier 并打印 WARNING，覆盖不受影响）；`tasks.json` 三个 `detail` 文案里的用例数（438/32/470）已过时，属另一条工作流的展示文案，未改；`scenarios/README.md` 的陈旧描述同 §8.8。
 
+### 8.10 阶段1 收敛的补完：backend_registry 提为包根叶子 + renderer_id 字面量归零【已实施 · 2026-11-15 · P0-1】
+- **§8.1 留下的权宜在此补完，且实测代价比当时记录的更大**。§8.1 写"scene 自我 id 常量未改（规避 compiler→adapters 循环 import）"；本轮 AST 扫描测得 renderer_id 字面量在 `carto_core` 内共 **26 处**（`rasterio-matplotlib-page` 9 / `matplotlib-vector-page` 10 / `maplibre-web` 7），真实代码副本分布在 **10 个文件**（`compiler/{raster_scene, vector_scene, layout}`、`validation/map_checks`、`adapters/{page_renderer, renderer_probe, webmap_renderer}`、`workflow/{map_final_check, map_render, template_validation}`），而 `backend_registry` 当时只有 4 个引用方——"单点登记"实际只在 `create_render_backend` 一处成立。
+- **规避理由已消失**：Tier-2 去环后 `compiler→workflow` 引用为 0，且 `backend_registry` 本就是零内部依赖叶子（仅 import `carto_core.errors`）。故 `git mv adapters/backend_registry.py → carto_core/backend_registry.py`（血缘保留），`compiler` / `validation` 现可模块级安全导入，不触发 `adapters/__init__` 级联。
+- **10 个文件的副本全部改为派生**：scene 与 `page_renderer` 的 id 常量改为 `RASTER_PAGE.renderer_id` 等；`compiler/layout.py` 的 `renderer_id in {两个字面量}` 改为 `is_static(...)`（对 `None` 与未知 id 同为 False，与历史行为逐字等价，已新增测试锚定该等价性）；`renderer_probe`/`webmap_renderer` 的 `DEFAULT_RENDERER`、`map_render` 的默认参数、`template_validation` 的 profile 构造同样改用描述符字段。
+- **不变量固化为守卫**：`test_backend_registry` 新增 AST 扫描——renderer_id 字面量出现在 `backend_registry.py` 之外即失败（跳过 docstring 与裸字符串表达式）；并以 `assertIs`（非 `assertEqual`）断言派生常量与 registry 为**同一对象**，等值断言挡不住重新硬编码。证伪实验：向 `compiler/layout.py` 注入 `PROBE_DUPLICATE_ID = "rasterio-matplotlib-page"` → 守卫变红且点名文件与字面量；字节级还原后复绿、注入痕迹为零。§8.1 中"由测试锚定两处字面量不漂移"的断言随之删除——它锚定的是"副本存在"，而副本已不存在。
+- **摘要影响（打点法实测：插桩 `Path.read_bytes` 后与 git 改动文件集求交，同树内比对）**：`raster.renderer_digest`、`raster/vector.page_renderer_digest`、`raster/vector.formal_renderer_digest` 变化（`layout.py` / `page_renderer.py` / `*_scene.py` / `render_backend.py` 在其清单内）；`raster.algorithm_digest`、`raster.portrayal_compiler_digest`、`vector.reader_digest`、`vector.compiler_digest` **不变** → 数据准备与 portrayal 产物不受影响，仅渲染侧按既定 fail-closed 语义需重渲染。
+- **门禁**：fast **554/586** · failures=0 · errors=0 · skipped=9；`compiler→adapters` 边 6→5（剩 `PageRenderer` ×3 + `RendererProfile` ×2，根因与处置见 P1 清单）。
+- **方法学更正（诚实记录）**：本轮曾尝试用"另开 worktree 检出旧提交"做摘要前后比对，得到大量假变化——根因是 `core.autocrlf=true` 且无 `.gitattributes`，同一提交在不同检出下字节不同（实测 227 个受版本文本源文件中 26 个在本工作树为 LF、新检出为 CRLF，其中 `workflow/material_extraction.py` 正是 `reader_digest` 的输入）。凡按字节哈希的量必须在同一工作树内比对，或先做 EOL 一致性核查。
+- **详细度量、P0-2/P0-3 与后续 P1/P2 清单**：[U-P3.7-p0-architecture-hardening.md](../dev-log/U-P3.7-p0-architecture-hardening.md)。
+
 ---
 
 ## 9. 模板层架构判断：契约合并 / 执行分离 / 先补能力再合并
