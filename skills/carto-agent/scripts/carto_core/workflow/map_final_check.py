@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from ..artifacts import atomic_yaml, file_digest
+from ..backend_registry import RASTER_PAGE, VECTOR_PAGE
 from ..canonical import sha256_digest
 from ..compiler.layout import LayoutResolver, overlay_bounds
 from ..errors import ProtocolError, SecurityError
@@ -97,10 +98,10 @@ class FinalMapCheckService:
             "evidence_path": evidence_path,
             "artifacts": selected,
         }
-        if scene.get("renderer_id") == "rasterio-matplotlib-page":
+        if scene.get("renderer_id") == RASTER_PAGE.renderer_id:
             context["static_page"] = self._raster_context(scene, lock, receipt)
             context["raster"] = context["static_page"]
-        elif scene.get("renderer_id") == "matplotlib-vector-page":
+        elif scene.get("renderer_id") == VECTOR_PAGE.renderer_id:
             context["static_page"] = self._vector_context(scene, lock, receipt)
             context["vector"] = context["static_page"]
         results = [self.checkers.evaluate(item["id"], lock, context).to_dict()

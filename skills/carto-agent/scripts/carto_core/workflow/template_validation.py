@@ -6,7 +6,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Callable
 
 
-from ..adapters.backend_registry import VECTOR_PAGE, is_static
+from ..backend_registry import MAPLIBRE_WEB, VECTOR_PAGE, is_static
 from ..adapters.controlled_renderer import FRONTEND_BUILD, MAPLIBRE_VERSION, OVERLAY_ENGINE_VERSION, RENDERER_VERSION, BrowserLimits, ControlledBrowserRenderer, browser_version, discover_browser
 from ..adapters.webmap_renderer import (
     RendererCapabilityProfile, RendererCapabilityRegistry, WebMapRendererAdapter,
@@ -582,7 +582,7 @@ class TemplatePackageValidator:
             attestation_key=self.attestation_key, limits=self.limits, browser=browser,
         )
         profile = RendererCapabilityProfile(
-            renderer_id="maplibre-web", frontend_build=FRONTEND_BUILD,
+            renderer_id=MAPLIBRE_WEB.renderer_id, frontend_build=FRONTEND_BUILD,
             renderer_version=RENDERER_VERSION, maplibre_version=MAPLIBRE_VERSION,
             overlay_engine_version=OVERLAY_ENGINE_VERSION,
             browser_engine=browser_version(browser), webgl_available=True,

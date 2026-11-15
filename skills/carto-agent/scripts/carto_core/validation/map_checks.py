@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..backend_registry import RASTER_PAGE, VECTOR_PAGE
 from ..canonical import sha256_digest
 from ..errors import ProtocolError
 from ..schema_registry import SchemaRegistry
@@ -51,14 +52,14 @@ class MapQualityChecks:
         return selected
 
     def reference(self, gates: dict[str, Any], scene: dict[str, Any]) -> dict[str, str]:
-        selected = self.selection(gates, raster=scene["renderer_id"] == "rasterio-matplotlib-page", vector=scene["renderer_id"] == "matplotlib-vector-page")
+        selected = self.selection(gates, raster=scene["renderer_id"] == RASTER_PAGE.renderer_id, vector=scene["renderer_id"] == VECTOR_PAGE.renderer_id)
         return {"id": "map-quality-checks", "version": self.checkers.version,
                 "digest": sha256_digest({"registry": self.checkers.policy_digest, "quality_gates": gates,
                     "effective_checks": [self.checkers.definition(check_id) for check_id in selected]})}
 
     def inspect(self, candidate: dict[str, Any], scene: dict[str, Any], gates: dict[str, Any],
                 *, profile: Any, raster: dict[str, Any] | None = None, vector: dict[str, Any] | None = None) -> dict[str, Any]:
-        selected = self.selection(gates, raster=scene["renderer_id"] == "rasterio-matplotlib-page", vector=scene["renderer_id"] == "matplotlib-vector-page")
+        selected = self.selection(gates, raster=scene["renderer_id"] == RASTER_PAGE.renderer_id, vector=scene["renderer_id"] == VECTOR_PAGE.renderer_id)
         reference = self.reference(gates, scene)
         frozen = [ref for ref in candidate["execution"].get("policy_refs", []) if ref["id"] == reference["id"]]
         if frozen != [reference]:

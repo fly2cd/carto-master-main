@@ -5,6 +5,7 @@ from typing import Any
 
 from ..adapters.controlled_renderer import BrowserLimits
 from ..adapters.render_backend import create_render_backend
+from ..backend_registry import MAPLIBRE_WEB
 from ..canonical import sha256_digest
 from ..errors import CartoError, ProtocolError
 from ..scenario_registry import ScenarioRegistry
@@ -37,7 +38,7 @@ class FormalMapRenderService:
         browser: str | Path | None = None,
         registry: SchemaRegistry | None = None,
         limits: BrowserLimits | None = None,
-        renderer_id: str = "maplibre-web",
+        renderer_id: str = MAPLIBRE_WEB.renderer_id,
         project_root: Path | None = None,
         context=None,
     ) -> None:

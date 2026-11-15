@@ -5,11 +5,12 @@ from ..canonical import sha256_digest
 from ..errors import ProtocolError, SecurityError
 from ..contracts.execution import ExecutionContext
 from ..contracts.bundle import context_snapshot
+from ..backend_registry import RASTER_PAGE
 from ..contracts.protocols import BundlePreparerFactory, RasterPreparationProtocol
 from .layout import LayoutResolver
 from .raster_page_contract import validate_page_request
 
-RASTER_RENDERER_ID='rasterio-matplotlib-page'
+RASTER_RENDERER_ID = RASTER_PAGE.renderer_id  # derived; single authority = carto_core.backend_registry
 
 # context_snapshot: imported from the neutral leaf contracts.bundle (single
 # authoritative definition). The former local duplicate was removed to prevent drift.

@@ -6,7 +6,7 @@ from pathlib import Path
 from ..canonical import sha256_digest
 from ..compiler.layout import LayoutResolver
 from ..errors import ProtocolError
-from .backend_registry import IMPL_BROWSER, MAPLIBRE_WEB, resolve
+from ..backend_registry import IMPL_BROWSER, MAPLIBRE_WEB, resolve
 from .controlled_renderer import (FRONTEND_BUILD, MAPLIBRE_VERSION, OVERLAY_ENGINE_VERSION,
     RENDERER_VERSION, BrowserLimits, ControlledBrowserRenderer, browser_version, discover_browser)
 from .webmap_renderer import (RendererCapabilityProfile, RendererCapabilityRegistry,

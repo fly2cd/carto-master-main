@@ -6,14 +6,19 @@ map_generation（``renderer_id in {...}``）与 map_candidate 等多处硬编码
 收敛为唯一权威表——新增一个后端只需在此登记一条 BackendDescriptor。
 
 本模块是零内部依赖的叶子（仅依赖 carto_core.errors），因此 workflow / compiler /
-adapters 均可安全导入而不触发循环 import（compiler.*_scene 对本包的模块级导入历来
-敏感，故这些模块保留各自的自我 id 常量，由测试锚定与此处一致，见 test_backend_registry）。
+validation / adapters 均可安全导入而不触发循环 import。P0-1 将其从 adapters/ 提到包根：
+后端身份表是内核与渲染后端之间的契约，留在 adapters 里会迫使 compiler 为一个常量去
+import 渲染适配器包（触发 adapters/__init__ 级联）。
+
+字面量单一权威由测试强制：renderer_id 字符串只允许出现在本文件；compiler.*_scene 与
+adapters.page_renderer 的 id 常量一律由本表派生，不再各持副本
+（见 tests/test_backend_registry.py 的 AST 守卫）。
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..errors import ProtocolError
+from .errors import ProtocolError
 
 # 后端家族：进程内静态页渲染（matplotlib 系） vs 浏览器/WebGL 渲染（maplibre）。
 STATIC_PAGE = "static-page"

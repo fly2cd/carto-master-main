@@ -5,6 +5,7 @@ import math
 from copy import deepcopy
 from typing import Any
 
+from ..backend_registry import is_static
 from ..canonical import sha256_digest
 from ..errors import ProtocolError
 from ..schema_registry import SchemaRegistry
@@ -259,7 +260,7 @@ class LayoutResolver:
         if (any(scene["viewport"].get(key) != page[key] for key in ("width_px", "height_px", "device_pixel_ratio"))
                 or scene["export"]["dpi"] != page["dpi"]):
             raise ProtocolError("LAYOUT_PAGE_MISMATCH", scene["scene_id"])
-        if scene.get("renderer_id") in {"rasterio-matplotlib-page", "matplotlib-vector-page"}:
+        if is_static(scene.get("renderer_id")):
             if scene["viewport"]["device_pixel_ratio"] != 1:
                 raise ProtocolError("RASTER_PIXEL_RATIO_UNSUPPORTED", "Static page uses physical pixels, DPR must be one")
             return
@@ -275,7 +276,7 @@ class LayoutResolver:
             raise ProtocolError("LAYOUT_EXECUTION_MISMATCH", scene["scene_id"])
         if execution.get("render_scene_ref", {}).get("digest") != sha256_digest(scene):
             raise ProtocolError("LAYOUT_SCENE_DIGEST_MISMATCH", scene["scene_id"])
-        if scene.get("renderer_id") in {"rasterio-matplotlib-page", "matplotlib-vector-page"}:
+        if is_static(scene.get("renderer_id")):
             if (execution.get("environment", {}).get("renderer_id") != scene["renderer_id"]
                     or execution.get("page_inputs") != {k: scene[k] for k in ("prepared_bundle_ref", "page_request_ref")}):
                 raise ProtocolError("RASTER_EXECUTION_INPUT_DRIFT", scene["scene_id"])

@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from ..backend_registry import MAPLIBRE_WEB
 from ..canonical import sha256_digest
 from .controlled_renderer import (
     FRONTEND_BUILD,
@@ -25,7 +26,7 @@ from .controlled_renderer import (
 class RendererCapabilityProbe:
     """Perform a real local Chromium/MapLibre capability handshake."""
 
-    DEFAULT_RENDERER = "maplibre-web"
+    DEFAULT_RENDERER = MAPLIBRE_WEB.renderer_id
 
     def __init__(self, timeout_seconds: float = 10.0) -> None:
         if timeout_seconds <= 0:

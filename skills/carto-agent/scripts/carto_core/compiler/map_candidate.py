@@ -171,7 +171,7 @@ class MapCandidateCompiler:
             raise ProtocolError("CANDIDATE_SCENE_DIGEST_MISMATCH", candidate["candidate_id"])
         self._require_port("material_facts")(
             candidate["execution"], self.path_guard, self.project_root, self.registry)
-        from ..adapters.backend_registry import RASTER_PAGE, VECTOR_PAGE
+        from ..backend_registry import RASTER_PAGE, VECTOR_PAGE
         inputs = None
         if scene["renderer_id"] == RASTER_PAGE.renderer_id:
             if self.project_root is None or self.context is None:

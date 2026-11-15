@@ -13,6 +13,7 @@ from pathlib import Path
 from threading import RLock
 from typing import Any
 
+from ..backend_registry import RASTER_PAGE, VECTOR_PAGE
 from ..canonical import sha256_digest
 from ..compiler.layout import LayoutResolver
 from ..errors import ProtocolError
@@ -20,9 +21,9 @@ from ..repository.immutable_store import StoredArtifact
 from ..workflow.models import ExecutionContext
 from .static_page_renderer import MeasuredPageRenderer, FONT_LIMIT
 
-RASTER_RENDERER_ID = "rasterio-matplotlib-page"
+RASTER_RENDERER_ID = RASTER_PAGE.renderer_id
 RASTER_VERSION = "3.0.0"
-VECTOR_RENDERER_ID = "matplotlib-vector-page"
+VECTOR_RENDERER_ID = VECTOR_PAGE.renderer_id
 VECTOR_VERSION = "1.0.0"
 
 

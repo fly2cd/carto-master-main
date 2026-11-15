@@ -9,6 +9,7 @@ from typing import Any
 
 from .controlled_renderer import RANDOM_SEED, ControlledBrowserRenderer
 from ..artifacts import file_digest
+from ..backend_registry import MAPLIBRE_WEB
 
 from ..compiler.layout import LayoutResolver
 from ..canonical import canonical_json_bytes, sha256_digest
@@ -349,7 +350,7 @@ class RenderReceiptValidator:
 class WebMapRendererAdapter:
     """Backend adapter for the MapLibre GL JS and SVG overlay renderer pipeline."""
 
-    DEFAULT_RENDERER = "maplibre-web"
+    DEFAULT_RENDERER = MAPLIBRE_WEB.renderer_id
 
     def __init__(
         self,
@@ -364,7 +365,7 @@ class WebMapRendererAdapter:
 
     def capabilities(self) -> set[str]:
         return {
-            "maplibre-web", "svg-overlay", "controlled-render-session",
+            MAPLIBRE_WEB.renderer_id, "svg-overlay", "controlled-render-session",
             "fill", "point-symbol", "offline-only", "svg", "png", "pdf-preview",
         }
 

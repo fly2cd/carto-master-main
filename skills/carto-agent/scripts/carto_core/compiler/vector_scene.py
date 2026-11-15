@@ -2,13 +2,14 @@
 from copy import deepcopy
 from ..canonical import sha256_digest
 from ..errors import ProtocolError, SecurityError
+from ..backend_registry import VECTOR_PAGE
 from ..contracts.bundle import context_snapshot
 from ..contracts.protocols import BundlePreparerFactory, VectorPreparationProtocol
 from .vector_page import validate_page
 from .layout import LayoutResolver
 from .thematic_design import resolve_design
 
-RENDERER_ID = 'matplotlib-vector-page'
+RENDERER_ID = VECTOR_PAGE.renderer_id  # derived; single authority = carto_core.backend_registry
 
 
 class VectorSceneCompiler:

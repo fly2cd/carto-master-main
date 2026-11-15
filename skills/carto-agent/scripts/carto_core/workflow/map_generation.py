@@ -5,7 +5,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any, Callable
 
-from ..adapters.backend_registry import VECTOR_PAGE, is_static
+from ..backend_registry import VECTOR_PAGE, is_static
 from ..canonical import sha256_digest
 from ..compiler.map_candidate import MapCandidateCompiler
 from ..compiler.map_lock import MapSpecLockCompiler
