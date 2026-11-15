@@ -172,7 +172,7 @@ class GridPageTests(PreparationFixture, unittest.TestCase):
                 artifact = self.renderer.render(page, self.context)
                 output = self.renderer.load_verified(artifact.ref(), self.context)
                 self.assertEqual(2, len(output['body_refs']))
-                bodies = [self.service._json_ref(item['ref'], 'raster-map-body') for item in output['body_refs']]
+                bodies = [self.service.document(item['ref'], 'raster-map-body') for item in output['body_refs']]
                 self.assertNotEqual(bodies[0]['bounds'], bodies[1]['bounds'])
                 for ref, body in zip(output['body_refs'], bodies):
                     self.assertEqual(ref['frame_id'], body['frame_id'])
@@ -200,7 +200,7 @@ class GridPageTests(PreparationFixture, unittest.TestCase):
         inputs = compiler.validate_scene(scene, self.context)
         self.assertEqual(4, len(inputs['layers']))
         self.assertEqual(2, len(inputs['bundle']['role_bindings']))
-        output = self.service._json_ref(self.renderer.render(page, self.context).ref(), 'page-output')
+        output = self.service.document(self.renderer.render(page, self.context).ref(), 'page-output')
         self.assertEqual(4, len(output['body_refs']))
         self.assertEqual(4, len({item['frame_id'] for item in output['body_refs']}))
         self.assertEqual(4, len(page['bindings']['panels']))
@@ -261,7 +261,7 @@ class GridPageTests(PreparationFixture, unittest.TestCase):
 
     def test_output_body_omission_swap_and_second_panel_artifact_tamper_fail(self):
         output_ref = self.renderer.render(self.page(), self.context).ref()
-        original = self.service._json_ref(output_ref, 'page-output')
+        original = self.service.document(output_ref, 'page-output')
         for mutation in ('omit', 'swap'):
             bad = deepcopy(original)
             if mutation == 'omit':
@@ -271,7 +271,7 @@ class GridPageTests(PreparationFixture, unittest.TestCase):
             bad_ref = self.service.save_document(bad, 'page-output').ref()
             with self.subTest(mutation=mutation), self.assertRaisesRegex(CartoError, 'RASTER_PAGE_CHANGED'):
                 self.renderer.load_verified(bad_ref, self.context)
-        body = self.service._json_ref(original['body_refs'][1]['ref'], 'raster-map-body')
+        body = self.service.document(original['body_refs'][1]['ref'], 'raster-map-body')
         path = Path(body['image']['artifact_ref']['uri'])
         path.write_bytes(path.read_bytes() + b'tampered')
         with self.assertRaises(CartoError):

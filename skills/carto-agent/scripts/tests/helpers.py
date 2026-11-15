@@ -29,7 +29,7 @@ def compile_portrayal(service, prepared, context):
 
 def pending_portrayal(service, ready_portrayal, pending):
     """Forge a schema-valid artifact to check consumers revalidate the whole chain."""
-    document = service._json_ref(ready_portrayal, "resolved-portrayal")
+    document = service.document(ready_portrayal, "resolved-portrayal")
     document["prepared_ref"] = pending.ref()
     return service.save_document(document, "resolved-portrayal")
 

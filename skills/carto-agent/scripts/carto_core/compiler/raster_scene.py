@@ -24,7 +24,7 @@ class RasterSceneCompiler:
 
     def _inputs(self,bundle_ref,page_ref,context):
         bundle=self.bundles(self.preparation, "raster").load_verified(bundle_ref,context)
-        page=self.preparation._json_ref(page_ref,'page-request')
+        page=self.preparation.document(page_ref,'page-request')
         inputs=validate_page_request(self.preparation,page,context,self.bundles)
         if bundle!=inputs['bundle']:
             raise ProtocolError('RASTER_BUNDLE_PORTRAYAL_MISMATCH','Page sources differ from bundle')

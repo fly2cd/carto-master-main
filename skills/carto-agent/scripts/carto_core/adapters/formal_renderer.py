@@ -254,7 +254,7 @@ class FormalRenderer:
         inputs = self.validate_scene(scene)
         started = utc_now()
         artifact = self.page_renderer.render(inputs["page"], self.context)
-        page = self.preparation._json_ref(artifact.ref(), self.page_output_schema) if not (
+        page = self.preparation.document(artifact.ref(), self.page_output_schema) if not (
             self.renderer_id == PAGE_VECTOR_ID) else self.preparation.document(artifact.ref(), self.page_output_schema)
         if page["environment"] != self.profile.runtime or page["request_ref"] != scene["page_request_ref"]:
             raise ProtocolError("RENDER_ENVIRONMENT_DRIFT", "Rendered page differs from the frozen request/runtime")

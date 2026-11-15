@@ -239,7 +239,7 @@ class RasterPortrayalCompiler:
         return self.preparation.save_document(result, "resolved-portrayal")
 
     def load_verified(self, reference: dict[str, str], context: ExecutionContext) -> dict[str, Any]:
-        result = self.preparation._json_ref(reference, "resolved-portrayal")
+        result = self.preparation.document(reference, "resolved-portrayal")
         expected = self._build(result["portrayal"], result["layer_id"], result["prepared_ref"], context)
         if result != expected:
             raise ProtocolError("RASTER_PORTRAYAL_CHANGED", "Display contract, source, expression or compiler differs from frozen portrayal")

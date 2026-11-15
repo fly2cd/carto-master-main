@@ -814,7 +814,7 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
         from carto_core.compiler.raster_page_contract import compile_page_request
         compiled = self.compile_via_components()
         original = compiled["scene"]
-        page = self.service._json_ref(original["page_request_ref"], "page-request")
+        page = self.service.document(original["page_request_ref"], "page-request")
         style = deepcopy(page["appearance"]["cartography"])
         style["typography"]["title_pt"] = 14
         raw = {k: deepcopy(v) for k, v in page.items() if k not in {"appearance", "bindings"}}

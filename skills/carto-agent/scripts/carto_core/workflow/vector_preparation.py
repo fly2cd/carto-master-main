@@ -122,9 +122,6 @@ class VectorPreparationService(StaticAssetStore):
     def save_document(self, value, kind):
         return self.save(kind, value)
 
-    def _json_ref(self, ref, kind):
-        return self.document(ref, kind)
-
     def document(self, ref, kind):
         expected_version = protocol_version(kind)
         if (set(ref) != {'id', 'version', 'digest', 'uri'} or ref['id'] != kind or ref['version'] != expected_version):

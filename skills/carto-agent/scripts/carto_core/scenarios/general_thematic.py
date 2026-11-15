@@ -922,7 +922,7 @@ def validation_scene(package_root: Path, snapshot: dict[str, Any], targets: list
     bundle_ref = preparation.save_document(bundle, "prepared-data-bundle").ref()
     portrayal_ref = RasterPortrayalCompiler(preparation).compile(
         deepcopy(documents["portrayal"]), LAYER_ID, prepared.ref(), context).ref()
-    resolved_portrayal = preparation._json_ref(portrayal_ref, "resolved-portrayal")
+    resolved_portrayal = preparation.document(portrayal_ref, "resolved-portrayal")
     legend = resolved_portrayal["legend_items"]
     scenario = documents["scenario"]
     limit = int(scenario["embedded"]["layout"]["capacity"]["legend_items"])

@@ -54,7 +54,11 @@ GEOMETRIES = ("raster", "vector")
 
 @runtime_checkable
 class PreparationServiceProtocol(Protocol):
-    """Members every preparation service exposes, independent of geometry."""
+    """Members every preparation service exposes, with an identical call contract.
+
+    ``load_verified`` and persistence are NOT here: their signatures and return shapes
+    genuinely differ per geometry, so they stay on the geometry-specific protocols.
+    """
 
     #: Schema registry used for every contract validation; never optional.
     registry: SchemaRegistry
@@ -62,18 +66,19 @@ class PreparationServiceProtocol(Protocol):
     def snapshot_bytes(self, asset: dict[str, Any], kind: str, extension: str) -> bytes:
         """Re-read frozen bytes and assert they still match their artifact ref."""
 
+    def document(self, ref: dict[str, str], kind: str) -> dict[str, Any]:
+        """Load an immutable JSON document by reference and re-verify its digest.
+
+        Both geometries provide it under this name (the raster implementation was
+        ``_json_ref`` until P1 Step A); it is the single way to read back a frozen
+        contract document, and it is what makes geometry-agnostic call sites --
+        ``adapters.formal_renderer`` / ``adapters.page_renderer`` -- possible.
+        """
+
 
 @runtime_checkable
 class RasterPreparationProtocol(PreparationServiceProtocol, Protocol):
     """Raster preparation port (MCP-gateway backed classification/continuous)."""
-
-    def _json_ref(self, reference: dict[str, str], schema: str) -> dict[str, Any]:
-        """Load an immutable JSON document by reference and re-verify its digest.
-
-        The leading underscore is the existing execution-layer name; it is kept so
-        the port describes reality instead of forcing a rename across frozen
-        artifacts and code digests.
-        """
 
     def save_document(self, value: dict[str, Any], schema: str) -> Any:
         """Validate against ``schema`` and store the document content-addressed."""
@@ -85,9 +90,6 @@ class RasterPreparationProtocol(PreparationServiceProtocol, Protocol):
 @runtime_checkable
 class VectorPreparationProtocol(PreparationServiceProtocol, Protocol):
     """Vector preparation port (hermetic Fiona/Shapely reader)."""
-
-    def document(self, ref: dict[str, str], kind: str) -> dict[str, Any]:
-        """Load an immutable vector document by reference and re-verify its digest."""
 
     def save(self, kind: str, value: dict[str, Any]) -> Any:
         """Validate against ``kind`` and store the document content-addressed."""

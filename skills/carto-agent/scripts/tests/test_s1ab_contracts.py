@@ -165,16 +165,16 @@ class SinglePageNormalizationTests(PreparationFixture, unittest.TestCase):
         self.assertEqual('4.0.0', ref['version'])
         ref['version'] = '1.0.0'
         with self.assertRaisesRegex(ProtocolError, 'RASTER_REFERENCE_INVALID'):
-            self.service._json_ref(ref,'page-request')
+            self.service.document(ref,'page-request')
 
     def test_template_typography_changes_actual_measurement(self):
         first = self.renderer.render(self.page,self.context)
-        one = self.service._json_ref(first.ref(),'page-output')
+        one = self.service.document(first.ref(),'page-output')
         updated = deepcopy(self.page)
         updated['appearance']['cartography']['typography']['title_pt'] = 14
         updated = rebind_page(self.service,updated,self.context)
         second = self.renderer.render(updated,self.context)
-        two = self.service._json_ref(second.ref(),'page-output')
+        two = self.service.document(second.ref(),'page-output')
         height = lambda output: next(item['bounds_px'][3] for item in output['measurements'] if item['element_id']=='title')
         self.assertLess(height(two), height(one))
         self.assertEqual(self.page['portrayals'][0]['ref'], updated['portrayals'][0]['ref'])

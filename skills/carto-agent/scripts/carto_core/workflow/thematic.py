@@ -12,8 +12,9 @@ working:
 
 * ``metric_value`` / ``finite`` / ``expression_reference`` ->
   ``carto_core.compiler.portrayal_resolver`` (IR-level value and catalog resolution);
-* ``equal_interval_edges`` / ``resolve_design`` / ``_domain`` / ``_design_to_ir`` ->
-  ``carto_core.compiler.thematic_design`` (design -> encoding IR).
+* ``equal_interval_edges`` / ``resolve_design`` ->
+  ``carto_core.compiler.thematic_design`` (design -> encoding IR). Its ``_domain`` /
+  ``_design_to_ir`` helpers stay private there: nothing outside that module uses them.
 
 New code in ``compiler`` must import them from the kernel directly; that is what
 removed the ``compiler -> workflow`` runtime edge. Per design-principles §2.3 these
@@ -23,16 +24,9 @@ from copy import deepcopy
 from ..canonical import sha256_digest
 from ..errors import ProtocolError, SecurityError
 from ..compiler.portrayal_resolver import expression_reference, finite, ir_to_kind, metric_value
-from ..compiler.thematic_design import (
-    _design_to_ir,
-    _domain,
-    equal_interval_edges,
-    resolve_design,
-)
+from ..compiler.thematic_design import equal_interval_edges, resolve_design
 
 __all__ = [
-    "_design_to_ir",
-    "_domain",
     "equal_interval_edges",
     "expression_reference",
     "finite",

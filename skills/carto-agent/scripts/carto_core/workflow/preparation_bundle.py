@@ -308,9 +308,9 @@ class BundlePreparer:
             if value != self.build_many([b['prepared_ref'] for b in value['role_bindings']], context):
                 raise ProtocolError('VECTOR_BUNDLE_CHANGED', 'Bundle differs from verified source bindings')
             return value
-        # Raster: _json_ref returns (value,) for prepared-data-bundle
-        bundle = self.preparation._json_ref(ref, 'prepared-data-bundle')
-        inputs = self.preparation._json_ref(bundle['task_ref'], 'bundle-inputs')
+        # Raster: document() returns (value,) for prepared-data-bundle
+        bundle = self.preparation.document(ref, 'prepared-data-bundle')
+        inputs = self.preparation.document(bundle['task_ref'], 'bundle-inputs')
         refs = index_by(inputs['inputs'], 'source_id')
         if bundle != self.build_many([v['prepared_ref'] for _, v in sorted(refs.items())], context):
             raise ProtocolError('RASTER_BUNDLE_CHANGED', 'Bundle differs from verified preparations')

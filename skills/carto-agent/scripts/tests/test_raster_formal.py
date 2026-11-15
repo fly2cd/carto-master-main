@@ -227,7 +227,7 @@ class RasterFormalTests(PreparationFixture, unittest.TestCase):
                           "embedded": {"cartography": deepcopy(self.page["appearance"]["cartography"]),
                                        "layout":deepcopy(self.page["resolved_layout"]["template_contract"])}},
                           "quality_gates": deepcopy(VALID_CASES["quality-gates"])}
-        self.contracts["portrayal"] = self.service._json_ref(self.page["portrayals"][0]["ref"], "resolved-portrayal")["portrayal"]
+        self.contracts["portrayal"] = self.service.document(self.page["portrayals"][0]["ref"], "resolved-portrayal")["portrayal"]
         reference = MapQualityChecks(self.registry).reference(self.contracts["quality_gates"], self.scene)
         self.execution["policy_refs"] = [reference]
         self.candidate.update(execution=self.execution, execution_digest=sha256_digest(self.execution))

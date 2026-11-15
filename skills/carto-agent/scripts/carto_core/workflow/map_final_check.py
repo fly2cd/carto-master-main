@@ -159,7 +159,7 @@ class FinalMapCheckService:
             if (item["artifact_ref"]["digest"] != asset["artifact_ref"]["digest"]
                     or item["size_bytes"] != asset["size_bytes"]):
                 raise ProtocolError("FINAL_CHECK_RASTER_BINDING", "Attested outputs differ from the verified page")
-        bodies={item['view_id']:preparation._json_ref(item['ref'],'raster-map-body') for item in page['body_refs']}
+        bodies={item['view_id']:preparation.document(item['ref'],'raster-map-body') for item in page['body_refs']}
         expected={p['view_id']:p['frame_id'] for p in inputs['page']['bindings']['panels']}
         if len(page['body_refs'])!=len(expected) or {p['view_id']:p['frame_id'] for p in page['body_refs']}!=expected:
             raise ProtocolError('FINAL_CHECK_RASTER_BINDING','Missing or duplicate panel output')

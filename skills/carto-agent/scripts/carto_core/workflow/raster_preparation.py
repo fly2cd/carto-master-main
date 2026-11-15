@@ -42,7 +42,16 @@ class RasterPreparationService(StaticAssetStore):
         _publish_bytes(self.project_guard, path, canonical_json_bytes(value) + b"\n")
         return StoredArtifact(schema, protocol_version(schema), digest, path)
 
-    def _json_ref(self, reference: dict[str, str], schema: str) -> dict[str, Any]:
+    def document(self, reference: dict[str, str], schema: str) -> dict[str, Any]:
+        """Load an immutable JSON document by reference, re-verifying identity and digest.
+
+        Public since P1 Step A: this was ``_json_ref``, yet it is called from four layers
+        and is declared on ``contracts.protocols.PreparationServiceProtocol`` -- a private
+        name for a cross-layer port member is a contract that cannot be honoured. The name
+        now matches ``VectorPreparationService.document``, which is the same contract with
+        geometry-specific internals (the two ``load_verified`` signatures still differ and
+        are deliberately not unified).
+        """
         # Reference identity is checked before indexing, including for direct library callers.
         if (not isinstance(reference, dict) or set(reference) != {"id", "version", "digest", "uri"}
                 or reference.get("version") != protocol_version(schema)
@@ -137,7 +146,7 @@ class RasterPreparationService(StaticAssetStore):
                 or receipt.capability_id != "gis-raster-statistics" or len(receipt.artifact_refs) != 1
                 or receipt.artifact_refs[0]["digest"] != receipt.output_digest):
             raise ProtocolError("CLASSIFICATION_EVIDENCE_INVALID", "Statistics gateway evidence is not bound to this request")
-        result = self._json_ref(receipt.artifact_refs[0], "geospatial-result")
+        result = self.document(receipt.artifact_refs[0], "geospatial-result")
         self._check_result(result, source)
         # Recheck live inputs before publishing their captured bytes. Later rendering uses ONLY snapshots.
         if (self.read_bytes(path, 268435456) != content or self.read_bytes(legend_path, 1048576) != legend):
@@ -195,7 +204,7 @@ class RasterPreparationService(StaticAssetStore):
                 or receipt.capability_id != "gis-raster-statistics" or len(receipt.artifact_refs) != 1
                 or receipt.artifact_refs[0]["digest"] != receipt.output_digest):
             raise ProtocolError("CLASSIFICATION_EVIDENCE_INVALID", "Statistics gateway evidence is not bound to this request")
-        result = self._json_ref(receipt.artifact_refs[0], "geospatial-result")
+        result = self.document(receipt.artifact_refs[0], "geospatial-result")
         self._check_continuous_result(result, source)
         encoding = self._continuous_encoding(request, result["statistics"]["continuous"])
         self.registry.validate("encoding-ir", encoding)
@@ -208,7 +217,7 @@ class RasterPreparationService(StaticAssetStore):
         return self.save_document(report, "raster-prepared-data")
 
     def load_verified(self, reference: dict[str, str]) -> tuple[dict[str, Any], dict[str, Any]]:
-        report = self._json_ref(reference, "raster-prepared-data")
+        report = self.document(reference, "raster-prepared-data")
         request = report["request"]
         if report["algorithm_digest"] != algorithm_digest() or report["request_digest"] != sha256_digest(request):
             raise ProtocolError("CLASSIFICATION_ALGORITHM_DRIFT", "Request or classification implementation has changed")
@@ -216,7 +225,7 @@ class RasterPreparationService(StaticAssetStore):
         if (self.digest_bytes(content) != request["source"]["source_ref"]["digest"]
                 or len(content) != request["source"]["size_bytes"]):
             raise ProtocolError("CLASSIFICATION_SNAPSHOT_MISMATCH", "Snapshots are not bound to the declared inputs")
-        result = self._json_ref(report["gis_result_ref"], "geospatial-result")
+        result = self.document(report["gis_result_ref"], "geospatial-result")
         if report["kind"] == "raster-continuous-preparation":
             self._check_continuous_result(result, request["source"])
             if report["encoding"] != self._continuous_encoding(request, result["statistics"]["continuous"]):

@@ -146,9 +146,9 @@ class PortConformanceTests(unittest.TestCase):
 
     def test_raster_service_does_not_satisfy_the_vector_port(self):
         # The two APIs are deliberately different (document/save vs
-        # save_document/_json_ref, crs_contract only on the vector reader), so a
+        # save_document/document, crs_contract only on the vector reader), so a
         # mis-wired geometry must not pass as the other port. The converse is not
-        # asserted: VectorPreparationService also exposes save_document/_json_ref
+        # asserted: VectorPreparationService also exposes save_document/document
         # aliases and is therefore a structural superset of the raster port.
         self.assertNotIsInstance(self.raster_service(), protocols.VectorPreparationProtocol)
 

@@ -192,7 +192,7 @@ class RasterMapBodyRenderer:
         Caller supplies one legend overlay; its items are filled from the SAME frozen
         classification as the map. Remaining overlays (title, source, etc.) use the existing layout.
         """
-        body = self.preparation._json_ref(body_ref, "raster-map-body")
+        body = self.preparation.document(body_ref, "raster-map-body")
         verified = self.render(body["portrayal_ref"], resolved_layout, context, frame_id=body["frame_id"])
         if verified.digest != body_ref["digest"]:
             raise ProtocolError("RASTER_MAP_BODY_CHANGED", "Body, layout, renderer or environment differs from frozen output")

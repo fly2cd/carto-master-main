@@ -335,7 +335,7 @@ class TemplatePackageValidator:
                 if any(ir_to_kind(VectorPortrayalCompiler(vector).load_verified(p["portrayal_ref"], self.context)[0]["encoding"]) != item["expression"] for p in page["panels"]):
                     raise ProtocolError("GRID_VALIDATION_CASE_MISMATCH", "Vector expression coverage differs")
             else:
-                page = preparation._json_ref(scene["page_request_ref"], "page-request")
+                page = preparation.document(scene["page_request_ref"], "page-request")
             actual_style = page["cartography"] if scene["renderer_id"] == VECTOR_PAGE.renderer_id else page["appearance"]["cartography"]
             if actual_style != snapshot["documents"]["scenario"]["embedded"]["cartography"]:
                 raise ProtocolError("APPEARANCE_TEMPLATE_MISMATCH", "Fixture style differs from template")

@@ -187,7 +187,7 @@ class PageRenderer(MeasuredPageRenderer):
         for panel in request["bindings"]["panels"]:
             body_artifact = self._body_renderer.render(
                 refs[panel["view_id"]], request["resolved_layout"], context, frame_id=panel["frame_id"])
-            body = self.preparation._json_ref(body_artifact.ref(), "raster-map-body")
+            body = self.preparation.document(body_artifact.ref(), "raster-map-body")
             bodies[panel["view_id"]] = body
             body_refs.append({"view_id": panel["view_id"], "frame_id": panel["frame_id"], "ref": body_artifact.ref()})
         if len({sha256_digest(b["environment"]) for b in bodies.values()}) != 1:
@@ -281,8 +281,8 @@ class PageRenderer(MeasuredPageRenderer):
             if self.render(page, context).digest != reference["digest"]:
                 raise ProtocolError("VECTOR_PAGE_CHANGED", "Page evidence does not match deterministic frozen inputs")
             return output
-        output = self.preparation._json_ref(reference, "page-output")
-        request = self.preparation._json_ref(output["request_ref"], "page-request")
+        output = self.preparation.document(reference, "page-output")
+        request = self.preparation.document(output["request_ref"], "page-request")
         self._validate(request, context)
         for kind, asset in output["outputs"].items():
             self.preparation.snapshot_bytes(asset, f"page-{kind}", f".{kind}")
