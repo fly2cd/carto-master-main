@@ -5,19 +5,14 @@ from typing import Any
 
 from ..schema_registry import SchemaRegistry
 from ..security.paths import PathGuard
+from ..contracts.bundle import MATERIAL_BUNDLE_KEYS, bundle_core
 from .data_adoption import DataAdoptionService
 from .material_extraction import MaterialExtractionService
 
-# Keys MapDataPreparer augments onto the scenario-prepared bundle for material
-# (non-GIS) provenance. Scenario candidate compilers re-prepare the GIS bundle
-# without these, so bundle-identity comparisons must exclude them; material
-# integrity is bound separately via execution.material_facts_refs (P0-1).
-MATERIAL_BUNDLE_KEYS = frozenset({"material_sources", "adoption_evidence", "data_facts"})
-
-
-def bundle_core(bundle: dict[str, Any]) -> dict[str, Any]:
-    """GIS-core view of a bundle, excluding MapDataPreparer material augmentation."""
-    return {k: v for k, v in bundle.items() if k not in MATERIAL_BUNDLE_KEYS}
+# MATERIAL_BUNDLE_KEYS / bundle_core relocated to the neutral leaf
+# ``carto_core.contracts.bundle`` so the compiler layer can consume them without
+# importing ``workflow``. Re-exported here (via the import above) so existing
+# ``from ..workflow.map_data_preparation import bundle_core`` paths keep working.
 
 
 class MapDataPreparer:

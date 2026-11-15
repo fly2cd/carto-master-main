@@ -17,6 +17,7 @@ from ..artifacts import atomic_write_bytes, protocol_version
 from ..repository.immutable_store import ImmutableArtifactStore, StoredArtifact
 from ..schema_registry import SchemaRegistry
 from ..security.paths import PathGuard
+from ..contracts.bundle import context_snapshot
 
 MAX_BYTES = 32 * 1024 * 1024
 MAX_FEATURES = 10000
@@ -43,9 +44,10 @@ def reader_digest():
                           for name in ('vector-input', 'vector-prepared-data')]]}})
 
 
-def context_snapshot(context):
-    context.require_project_scope()
-    return {key: getattr(context, key) for key in ('run_id', 'tenant_id', 'project_id', 'subject_id')}
+# context_snapshot relocated to the neutral leaf ``carto_core.contracts.bundle``
+# (single authoritative definition; it was duplicated in compiler/raster_scene.py).
+# Imported at the top of this module and re-exported for existing importers such
+# as compiler.vector_scene (``from ..workflow.vector_preparation import context_snapshot``).
 
 
 def _json(payload):
