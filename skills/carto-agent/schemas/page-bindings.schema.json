@@ -234,6 +234,7 @@
           },
           "kind": {
             "enum": [
+              "chart",
               "title",
               "marginalia",
               "scale-bar",

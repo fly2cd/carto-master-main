@@ -208,9 +208,14 @@ class PageRenderer(MeasuredPageRenderer):
         request = self.preparation.document(frozen.ref(), "page-request")
         if not hasattr(self, "_layout"):
             self._layout = LayoutResolver(self.preparation.registry)
-        bodies = {p["view_id"]: {**layers[p["view_id"]], "panel": p,
-                  "frame": self._layout.map_frame(request["resolved_layout"], p["frame_id"])}
-                  for p in request["panels"]}
+        bodies = {}
+        for p in request["panels"]:
+            stack = layers[p["view_id"]]
+            bodies[p["view_id"]] = {"stack": stack,
+                                    "portrayal": stack[0]["portrayal"], "report": stack[0]["report"],
+                                    "panel": p,
+                                    "frame": self._layout.map_frame(request["resolved_layout"], p["frame_id"]),
+                                    "basemap": request.get("basemap")}
 
         import platform as _platform
         import zlib as _zlib
@@ -240,8 +245,10 @@ class PageRenderer(MeasuredPageRenderer):
             "renderer_code_digest": page_renderer_digest("vector"),
             "request_ref": frozen.ref(),
             "panel_evidence": [
-                {**p, "feature_count": layers[p["view_id"]]["portrayal"]["counts"]["feature_count"],
-                 "drawn_count": layers[p["view_id"]]["portrayal"]["counts"]["visible_count"]}
+                {**p, "feature_count": sum(item["portrayal"]["counts"]["feature_count"]
+                                           for item in layers[p["view_id"]]),
+                 "drawn_count": sum(item["portrayal"]["counts"]["visible_count"]
+                                    for item in layers[p["view_id"]])}
                 for p in request["panels"]
             ],
             "font_snapshot": font, "font_family": family, "font_embedding_flags": flags,
@@ -303,9 +310,10 @@ class PageRenderer(MeasuredPageRenderer):
         for body in bodies.values():
             x, y, fw, fh = body["frame"]["bounds_px"]
             left, bottom, right, top = body["panel"]["extent"]
-            max_radius = max((s["style"]["symbol"]["radius_mm"] for s in body["portrayal"]["feature_styles"] if s["style"]), default=0)
-            max_stroke = max((s["style"]["symbol"]["stroke_width_pt"] for s in body["portrayal"]["feature_styles"] if s["style"]), default=0)
-            padding = (max_radius * dpi / 25.4 if body["report"]["geometry"] == "point" else 0) + max_stroke * dpi / 144 + 1
+            flat_styles = [s for item in body["stack"] for s in item["portrayal"]["feature_styles"] if s["style"]]
+            max_radius = max((s["style"]["symbol"]["radius_mm"] for s in flat_styles), default=0)
+            max_stroke = max((s["style"]["symbol"]["stroke_width_pt"] for s in flat_styles), default=0)
+            padding = (max_radius * dpi / 25.4 if any(item["report"]["geometry"] == "point" for item in body["stack"]) else 0) + max_stroke * dpi / 144 + 1
             if fw <= 2 * padding or fh <= 2 * padding:
                 raise ProtocolError("VECTOR_MARK_OVERFLOW", "Map frame cannot contain the declared symbol size")
             scale = min((fw - 2 * padding) / (right - left), (fh - 2 * padding) / (top - bottom))
@@ -316,8 +324,19 @@ class PageRenderer(MeasuredPageRenderer):
                 return ((ox + (point[0] - left) * scale) / width,
                         1 - (oy + (top - point[1]) * scale) / height)
 
-            styles = {s["feature_id"]: s["style"] for s in body["portrayal"]["feature_styles"]}
-            for feature in body["report"]["features"]:
+            basemap = body.get("basemap")
+            if basemap:
+                self._draw_basemap(fig, basemap, x, y, fw, fh, left, top, scale, ox, oy, width, height)
+            # Paint each stacked layer in declared order; later layers cover earlier ones.
+            for item in body["stack"]:
+                self._draw_stacked_layer(fig, item, position, width, height, dpi, body)
+
+    def _draw_stacked_layer(self, fig: Any, item: dict[str, Any], position: Any,
+                            width: float, height: float, dpi: float, body: dict[str, Any]) -> None:
+        from matplotlib.path import Path as MplPath
+        from matplotlib.patches import PathPatch, Ellipse
+        styles = {s["feature_id"]: s["style"] for s in item["portrayal"]["feature_styles"]}
+        for feature in item["report"]["features"]:
                 style = styles[feature["id"]]
                 if style is None:
                     continue
@@ -351,7 +370,45 @@ class PageRenderer(MeasuredPageRenderer):
                             vertices.extend(position(point) for point in ring)
                             codes.extend([MplPath.MOVETO] + [MplPath.LINETO] * (len(ring) - 2) + [MplPath.CLOSEPOLY])
                         fig.add_artist(PathPatch(MplPath(vertices, codes), **kwargs))
-            self._draw_feature_labels(fig, body, position, width, height, dpi)
+        self._draw_feature_labels(fig, {"portrayal": item["portrayal"], "frame": body["frame"]},
+                                  position, width, height, dpi)
+
+    def _draw_basemap(self, fig: Any, basemap: dict[str, Any], x: float, y: float, fw: float, fh: float,
+                      left: float, top: float, scale: float, ox: float, oy: float,
+                      width: float, height: float) -> None:
+        # Ground layer: the basemap image is georeferenced by its declared extent
+        # and painted through the SAME affine transform as the thematic features
+        # (no separate placement decision). Figure-ground is enforced via the
+        # frozen style constraints (desaturate/lighten), applied deterministically.
+        import io as _io
+        from pathlib import Path as _Path
+        import numpy as _np
+        from PIL import Image as _Image
+        image = basemap["image"]
+        data = _Path(image["path"]).read_bytes()
+        if self.preparation.digest_bytes(data) != image["digest"]:
+            raise ProtocolError("BASEMAP_DRIFT", "Basemap image differs from its frozen digest")
+        with _Image.open(_io.BytesIO(data)) as opened:
+            rgba = _np.array(opened.convert("RGBA"))
+        style = basemap.get("style") or {}
+        desaturate = float(style.get("desaturate", 0.0))
+        lighten = float(style.get("lighten", 0.0))
+        if desaturate or lighten:
+            rgb = rgba[..., :3].astype(float) / 255.0
+            if desaturate:
+                luminance = rgb @ _np.array([0.2126, 0.7152, 0.0722])
+                rgb = rgb * (1.0 - desaturate) + luminance[..., None] * desaturate
+            if lighten:
+                rgb = _np.clip(rgb + lighten * (1.0 - rgb) if lighten > 0 else rgb * (1.0 + lighten), 0.0, 1.0)
+            rgba = _np.dstack([(rgb * 255.0).round().astype("uint8"), rgba[..., 3]])
+        # The axes occupies the frame; the data window mirrors position()'s affine.
+        axis = fig.add_axes([x / width, 1 - (y + fh) / height, fw / width, fh / height])
+        axis.set_axis_off()
+        bx0, by0, bx1, by1 = basemap["extent"]
+        axis.imshow(rgba, extent=(bx0, bx1, by0, by1), origin="upper",
+                    interpolation="none", resample=False, aspect="auto", zorder=-5)
+        axis.set_xlim(left + (x - ox) / scale, left + (x + fw - ox) / scale)
+        axis.set_ylim(top - (y + fh - oy) / scale, top - (y - oy) / scale)
 
     def _draw_feature_labels(self, fig: Any, body: dict[str, Any], position: Any,
                              width: float, height: float, dpi: float) -> None:

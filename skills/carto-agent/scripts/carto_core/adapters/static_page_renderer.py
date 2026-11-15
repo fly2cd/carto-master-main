@@ -93,6 +93,13 @@ class MeasuredPageRenderer:
         padding = typography["padding_mm"] * mm
         frames = {f["content_id"]: f for f in layout["frames"]}
         font_path = font_asset["artifact_ref"]["uri"]
+        # Layer stack contract: the frozen paint order must match what this
+        # renderer actually draws (bodies -> texts/legends -> charts -> scale/north),
+        # otherwise the contract and the behavior have silently diverged.
+        declared_stack = request.get("layer_stack")
+        expected_stack = (["basemap"] if request.get("basemap") else []) + ["thematic", "legends", "charts", "furniture"]
+        if declared_stack is not None and declared_stack != expected_stack:
+            raise ProtocolError("LAYER_STACK_DRIFT", "Declared layer stack differs from the renderer's paint order")
         # Explicit rc context: no TeX/math parsing, tight crop, system font fallback or random SVG IDs.
         rc = {"text.usetex": False, "text.parse_math": False, "pdf.fonttype": 42, "pdf.use14corefonts": False,
               "pdf.compression": 6, "svg.fonttype": "path", "svg.hashsalt": sha256_digest(request),
@@ -187,6 +194,64 @@ class MeasuredPageRenderer:
                         self._draw_legend_symbol(fig, artists, row, f'{key}-swatch-{index}', key, left, cursor, swatch, width, height, dpi)
                         row_height=max(row_height,swatch,ih)
                     cursor+=row_height+2*mm
+            # E6 chart core: draw frozen chart declarations into their chart frames.
+            # Proportions are recomputed from the frozen declaration via the pure
+            # chart_core (deterministic); the declaration was schema-validated and
+            # slot-bound at compile time, so no placement decisions happen here.
+            from ..compiler.chart_core import validate_chart
+            for chart in request.get("charts", []):
+                key = chart["content_id"]
+                x, y, w, h = frames[key]["bounds_px"]
+                computed = validate_chart(chart)
+                cursor = y + padding
+                if chart.get("title"):
+                    cursor += text(key + "-title", key, chart["title"], x + padding, cursor,
+                                   typography["legend_heading_pt"], w - 2 * padding) + 2 * mm
+                if chart["kind"] == "bar-horizontal":
+                    row_h = 4 * mm
+                    for index, series in enumerate(chart["series"]):
+                        bar_w = computed["fractions"][index] * (w - 2 * padding)
+                        patch(key + "-bar-%d" % index, key, x + padding, cursor,
+                              max(bar_w, 0.1), row_h, series["color"])
+                        text(key + "-label-%d" % index, key, series["label"],
+                             x + padding + bar_w + 1.5 * mm, cursor, typography["legend_pt"],
+                             max(w - 2 * padding - bar_w - 1.5 * mm, 1))
+                        cursor += row_h + 1.5 * mm
+                elif chart["kind"] == "bar-vertical":
+                    from matplotlib.patches import Rectangle as _BarRect
+                    count_n = len(chart["series"])
+                    col_w = (w - 2 * padding) / count_n
+                    label_h = 5 * mm
+                    bar_max_h = h - 2 * padding - label_h - (cursor - y - padding)
+                    for index, series in enumerate(chart["series"]):
+                        bar_h = computed["fractions"][index] * bar_max_h
+                        bar_x = x + padding + index * col_w + col_w * 0.2
+                        patch(key + "-bar-%d" % index, key, bar_x,
+                              cursor + (bar_max_h - bar_h), col_w * 0.6, bar_h, series["color"])
+                        text(key + "-label-%d" % index, key, series["label"],
+                             x + padding + index * col_w, cursor + bar_max_h + 1 * mm,
+                             typography["legend_pt"], col_w, align="center")
+                else:  # pie
+                    from matplotlib.patches import Wedge
+                    # A dedicated square axis keeps the pie circular regardless of frame aspect.
+                    title_h = cursor - y - padding
+                    side = min(w - 2 * padding, h - 2 * padding - title_h)
+                    if side <= 0:
+                        raise ProtocolError("RASTER_PAGE_CONTENT_OVERFLOW", "Chart frame has no room for a pie")
+                    axis = fig.add_axes([(x + (w - side) / 2) / width,
+                                         1 - (y + padding + title_h + side) / height,
+                                         side / width, side / height])
+                    axis.set_aspect("equal")
+                    axis.set_axis_off()
+                    start_angle = 90.0
+                    for index, series in enumerate(chart["series"]):
+                        fraction = computed["fractions"][index]
+                        wedge = Wedge((0, 0), 1.0, start_angle - fraction * 360, start_angle,
+                                      facecolor=series["color"], edgecolor="white", linewidth=0.5)
+                        axis.add_patch(wedge)
+                        start_angle -= fraction * 360
+                    axis.set_xlim(-1.05, 1.05)
+                    axis.set_ylim(-1.05, 1.05)
             body=next(iter(bodies.values()))
             scale = request["scale_bar"]
             if scale is not None:

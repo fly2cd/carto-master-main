@@ -101,7 +101,8 @@
               "scale-bar",
               "north-arrow",
               "inset",
-              "marginalia"
+              "marginalia",
+              "chart"
             ]
           },
           "coordinate_space": {

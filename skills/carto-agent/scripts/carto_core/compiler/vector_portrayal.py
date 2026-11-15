@@ -153,15 +153,26 @@ class VectorPortrayalCompiler:
 
 def shared_legend(portrayals):
     if not portrayals:raise ProtocolError('VECTOR_SHARED_LEGEND', 'At least one portrayal is required')
-    ir = portrayals[0]['encoding']
-    if any(item['encoding'] != ir for item in portrayals):
+    # The declared contract is identical units/categories/edges/scales (domain+scale+
+    # key_mode). geometry_role and channel colors are layer-specific; per-entry
+    # symbol consistency is enforced by the id-collision check below, so a
+    # multi-geometry stack sharing one legend stays semantically verifiable.
+    def _legend_key(ir):
+        return {key: deepcopy(ir[key]) for key in ('key_mode', 'domain', 'scale') if key in ir}
+    key = _legend_key(portrayals[0]['encoding'])
+    if any(_legend_key(item['encoding']) != key for item in portrayals):
         raise ProtocolError('VECTOR_SHARED_ENCODING_MISMATCH', 'Shared legends require identical units, categories, edges and scales')
     entries = {}
     for portrayal in portrayals:
         for entry in portrayal['legend_items']:
-            if entry['id'] in entries and entry != entries[entry['id']]:
+            # Shape is derived from the layer's geometry family (square ground vs
+            # circle figure); label/symbol/color must stay identical across layers.
+            previous = entries.get(entry['id'])
+            if previous is not None and ({k: v for k, v in previous.items() if k != 'shape'}
+                                          != {k: v for k, v in entry.items() if k != 'shape'}):
                 raise ProtocolError('VECTOR_SHARED_ENCODING_MISMATCH', 'Legend symbols differ')
-            entries[entry['id']] = deepcopy(entry)
+            if previous is None:
+                entries[entry['id']] = deepcopy(entry)
     def order(key):
         if key == 'missing':return 999
         if key == 'single':return 0

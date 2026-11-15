@@ -301,6 +301,16 @@ VALID_CASES["data-facts"] = {
     "observed_dimensions": {"row_count": 1, "byte_size": 5},
 }
 
+VALID_CASES["chart"] = {
+    "chart_id": "chart-001", "content_id": "industry-chart",
+    "kind": "bar-horizontal", "title": "Top industries", "unit": "100M CNY",
+    "value_max": 150,
+    "series": [
+        {"label": "Electronics", "value": 120, "color": "#2288CC"},
+        {"label": "Equipment", "value": 150, "color": "#CC3322"},
+    ],
+}
+
 INVALID_CASES = {}
 for name, case in VALID_CASES.items():
     invalid = deepcopy(case)

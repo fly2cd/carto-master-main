@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/chart.schema.json",
+  "title": "chart",
+  "description": "E6 chart core declaration. The chart core is placement-agnostic: series values, an explicit scale (bars require a declared value_max; pies require a declared denominator scope), and the computed proportions live in local [0,1] coordinates. Placement into a page frame is bound by content_id to a layout chart slot. No implicit normalization: the shared scale and the pie denominator semantics are explicit design decisions, never silently derived.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "chart_id",
+    "content_id",
+    "kind",
+    "series"
+  ],
+  "properties": {
+    "chart_id": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+    },
+    "content_id": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier",
+      "description": "Binding to the layout chart frame this chart is placed in."
+    },
+    "kind": {
+      "enum": [
+        "bar-horizontal",
+        "bar-vertical",
+        "pie"
+      ]
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120,
+      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+    },
+    "unit": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+    },
+    "value_max": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Explicit shared-scale upper bound for bar charts. Required for bar kinds; values above it are rejected (no silent rescaling)."
+    },
+    "denominator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope"
+      ],
+      "properties": {
+        "scope": {
+          "enum": [
+            "sum-of-parts",
+            "declared-total"
+          ],
+          "description": "sum-of-parts: each slice is value/sum(series). declared-total: each slice is value/total; the undeclared remainder represents other categories."
+        },
+        "total": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Required when scope is declared-total; must not be below the sum of series values."
+        }
+      }
+    },
+    "series": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "label",
+          "value",
+          "color"
+        ],
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          },
+          "value": {
+            "type": "number"
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9A-F]{6}$"
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "bar-horizontal",
+              "bar-vertical"
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "value_max"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "pie"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "denominator"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "denominator": {
+            "properties": {
+              "scope": {
+                "const": "declared-total"
+              }
+            },
+            "required": [
+              "scope"
+            ]
+          }
+        },
+        "required": [
+          "denominator"
+        ]
+      },
+      "then": {
+        "properties": {
+          "denominator": {
+            "required": [
+              "total"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

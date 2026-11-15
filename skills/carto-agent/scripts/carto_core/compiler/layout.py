@@ -18,6 +18,7 @@ INSET_PX = 4
 _FRAME_OVERLAYS = {
     "title": {"text"}, "legend": {"legend"}, "scale-bar": {"scale-bar"},
     "north-arrow": {"north-arrow"}, "marginalia": {"text", "attribution"},
+    "chart": {"chart"},
 }
 
 
@@ -66,7 +67,7 @@ _SEMANTIC_POSITIONS = {
 _DEFAULT_OFFSET_PX = {
     "text": ("top-left", 0, 20), "attribution": ("top-left", 0, 20),
     "legend": ("top-left", 0, 4), "north-arrow": ("top-center", 0, 43),
-    "scale-bar": ("top-left", 0, 27),
+    "scale-bar": ("top-left", 0, 27), "chart": ("top-left", 0, 0),
 }
 
 

@@ -12,7 +12,7 @@ from .registry import CheckerRegistry
 def legend_consistency(context):
     if 'vector' in context:
         from ..compiler.vector_portrayal import resolve_features
-        valid = all(resolve_features(layer['report'], layer['portrayal']['encoding']) == {k: layer['portrayal'][k] for k in ('feature_styles', 'legend_items', 'counts')} for layer in context['vector']['layers'].values())
+        valid = all(resolve_features(item['report'], item['portrayal']['encoding']) == {k: item['portrayal'][k] for k in ('feature_styles', 'legend_items', 'counts')} for stack in context['vector']['layers'].values() for item in stack)
         ok, details, disposition = context['scenario_profile'].component('legend_checker')(context)
         return valid and ok, {'vector_encoding_valid': valid, 'business': details}, disposition
     raster=context.get('raster')

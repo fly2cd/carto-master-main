@@ -19,7 +19,7 @@ class VectorSceneCompiler:
         bundle = BundlePreparer(self.preparation, "vector").load_verified(bundle_ref, context)
         page = self.preparation.document(page_ref, 'page-request')
         layers = validate_page(self.preparation, page, context)
-        rebuilt = BundlePreparer(self.preparation, "vector").build_many([v['portrayal']['prepared_ref'] for v in layers.values()], context)
+        rebuilt = BundlePreparer(self.preparation, "vector").build_many([item['portrayal']['prepared_ref'] for stack in layers.values() for item in stack], context)
         if rebuilt != bundle:raise ProtocolError('VECTOR_BUNDLE_MISMATCH', 'Page sources differ from the prepared bundle')
         font = {'artifact_ref': {'id': 'font', 'version': '1.0.0', 'digest': page['font']['digest'], 'uri': page['font']['path']},
                 'size_bytes': page['font']['size_bytes']}
@@ -31,12 +31,14 @@ class VectorSceneCompiler:
         add(bundle_ref, 'contract', 'canonical-json');add(bundle['task_ref'], 'contract', 'canonical-json');add(page_ref, 'contract', 'canonical-json')
         add(font['artifact_ref'], 'font', 'bytes')
         for panel in page['panels']:
-            layer = layers[panel['view_id']]
-            add(panel['portrayal_ref'], 'contract', 'canonical-json')
-            add(layer['portrayal']['prepared_ref'], 'contract', 'canonical-json')
-            for asset in layer['report']['source_assets']:add(asset['ref'], 'data', 'bytes')
-            if layer['report'].get('attribute_evidence'):
-                add(layer['report']['attribute_evidence']['asset']['artifact_ref'], 'data', 'bytes')
+            stack = layers[panel['view_id']]
+            for ref in (panel.get('layers') or [{'portrayal_ref': panel['portrayal_ref']}]):
+                add(ref['portrayal_ref'], 'contract', 'canonical-json')
+            for layer in stack:
+                add(layer['portrayal']['prepared_ref'], 'contract', 'canonical-json')
+                for asset in layer['report']['source_assets']:add(asset['ref'], 'data', 'bytes')
+                if layer['report'].get('attribute_evidence'):
+                    add(layer['report']['attribute_evidence']['asset']['artifact_ref'], 'data', 'bytes')
         return {'page': page, 'layers': layers, 'bundle': bundle, 'font': font,
                 'resources': [resources[key] for key in sorted(resources)]}
 
@@ -94,8 +96,12 @@ class VectorSceneCompiler:
         if set(requested) != set(inputs['layers']) or request['layout_parameters'] != scene['resolved_layout']['parameters']:
             raise ProtocolError('VECTOR_GENERATION_CHANGED', 'Panel selection differs')
         for panel in inputs['page']['panels']:
-            source = requested[panel['view_id']]; layer = inputs['layers'][panel['view_id']]
+            source = requested[panel['view_id']]; stack = inputs['layers'][panel['view_id']]
             from ..workflow.thematic import resolve_design
+            # First version: the generate workflow binds one source per panel;
+            # stacked panels are composed at compile_page level (request-level
+            # multi-layer declaration is a later orchestration step).
+            layer = stack[0]
             expected_encoding,_=resolve_design(source['design'],layer['report'],self.registry)
             if (source['source_id'] != layer['report']['source']['source_id'] or expected_encoding != layer['portrayal']['encoding']
                     or source['extent'] != panel['extent']):

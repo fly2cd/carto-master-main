@@ -98,7 +98,8 @@
               "legend",
               "scale-bar",
               "north-arrow",
-              "marginalia"
+              "marginalia",
+              "chart"
             ]
           },
           "bounds_px": {

@@ -33,6 +33,15 @@
     "grid_north": {
       "type": "null"
     },
+    "basemap": {
+      "type": "object"
+    },
+    "layer_stack": {
+      "type": "array"
+    },
+    "charts": {
+      "type": "array"
+    },
     "legends": {
       "type": "array"
     },
@@ -69,47 +78,105 @@
     "coordinate_mode": {
       "const": "native-no-reprojection"
     },
-    "panels": {
+        "panels": {
       "type": "array",
       "minItems": 1,
       "maxItems": 4,
       "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "view_id",
-          "frame_id",
-          "portrayal_ref",
-          "extent"
-        ],
-        "properties": {
-          "view_id": {
-            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
-          },
-          "frame_id": {
-            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
-          },
-          "portrayal_ref": {
-            "allOf": [
-              {
-                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "view_id",
+              "frame_id",
+              "portrayal_ref",
+              "extent"
+            ],
+            "properties": {
+              "view_id": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
               },
-              {
-                "required": [
-                  "uri"
+              "frame_id": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+              },
+              "portrayal_ref": {
+                "allOf": [
+                  {
+                    "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+                  },
+                  {
+                    "required": [
+                      "uri"
+                    ]
+                  }
                 ]
+              },
+              "extent": {
+                "type": "array",
+                "minItems": 4,
+                "maxItems": 4,
+                "items": {
+                  "type": "number"
+                }
               }
-            ]
+            }
           },
-          "extent": {
-            "type": "array",
-            "minItems": 4,
-            "maxItems": 4,
-            "items": {
-              "type": "number"
+          {
+            "description": "Ordered thematic layer stack: later layers paint above earlier ones within the same frame.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "view_id",
+              "frame_id",
+              "layers",
+              "extent"
+            ],
+            "properties": {
+              "view_id": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+              },
+              "frame_id": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+              },
+              "layers": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 4,
+                "uniqueItems": true,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "portrayal_ref"
+                  ],
+                  "properties": {
+                    "portrayal_ref": {
+                      "allOf": [
+                        {
+                          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+                        },
+                        {
+                          "required": [
+                            "uri"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              "extent": {
+                "type": "array",
+                "minItems": 4,
+                "maxItems": 4,
+                "items": {
+                  "type": "number"
+                }
+              }
             }
           }
-        }
+        ]
       }
     },
     "geometry": {
@@ -201,6 +268,107 @@
                 }
               }
             ]
+          },
+          "layer_stack": {
+            "type": "array",
+            "uniqueItems": true,
+            "minItems": 4,
+            "maxItems": 5,
+            "description": "Frozen paint order: who covers whom is cartographic semantics, not convention. The compiler emits the canonical order; the renderer asserts it before drawing.",
+            "items": {
+              "enum": [
+                "basemap",
+                "thematic",
+                "legends",
+                "charts",
+                "furniture"
+              ]
+            }
+          },
+          "basemap": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "image",
+              "crs",
+              "extent"
+            ],
+            "properties": {
+              "image": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "path",
+                  "digest",
+                  "size_bytes"
+                ],
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  "digest": {
+                    "type": "string",
+                    "pattern": "^sha256:[0-9a-f]{64}$"
+                  },
+                  "size_bytes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 268435456
+                  }
+                }
+              },
+              "crs": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "authority",
+                  "code"
+                ],
+                "properties": {
+                  "authority": {
+                    "const": "EPSG"
+                  },
+                  "code": {
+                    "type": "string",
+                    "pattern": "^[0-9]+$"
+                  }
+                }
+              },
+              "extent": {
+                "type": "array",
+                "minItems": 4,
+                "maxItems": 4,
+                "items": {
+                  "type": "number"
+                }
+              },
+              "style": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "desaturate": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "lighten": {
+                    "type": "number",
+                    "minimum": -1,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          },
+          "charts": {
+            "type": "array",
+            "minItems": 0,
+            "maxItems": 4,
+            "items": {
+              "$ref": "https://schemas.carto-agent.local/v1/chart.schema.json"
+            }
           },
           "legends": {
             "type": "array",
@@ -369,6 +537,107 @@
           },
           "grid_north": {
             "type": "null"
+          },
+          "layer_stack": {
+            "type": "array",
+            "uniqueItems": true,
+            "minItems": 4,
+            "maxItems": 5,
+            "description": "Frozen paint order: who covers whom is cartographic semantics, not convention. The compiler emits the canonical order; the renderer asserts it before drawing.",
+            "items": {
+              "enum": [
+                "basemap",
+                "thematic",
+                "legends",
+                "charts",
+                "furniture"
+              ]
+            }
+          },
+          "basemap": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "image",
+              "crs",
+              "extent"
+            ],
+            "properties": {
+              "image": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "path",
+                  "digest",
+                  "size_bytes"
+                ],
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  "digest": {
+                    "type": "string",
+                    "pattern": "^sha256:[0-9a-f]{64}$"
+                  },
+                  "size_bytes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 268435456
+                  }
+                }
+              },
+              "crs": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "authority",
+                  "code"
+                ],
+                "properties": {
+                  "authority": {
+                    "const": "EPSG"
+                  },
+                  "code": {
+                    "type": "string",
+                    "pattern": "^[0-9]+$"
+                  }
+                }
+              },
+              "extent": {
+                "type": "array",
+                "minItems": 4,
+                "maxItems": 4,
+                "items": {
+                  "type": "number"
+                }
+              },
+              "style": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "desaturate": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "lighten": {
+                    "type": "number",
+                    "minimum": -1,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          },
+          "charts": {
+            "type": "array",
+            "minItems": 0,
+            "maxItems": 4,
+            "items": {
+              "$ref": "https://schemas.carto-agent.local/v1/chart.schema.json"
+            }
           },
           "legends": {
             "type": "array",

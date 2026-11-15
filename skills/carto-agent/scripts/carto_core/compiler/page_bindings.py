@@ -73,8 +73,9 @@ def validate_bindings(value, registry=None, *, executable=False):
             if used.intersection(group["members"]):
                 raise ProtocolError("PAGE_BINDING_SHARING", "Overlapping sharing groups")
             used.update(group["members"])
+    # Views map 1:1 to panels; a panel may stack 1-4 layers (len(layers) >= panels).
     if executable and (len(views) != len(panels)
-                       or len(layers) != len(panels)
+                       or len(layers) < len(panels)
                        or value['sharing']['view_groups'] or value['sharing']['legend_groups']):
         raise ProtocolError('PAGE_BINDING_UNSUPPORTED','Unsupported grid binding')
     if executable and len(legends) not in {1, len(panels)}:

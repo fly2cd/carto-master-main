@@ -201,9 +201,26 @@ class GeneralVectorCandidateCompiler:
         texts = [{'content_id': 'title', 'text': request['map_title']}, {'content_id': 'source', 'text': profile.notice}]
         if len(inputs) > 1:texts += [{'content_id': p['id'].replace('view-', 'caption-', 1), 'text': p['title']} for p in request['vector_panels']]
 
+        frozen_basemap = None
+        declared_basemap = request.get('basemap')
+        if declared_basemap is not None:
+            # A basemap is a reference resource (font-like admission): digest-bound,
+            # never thematic data. CRS must match the template display CRS exactly;
+            # reprojection is an explicit data-preparation operation, never implicit.
+            if declared_basemap['crs'] != contracts['spatial_behavior']['display_crs']:
+                raise ProtocolError('BASEMAP_CRS_MISMATCH', 'Basemap CRS must equal the display CRS; no implicit reprojection')
+            image_path = Path(declared_basemap['image']['path'])
+            image_bytes = service.read_bytes(image_path, 64 * 1024 * 1024)
+            frozen_basemap = {'image': {'path': str(image_path), 'digest': service.digest_bytes(image_bytes),
+                                        'size_bytes': len(image_bytes)},
+                              'crs': deepcopy(declared_basemap['crs']),
+                              'extent': list(declared_basemap['extent'])}
+            if declared_basemap.get('style'):
+                frozen_basemap['style'] = deepcopy(declared_basemap['style'])
         page = compile_page(service, layout=layout, cartography=contracts['scenario']['embedded']['cartography'],
                             panels=inputs, font={'path': str(font_path), 'digest': service.digest_bytes(font), 'size_bytes': len(font)},
-                            texts=texts, legend_titles={f['content_id']: 'Legend' for f in layout['contract']['frames'] if f['type'] == 'legend'}, context=context)
+                            texts=texts, legend_titles={f['content_id']: 'Legend' for f in layout['contract']['frames'] if f['type'] == 'legend'}, context=context,
+                            charts=request.get('charts'), basemap=frozen_basemap)
         if plan['bindings'] != page['bindings'] or plan['layout_parameters'] != request['layout_parameters'] or plan['decisions']['title'] != request['map_title']:
             raise ProtocolError('VECTOR_PLAN_MISMATCH', 'Plan does not describe the compiled page')
         compiler = VectorSceneCompiler(service)

@@ -643,6 +643,71 @@ class ThematicWorkflowTests(unittest.TestCase):
             service.prepare(source, ExecutionContext('run', 'tenant', 'project', 'subj',
                               frozenset({'operator'}), frozenset({'project'}), frozenset()))
 
+    def _make_basemap_image(self):
+        from PIL import Image as PILImage
+        basemap_file = self.root / 'basemap.png'
+        image = PILImage.new('RGB', (120, 100))
+        for i in range(120):
+            for j in range(100):
+                image.putpixel((i, j), (200 - i, 180 - j, 160))
+        image.save(basemap_file)
+        return basemap_file
+
+    def test_basemap_reaches_real_rendering(self):
+        from tests.test_general_thematic import APPROVAL_KEY, KEY
+        from carto_core.schema_registry import load_document
+        basemap_file = self._make_basemap_image()
+        self.generate['basemap'] = {
+            'image': {'path': str(basemap_file)},
+            'crs': {'authority': 'EPSG', 'code': '4326'},
+            'extent': [-1, -1, 5, 2],
+            'style': {'desaturate': 0.5, 'lighten': 0.2},
+        }
+        self.registry.validate('general-generate-request', self.generate)
+        workflow, path = self.workflow_at_compile()
+        compiled = workflow.compile(path, self.root / 'workflow-g1.yaml', approval_key=APPROVAL_KEY)
+        self.assertEqual('preview', compiled['state']['step'])
+        # The basemap is frozen into the page request with a digest-bound image.
+        scene = load_document(workflow._design_path('candidates/render-scene.yaml'))
+        page_request = load_document(Path(scene['page_request_ref']['uri']))
+        frozen = page_request['basemap']
+        self.assertEqual({'authority': 'EPSG', 'code': '4326'}, frozen['crs'])
+        self.assertEqual([-1, -1, 5, 2], frozen['extent'])
+        self.assertEqual({'desaturate': 0.5, 'lighten': 0.2}, frozen['style'])
+        self.assertEqual(basemap_file.stat().st_size, frozen['image']['size_bytes'])
+        # The paint order is a frozen contract: ground first, figures above.
+        self.assertEqual(['basemap', 'thematic', 'legends', 'charts', 'furniture'],
+                         page_request['layer_stack'])
+        # The full preview renders with the ground layer beneath the thematic features.
+        preview = workflow.preview(path, attestation_key=KEY)
+        self.assertEqual('passed', preview['evidence']['status'])
+
+    def test_basemap_extent_insufficient_rejected(self):
+        from tests.test_general_thematic import APPROVAL_KEY
+        from carto_core.errors import ProtocolError
+        basemap_file = self._make_basemap_image()
+        self.generate['basemap'] = {
+            'image': {'path': str(basemap_file)},
+            'crs': {'authority': 'EPSG', 'code': '4326'},
+            'extent': [0.9, 0.5, 1.2, 0.7],  # far smaller than the thematic bounds
+        }
+        workflow, path = self.workflow_at_compile()
+        with self.assertRaisesRegex(ProtocolError, 'BASEMAP_EXTENT_INSUFFICIENT'):
+            workflow.compile(path, self.root / 'workflow-g1.yaml', approval_key=APPROVAL_KEY)
+
+    def test_basemap_crs_mismatch_rejected(self):
+        from tests.test_general_thematic import APPROVAL_KEY
+        from carto_core.errors import ProtocolError
+        basemap_file = self._make_basemap_image()
+        self.generate['basemap'] = {
+            'image': {'path': str(basemap_file)},
+            'crs': {'authority': 'EPSG', 'code': '3857'},  # display CRS is 4326
+            'extent': [-1, -1, 5, 2],
+        }
+        workflow, path = self.workflow_at_compile()
+        with self.assertRaisesRegex(ProtocolError, 'BASEMAP_CRS_MISMATCH'):
+            workflow.compile(path, self.root / 'workflow-g1.yaml', approval_key=APPROVAL_KEY)
+
     def test_proportional_count_reaches_real_preview(self):
         from tests.test_general_thematic import APPROVAL_KEY, KEY
         from carto_core.schema_registry import load_document
