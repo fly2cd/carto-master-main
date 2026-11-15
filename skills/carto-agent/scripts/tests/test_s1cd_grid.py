@@ -7,6 +7,7 @@ from pathlib import Path
 import unittest
 from unittest.mock import patch
 
+from carto_core.adapters.formal_renderer import environment_snapshot
 from carto_core.adapters.page_renderer import PageRenderer
 from carto_core.adapters.raster_renderer import _dependencies
 from carto_core.compiler.grid_layout import grid_cases, instantiate_grid
@@ -194,7 +195,8 @@ class GridPageTests(PreparationFixture, unittest.TestCase):
         bundle = self.service.save_document(
             BundlePreparer(self.service, "raster").build_many([p.ref() for p in self.prepared], self.context),
             'prepared-data-bundle')
-        compiler = RasterSceneCompiler(self.service, BundlePreparer)
+        compiler = RasterSceneCompiler(self.service, bundles=BundlePreparer, pages=PageRenderer,
+                                      environment=environment_snapshot)
         scene = compiler.compile(bundle_ref=bundle.ref(), page_request=page, context=self.context,
                                  scene_id='synthetic-grid')
         inputs = compiler.validate_scene(scene, self.context)

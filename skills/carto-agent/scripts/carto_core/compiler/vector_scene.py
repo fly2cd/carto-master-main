@@ -4,7 +4,8 @@ from ..canonical import sha256_digest
 from ..errors import ProtocolError, SecurityError
 from ..backend_registry import VECTOR_PAGE
 from ..contracts.bundle import context_snapshot
-from ..contracts.protocols import BundlePreparerFactory, VectorPreparationProtocol
+from ..contracts.protocols import (BundlePreparerFactory, EnvironmentSnapshotProvider,
+                                   PageContractFactory, VectorPreparationProtocol)
 from .vector_page import validate_page
 from .layout import LayoutResolver
 from .thematic_design import resolve_design
@@ -13,13 +14,16 @@ RENDERER_ID = VECTOR_PAGE.renderer_id  # derived; single authority = carto_core.
 
 
 class VectorSceneCompiler:
-    def __init__(self, preparation: VectorPreparationProtocol, bundles: BundlePreparerFactory):
-        # ``bundles`` is the injected BundlePreparer factory (Tier-2 去环 Step8): this
-        # compiler always prepares vector bundles, so it keeps the geometry decision
-        # while the concrete class stays in the execution layer.
+    def __init__(self, preparation: VectorPreparationProtocol, *, bundles: BundlePreparerFactory,
+                 pages: PageContractFactory, environment: EnvironmentSnapshotProvider):
+        # All three collaborators are injected ports (Tier-2 去环 Step8 for ``bundles``,
+        # P1 Step D2 for ``pages`` / ``environment``); keyword-only so three callables
+        # cannot be silently mis-ordered.
         self.preparation = preparation
         self.bundles = bundles
         self.registry = preparation.registry
+        self.pages = pages
+        self.environment = environment
 
     def _inputs(self, bundle_ref, page_ref, context):
         bundle = self.bundles(self.preparation, "vector").load_verified(bundle_ref, context)
@@ -49,8 +53,7 @@ class VectorSceneCompiler:
                 'resources': [resources[key] for key in sorted(resources)]}
 
     def compile(self, *, bundle_ref, page_request, context, scene_id, revision=1, targets=('pdf', 'png'), random_seed=0):
-        from ..adapters.page_renderer import PageRenderer
-        page_ref = PageRenderer(self.preparation).freeze_request(page_request, context).ref()
+        page_ref = self.pages(self.preparation).freeze_request(page_request, context).ref()
         inputs = self._inputs(bundle_ref, page_ref, context); page = inputs['page']['resolved_layout']['page']
         scene = {'schema_version': 1, 'scene_id': scene_id, 'revision': revision, 'renderer_id': RENDERER_ID,
                  'context': context_snapshot(context), 'prepared_bundle_ref': deepcopy(bundle_ref), 'page_request_ref': page_ref,
@@ -73,14 +76,13 @@ class VectorSceneCompiler:
         return inputs
 
     def bind_execution(self, execution, scene, context):
-        from ..adapters.formal_renderer import RendererProfile
         inputs = self.validate_scene(scene, context); result = deepcopy(execution)
         page = scene['resolved_layout']['page']; crs = inputs['page']['bindings']['views'][0]['crs']
         result.update(page_inputs={k: deepcopy(scene[k]) for k in ('prepared_bundle_ref', 'page_request_ref')},
                       resolved_layout=deepcopy(scene['resolved_layout']),
                       render_scene_ref={'id': scene['scene_id'], 'version': '1.0.0', 'digest': sha256_digest(scene)},
                       dataset_refs=deepcopy(inputs['bundle']['datasets']), prepared_data_refs=[deepcopy(scene['prepared_bundle_ref'])],
-                      resolved_assets=[deepcopy(inputs['font']['artifact_ref'])], environment=RendererProfile.current(RENDERER_ID).environment_snapshot(),
+                      resolved_assets=[deepcopy(inputs['font']['artifact_ref'])], environment=self.environment(RENDERER_ID),
                       views=[{'id': v['id'], 'extent': v['extent'], 'layer_ids': v['layer_ids'], 'target_ids': scene['export']['targets']}
                              for v in inputs['page']['bindings']['views']],
                       targets={kind: {'format': kind, 'display_crs': crs, **{k: page[k] for k in ('width_mm', 'height_mm', 'dpi')}}

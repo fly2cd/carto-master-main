@@ -38,10 +38,14 @@ from carto_core.schema_registry import SchemaRegistry
 from carto_core.security.paths import PathGuard
 
 CORE = SCRIPTS_ROOT / "carto_core"
-# Layers that must stay importable without the execution layer. ``scenarios`` and
-# ``adapters`` are deliberately absent: they sit above ``workflow`` and may use it.
+# Layers that must stay importable without the execution or adapter layers. ``scenarios``
+# is deliberately absent: it sits above both and may use them.
 KERNEL_LAYERS = ("compiler", "contracts", "validation", "repository", "security")
-FORBIDDEN = "carto_core.workflow"
+# Both directions were measured to be violations: ``workflow`` re-created the historical
+# compiler <-> workflow import cycle (Tier-2), and ``adapters`` made the formal-verification
+# kernel depend on the rendering stack -- PageRenderer for page freezing/validation and
+# RendererProfile for the environment snapshot (P1 Step D2). Both are now injected ports.
+FORBIDDEN = ("carto_core.workflow", "carto_core.adapters")
 # The only intra-package modules the ``contracts`` leaf may import.
 SPINE = {"carto_core.errors", "carto_core.canonical", "carto_core.schema_registry",
          "carto_core.contracts"}
@@ -85,17 +89,18 @@ def kernel_files(layers=KERNEL_LAYERS):
 
 
 class KernelImportBoundaryTests(unittest.TestCase):
-    def test_no_kernel_module_imports_the_execution_layer(self):
+    def test_no_kernel_module_imports_the_execution_or_adapter_layer(self):
         offenders = []
         for path in kernel_files():
             for lineno, module in imported_modules(path):
-                if module == FORBIDDEN or module.startswith(FORBIDDEN + "."):
+                if any(module == banned or module.startswith(banned + ".") for banned in FORBIDDEN):
                     offenders.append(f"{path.relative_to(SCRIPTS_ROOT)}:{lineno} -> {module}")
         self.assertEqual(
             [], offenders,
-            "Kernel layers must obtain execution-layer collaborators through the "
-            "injected ports in carto_core.contracts.protocols, never by import; "
-            "an import here re-creates the compiler <-> workflow cycle")
+            "Kernel layers must obtain execution-layer and adapter collaborators through "
+            "the injected ports in carto_core.contracts.protocols, never by import; an "
+            "import here re-creates the compiler <-> workflow cycle or re-couples the "
+            "formal-verification kernel to the rendering stack")
 
     def test_contracts_package_is_a_dependency_leaf(self):
         offenders = []
@@ -160,6 +165,18 @@ class PortConformanceTests(unittest.TestCase):
                               protocols.BundlePreparerProtocol)
         with self.assertRaisesRegex(ProtocolError, "BUNDLE_GEOMETRY_UNKNOWN"):
             BundlePreparer(self.raster_service(), "point")
+
+    def test_page_and_environment_ports_are_satisfied_by_the_adapter_impls(self):
+        # P1 Step D2: the kernel freezes/validates pages and binds the environment snapshot
+        # through ports instead of importing adapters. Pin the concrete implementations to
+        # those ports so a rename on either side fails here rather than at render time.
+        from carto_core.adapters.formal_renderer import environment_snapshot
+        from carto_core.adapters.page_renderer import PageRenderer
+        self.assertIsInstance(PageRenderer, protocols.PageContractFactory)
+        self.assertIsInstance(PageRenderer(self.raster_service()), protocols.PageContractPort)
+        self.assertIsInstance(PageRenderer(self.vector_service()), protocols.PageContractPort)
+        self.assertIsInstance(environment_snapshot, protocols.EnvironmentSnapshotProvider)
+        self.assertNotIsInstance(object(), protocols.PageContractFactory)
 
     def test_injected_callables_satisfy_the_callable_ports(self):
         # runtime_checkable callable ports only verify that __call__ exists; the

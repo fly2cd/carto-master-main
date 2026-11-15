@@ -202,7 +202,9 @@ class GeneralThematicCandidateCompiler:
             or plan['decisions']['title'] != request['map_title']
             or plan['decisions']['legend_capacity']!=resolved['contract']['capacity']['legend_items']):
             raise ProtocolError('PLAN_BINDING_MISMATCH','Plan differs from verified template and data')
-        compiler=RasterSceneCompiler(preparation,BundlePreparer)
+        from ..adapters.formal_renderer import environment_snapshot
+        from ..adapters.page_renderer import PageRenderer
+        compiler=RasterSceneCompiler(preparation,bundles=BundlePreparer,pages=PageRenderer,environment=environment_snapshot)
         scene=compiler.compile(bundle_ref=prepared['bundle_ref'],page_request=page,context=context,scene_id=f"scene-{request['run_id']}",targets=tuple(sorted(request['requested_outputs'])))
         base=self._execution_base(intent,installation,bundle,profile,contracts)
         base['thematic_plan_ref']=artifact_ref('map-plan',plan)
@@ -961,6 +963,9 @@ def validation_scene(package_root: Path, snapshot: dict[str, Any], targets: list
         "validator_version": validator_version,
         "layout_parameters": resolved_layout["parameters"],
     })[7:23]
-    return RasterSceneCompiler(preparation, BundlePreparer).compile(
+    from ..adapters.formal_renderer import environment_snapshot
+    from ..adapters.page_renderer import PageRenderer
+    return RasterSceneCompiler(preparation, bundles=BundlePreparer, pages=PageRenderer,
+                               environment=environment_snapshot).compile(
         bundle_ref=deepcopy(bundle_ref), page_request=page_request, context=context,
         scene_id=scene_id, targets=tuple(sorted(targets)))

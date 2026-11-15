@@ -6,7 +6,8 @@ from ..errors import ProtocolError, SecurityError
 from ..contracts.execution import ExecutionContext
 from ..contracts.bundle import context_snapshot
 from ..backend_registry import RASTER_PAGE
-from ..contracts.protocols import BundlePreparerFactory, RasterPreparationProtocol
+from ..contracts.protocols import (BundlePreparerFactory, EnvironmentSnapshotProvider,
+                                   PageContractFactory, RasterPreparationProtocol)
 from .layout import LayoutResolver
 from .raster_page_contract import validate_page_request
 
@@ -16,11 +17,15 @@ RASTER_RENDERER_ID = RASTER_PAGE.renderer_id  # derived; single authority = cart
 # authoritative definition). The former local duplicate was removed to prevent drift.
 
 class RasterSceneCompiler:
-    def __init__(self,preparation:RasterPreparationProtocol,bundles:BundlePreparerFactory):
-        # ``bundles`` is the injected BundlePreparer factory (Tier-2 去环 Step7): this
-        # compiler always prepares raster bundles, so it keeps the geometry decision
-        # while the concrete class stays in the execution layer.
+    def __init__(self,preparation:RasterPreparationProtocol,*,bundles:BundlePreparerFactory,
+                 pages:PageContractFactory,environment:EnvironmentSnapshotProvider):
+        # All three collaborators are injected ports (Tier-2 去环 Step7 for ``bundles``,
+        # P1 Step D2 for ``pages`` / ``environment``): this compiler always prepares raster
+        # bundles and always targets the static raster page backend, so it keeps those
+        # decisions, while the concrete classes stay in the execution and adapter layers.
+        # Keyword-only, because all three are callables and must not be silently reordered.
         self.preparation=preparation;self.bundles=bundles;self.registry=preparation.registry
+        self.pages=pages;self.environment=environment
 
     def _inputs(self,bundle_ref,page_ref,context):
         bundle=self.bundles(self.preparation, "raster").load_verified(bundle_ref,context)
@@ -28,8 +33,7 @@ class RasterSceneCompiler:
         inputs=validate_page_request(self.preparation,page,context,self.bundles)
         if bundle!=inputs['bundle']:
             raise ProtocolError('RASTER_BUNDLE_PORTRAYAL_MISMATCH','Page sources differ from bundle')
-        from ..adapters.page_renderer import PageRenderer
-        PageRenderer(self.preparation).validate_request(page,context)
+        self.pages(self.preparation).validate_request(page,context)
         font={'artifact_ref':{'id':'font','version':'1.0.0','digest':page['font']['digest'],'uri':page['font']['path']},'size_bytes':page['font']['size_bytes']}
         self.preparation.snapshot_bytes(font,'font','.ttf')
         resources={}
@@ -48,8 +52,7 @@ class RasterSceneCompiler:
         return {**inputs,'page':page,'font':font,'resources':[resources[k] for k in sorted(resources)]}
 
     def compile(self,*,bundle_ref,page_request,context,scene_id,revision=1,targets=('pdf','png'),random_seed=0):
-        from ..adapters.page_renderer import PageRenderer
-        page_ref=PageRenderer(self.preparation).freeze_request(page_request,context).ref()
+        page_ref=self.pages(self.preparation).freeze_request(page_request,context).ref()
         inputs=self._inputs(bundle_ref,page_ref,context);page=inputs['page']['resolved_layout']['page']
         scene={'schema_version':1,'scene_id':scene_id,'revision':revision,'renderer_id':RASTER_RENDERER_ID,
                'context':context_snapshot(context),'prepared_bundle_ref':deepcopy(bundle_ref),'page_request_ref':page_ref,
@@ -74,7 +77,6 @@ class RasterSceneCompiler:
         return [{'id':v['id'],'extent':deepcopy(v['extent']),'layer_ids':deepcopy(v['layer_ids']),'target_ids':sorted(targets)} for v in inputs['page']['bindings']['views']]
 
     def bind_execution(self,execution,scene,context):
-        from ..adapters.formal_renderer import RendererProfile
         inputs=self.validate_scene(scene,context);result=deepcopy(execution)
         for key in ('camera','overlay_coordinate_policy','interaction_policy'):result.pop(key,None)
         page=scene['resolved_layout']['page'];views=inputs['page']['bindings']['views'];crs=views[0]['crs']
@@ -82,7 +84,7 @@ class RasterSceneCompiler:
         result.update(page_inputs={k:deepcopy(scene[k]) for k in ('prepared_bundle_ref','page_request_ref')},
             resolved_layout=deepcopy(scene['resolved_layout']),render_scene_ref={'id':scene['scene_id'],'version':'1.0.0','digest':sha256_digest(scene)},
             dataset_refs=deepcopy(inputs['bundle']['datasets']),prepared_data_refs=[deepcopy(scene['prepared_bundle_ref'])],
-            resolved_assets=[deepcopy(inputs['font']['artifact_ref'])],environment=RendererProfile.current().environment_snapshot(),
+            resolved_assets=[deepcopy(inputs['font']['artifact_ref'])],environment=self.environment(),
             views=self._views(inputs,scene['export']['targets']),
             targets={kind:{'format':kind,'display_crs':deepcopy(crs),**{k:page[k] for k in ('width_mm','height_mm','dpi')}} for kind in scene['export']['targets']})
         self.validate_execution(scene,result,context);return result

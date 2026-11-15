@@ -223,7 +223,10 @@ class GeneralVectorCandidateCompiler:
                             charts=request.get('charts'), basemap=frozen_basemap)
         if plan['bindings'] != page['bindings'] or plan['layout_parameters'] != request['layout_parameters'] or plan['decisions']['title'] != request['map_title']:
             raise ProtocolError('VECTOR_PLAN_MISMATCH', 'Plan does not describe the compiled page')
-        compiler = VectorSceneCompiler(service, BundlePreparer)
+        from ..adapters.formal_renderer import environment_snapshot
+        from ..adapters.page_renderer import PageRenderer
+        compiler = VectorSceneCompiler(service, bundles=BundlePreparer, pages=PageRenderer,
+                                       environment=environment_snapshot)
         from ..workflow.map_data_preparation import bundle_core
         # The scene verifies the GIS core; adopted material facts are separately bound
         # into execution and verified by the shared generation workflow.
@@ -361,5 +364,8 @@ def validation_scene(package_root, snapshot, targets, font, validator_version, *
         font={'path': str(font), 'digest': service.digest_bytes(font_bytes), 'size_bytes': len(font_bytes)}, texts=texts,
         legend_titles={f['content_id']: 'Legend' for f in layout['contract']['frames'] if f['type'] == 'legend'}, context=context)
     bundle = BundlePreparer(service, "vector").build_many([prepared.ref()], context)
-    return VectorSceneCompiler(service, BundlePreparer).compile(bundle_ref=service.save('prepared-data-bundle', bundle).ref(), page_request=page,
+    from ..adapters.formal_renderer import environment_snapshot
+    from ..adapters.page_renderer import PageRenderer
+    return VectorSceneCompiler(service, bundles=BundlePreparer, pages=PageRenderer,
+        environment=environment_snapshot).compile(bundle_ref=service.save('prepared-data-bundle', bundle).ref(), page_request=page,
         context=context, scene_id='validation-' + sha256_digest({'package': snapshot['package_digest'], 'params': params, 'expression': validation_expression})[7:31], targets=tuple(targets))

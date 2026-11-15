@@ -169,3 +169,39 @@ class MaterialFactsVerifier(Protocol):
     def __call__(self, execution: dict[str, Any], guard: Any, project_root: Path,
                  registry: SchemaRegistry) -> None:
         """Verify every ``material_facts_refs`` chain; raise on any drift."""
+
+
+@runtime_checkable
+class PageContractPort(Protocol):
+    """Freeze a page request into an immutable artifact and formally re-validate it.
+
+    Painting is deliberately NOT part of this port: the compiler needs the §2.2 formal
+    half of ``adapters.page_renderer.PageRenderer`` (freeze + validate) and must not be
+    able to reach the rasterising half. ``PageRenderer`` satisfies this structurally.
+    """
+
+    def freeze_request(self, request: dict[str, Any], context: Any) -> Any:
+        """Validate, canonicalise and store the page request; return the stored artifact."""
+
+    def validate_request(self, request: dict[str, Any], context: Any) -> Any:
+        """Re-validate a page request against its verified sources; return the inputs."""
+
+
+@runtime_checkable
+class PageContractFactory(Protocol):
+    """Binds a preparation service to a :class:`PageContractPort` (``PageRenderer`` itself)."""
+
+    def __call__(self, preparation: PreparationServiceProtocol) -> PageContractPort: ...
+
+
+@runtime_checkable
+class EnvironmentSnapshotProvider(Protocol):
+    """Runtime rendering-environment facts bound into an execution document.
+
+    ``RendererProfile.current()`` collects library versions, the renderer code digest and
+    the platform fingerprint. Those are facts about the renderer, so the renderer supplies
+    them; the kernel receives this callable instead of importing the adapter (P1 Step D2).
+    ``renderer_id=None`` means the composition root's default backend.
+    """
+
+    def __call__(self, renderer_id: str | None = None) -> dict[str, Any]: ...

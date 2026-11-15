@@ -14,7 +14,9 @@ from ..security.paths import PathGuard
 from ..validation.map_checks import MapQualityChecks
 from .dependencies import DependencyResolver
 from ..contracts.bundle import bundle_core as _bundle_core
-from ..contracts.protocols import BundlePreparerFactory, MaterialFactsVerifier, PreparationServiceFactory
+from ..contracts.protocols import (BundlePreparerFactory, EnvironmentSnapshotProvider,
+                                   MaterialFactsVerifier, PageContractFactory,
+                                   PreparationServiceFactory)
 
 
 class MapCandidateCompiler:
@@ -29,7 +31,9 @@ class MapCandidateCompiler:
                  *, project_root: Path | None = None, context=None,
                  preparations: PreparationServiceFactory | None = None,
                  material_facts: MaterialFactsVerifier | None = None,
-                 bundles: BundlePreparerFactory | None = None) -> None:
+                 bundles: BundlePreparerFactory | None = None,
+                 pages: PageContractFactory | None = None,
+                 environment: EnvironmentSnapshotProvider | None = None) -> None:
         self.path_guard = path_guard
         self.project_root, self.context = project_root, context
         self.registry = registry or SchemaRegistry()
@@ -40,6 +44,7 @@ class MapCandidateCompiler:
         # _require_port instead of importing workflow from the kernel.
         self.bundles, self.preparations = bundles, preparations
         self.material_facts = material_facts
+        self.pages, self.environment = pages, environment
 
     def _require_port(self, name: str):
         """Return an injected execution-layer port, or fail closed naming it."""
@@ -180,7 +185,8 @@ class MapCandidateCompiler:
             preparation = self._require_port("preparations")(
                 "raster", project_root=self.project_root,
                 allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
-            inputs = RasterSceneCompiler(preparation, self._require_port("bundles")).validate_generation(
+            inputs = RasterSceneCompiler(preparation, bundles=self._require_port("bundles"),
+                pages=self._require_port("pages"), environment=self._require_port("environment")).validate_generation(
                 scene, candidate["execution"], request, self.context)
             template_style = contracts["scenario"].get("embedded", {}).get("cartography")
             if scene['resolved_layout']['template_contract'] != contracts['scenario']['embedded']['layout']:
@@ -197,7 +203,8 @@ class MapCandidateCompiler:
             service = self._require_port("preparations")(
                 "vector", project_root=self.project_root,
                 allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
-            vector = VectorSceneCompiler(service, self._require_port("bundles")).validate_generation(scene, candidate["execution"], request, self.context)
+            vector = VectorSceneCompiler(service, bundles=self._require_port("bundles"),
+                pages=self._require_port("pages"), environment=self._require_port("environment")).validate_generation(scene, candidate["execution"], request, self.context)
             if (scene["resolved_layout"]["template_contract"] != contracts["scenario"]["embedded"]["layout"]
                     or vector["page"]["cartography"] != contracts["scenario"]["embedded"]["cartography"]):
                 raise ProtocolError("VECTOR_TEMPLATE_MISMATCH", "Page layout or appearance differs from the installed template")

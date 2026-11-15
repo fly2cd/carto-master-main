@@ -139,6 +139,7 @@ class FinalMapCheckService:
         return report
 
     def _raster_context(self, scene, lock, receipt):
+        from ..adapters.formal_renderer import environment_snapshot
         from ..adapters.page_renderer import PageRenderer
         from ..compiler.raster_scene import RasterSceneCompiler
         from .preparation_bundle import BundlePreparer
@@ -147,7 +148,8 @@ class FinalMapCheckService:
             raise SecurityError("RASTER_EXECUTION_CONTEXT_REQUIRED", "Final checks require the trusted execution context")
         preparation = RasterPreparationService(project_root=self.project_root,
             allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
-        inputs = RasterSceneCompiler(preparation, BundlePreparer).validate_execution(scene, lock["execution"], self.execution_context)
+        inputs = RasterSceneCompiler(preparation, bundles=BundlePreparer, pages=PageRenderer,
+            environment=environment_snapshot).validate_execution(scene, lock["execution"], self.execution_context)
         page = PageRenderer(preparation).load_verified(receipt["page_output_ref"], self.execution_context)
         if (page["request_ref"] != scene["page_request_ref"]
                 or receipt["renderer_id"] != scene["renderer_id"]
@@ -168,6 +170,7 @@ class FinalMapCheckService:
         return {**inputs, "output": page, "bodies": bodies}
 
     def _vector_context(self, scene, lock, receipt):
+        from ..adapters.formal_renderer import environment_snapshot
         from ..adapters.page_renderer import PageRenderer
         from ..compiler.vector_scene import VectorSceneCompiler
         from .preparation_bundle import BundlePreparer
@@ -176,7 +179,8 @@ class FinalMapCheckService:
             raise SecurityError("VECTOR_EXECUTION_CONTEXT", "Trusted execution scope required")
         preparation = VectorPreparationService(project_root=self.project_root,
             allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
-        inputs = VectorSceneCompiler(preparation, BundlePreparer).validate_execution(scene, lock["execution"], self.execution_context)
+        inputs = VectorSceneCompiler(preparation, bundles=BundlePreparer, pages=PageRenderer,
+            environment=environment_snapshot).validate_execution(scene, lock["execution"], self.execution_context)
         page = PageRenderer(preparation).load_verified(receipt["page_output_ref"], self.execution_context)
         if (page["request_ref"] != scene["page_request_ref"] or receipt["renderer_id"] != scene["renderer_id"]
                 or page["environment"] != receipt["runtime"] or page["environment"] != lock["execution"]["environment"]["runtime"]):

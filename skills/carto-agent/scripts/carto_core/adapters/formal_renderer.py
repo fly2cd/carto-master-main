@@ -136,6 +136,15 @@ class RendererProfile:
                 "fingerprint": self.environment_fingerprint}
 
 
+def environment_snapshot(renderer_id: str | None = None) -> dict[str, Any]:
+    """Composition-root implementation of ``contracts.protocols.EnvironmentSnapshotProvider``.
+
+    Behaviour is identical to the previous in-kernel call ``RendererProfile.current(...).
+    environment_snapshot()``; only the direction of the dependency changed.
+    """
+    return RendererProfile.current(renderer_id or RASTER_RENDERER_ID).environment_snapshot()
+
+
 class FormalRenderer:
     """Unified formal renderer. renderer_id selects the attestation partition and geometry strategy."""
 
@@ -155,11 +164,13 @@ class FormalRenderer:
         if is_vector:
             self.preparation = VectorPreparationService(project_root=project_root,
                 allowed_roots=list(path_guard.allowed_roots), registry=registry)
-            self.compiler = VectorSceneCompiler(self.preparation, BundlePreparer)
+            self.compiler = VectorSceneCompiler(self.preparation, bundles=BundlePreparer,
+                                                pages=PageRenderer, environment=environment_snapshot)
         else:
             self.preparation = RasterPreparationService(project_root=project_root,
                 allowed_roots=list(path_guard.allowed_roots), registry=registry)
-            self.compiler = RasterSceneCompiler(self.preparation, BundlePreparer)
+            self.compiler = RasterSceneCompiler(self.preparation, bundles=BundlePreparer,
+                                                pages=PageRenderer, environment=environment_snapshot)
         self.preparation.project_guard.resolve(self.output_root)
 
         self.page_renderer = PageRenderer(self.preparation)
