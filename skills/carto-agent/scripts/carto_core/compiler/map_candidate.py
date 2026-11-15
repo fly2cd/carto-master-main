@@ -14,7 +14,7 @@ from ..security.paths import PathGuard
 from ..validation.map_checks import MapQualityChecks
 from .dependencies import DependencyResolver
 from ..contracts.bundle import bundle_core as _bundle_core
-from ..contracts.protocols import MaterialFactsVerifier, PreparationServiceFactory
+from ..contracts.protocols import BundlePreparerFactory, MaterialFactsVerifier, PreparationServiceFactory
 
 
 class MapCandidateCompiler:
@@ -28,7 +28,8 @@ class MapCandidateCompiler:
     def __init__(self, path_guard: PathGuard, registry: SchemaRegistry | None = None,
                  *, project_root: Path | None = None, context=None,
                  preparations: PreparationServiceFactory | None = None,
-                 material_facts: MaterialFactsVerifier | None = None) -> None:
+                 material_facts: MaterialFactsVerifier | None = None,
+                 bundles: BundlePreparerFactory | None = None) -> None:
         self.path_guard = path_guard
         self.project_root, self.context = project_root, context
         self.registry = registry or SchemaRegistry()
@@ -37,7 +38,8 @@ class MapCandidateCompiler:
         # They are optional only because load_contracts() / require_execution_intent()
         # need neither; every path that does need one fails closed through
         # _require_port instead of importing workflow from the kernel.
-        self.preparations, self.material_facts = preparations, material_facts
+        self.bundles, self.preparations = bundles, preparations
+        self.material_facts = material_facts
 
     def _require_port(self, name: str):
         """Return an injected execution-layer port, or fail closed naming it."""
@@ -178,7 +180,7 @@ class MapCandidateCompiler:
             preparation = self._require_port("preparations")(
                 "raster", project_root=self.project_root,
                 allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
-            inputs = RasterSceneCompiler(preparation).validate_generation(
+            inputs = RasterSceneCompiler(preparation, self._require_port("bundles")).validate_generation(
                 scene, candidate["execution"], request, self.context)
             template_style = contracts["scenario"].get("embedded", {}).get("cartography")
             if scene['resolved_layout']['template_contract'] != contracts['scenario']['embedded']['layout']:

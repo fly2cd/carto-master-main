@@ -149,7 +149,7 @@ class GridPageTests(PreparationFixture, unittest.TestCase):
                          for f in frames if f['type'] not in {'map', 'legend'}]
         base['scale_bar'] = None
         base['grid_north'] = None
-        return compile_page_request(self.service, base, VALID_CASES['cartography'], self.context)
+        return compile_page_request(self.service, base, VALID_CASES['cartography'], self.context, BundlePreparer)
 
     def test_multi_source_bundle_preserves_source_specific_extents_and_counts(self):
         bundle = BundlePreparer(self.service, "raster").build_many([p.ref() for p in self.prepared], self.context)
@@ -194,7 +194,7 @@ class GridPageTests(PreparationFixture, unittest.TestCase):
         bundle = self.service.save_document(
             BundlePreparer(self.service, "raster").build_many([p.ref() for p in self.prepared], self.context),
             'prepared-data-bundle')
-        compiler = RasterSceneCompiler(self.service)
+        compiler = RasterSceneCompiler(self.service, BundlePreparer)
         scene = compiler.compile(bundle_ref=bundle.ref(), page_request=page, context=self.context,
                                  scene_id='synthetic-grid')
         inputs = compiler.validate_scene(scene, self.context)
@@ -257,7 +257,7 @@ class GridPageTests(PreparationFixture, unittest.TestCase):
         bad = deepcopy(page); bad['legends'][0]['items'][2]['color'] = '#123456'; cases.append(bad)
         for index, bad in enumerate(cases):
             with self.subTest(index=index), self.assertRaises(CartoError):
-                validate_page_request(self.service, bad, self.context)
+                validate_page_request(self.service, bad, self.context, BundlePreparer)
 
     def test_output_body_omission_swap_and_second_panel_artifact_tamper_fail(self):
         output_ref = self.renderer.render(self.page(), self.context).ref()

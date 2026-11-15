@@ -5,8 +5,7 @@ from ..canonical import sha256_digest
 from ..errors import ProtocolError, SecurityError
 from ..contracts.execution import ExecutionContext
 from ..contracts.bundle import context_snapshot
-from ..workflow.preparation_bundle import BundlePreparer
-from ..workflow.raster_preparation import RasterPreparationService
+from ..contracts.protocols import BundlePreparerFactory, RasterPreparationProtocol
 from .layout import LayoutResolver
 from .raster_page_contract import validate_page_request
 
@@ -16,13 +15,16 @@ RASTER_RENDERER_ID='rasterio-matplotlib-page'
 # authoritative definition). The former local duplicate was removed to prevent drift.
 
 class RasterSceneCompiler:
-    def __init__(self,preparation:RasterPreparationService):
-        self.preparation=preparation;self.registry=preparation.registry
+    def __init__(self,preparation:RasterPreparationProtocol,bundles:BundlePreparerFactory):
+        # ``bundles`` is the injected BundlePreparer factory (Tier-2 去环 Step7): this
+        # compiler always prepares raster bundles, so it keeps the geometry decision
+        # while the concrete class stays in the execution layer.
+        self.preparation=preparation;self.bundles=bundles;self.registry=preparation.registry
 
     def _inputs(self,bundle_ref,page_ref,context):
-        bundle=BundlePreparer(self.preparation, "raster").load_verified(bundle_ref,context)
+        bundle=self.bundles(self.preparation, "raster").load_verified(bundle_ref,context)
         page=self.preparation._json_ref(page_ref,'page-request')
-        inputs=validate_page_request(self.preparation,page,context)
+        inputs=validate_page_request(self.preparation,page,context,self.bundles)
         if bundle!=inputs['bundle']:
             raise ProtocolError('RASTER_BUNDLE_PORTRAYAL_MISMATCH','Page sources differ from bundle')
         from ..adapters.page_renderer import PageRenderer
@@ -98,7 +100,7 @@ class RasterSceneCompiler:
 
     def validate_generation(self,scene,execution,request,context):
         inputs=self.validate_execution(scene,execution,context)
-        BundlePreparer(self.preparation, "raster").validate_request(request,inputs['bundle'],context)
+        self.bundles(self.preparation, "raster").validate_request(request,inputs['bundle'],context)
         actual={v['id']:v['source_id'] for v in request['panels']}
         data={v['id']:v['source_id'] for v in inputs['page']['bindings']['data_bindings']}
         layers={v['id']:data[v['data_binding_id']] for v in inputs['page']['bindings']['layers']}

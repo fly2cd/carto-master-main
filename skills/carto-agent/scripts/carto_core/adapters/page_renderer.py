@@ -105,6 +105,7 @@ class PageRenderer(MeasuredPageRenderer):
 
     def _validate_raster(self, request: dict[str, Any], context: ExecutionContext) -> Any:
         from ..compiler.raster_page_contract import validate_page_request
+        from ..workflow.preparation_bundle import BundlePreparer
         from .raster_renderer import RasterMapBodyRenderer
 
         if not hasattr(self, "_body_renderer"):
@@ -112,7 +113,7 @@ class PageRenderer(MeasuredPageRenderer):
         if not hasattr(self, "_layout"):
             self._layout = self._body_renderer.layout
 
-        inputs = validate_page_request(self.preparation, request, context)
+        inputs = validate_page_request(self.preparation, request, context, BundlePreparer)
         resolved = request["resolved_layout"]
         self._layout.validate(resolved)
         frames = {f["content_id"]: f for f in resolved["frames"] if f["type"] != "map"}

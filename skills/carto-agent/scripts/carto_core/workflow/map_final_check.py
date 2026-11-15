@@ -140,12 +140,13 @@ class FinalMapCheckService:
     def _raster_context(self, scene, lock, receipt):
         from ..adapters.page_renderer import PageRenderer
         from ..compiler.raster_scene import RasterSceneCompiler
+        from .preparation_bundle import BundlePreparer
         from .raster_preparation import RasterPreparationService
         if self.execution_context is None:
             raise SecurityError("RASTER_EXECUTION_CONTEXT_REQUIRED", "Final checks require the trusted execution context")
         preparation = RasterPreparationService(project_root=self.project_root,
             allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
-        inputs = RasterSceneCompiler(preparation).validate_execution(scene, lock["execution"], self.execution_context)
+        inputs = RasterSceneCompiler(preparation, BundlePreparer).validate_execution(scene, lock["execution"], self.execution_context)
         page = PageRenderer(preparation).load_verified(receipt["page_output_ref"], self.execution_context)
         if (page["request_ref"] != scene["page_request_ref"]
                 or receipt["renderer_id"] != scene["renderer_id"]

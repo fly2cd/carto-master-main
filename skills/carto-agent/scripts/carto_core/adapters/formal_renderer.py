@@ -16,6 +16,7 @@ from ..compiler.raster_scene import RasterSceneCompiler, RASTER_RENDERER_ID
 from ..compiler.vector_scene import VectorSceneCompiler
 from ..errors import ProtocolError, SecurityError
 from ..artifacts import file_digest, utc_now
+from ..workflow.preparation_bundle import BundlePreparer
 from ..workflow.raster_preparation import RasterPreparationService
 from ..workflow.vector_preparation import VectorPreparationService
 from .geospatial_mcp import _publish_bytes
@@ -159,7 +160,7 @@ class FormalRenderer:
         else:
             self.preparation = RasterPreparationService(project_root=project_root,
                 allowed_roots=list(path_guard.allowed_roots), registry=registry)
-            self.compiler = RasterSceneCompiler(self.preparation)
+            self.compiler = RasterSceneCompiler(self.preparation, BundlePreparer)
         self.preparation.project_guard.resolve(self.output_root)
 
         self.page_renderer = PageRenderer(self.preparation)

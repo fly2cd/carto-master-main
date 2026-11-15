@@ -1,4 +1,10 @@
-"""Compile and revalidate v4 raster pages, including strict shared legends."""
+"""Compile and revalidate v4 raster pages, including strict shared legends.
+
+``bundles`` is the injected BundlePreparer factory
+(``contracts.protocols.BundlePreparerFactory``): the concrete preparer stays in the
+execution layer and is handed in by the composition root, so this module never
+imports ``workflow`` (Tier-2 去环 Step7).
+"""
 from __future__ import annotations
 from copy import deepcopy
 from ..errors import ProtocolError
@@ -7,9 +13,8 @@ from .page_bindings import build_page_bindings, index_by, validate_bindings
 from .raster_legends import resolve_shared_legend
 
 
-def load_layers(service, references, context):
+def load_layers(service, references, context, bundles):
     from .raster_portrayal import RasterPortrayalCompiler
-    from ..workflow.preparation_bundle import BundlePreparer
     if not 1 <= len(references) <= 4:
         raise ProtocolError('PAGE_BINDING_UNSUPPORTED','One to four explicit map references required')
     indexed=index_by(references,'view_id');layers={};prototype=None
@@ -20,7 +25,7 @@ def load_layers(service, references, context):
         elif prototype!=portrayal['portrayal']:
             raise ProtocolError('PAGE_EXPRESSION_CONTRACT_MISMATCH','All panels must use the template expression contract')
         layers[vid]={'portrayal_ref':deepcopy(item['ref']),'portrayal':portrayal,'report':report,'gis':gis}
-    bundle=BundlePreparer(service, "raster").build_many([v['portrayal']['prepared_ref'] for v in layers.values()],context)
+    bundle=bundles(service, "raster").build_many([v['portrayal']['prepared_ref'] for v in layers.values()],context)
     assignments=[{'id':vid,'source_id':v['report']['request']['source']['source_ref']['id']} for vid,v in layers.items()]
     return layers,bundle,prototype,assignments
 
@@ -38,7 +43,7 @@ def resolve_legends(service, bindings, legends, layers, context):
     return result
 
 
-def compile_page_request(service, request, cartography, context):
+def compile_page_request(service, request, cartography, context, bundles):
     if request.get('schema_version')!=4:
         raise ProtocolError('PAGE_CONTRACT_VERSION','An explicit v4 page design is required')
     if any(k in request for k in ('typography','appearance','bindings','portrayal_ref','legend')):
@@ -46,7 +51,7 @@ def compile_page_request(service, request, cartography, context):
     if any('items' in item for item in request['legends']):
         raise ProtocolError('PAGE_DESIGN_ALREADY_RESOLVED','Legend entries come only from verified sources')
     result=deepcopy(request);result['portrayals']=sorted(result['portrayals'],key=lambda x:x['view_id'])
-    layers,bundle,prototype,assignments=load_layers(service,result['portrayals'],context)
+    layers,bundle,prototype,assignments=load_layers(service,result['portrayals'],context,bundles)
     layout=result['resolved_layout']['contract']
     result['bindings']=build_page_bindings(layout,prototype,bundle,assignments,service.registry)
     result['appearance']=resolve_appearance(cartography,layout,result['portrayals'],service.registry)
@@ -56,11 +61,11 @@ def compile_page_request(service, request, cartography, context):
     return result
 
 
-def validate_page_request(service,request,context):
+def validate_page_request(service,request,context,bundles):
     service.registry.validate('page-request', request)
     require_appearance(request['appearance'],request['resolved_layout']['contract'],request['portrayals'],service.registry)
     validate_bindings(request['bindings'],service.registry,executable=True)
-    layers,bundle,prototype,assignments=load_layers(service,request['portrayals'],context)
+    layers,bundle,prototype,assignments=load_layers(service,request['portrayals'],context,bundles)
     expected=build_page_bindings(request['resolved_layout']['contract'],prototype,bundle,assignments,service.registry)
     if request['bindings']!=expected:
         raise ProtocolError('PAGE_BINDING_DRIFT','Page does not match source and layout bindings')

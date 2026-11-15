@@ -89,7 +89,7 @@ class RasterFormalTests(PreparationFixture, unittest.TestCase):
         self.bundle_preparer = BundlePreparer(self.service, "raster")
         self.bundle_ref = self.bundle_preparer.prepare(self.prepared.ref(), self.context).ref()
         self.page = page_request(self.service, self.prepared, self.context, dpi=72)
-        self.compiler = RasterSceneCompiler(self.service)
+        self.compiler = RasterSceneCompiler(self.service, BundlePreparer)
         self.scene = self.compiler.compile(bundle_ref=self.bundle_ref, page_request=self.page,
                                            context=self.context, scene_id="synthetic-raster-scene")
         self.candidate = deepcopy(VALID_CASES["resolved-map"])
@@ -239,7 +239,7 @@ class RasterFormalTests(PreparationFixture, unittest.TestCase):
         self.request_path = self.work/"request/generate-request.yaml"
         preflight = MapCandidateCompiler(self.service.guard, self.registry,
             project_root=self.root, context=self.context, preparations=preparation_service,
-            material_facts=verify_material_facts).check_candidate(
+            material_facts=verify_material_facts, bundles=BundlePreparer).check_candidate(
                 self.generate, self.candidate, self.scene, self.contracts)
         files = {"request/generate-request.yaml": self.generate, "intent/map-intent.yaml": intent,
                  "candidates/resolved-map.yaml": self.candidate, "candidates/render-scene.yaml": self.scene,
@@ -399,7 +399,8 @@ class RasterFormalTests(PreparationFixture, unittest.TestCase):
              patch.object(self.capability, "require_contract", create=True), \
              patch.object(self.capability, "require_intent_projection", side_effect=projection, create=True):
             compiler = MapCandidateCompiler(self.service.guard, self.registry, project_root=self.root,
-                context=self.context, preparations=preparation_service, material_facts=verify_material_facts)
+                context=self.context, preparations=preparation_service, material_facts=verify_material_facts,
+                bundles=BundlePreparer)
             args = (self.generate, intent, plan, prepared["bundle"], {}, self.contracts, Path(self.page["font"]["path"]))
             self.assertIs(envelope, compiler.compile(*args))
             prepared["bundle"]["role_bindings"][0]["width"] += 1

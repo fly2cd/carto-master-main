@@ -744,7 +744,8 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
             self.generate, self.intent, {"synthetic": "brief", "revision": 1}, bundle,
             self.installation, contracts)
         kwargs = {"project_root": self.root, "context": ExecutionContext.from_generate_request(self.generate),
-                  "preparations": preparation_service, "material_facts": verify_material_facts}
+                  "preparations": preparation_service, "material_facts": verify_material_facts,
+                  "bundles": BundlePreparer}
         kwargs.update(compiler_kwargs or {})
         compiler = MapCandidateCompiler(self.guard, self.registry, **kwargs)
         return compiler.compile(self.generate, self.intent, plan, bundle, self.installation,
@@ -806,7 +807,7 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
         self.assertEqual(self.scenarios.for_template(deepcopy(TEMPLATE)).ref, profile.ref)
         profile.require_scene(scene)
         MapCandidateCompiler.require_execution_intent(execution, self.intent)
-        RasterSceneCompiler(self.service).validate_generation(
+        RasterSceneCompiler(self.service, BundlePreparer).validate_generation(
             scene, execution, self.generate, self.context)
 
     def test_consistent_but_foreign_appearance_is_rejected_by_template_check(self):
@@ -818,8 +819,8 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
         style["typography"]["title_pt"] = 14
         raw = {k: deepcopy(v) for k, v in page.items() if k not in {"appearance", "bindings"}}
         raw["legends"]=[{"content_id":x["content_id"],"title":x["title"]} for x in raw["legends"]]
-        page = compile_page_request(self.service, raw, style, self.context)
-        compiler = RasterSceneCompiler(self.service)
+        page = compile_page_request(self.service, raw, style, self.context, BundlePreparer)
+        compiler = RasterSceneCompiler(self.service, BundlePreparer)
         scene = compiler.compile(bundle_ref=original["prepared_bundle_ref"], page_request=page,
                                  context=self.context, scene_id="different-template-style")
         candidate = deepcopy(compiled["candidate"])
@@ -828,7 +829,8 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
         with self.assertRaisesRegex(ProtocolError, "APPEARANCE_TEMPLATE_MISMATCH"):
             MapCandidateCompiler(self.guard, self.registry, project_root=self.root,
                                  context=self.context, preparations=preparation_service,
-                                 material_facts=verify_material_facts).check_candidate(
+                                 material_facts=verify_material_facts,
+                                 bundles=BundlePreparer).check_candidate(
                 self.generate, candidate, scene, self.contracts)
 
     def test_candidate_compiler_rejects_context_drift_and_input_tampering(self):

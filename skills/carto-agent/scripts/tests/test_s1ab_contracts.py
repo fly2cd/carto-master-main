@@ -14,6 +14,7 @@ from carto_core.compiler.page_bindings import build_single_bindings, category_co
 from carto_core.compiler.raster_page_contract import compile_page_request
 from carto_core.errors import CartoError, ProtocolError
 from carto_core.schema_registry import SchemaRegistry
+from carto_core.workflow.preparation_bundle import BundlePreparer
 from tests.fixtures.schema_cases import VALID_CASES
 from tests.test_raster_classification import PreparationFixture
 from tests.helpers import page_request, rebind_page, release_test_font_handles, set_raster
@@ -182,11 +183,11 @@ class SinglePageNormalizationTests(PreparationFixture, unittest.TestCase):
         raw = {k: deepcopy(v) for k, v in self.page.items() if k not in {"appearance", "bindings"}}
         raw["schema_version"] = 1
         with self.assertRaisesRegex(ProtocolError, "PAGE_CONTRACT_VERSION"):
-            compile_page_request(self.service, raw, self.page["appearance"]["cartography"], self.context)
+            compile_page_request(self.service, raw, self.page["appearance"]["cartography"], self.context, BundlePreparer)
 
     def test_compiler_is_not_an_implicit_legacy_upgrade(self):
         with self.assertRaisesRegex(ProtocolError, 'PAGE_DESIGN_ALREADY_RESOLVED'):
-            compile_page_request(self.service,self.page,self.page['appearance']['cartography'],self.context)
+            compile_page_request(self.service,self.page,self.page['appearance']['cartography'],self.context,BundlePreparer)
 
 
 if __name__ == '__main__':

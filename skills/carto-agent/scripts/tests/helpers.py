@@ -139,7 +139,8 @@ def page_request(service, prepared, context, font_source=None, *, dpi=300):
     result["legends"] = [{"content_id": x["content_id"], "title": x["title"]}
                           for x in result["legends"]]
     from carto_core.compiler.raster_page_contract import compile_page_request
-    return compile_page_request(service, result, VALID_CASES["cartography"], context)
+    from carto_core.workflow.preparation_bundle import BundlePreparer
+    return compile_page_request(service, result, VALID_CASES["cartography"], context, BundlePreparer)
 
 
 def rebind_page(service, page, context):
@@ -149,7 +150,8 @@ def rebind_page(service, page, context):
     unresolved["legends"] = [{"content_id": x["content_id"], "title": x["title"]}
                               for x in unresolved["legends"]]
     from carto_core.compiler.raster_page_contract import compile_page_request
-    return compile_page_request(service, unresolved, style, context)
+    from carto_core.workflow.preparation_bundle import BundlePreparer
+    return compile_page_request(service, unresolved, style, context, BundlePreparer)
 
 
 def adorned_layout(dpi=300):

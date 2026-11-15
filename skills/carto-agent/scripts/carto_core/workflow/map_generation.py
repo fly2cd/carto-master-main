@@ -1473,10 +1473,11 @@ class MapGenerationWorkflow:
     def _candidate_compiler(self, request: dict[str, Any]) -> MapCandidateCompiler:
         """Composition root: inject the execution-layer ports the compiler may not import."""
         from .material_evidence import verify_material_facts
+        from .preparation_bundle import BundlePreparer
         from .preparation_services import preparation_service
         return MapCandidateCompiler(self.path_guard, self.registry, project_root=self.project_root,
-            context=ExecutionContext.from_generate_request(request),
-            preparations=preparation_service, material_facts=verify_material_facts)
+            context=ExecutionContext.from_generate_request(request), preparations=preparation_service,
+            material_facts=verify_material_facts, bundles=BundlePreparer)
 
     def _verify_candidate_inputs(self, candidate: dict[str, Any], scene: dict[str, Any],
                                  contracts: dict[str, Any], preflight: dict[str, Any]) -> None:
@@ -1507,10 +1508,11 @@ class MapGenerationWorkflow:
             VectorSceneCompiler(service).validate_generation(scene, execution, request, ExecutionContext.from_generate_request(request))
             return
         from ..compiler.raster_scene import RasterSceneCompiler
+        from .preparation_bundle import BundlePreparer
         from .raster_preparation import RasterPreparationService
         preparation = RasterPreparationService(project_root=self.project_root,
             allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
-        RasterSceneCompiler(preparation).validate_generation(scene, execution, request, ExecutionContext.from_generate_request(request))
+        RasterSceneCompiler(preparation, BundlePreparer).validate_generation(scene, execution, request, ExecutionContext.from_generate_request(request))
 
     def _resolve_project_path(self, value: str | Path, *, must_exist: bool = False) -> Path:
         return self.path_guard.resolve(value, base_root=self.project_root, must_exist=must_exist)

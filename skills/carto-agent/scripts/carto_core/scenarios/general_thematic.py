@@ -195,14 +195,14 @@ class GeneralThematicCandidateCompiler:
              'resolved_layout':resolved,'font':{'path':str(font_path),'digest':preparation.digest_bytes(font_bytes),'size_bytes':len(font_bytes)},
              'texts':texts,'legends':[{'content_id':f['content_id'],'title':resolved['contract'].get('legend_title',LEGEND_TITLE)} for f in resolved['frames'] if f['type']=='legend'],
              'scale_bar':None,'grid_north':None}
-        page=compile_page_request(preparation,raw,contracts['scenario']['embedded']['cartography'],context)
+        page=compile_page_request(preparation,raw,contracts['scenario']['embedded']['cartography'],context,BundlePreparer)
         stats=[{'source_id':b['source_id'],'counts':b['category_counts']} for b in bundle['role_bindings']]
         if (plan['bindings']!=page['bindings'] or plan['layout_parameters']!=request['layout_parameters']
             or plan['decisions']['thematic_views'] != raster_views(request,bundle,self.registry)
             or plan['decisions']['title'] != request['map_title']
             or plan['decisions']['legend_capacity']!=resolved['contract']['capacity']['legend_items']):
             raise ProtocolError('PLAN_BINDING_MISMATCH','Plan differs from verified template and data')
-        compiler=RasterSceneCompiler(preparation)
+        compiler=RasterSceneCompiler(preparation,BundlePreparer)
         scene=compiler.compile(bundle_ref=prepared['bundle_ref'],page_request=page,context=context,scene_id=f"scene-{request['run_id']}",targets=tuple(sorted(request['requested_outputs'])))
         base=self._execution_base(intent,installation,bundle,profile,contracts)
         base['thematic_plan_ref']=artifact_ref('map-plan',plan)
@@ -954,13 +954,13 @@ def validation_scene(package_root: Path, snapshot: dict[str, Any], targets: list
     for frame in resolved_layout['frames']:
         if frame['content_id'].startswith('caption-'):
             page_request['texts'].append({'content_id':frame['content_id'],'text':'Panel '+frame['content_id'].removeprefix('caption-')})
-    page_request = compile_page_request(preparation, page_request, scenario["embedded"]["cartography"], context)
+    page_request = compile_page_request(preparation, page_request, scenario["embedded"]["cartography"], context, BundlePreparer)
     scene_id = "validation-scene-" + sha256_digest({
         "package_digest": snapshot["package_digest"],
         "fixture_set_digest": snapshot["fixture_set_digest"],
         "validator_version": validator_version,
         "layout_parameters": resolved_layout["parameters"],
     })[7:23]
-    return RasterSceneCompiler(preparation).compile(
+    return RasterSceneCompiler(preparation, BundlePreparer).compile(
         bundle_ref=deepcopy(bundle_ref), page_request=page_request, context=context,
         scene_id=scene_id, targets=tuple(sorted(targets)))

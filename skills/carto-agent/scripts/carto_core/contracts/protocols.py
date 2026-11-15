@@ -124,6 +124,21 @@ class BundlePreparerProtocol(Protocol):
         """Cross-check generate-request bindings against the frozen bundle."""
 
 
+class BundlePreparerFactory(Protocol):
+    """Port that binds a preparation service and a geometry into a bundle preparer.
+
+    Injected as the concrete ``workflow.preparation_bundle.BundlePreparer`` class
+    itself, which satisfies this signature structurally. The geometry stays chosen
+    by the component that knows it -- a raster scene compiler always prepares a
+    raster bundle -- so a composition root cannot hand a compiler a preparer bound
+    to the wrong geometry (Tier-2 去环 Step7).
+    """
+
+    def __call__(self, preparation: PreparationServiceProtocol,
+                 geometry: str) -> BundlePreparerProtocol:
+        """Return the bundle preparer for ``geometry`` (one of :data:`GEOMETRIES`)."""
+
+
 class PreparationServiceFactory(Protocol):
     """Composition-root port that builds the preparation service for a geometry.
 
