@@ -11,6 +11,7 @@ import hashlib
 import json
 import math
 from pathlib import Path
+from typing import Any
 from ..canonical import sha256_digest
 from ..errors import ProtocolError, SecurityError
 from ..artifacts import atomic_write_bytes, protocol_version
@@ -35,6 +36,25 @@ def dependencies():
         raise ProtocolError('VECTOR_DEPENDENCY_MISSING',
                             'The explicit vector-rendering extra (Fiona/Shapely) is required') from None
     return fiona, shapely, shape, mapping, orient, CRS
+
+
+def crs_contract(report: dict[str, Any]) -> dict[str, Any]:
+    """Reconstruct the CRS contract from a vector preparation report.
+
+    Relocated from ``workflow.preparation_bundle`` (Tier-2 去环 Step5): the
+    derivation needs this module's Fiona CRS authority, and its result is frozen
+    into both the bundle role bindings and the page view bindings, so it belongs
+    with the reader that owns the authority and is covered by the same code
+    fingerprints. ``preparation_bundle`` re-exports it for existing importers, and
+    the compiler consumes it through ``VectorPreparationService.crs_contract`` --
+    the injected port -- instead of importing the execution layer.
+    """
+    CRS = dependencies()[-1]
+    crs = CRS.from_wkt(report['crs_wkt'])
+    code = crs.to_epsg()
+    if code is not None:
+        return {'authority': 'EPSG', 'code': str(code)}
+    return {'authority': 'CUSTOM', 'code': 'native-vector', 'wkt_digest': sha256_digest(report['crs_wkt'])}
 
 
 def reader_digest():
@@ -121,6 +141,15 @@ class VectorPreparationService(StaticAssetStore):
         if sha256_digest(value) != ref['digest']:
             raise ProtocolError('VECTOR_SNAPSHOT_CHANGED', 'Vector document digest differs')
         return value
+
+    def crs_contract(self, report):
+        """CRS contract of a prepared report; delegates to the module function.
+
+        Exposed as a service member so ``compiler.vector_page`` can reach it
+        through the injected preparation port (contracts.protocols.
+        VectorPreparationProtocol) rather than importing this layer.
+        """
+        return crs_contract(report)
 
     def _snapshot_inputs(self, source):
         files = {item['extension']: item for item in source['files']}

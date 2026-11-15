@@ -104,7 +104,6 @@ def compile_page(service, *, layout, cartography, panels, font, texts, legend_ti
             **({'basemap': deepcopy(basemap)} if basemap is not None else {}),
             'appearance': resolve_appearance(cartography, layout['contract'], colors, service.registry),
             'coordinate_mode': 'native-no-reprojection', 'scale_bar': None, 'grid_north': None}
-    from ..workflow.preparation_bundle import crs_contract
     from .page_bindings import validate_bindings
     data = {}
     for vid in sorted(layers):
@@ -123,7 +122,7 @@ def compile_page(service, *, layout, cartography, panels, font, texts, legend_ti
                                    'data_binding_id': item['report']['source']['source_id'],
                                    'expression_ref': expression_reference(ir_to_kind(item['portrayal']['encoding']), service.registry)})
     page['bindings'] = {'schema_version': 2, 'data_bindings': [data[key] for key in sorted(data)], 'layers': binding_layers,
-        'views': [{'id': p['view_id'], 'extent': p['extent'], 'crs': crs_contract(layers[p['view_id']][0]['report']),
+        'views': [{'id': p['view_id'], 'extent': p['extent'], 'crs': service.crs_contract(layers[p['view_id']][0]['report']),
                    'layer_ids': view_layer_ids[p['view_id']]} for p in resolved_panels],
         'panels': [{'id': p['frame_id'], 'frame_id': p['frame_id'], 'view_id': p['view_id']} for p in resolved_panels],
         'legends': [{'id': l['content_id'], 'frame_id': next(f['id'] for f in slots if f['content_id'] == l['content_id']),

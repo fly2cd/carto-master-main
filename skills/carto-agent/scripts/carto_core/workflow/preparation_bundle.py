@@ -22,23 +22,11 @@ from ..canonical import sha256_digest
 from ..compiler.page_bindings import category_counts, index_by
 from ..errors import ProtocolError, SecurityError
 from .models import ExecutionContext
-from .raster_preparation import RasterPreparationService
-from .vector_preparation import VectorPreparationService, dependencies as vector_deps
+# crs_contract lives with the vector reader that owns the Fiona CRS authority
+# (Tier-2 去环 Step5); re-exported here so the historical import path keeps working.
+from .vector_preparation import crs_contract
 
 GEOMETRIES = ("raster", "vector")
-
-
-def crs_contract(report: dict[str, Any]) -> dict[str, Any]:
-    """Reconstruct the CRS contract from a vector preparation report.
-
-    Public for use by vector page compilation.
-    """""
-    CRS = vector_deps()[-1]
-    crs = CRS.from_wkt(report['crs_wkt'])
-    code = crs.to_epsg()
-    if code is not None:
-        return {'authority': 'EPSG', 'code': str(code)}
-    return {'authority': 'CUSTOM', 'code': 'native-vector', 'wkt_digest': sha256_digest(report['crs_wkt'])}
 
 
 class BundlePreparer:
