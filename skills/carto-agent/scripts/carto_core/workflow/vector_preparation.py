@@ -40,7 +40,10 @@ def dependencies():
 def reader_digest():
     return sha256_digest({'version': '1.0.0', 'files': {
         path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in
-        [Path(__file__), Path(__file__).with_name('thematic.py'), Path(__file__).with_name('material_extraction.py'), *[Path(__file__).resolve().parents[3] / 'schemas' / (name + '.schema.json')
+        [Path(__file__), Path(__file__).with_name('thematic.py'), Path(__file__).with_name('material_extraction.py'),
+         # finite/metric_value moved to the kernel in Tier-2 去环 Step4: the reader's
+         # attribute join calls finite(), so the fingerprint must follow the code.
+         Path(__file__).resolve().parents[1] / 'compiler' / 'portrayal_resolver.py', *[Path(__file__).resolve().parents[3] / 'schemas' / (name + '.schema.json')
                           for name in ('vector-input', 'vector-prepared-data')]]}})
 
 

@@ -6,6 +6,7 @@ from ..contracts.bundle import context_snapshot
 from ..workflow.preparation_bundle import BundlePreparer
 from .vector_page import validate_page
 from .layout import LayoutResolver
+from .thematic_design import resolve_design
 
 RENDERER_ID = 'matplotlib-vector-page'
 
@@ -97,7 +98,6 @@ class VectorSceneCompiler:
             raise ProtocolError('VECTOR_GENERATION_CHANGED', 'Panel selection differs')
         for panel in inputs['page']['panels']:
             source = requested[panel['view_id']]; stack = inputs['layers'][panel['view_id']]
-            from ..workflow.thematic import resolve_design
             # First version: the generate workflow binds one source per panel;
             # stacked panels are composed at compile_page level (request-level
             # multi-layer declaration is a later orchestration step).

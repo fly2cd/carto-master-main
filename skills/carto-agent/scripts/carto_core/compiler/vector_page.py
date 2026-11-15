@@ -6,7 +6,7 @@ from .layout import LayoutResolver
 from .appearance import resolve_appearance, require_appearance
 from .page_bindings import index_by
 from .vector_portrayal import VectorPortrayalCompiler, shared_legend
-from .portrayal_resolver import ir_to_kind
+from .portrayal_resolver import expression_reference, ir_to_kind
 
 
 def _panel_refs(panel):
@@ -105,7 +105,6 @@ def compile_page(service, *, layout, cartography, panels, font, texts, legend_ti
             'appearance': resolve_appearance(cartography, layout['contract'], colors, service.registry),
             'coordinate_mode': 'native-no-reprojection', 'scale_bar': None, 'grid_north': None}
     from ..workflow.preparation_bundle import crs_contract
-    from ..workflow.thematic import expression_reference
     from .page_bindings import validate_bindings
     data = {}
     for vid in sorted(layers):

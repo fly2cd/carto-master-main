@@ -16,14 +16,15 @@ from pathlib import Path
 from ..canonical import sha256_digest
 from ..errors import ProtocolError
 # ADR-001 stage 3: geometry-agnostic IR primitives live in portrayal_resolver (§9.5 item 1).
-from .portrayal_resolver import validate_ir, radius, _size_symbol, _number, _key
+# metric_value joined them in Tier-2 去环 Step4 (it was reached up from workflow.thematic).
+from .portrayal_resolver import validate_ir, radius, _size_symbol, _number, _key, metric_value
 
 
 def compiler_digest():
     root = Path(__file__).resolve().parents[3]
     return sha256_digest({'version': '2.0.0', 'files': {
         path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in
-        [Path(__file__), Path(__file__).resolve().parent / 'portrayal_resolver.py', Path(__file__).resolve().parents[1] / 'workflow/thematic.py', root / 'schemas/encoding-ir.schema.json', root / 'schemas/resolved-portrayal.schema.json']}})
+        [Path(__file__), Path(__file__).resolve().parent / 'portrayal_resolver.py', Path(__file__).resolve().parent / 'thematic_design.py', Path(__file__).resolve().parents[1] / 'workflow/thematic.py', root / 'schemas/encoding-ir.schema.json', root / 'schemas/resolved-portrayal.schema.json']}})
 
 
 def resolve_labels(report, label_source):
@@ -80,7 +81,6 @@ def resolve_features(prepared, ir, registry=None):
     keys = {_key(c['value']): i for i, c in enumerate(ir['scale']['categories'])} if (key_mode == 'discrete' and not single) else {}
     for feature in prepared['features']:
         counts['feature_count'] += 1
-        from ..workflow.thematic import metric_value
         value = metric_value(feature['properties'], ir['domain'])
         legend_id, symbol = None, None
         if not single and value is None:

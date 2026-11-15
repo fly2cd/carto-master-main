@@ -1,118 +1,50 @@
 """Explicit thematic semantics and deterministic attribute/encoding execution.
 
 No automatic method selection, unit inference, business-data logging or code evaluation.
+
+This module keeps the parts that are genuinely execution-layer work: request/bundle
+view assembly (``vector_views`` / ``raster_views``) and the evidenced exact CSV
+attribute join (``join_attributes``).
+
+The mechanical derivations moved down into the kernel (Tier-2 去环 Step4) and are
+re-exported here unchanged, so every existing ``from .thematic import ...`` keeps
+working:
+
+* ``metric_value`` / ``finite`` / ``expression_reference`` ->
+  ``carto_core.compiler.portrayal_resolver`` (IR-level value and catalog resolution);
+* ``equal_interval_edges`` / ``resolve_design`` / ``_domain`` / ``_design_to_ir`` ->
+  ``carto_core.compiler.thematic_design`` (design -> encoding IR).
+
+New code in ``compiler`` must import them from the kernel directly; that is what
+removed the ``compiler -> workflow`` runtime edge. Per design-principles §2.3 these
+are program-owned mechanical derivations, not orchestration.
 """
 from copy import deepcopy
-import math
 from ..canonical import sha256_digest
 from ..errors import ProtocolError, SecurityError
-from ..schema_registry import SchemaRegistry
+from ..compiler.portrayal_resolver import expression_reference, finite, ir_to_kind, metric_value
+from ..compiler.thematic_design import (
+    _design_to_ir,
+    _domain,
+    equal_interval_edges,
+    resolve_design,
+)
 
-
-def expression_reference(kind, registry=None):
-    from ..repository.map_expression_catalog import MapExpressionCatalog
-    choices = {"single":"categorical", "categorical":"categorical",
-               "choropleth":"graduated-color", "proportional":"proportional-symbol"}
-    if kind not in choices:
-        raise ProtocolError("THEMATIC_METHOD_UNSUPPORTED", "An admitted expression method is required")
-    catalog=MapExpressionCatalog(registry)
-    ref=catalog.reference(choices[kind], "2.0.0")
-    if catalog.require(ref)["status"] != "active":
-        raise ProtocolError("THEMATIC_METHOD_UNSUPPORTED", "The selected expression is not active")
-    return ref
-
-
-def metric_value(properties, domain):
-    field = domain.get("field")
-    value = properties.get(field) if field else None
-    normalization = domain.get("normalization")
-    if normalization is None or value is None:
-        return value
-    denominator = properties.get(normalization["denominator_field"])
-    if not finite(value) or not finite(denominator) or denominator <= 0:
-        raise ProtocolError("THEMATIC_DENOMINATOR_INVALID", "Normalization requires finite values and a positive denominator")
-    result = value / denominator * normalization["scale"]
-    if not finite(result):
-        raise ProtocolError("THEMATIC_VALUE_INVALID", "Derived metric is not finite")
-    return result
-
-
-def finite(value):
-    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
-
-
-def equal_interval_edges(low, high, count):
-    """Shared equal-interval break computation for raster & vector choropleth (ADR-001 阶段2.3)."""
-    if low == high:
-        raise ProtocolError("THEMATIC_CONSTANT_DOMAIN", "Equal intervals need a nonconstant domain; select another explicit expression")
-    edges = [low + (high - low) * i / count for i in range(count)] + [high]
-    labels = [f"Class {i+1}" for i in range(count)]
-    return edges, labels
-
-
-def _domain(design):
-    return {"field": design["field"], "measurement": design["measurement"],
-            "unit": design["unit"], "normalization": design.get("normalization")}
-
-
-def _design_to_ir(design, stats):
-    """Map a kind-based thematic-design into the geometry-agnostic encoding IR (ADR-001 stage 2)."""
-    kind = design["kind"]
-    geometry_role = design["geometry"]
-    missing = deepcopy(design["missing"])
-    domain = _domain(design)
-    if kind == "single":
-        return {"schema_version": 1, "key_mode": "discrete", "geometry_role": geometry_role, "domain": domain,
-                "scale": {"categories": []},
-                "channels": {"symbols": [deepcopy(design["symbol"])], "shape": "auto"},
-                "missing": missing, "legend": {"policy": "all", "uniform_label": design["label"]}}
-    if kind == "categorical":
-        return {"schema_version": 1, "key_mode": "discrete", "geometry_role": geometry_role, "domain": domain,
-                "scale": {"categories": [{"value": c["value"], "label": c["label"]} for c in design["categories"]]},
-                "channels": {"symbols": [deepcopy(c["symbol"]) for c in design["categories"]], "shape": "auto"},
-                "missing": missing, "legend": {"policy": design["legend_policy"]}}
-    if kind == "choropleth":
-        classification = design["classification"]
-        if classification["method"] == "equal-interval":
-            edges, labels = equal_interval_edges(stats["minimum"], stats["maximum"], classification["class_count"])
-        else:
-            edges, labels = classification["edges"], classification["labels"]
-        return {"schema_version": 1, "key_mode": "interval", "geometry_role": geometry_role, "domain": domain,
-                "scale": {"edges": edges, "labels": labels, "interval_policy": "left-closed-last-both", "out_of_range": "reject"},
-                "channels": {"symbols": deepcopy(design["symbols"]), "shape": "auto"},
-                "missing": missing, "legend": {"policy": "all"}}
-    return {"schema_version": 1, "key_mode": "scaling", "geometry_role": geometry_role, "domain": domain,
-            "scale": {"domain_max": design["maximum_value"], "range_mm": [design["minimum_radius_mm"], design["maximum_radius_mm"]],
-                      "size_scale": "sqrt", "zero_policy": design["zero_policy"], "negative_policy": design["negative_policy"],
-                      "out_of_range": design["out_of_range"], "legend_values": design["legend_values"]},
-            "channels": {"symbols": [deepcopy(design["symbol"])], "shape": "auto"},
-            "missing": missing, "legend": {"policy": "all"}}
-
-
-def resolve_design(design, report, registry=None):
-    registry = registry or SchemaRegistry()
-    registry.validate("thematic-design", design)
-    if design["geometry"] != report["geometry"]:
-        raise ProtocolError("THEMATIC_GEOMETRY_MISMATCH", "Design must match the source geometry")
-    kind = design["kind"]
-    if kind == "proportional" and design.get("normalization") is not None:
-        raise ProtocolError("THEMATIC_MEASUREMENT_INVALID", "Count symbols cannot silently normalize their values")
-    domain = _domain(design)
-    values = [metric_value(feature["properties"], domain) for feature in report["features"]]
-    numeric = [value for value in values if value is not None]
-    if kind in {"choropleth", "proportional"} and (not numeric or any(not finite(v) for v in numeric)):
-        raise ProtocolError("THEMATIC_VALUE_INVALID", "A numeric expression requires observed finite numeric values")
-    stats = {"count": len(numeric), "minimum": min(numeric) if numeric and all(finite(v) for v in numeric) else None,
-             "maximum": max(numeric) if numeric and all(finite(v) for v in numeric) else None}
-    ir = _design_to_ir(design, stats)
-    from ..compiler.vector_portrayal import resolve_features
-    # Validate the actual values, all interval coverage, missing policy and symbol domains now.
-    resolve_features(report, ir, registry)
-    return ir, stats
+__all__ = [
+    "_design_to_ir",
+    "_domain",
+    "equal_interval_edges",
+    "expression_reference",
+    "finite",
+    "join_attributes",
+    "metric_value",
+    "raster_views",
+    "resolve_design",
+    "vector_views",
+]
 
 
 def vector_views(request, bundle, service, context):
-    from ..compiler.portrayal_resolver import ir_to_kind
     bindings = {item["source_id"]: item for item in bundle["role_bindings"]}
     results = []
     for panel in sorted(request["vector_panels"], key=lambda p:p["id"]):

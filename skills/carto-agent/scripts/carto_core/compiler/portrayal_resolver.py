@@ -30,8 +30,20 @@ def ir_to_kind(ir):
     return 'single' if ir['domain']['field'] is None else 'categorical'
 
 
-def _number(value):
+def finite(value):
+    """The single finiteness predicate for declared numeric values.
+
+    Relocated from ``workflow.thematic`` (Tier-2 去环 Step4): evaluating a domain
+    against observed properties is IR-level mechanical derivation, so it belongs
+    with the other IR primitives instead of in the execution layer.
+    """
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def _number(value):
+    # Historical private name for ``finite``; the two were byte-identical copies, so
+    # one now delegates to the other and existing import sites keep working.
+    return finite(value)
 
 
 def _key(value):
@@ -102,3 +114,42 @@ def _size_symbol(ir, value):
     result = deepcopy(ir['channels']['symbols'][0])
     result['radius_mm'] = radius(ir, value)
     return result
+
+
+# ---------------------------------------------------------------------------
+# Domain evaluation and expression-catalog reference
+#
+# Relocated verbatim from ``workflow.thematic`` (Tier-2 去环 Step4). Both are
+# mechanical derivations over declared inputs: ``metric_value`` evaluates an IR
+# domain (field + optional normalization) on one feature, ``expression_reference``
+# resolves an admitted design kind to its versioned catalog entry. Neither reads
+# data, chooses a method nor invents a default, so neither belongs in the
+# execution layer that the compiler must not import.
+# ---------------------------------------------------------------------------
+
+def metric_value(properties, domain):
+    field = domain.get("field")
+    value = properties.get(field) if field else None
+    normalization = domain.get("normalization")
+    if normalization is None or value is None:
+        return value
+    denominator = properties.get(normalization["denominator_field"])
+    if not finite(value) or not finite(denominator) or denominator <= 0:
+        raise ProtocolError("THEMATIC_DENOMINATOR_INVALID", "Normalization requires finite values and a positive denominator")
+    result = value / denominator * normalization["scale"]
+    if not finite(result):
+        raise ProtocolError("THEMATIC_VALUE_INVALID", "Derived metric is not finite")
+    return result
+
+
+def expression_reference(kind, registry=None):
+    from ..repository.map_expression_catalog import MapExpressionCatalog
+    choices = {"single":"categorical", "categorical":"categorical",
+               "choropleth":"graduated-color", "proportional":"proportional-symbol"}
+    if kind not in choices:
+        raise ProtocolError("THEMATIC_METHOD_UNSUPPORTED", "An admitted expression method is required")
+    catalog=MapExpressionCatalog(registry)
+    ref=catalog.reference(choices[kind], "2.0.0")
+    if catalog.require(ref)["status"] != "active":
+        raise ProtocolError("THEMATIC_METHOD_UNSUPPORTED", "The selected expression is not active")
+    return ref
