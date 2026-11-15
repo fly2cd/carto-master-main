@@ -41,6 +41,14 @@ def page_renderer_digest(geometry: str = "raster") -> str:
         path.parents[1] / "compiler" / "appearance.py",
         path.parents[1] / "compiler" / "page_bindings.py",
         path.parents[1] / "compiler" / "grid_layout.py",
+        # P0-2 coverage: LayoutResolver decides frame/viewport geometry for BOTH
+        # geometries; it was only fingerprinted on the raster side, and only
+        # indirectly through the embedded body-renderer digest.
+        path.parents[1] / "compiler" / "layout.py",
+        # P0-2 coverage: chart slots are bound by chart_core.bind_chart_slots while
+        # freezing a page (compiler.vector_page) and re-validated by
+        # static_page_renderer while painting one, so both geometries depend on it.
+        path.parents[1] / "compiler" / "chart_core.py",
         root / "schemas" / "cartography.schema.json",
         root / "schemas" / "layout.schema.json",
         root / "schemas" / "resolved-appearance.schema.json",

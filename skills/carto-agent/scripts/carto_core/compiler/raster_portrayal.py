@@ -42,6 +42,11 @@ def algorithm_digest() -> str:
     return sha256_digest({
         "version": VERSION, "code": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         "preparation": hashlib.sha256((Path(__file__).resolve().parents[1] / "workflow/raster_preparation.py").read_bytes()).hexdigest(),
+        # P0-2 coverage: continuous class breaks come from equal_interval_edges, which
+        # lives in the kernel and is reached via workflow.thematic's re-export shim.
+        # Without this entry the break math could change while every frozen raster
+        # preparation still verified (pre-existing gap, not introduced by Tier-2).
+        "derivation": hashlib.sha256((Path(__file__).resolve().parent / "thematic_design.py").read_bytes()).hexdigest(),
         "schemas": {name: hashlib.sha256((root / (name + ".schema.json")).read_bytes()).hexdigest()
                     for name in ("raster-classification-request", "raster-classification-answers", "raster-prepared-data")},
     })
