@@ -19,7 +19,7 @@ class MeasuredPageRenderer:
         strings=[x['text'] for x in request['texts']]
         for legend in request['legends']:
             strings.append(legend['title']);strings.extend(x['label'] for x in legend['items'])
-        if request['scale_bar'] is not None:strings.append(self._scale_label(request['scale_bar']))
+        if request['scale_bar'] is not None:strings.append(self.scale_label(request['scale_bar']))
         if request['grid_north'] is not None:strings.append(request['grid_north']['label'])
         return strings
 
@@ -58,7 +58,7 @@ class MeasuredPageRenderer:
 
 
     @staticmethod
-    def _scale_label(scale: dict[str, Any]) -> str:
+    def scale_label(scale: dict[str, Any]) -> str:
         meters = scale["distance_m"]
         distance = f"{meters / 1000:g} km" if meters >= 1000 else f"{meters:g} m"
         prefix = "投影距离" if scale["label_language"] == "zh" else "Grid distance:"
@@ -261,7 +261,7 @@ class MeasuredPageRenderer:
                 length = self.grid_scale_length(body, scale["distance_m"])
                 if length < 2 or length > w - 2 * padding:
                     raise ProtocolError("RASTER_SCALE_LENGTH_INVALID", "Requested distance is too small or exceeds the scale frame")
-                label_height = text("scale-label", key, self._scale_label(scale), x + padding, y + padding,
+                label_height = text("scale-label", key, self.scale_label(scale), x + padding, y + padding,
                                     typography["body_pt"], w - 2 * padding)
                 for i in range(2):
                     patch(f"scale-segment-{i}", key, x + padding + length * i / 2,

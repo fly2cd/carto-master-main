@@ -556,7 +556,7 @@ class FinalMapCheckService:
                 strings.append(raster["page"]["grid_north"]["label"])
             if raster["page"]["scale_bar"] is not None:
                 from ..adapters.page_renderer import PageRenderer
-                strings.append(PageRenderer._scale_label(raster["page"]["scale_bar"]))
+                strings.append(PageRenderer.scale_label(raster["page"]["scale_bar"]))
             payload = "\n".join(strings).encode("utf-8")
             hits = [marker.decode("utf-8") for marker in forbidden if marker in payload]
             if hits:

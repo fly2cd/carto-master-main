@@ -133,7 +133,7 @@ class SinglePageNormalizationTests(PreparationFixture, unittest.TestCase):
         self.renderer = PageRenderer(self.service)
 
     def test_single_page_has_explicit_data_and_element_bindings(self):
-        self.renderer._validate(self.page, self.context)
+        self.renderer.validate_request(self.page, self.context)
         self.assertNotIn('typography', self.page)
         binding = self.page['bindings']
         self.assertEqual(self.prepared.ref(), binding['data_bindings'][0]['prepared_ref'])
@@ -148,7 +148,7 @@ class SinglePageNormalizationTests(PreparationFixture, unittest.TestCase):
         updated['resolved_layout'] = LayoutResolver(self.service.registry).resolve(layout,72)
         result = rebind_page(self.service, updated, self.context)
         self.assertEqual(self.page['bindings'], result['bindings'])
-        self.renderer._validate(result, self.context)
+        self.renderer.validate_request(result, self.context)
 
     def test_resolved_style_and_binding_tampering_fail(self):
         for change in ('font-size','source-style','data','view'):
@@ -158,7 +158,7 @@ class SinglePageNormalizationTests(PreparationFixture, unittest.TestCase):
             elif change == 'data': value['bindings']['data_bindings'][0]['prepared_ref']['digest'] = 'sha256:'+'b'*64
             else: value['bindings']['panels'][0]['view_id'] = 'different-view'
             with self.subTest(change=change), self.assertRaises(ProtocolError):
-                self.renderer._validate(value,self.context)
+                self.renderer.validate_request(value,self.context)
 
     def test_legacy_reference_is_not_migrated(self):
         ref = self.renderer.freeze_request(self.page,self.context).ref()

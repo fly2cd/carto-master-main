@@ -38,9 +38,6 @@ CORE = SCRIPTS_ROOT / "carto_core"
 # Frozen, shrink-only. Key = private member name, value = why it is still here and what
 # removes it. Adding a key requires justifying a new boundary break in review.
 ALLOWED_ATTRIBUTES = {
-    "_validate": "PageRenderer._validate called from compiler.raster_scene -- kernel reaching into an "
-                 "adapter's private method. Fixed in P1 Step D (page freeze/validate port).",
-    "_scale_label": "PageRenderer._scale_label called from workflow.map_final_check. Fixed in P1 Step D.",
     "_directory_size": "ControlledBrowserRenderer._directory_size, called by a collaborator object inside "
                        "the same module family (adapters, intra-layer). Cosmetic rename, tracked as P2.",
     "_fields_": "ctypes.Structure._fields_ -- stdlib API, not a carto private member.",

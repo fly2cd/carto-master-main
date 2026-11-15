@@ -29,7 +29,7 @@ class RasterSceneCompiler:
         if bundle!=inputs['bundle']:
             raise ProtocolError('RASTER_BUNDLE_PORTRAYAL_MISMATCH','Page sources differ from bundle')
         from ..adapters.page_renderer import PageRenderer
-        PageRenderer(self.preparation)._validate(page,context)
+        PageRenderer(self.preparation).validate_request(page,context)
         font={'artifact_ref':{'id':'font','version':'1.0.0','digest':page['font']['digest'],'uri':page['font']['path']},'size_bytes':page['font']['size_bytes']}
         self.preparation.snapshot_bytes(font,'font','.ttf')
         resources={}

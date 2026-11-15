@@ -105,7 +105,7 @@ class PageRenderer(MeasuredPageRenderer):
 
     # -- validation -------------------------------------------------------
 
-    def _validate(self, request: dict[str, Any], context: ExecutionContext) -> Any:
+    def validate_request(self, request: dict[str, Any], context: ExecutionContext) -> Any:
         g = request.get("geometry", "raster")
         self._geometry = g
         if g == "vector":
@@ -161,7 +161,7 @@ class PageRenderer(MeasuredPageRenderer):
     # -- freeze / render / verify -----------------------------------------
 
     def freeze_request(self, request: dict[str, Any], context: ExecutionContext) -> StoredArtifact:
-        self._validate(request, context)
+        self.validate_request(request, context)
         request = deepcopy(request)
         font, _, _ = self._font(request, self._strings(request))
         request["font"] = {"path": font["artifact_ref"]["uri"], "digest": font["artifact_ref"]["digest"], "size_bytes": font["size_bytes"]}
@@ -177,7 +177,7 @@ class PageRenderer(MeasuredPageRenderer):
     def _render_raster(self, request: dict[str, Any], context: ExecutionContext) -> StoredArtifact:
         from .raster_renderer import RasterMapBodyRenderer
 
-        self._validate(request, context)
+        self.validate_request(request, context)
         request = deepcopy(request)
         if not hasattr(self, "_body_renderer"):
             self._body_renderer = RasterMapBodyRenderer(self.preparation)
@@ -283,7 +283,7 @@ class PageRenderer(MeasuredPageRenderer):
             return output
         output = self.preparation.document(reference, "page-output")
         request = self.preparation.document(output["request_ref"], "page-request")
-        self._validate(request, context)
+        self.validate_request(request, context)
         for kind, asset in output["outputs"].items():
             self.preparation.snapshot_bytes(asset, f"page-{kind}", f".{kind}")
         current = self.render(request, context)
