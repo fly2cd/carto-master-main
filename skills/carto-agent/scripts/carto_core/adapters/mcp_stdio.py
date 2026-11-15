@@ -9,7 +9,7 @@ from typing import Any
 
 from ..canonical import canonical_json_bytes, sha256_digest
 from ..errors import CartoError, ProtocolError
-from ..workflow.models import ExecutionContext
+from ..contracts.execution import ExecutionContext
 
 
 class _LocalSchemaValidation:

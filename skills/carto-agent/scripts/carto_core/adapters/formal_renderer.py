@@ -109,7 +109,7 @@ class RendererProfile:
                    "freetype": ft2font.__freetype_version__, "fonttools": fontTools.__version__,
                    "zlib": zlib.ZLIB_RUNTIME_VERSION}
         if renderer_id == PAGE_VECTOR_ID:
-            from ..workflow.vector_preparation import dependencies as _vec_deps
+            from ..geospatial_deps import dependencies as _vec_deps
             _fiona, _shapely, *_ = _vec_deps()
             runtime = {"python": platform.python_version(), "rasterio": rio.__version__,
                        "gdal": rio.__gdal_version__, "numpy": np.__version__,

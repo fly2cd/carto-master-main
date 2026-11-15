@@ -25,7 +25,7 @@ from carto_core.cli import main
 from carto_core.errors import CartoError, ProtocolError
 from carto_core.scenario_registry import ScenarioRegistry
 from carto_core.schema_registry import SchemaRegistry
-from carto_core.workflow.models import ExecutionContext
+from carto_core.contracts.execution import ExecutionContext
 from tests.fixtures.schema_cases import VALID_CASES
 
 

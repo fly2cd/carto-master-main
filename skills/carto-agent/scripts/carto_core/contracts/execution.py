@@ -7,8 +7,11 @@ can depend on the execution contract *downward* through a leaf package instead
 of reaching "up" into ``workflow`` -- which historically triggered the
 ``workflow/__init__`` -> ``template_validation`` -> ``compiler`` import cascade.
 
-``carto_core.workflow.models`` remains a thin re-export shim, so every existing
-``from ..workflow.models import ExecutionContext`` keeps working unchanged.
+``carto_core.workflow`` re-exports these dataclasses as part of its public package
+surface, so ``from carto_core.workflow import ExecutionContext`` keeps working. The
+former ``carto_core.workflow.models`` shim was retired in P1 Step C, once all 36
+import sites pointed here directly -- keeping it alive made every one of them look
+like a dependency on the execution layer instead of on this leaf.
 """
 from __future__ import annotations
 

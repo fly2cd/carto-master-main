@@ -19,7 +19,7 @@ from ..compiler.layout import LayoutResolver
 from ..compiler.raster_portrayal import RasterPortrayalCompiler, portrayal_compiler_digest
 from ..errors import ProtocolError
 from ..repository.immutable_store import StoredArtifact
-from ..workflow.models import ExecutionContext
+from ..contracts.execution import ExecutionContext
 from ..workflow.raster_preparation import RasterPreparationService
 from .svg_compositor import SvgCompositor
 

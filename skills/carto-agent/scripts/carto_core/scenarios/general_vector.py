@@ -20,7 +20,7 @@ from ..compiler.vector_scene import VectorSceneCompiler, RENDERER_ID
 from ..repository.map_expression_catalog import MapExpressionCatalog
 from ..workflow.vector_preparation import VectorPreparationService
 from ..workflow.preparation_bundle import BundlePreparer
-from ..workflow.models import ExecutionContext
+from ..contracts.execution import ExecutionContext
 from .general_thematic import (
     FIXTURE_PATH, GATE_LEGEND, GATE_PROTOCOL, LAYOUT_ID, author_context,
     data_schema_contract, delivery_contract, dependency_lock, fixture_csv,
@@ -297,7 +297,7 @@ class GeneralVectorAuthor:
 def validation_scene(package_root, snapshot, targets, font, validator_version, *, context, workspace, registry,
                      layout_parameters=None, validation_expression='single'):
     """Synthetic sample, never a template copy of user geometry or attribute rows."""
-    from ..workflow.vector_preparation import dependencies
+    from ..geospatial_deps import dependencies
     from ..compiler.grid_layout import grid_cases
     from ..security.paths import PathGuard
     fiona, _, _, _, _, CRS = dependencies()

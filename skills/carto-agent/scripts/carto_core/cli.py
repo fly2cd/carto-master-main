@@ -15,7 +15,7 @@ from .security.paths import PathGuard
 from .workflow.data_preparation import DeterministicDataPreparer
 from .workflow.intent import IntentResolver
 from .workflow.map_generation import MapGenerationWorkflow
-from .workflow.models import ExecutionContext
+from .contracts.execution import ExecutionContext
 from .workflow.template_workflow import TemplateCreationWorkflow
 
 

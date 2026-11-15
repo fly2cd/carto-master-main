@@ -24,7 +24,7 @@ from carto_core.cli import build_parser, main as cli_main
 from carto_core.errors import ProtocolError, SecurityError
 from carto_core.security.approval import ApprovalReceipt, sign_receipt
 from carto_core.workflow.approvals import ApprovalGateCoordinator
-from carto_core.workflow.models import ExecutionContext
+from carto_core.contracts.execution import ExecutionContext
 from carto_core.workflow.state_machine import WorkflowStateStore
 
 

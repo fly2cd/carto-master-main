@@ -15,7 +15,7 @@ from carto_core.canonical import sha256_digest as _sha256
 from carto_core.errors import ProtocolError, SecurityError
 from carto_core.schema_registry import SchemaRegistry, load_document
 from carto_core.workflow.budget_store import BudgetStore
-from carto_core.workflow.models import ExecutionBudget
+from carto_core.contracts.execution import ExecutionBudget
 
 # ----- helpers ---------------------------------------------------------------
 

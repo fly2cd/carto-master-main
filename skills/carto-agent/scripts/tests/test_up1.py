@@ -42,7 +42,7 @@ from carto_core.workflow.agent_runtime import AgentSubmission, BoundedAgentRunti
 from carto_core.workflow.approvals import ApprovalGateCoordinator, GATES
 from carto_core.workflow.data_preparation import DeterministicDataPreparer
 from carto_core.workflow.intent import IntentResolver, TaskDispatcher
-from carto_core.workflow.models import ExecutionBudget, ExecutionContext
+from carto_core.contracts.execution import ExecutionBudget, ExecutionContext
 from carto_core.workflow.state_machine import WorkflowStateStore
 from carto_core.validation.registry import CheckerRegistry
 from tests.fixtures.schema_cases import VALID_CASES

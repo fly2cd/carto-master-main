@@ -25,7 +25,7 @@ from ..schema_registry import SchemaRegistry, load_document
 from ..security.paths import PathGuard
 from ..validation.registry import CheckerRegistry
 from ..validation.map_checks import MapQualityChecks
-from .models import ExecutionContext
+from ..contracts.execution import ExecutionContext
 
 VALIDATOR_VERSION = "1.5.0"
 ADAPTER_VERSION = "1.1.0"

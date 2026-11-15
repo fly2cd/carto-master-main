@@ -21,7 +21,7 @@ from typing import Any
 from ..canonical import sha256_digest
 from ..compiler.page_bindings import category_counts, index_by
 from ..errors import ProtocolError, SecurityError
-from .models import ExecutionContext
+from ..contracts.execution import ExecutionContext
 # crs_contract lives with the vector reader that owns the Fiona CRS authority
 # (Tier-2 去环 Step5); re-exported here so the historical import path keeps working.
 from .vector_preparation import crs_contract

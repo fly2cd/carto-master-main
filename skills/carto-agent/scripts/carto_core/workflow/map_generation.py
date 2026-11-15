@@ -26,7 +26,7 @@ from .map_final_check import FinalMapCheckService
 from .map_planning import MapPlanner
 from .map_preview import MapPreviewService, freeze_object_digest
 from .map_render import FormalMapRenderService, is_transient_render_error
-from .models import ExecutionContext
+from ..contracts.execution import ExecutionContext
 from .state_machine import WorkflowStateStore, serialized_workflow_step
 
 TOOL_VERSION = "0.4.0"

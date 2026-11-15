@@ -7,7 +7,7 @@ from typing import Any
 from ..errors import ProtocolError, SecurityError
 from ..schema_registry import SchemaRegistry
 from ..security.sensitive import redact_for_log
-from .models import ExecutionContext
+from ..contracts.execution import ExecutionContext
 
 
 FORBIDDEN_FIELDS = {"sql", "shell", "command", "python", "python_code", "gis_expression"}

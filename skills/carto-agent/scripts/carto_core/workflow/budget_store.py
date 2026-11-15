@@ -9,7 +9,7 @@ from typing import Any
 from ..artifacts import atomic_json, utc_now
 from ..errors import ProtocolError
 from ..schema_registry import SchemaRegistry
-from .models import ExecutionBudget
+from ..contracts.execution import ExecutionBudget
 
 
 class BudgetStore:

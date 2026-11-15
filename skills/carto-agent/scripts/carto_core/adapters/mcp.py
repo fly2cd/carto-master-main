@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Iterable
 
 from ..errors import SecurityError
-from ..workflow.models import ExecutionContext
+from ..contracts.execution import ExecutionContext
 from .tool_gateway import ToolGateway, ToolResult
 
 

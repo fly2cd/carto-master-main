@@ -13,7 +13,7 @@ from ..security.approval import ApprovalReceipt
 from ..security.nonce_store import NonceStore
 from ..security.paths import PathGuard
 from .approvals import ApprovalGateCoordinator
-from .models import ExecutionContext
+from ..contracts.execution import ExecutionContext
 from .state_machine import WorkflowStateStore, serialized_workflow_step
 from .template_analysis import ControlledSourceAnalyzer
 from .template_author import MapScenarioAuthor

@@ -38,7 +38,7 @@ from carto_core.scenarios.general_thematic import (
 from carto_core.security.approval import ApprovalReceipt, sign_receipt
 from carto_core.security.paths import PathGuard
 from carto_core.artifacts import artifact_ref, atomic_yaml, file_digest, utc_now
-from carto_core.workflow.models import ExecutionContext
+from carto_core.contracts.execution import ExecutionContext
 from carto_core.validation.map_checks import MapQualityChecks
 from carto_core.workflow.map_generation import MapGenerationWorkflow
 from carto_core.workflow.preparation_bundle import BundlePreparer

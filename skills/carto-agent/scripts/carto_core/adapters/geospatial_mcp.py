@@ -19,7 +19,7 @@ from ..errors import ProtocolError, SecurityError
 from ..repository.immutable_store import ImmutableArtifactStore
 from ..schema_registry import SchemaRegistry, load_document
 from ..security.paths import PathGuard
-from ..workflow.models import ExecutionContext
+from ..contracts.execution import ExecutionContext
 from .mcp_stdio import connect_stdio
 from .tool_gateway import ToolGateway
 

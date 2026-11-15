@@ -24,7 +24,7 @@ from carto_core.security.paths import PathGuard
 from carto_core.validation.map_checks import MapQualityChecks, legend_consistency
 from carto_core.validation.registry import CheckerRegistry, DEFAULT_POLICY
 from carto_core.workflow.map_final_check import FinalMapCheckService
-from carto_core.workflow.models import ExecutionContext
+from carto_core.contracts.execution import ExecutionContext
 from carto_core.workflow.state_machine import _create_json_once
 from carto_core.workflow.template_validation import TemplatePackageValidator
 

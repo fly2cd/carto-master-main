@@ -19,23 +19,11 @@ from ..repository.immutable_store import ImmutableArtifactStore, StoredArtifact
 from ..schema_registry import SchemaRegistry
 from ..security.paths import PathGuard
 from ..contracts.bundle import context_snapshot
+from ..geospatial_deps import dependencies
 
 MAX_BYTES = 32 * 1024 * 1024
 MAX_FEATURES = 10000
 MAX_VERTICES = 200000
-
-
-def dependencies():
-    try:
-        import fiona
-        import shapely
-        from shapely.geometry import shape, mapping
-        from shapely.geometry.polygon import orient
-        from fiona.crs import CRS
-    except ImportError:
-        raise ProtocolError('VECTOR_DEPENDENCY_MISSING',
-                            'The explicit vector-rendering extra (Fiona/Shapely) is required') from None
-    return fiona, shapely, shape, mapping, orient, CRS
 
 
 def crs_contract(report: dict[str, Any]) -> dict[str, Any]:

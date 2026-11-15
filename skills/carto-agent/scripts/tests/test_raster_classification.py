@@ -23,7 +23,7 @@ from carto_core.compiler.raster_portrayal import parse_legend, resolve_classes, 
 from carto_core.errors import CartoError
 from carto_core.repository.immutable_store import ImmutableArtifactStore
 from carto_core.schema_registry import SchemaRegistry
-from carto_core.workflow.models import ExecutionContext
+from carto_core.contracts.execution import ExecutionContext
 from carto_core.workflow.raster_preparation import RasterPreparationService
 from tests.fixtures.schema_cases import VALID_CASES
 

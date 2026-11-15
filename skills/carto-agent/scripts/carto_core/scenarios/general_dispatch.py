@@ -14,7 +14,7 @@ from typing import Any
 from ..errors import ProtocolError
 from ..schema_registry import SchemaRegistry
 from ..security.paths import PathGuard
-from ..workflow.models import ExecutionContext
+from ..contracts.execution import ExecutionContext
 from . import general_thematic as raster
 from . import general_vector as vector
 

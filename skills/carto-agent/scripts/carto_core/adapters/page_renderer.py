@@ -18,7 +18,7 @@ from ..canonical import sha256_digest
 from ..compiler.layout import LayoutResolver
 from ..errors import ProtocolError
 from ..repository.immutable_store import StoredArtifact
-from ..workflow.models import ExecutionContext
+from ..contracts.execution import ExecutionContext
 from .static_page_renderer import MeasuredPageRenderer, FONT_LIMIT
 
 RASTER_RENDERER_ID = RASTER_PAGE.renderer_id
@@ -235,7 +235,7 @@ class PageRenderer(MeasuredPageRenderer):
             from matplotlib import ft2font as _ft2font
         except ImportError:
             raise ProtocolError("VECTOR_RENDER_DEPENDENCY_MISSING", "fonttools is required") from None
-        from ..workflow.vector_preparation import dependencies as _vec_deps
+        from ..geospatial_deps import dependencies as _vec_deps
         _np, _rio, _mpl, _, _, _pil, _ = _deps()
         _fiona, _shapely, *_ = _vec_deps()
         runtime = {"python": _platform.python_version(), "rasterio": _rio.__version__,

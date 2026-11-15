@@ -18,7 +18,7 @@ from ..artifacts import protocol_version, publish_bytes
 from ..repository.immutable_store import StoredArtifact
 from ..schema_registry import SchemaRegistry, load_document
 from ..security.paths import PathGuard
-from .models import ExecutionContext
+from ..contracts.execution import ExecutionContext
 
 
 from .static_assets import StaticAssetStore

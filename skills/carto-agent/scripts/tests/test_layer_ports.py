@@ -215,5 +215,43 @@ class FailClosedTests(unittest.TestCase):
         self.assertIs(BundlePreparer, injected._require_port("bundles"))
 
 
+class RetiredShimTests(unittest.TestCase):
+    """``workflow.models`` was a re-export shim for ``contracts.execution``; retired in P1 Step C.
+
+    Tier-1 moved the dataclasses to the leaf but left the shim, and 36 import sites kept
+    using it. Consequence measured at the time: 7 of the 14 ``adapters -> workflow`` edges
+    were pure shim artifacts -- every one of them made a leaf-contract dependency look like
+    a dependency on the execution layer. These assertions keep the shim retired and keep the
+    ``carto_core.workflow`` package surface (which legitimately re-exports the dataclasses)
+    intact, so retiring the shim cannot silently break ``from carto_core.workflow import ...``.
+    """
+
+    def test_the_shim_file_is_gone(self):
+        self.assertFalse((CORE / "workflow" / "models.py").exists(),
+            "carto_core/workflow/models.py was deleted on purpose; import the execution "
+            "contracts from carto_core.contracts.execution instead of re-adding a shim")
+
+    def test_no_module_imports_the_retired_shim(self):
+        offenders = []
+        for base in (CORE, SCRIPTS_ROOT / "tests"):
+            for path in sorted(base.rglob("*.py")):
+                if "__pycache__" in path.parts:
+                    continue
+                for lineno, module in imported_modules(path):
+                    if module == "carto_core.workflow.models" or module.startswith("carto_core.workflow.models."):
+                        offenders.append(f"{path.relative_to(SCRIPTS_ROOT)}:{lineno}")
+        self.assertEqual([], offenders,
+            "import ExecutionContext / ExecutionBudget / JobState / StepReceipt from "
+            "carto_core.contracts.execution (the leaf), not through a workflow shim")
+
+    def test_workflow_package_still_reexports_the_execution_contracts(self):
+        import carto_core.workflow as workflow_package
+        from carto_core.contracts import execution
+        for name in ("ExecutionBudget", "ExecutionContext", "JobState", "StepReceipt"):
+            with self.subTest(contract=name):
+                self.assertIs(getattr(workflow_package, name), getattr(execution, name),
+                    "the package re-export must be the same object, not a copy")
+
+
 if __name__ == "__main__":
     unittest.main()

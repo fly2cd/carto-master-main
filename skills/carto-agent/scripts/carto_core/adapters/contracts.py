@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
-from ..workflow.models import ExecutionContext
+from ..contracts.execution import ExecutionContext
 
 
 class CapabilityHandler(Protocol):

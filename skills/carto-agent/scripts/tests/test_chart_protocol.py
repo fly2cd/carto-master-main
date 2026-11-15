@@ -195,7 +195,7 @@ class ChartCompilePageTests(unittest.TestCase):
         from carto_core.compiler.vector_portrayal import VectorPortrayalCompiler
         from carto_core.compiler.vector_page import compile_page
         from carto_core.compiler.layout import LayoutResolver
-        from carto_core.workflow.models import ExecutionContext
+        from carto_core.contracts.execution import ExecutionContext
         from carto_core.artifacts import file_digest
         from tests.fixtures.schema_cases import VALID_CASES
         from copy import deepcopy
@@ -281,7 +281,7 @@ class StackedLayerPanelTests(unittest.TestCase):
         from carto_core.compiler.vector_portrayal import VectorPortrayalCompiler
         from carto_core.compiler.vector_page import compile_page, validate_page
         from carto_core.compiler.layout import LayoutResolver
-        from carto_core.workflow.models import ExecutionContext
+        from carto_core.contracts.execution import ExecutionContext
         from carto_core.artifacts import file_digest
         from tests.fixtures.schema_cases import VALID_CASES
         from copy import deepcopy

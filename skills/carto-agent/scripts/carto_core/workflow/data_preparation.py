@@ -6,7 +6,7 @@ from typing import Any
 from ..canonical import sha256_digest
 from ..errors import ProtocolError, SecurityError
 from ..schema_registry import SchemaRegistry, load_document
-from .models import ExecutionContext
+from ..contracts.execution import ExecutionContext
 
 
 class DeterministicDataPreparer:

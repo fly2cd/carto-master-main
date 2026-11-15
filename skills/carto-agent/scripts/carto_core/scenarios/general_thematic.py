@@ -46,7 +46,7 @@ from ..scenario_registry import ScenarioRegistry
 from ..schema_registry import SchemaRegistry
 from ..security.paths import PathGuard
 from ..artifacts import artifact_ref
-from ..workflow.models import ExecutionContext
+from ..contracts.execution import ExecutionContext
 from ..workflow.preparation_bundle import BundlePreparer
 from ..workflow.raster_preparation import RasterPreparationService
 

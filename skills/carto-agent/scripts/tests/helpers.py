@@ -229,7 +229,7 @@ class VectorFixture:
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name).resolve()
         self.addCleanup(release_test_font_handles)
-        from carto_core.workflow.models import ExecutionContext
+        from carto_core.contracts.execution import ExecutionContext
         self.context = ExecutionContext(
             "vector-run", "test-tenant", "test-project", "test-subject",
             frozenset({"operator"}), frozenset({"test-project"}),

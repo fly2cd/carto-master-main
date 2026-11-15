@@ -24,7 +24,7 @@ if str(SCRIPTS_ROOT) not in sys.path:
 from carto_core.adapters.geospatial_mcp import CAPABILITIES, GeospatialMcpAdapter
 from carto_core.canonical import sha256_digest
 from carto_core.cli import main
-from carto_core.workflow.models import ExecutionContext
+from carto_core.contracts.execution import ExecutionContext
 from tests.fixtures.schema_cases import VALID_CASES
 
 

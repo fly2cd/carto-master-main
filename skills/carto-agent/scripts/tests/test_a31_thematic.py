@@ -18,7 +18,7 @@ from carto_core.canonical import sha256_digest
 from carto_core.errors import ProtocolError, SecurityError
 from carto_core.schema_registry import SchemaRegistry
 from carto_core.security.paths import PathGuard
-from carto_core.workflow.models import ExecutionContext
+from carto_core.contracts.execution import ExecutionContext
 from carto_core.workflow.vector_preparation import VectorPreparationService
 from carto_core.workflow.thematic import resolve_design, metric_value
 from carto_core.workflow.preparation_bundle import BundlePreparer
@@ -599,7 +599,7 @@ class ThematicWorkflowTests(unittest.TestCase):
         """A source must have one geometry family: line + point is rejected."""
         from carto_core.workflow.vector_preparation import VectorPreparationService
         from carto_core.errors import ProtocolError
-        from carto_core.workflow.models import ExecutionContext
+        from carto_core.contracts.execution import ExecutionContext
         features = [
             {'type': 'Feature', 'geometry': {'type': 'LineString', 'coordinates': [[0, 0], [1, 1]]},
              'properties': {'code': 'A'}},
@@ -624,7 +624,7 @@ class ThematicWorkflowTests(unittest.TestCase):
         """3D line geometries (Z coordinates) are rejected, same as point/polygon."""
         from carto_core.workflow.vector_preparation import VectorPreparationService
         from carto_core.errors import ProtocolError
-        from carto_core.workflow.models import ExecutionContext
+        from carto_core.contracts.execution import ExecutionContext
         features = [
             {'type': 'Feature', 'geometry': {'type': 'LineString',
              'coordinates': [[0, 0, 100], [1, 1, 200]]}, 'properties': {'code': 'A'}},

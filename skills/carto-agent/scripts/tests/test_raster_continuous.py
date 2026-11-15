@@ -25,7 +25,7 @@ from carto_core.compiler.raster_portrayal import RasterPortrayalCompiler
 from carto_core.errors import CartoError
 from carto_core.repository.immutable_store import ImmutableArtifactStore
 from carto_core.repository.map_expression_catalog import MapExpressionCatalog
-from carto_core.workflow.models import ExecutionContext
+from carto_core.contracts.execution import ExecutionContext
 from carto_core.workflow.raster_preparation import RasterPreparationService
 from tests.fixtures.schema_cases import VALID_CASES
 from tests.helpers import set_raster

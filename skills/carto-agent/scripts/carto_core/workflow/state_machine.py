@@ -14,7 +14,7 @@ from ..artifacts import atomic_json, utc_now
 from ..canonical import sha256_digest
 from ..errors import ProtocolError
 from ..schema_registry import SchemaRegistry
-from .models import JobState, StepReceipt
+from ..contracts.execution import JobState, StepReceipt
 
 
 F = TypeVar("F", bound=Callable[..., Any])
