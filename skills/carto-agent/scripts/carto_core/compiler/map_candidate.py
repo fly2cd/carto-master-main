@@ -197,7 +197,7 @@ class MapCandidateCompiler:
             service = self._require_port("preparations")(
                 "vector", project_root=self.project_root,
                 allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
-            vector = VectorSceneCompiler(service).validate_generation(scene, candidate["execution"], request, self.context)
+            vector = VectorSceneCompiler(service, self._require_port("bundles")).validate_generation(scene, candidate["execution"], request, self.context)
             if (scene["resolved_layout"]["template_contract"] != contracts["scenario"]["embedded"]["layout"]
                     or vector["page"]["cartography"] != contracts["scenario"]["embedded"]["cartography"]):
                 raise ProtocolError("VECTOR_TEMPLATE_MISMATCH", "Page layout or appearance differs from the installed template")

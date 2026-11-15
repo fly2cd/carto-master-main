@@ -156,7 +156,7 @@ class FormalRenderer:
         if is_vector:
             self.preparation = VectorPreparationService(project_root=project_root,
                 allowed_roots=list(path_guard.allowed_roots), registry=registry)
-            self.compiler = VectorSceneCompiler(self.preparation)
+            self.compiler = VectorSceneCompiler(self.preparation, BundlePreparer)
         else:
             self.preparation = RasterPreparationService(project_root=project_root,
                 allowed_roots=list(path_guard.allowed_roots), registry=registry)

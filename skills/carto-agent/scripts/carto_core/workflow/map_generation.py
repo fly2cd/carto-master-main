@@ -1502,10 +1502,11 @@ class MapGenerationWorkflow:
     def _verify_page_inputs(self, execution, scene, request):
         if scene["renderer_id"] == VECTOR_PAGE.renderer_id:
             from ..compiler.vector_scene import VectorSceneCompiler
+            from .preparation_bundle import BundlePreparer
             from .vector_preparation import VectorPreparationService
             service = VectorPreparationService(project_root=self.project_root,
                 allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
-            VectorSceneCompiler(service).validate_generation(scene, execution, request, ExecutionContext.from_generate_request(request))
+            VectorSceneCompiler(service, BundlePreparer).validate_generation(scene, execution, request, ExecutionContext.from_generate_request(request))
             return
         from ..compiler.raster_scene import RasterSceneCompiler
         from .preparation_bundle import BundlePreparer

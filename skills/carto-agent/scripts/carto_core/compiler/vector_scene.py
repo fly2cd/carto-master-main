@@ -3,7 +3,7 @@ from copy import deepcopy
 from ..canonical import sha256_digest
 from ..errors import ProtocolError, SecurityError
 from ..contracts.bundle import context_snapshot
-from ..workflow.preparation_bundle import BundlePreparer
+from ..contracts.protocols import BundlePreparerFactory, VectorPreparationProtocol
 from .vector_page import validate_page
 from .layout import LayoutResolver
 from .thematic_design import resolve_design
@@ -12,15 +12,19 @@ RENDERER_ID = 'matplotlib-vector-page'
 
 
 class VectorSceneCompiler:
-    def __init__(self, preparation):
+    def __init__(self, preparation: VectorPreparationProtocol, bundles: BundlePreparerFactory):
+        # ``bundles`` is the injected BundlePreparer factory (Tier-2 去环 Step8): this
+        # compiler always prepares vector bundles, so it keeps the geometry decision
+        # while the concrete class stays in the execution layer.
         self.preparation = preparation
+        self.bundles = bundles
         self.registry = preparation.registry
 
     def _inputs(self, bundle_ref, page_ref, context):
-        bundle = BundlePreparer(self.preparation, "vector").load_verified(bundle_ref, context)
+        bundle = self.bundles(self.preparation, "vector").load_verified(bundle_ref, context)
         page = self.preparation.document(page_ref, 'page-request')
         layers = validate_page(self.preparation, page, context)
-        rebuilt = BundlePreparer(self.preparation, "vector").build_many([item['portrayal']['prepared_ref'] for stack in layers.values() for item in stack], context)
+        rebuilt = self.bundles(self.preparation, "vector").build_many([item['portrayal']['prepared_ref'] for stack in layers.values() for item in stack], context)
         if rebuilt != bundle:raise ProtocolError('VECTOR_BUNDLE_MISMATCH', 'Page sources differ from the prepared bundle')
         font = {'artifact_ref': {'id': 'font', 'version': '1.0.0', 'digest': page['font']['digest'], 'uri': page['font']['path']},
                 'size_bytes': page['font']['size_bytes']}
@@ -92,7 +96,7 @@ class VectorSceneCompiler:
 
     def validate_generation(self, scene, execution, request, context):
         inputs = self.validate_execution(scene, execution, context)
-        BundlePreparer(self.preparation, "vector").validate_request(request, inputs['bundle'], context)
+        self.bundles(self.preparation, "vector").validate_request(request, inputs['bundle'], context)
         requested = {p['id']: p for p in request['vector_panels']}
         if set(requested) != set(inputs['layers']) or request['layout_parameters'] != scene['resolved_layout']['parameters']:
             raise ProtocolError('VECTOR_GENERATION_CHANGED', 'Panel selection differs')

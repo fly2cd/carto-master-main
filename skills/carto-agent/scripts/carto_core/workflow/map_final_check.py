@@ -169,12 +169,13 @@ class FinalMapCheckService:
     def _vector_context(self, scene, lock, receipt):
         from ..adapters.page_renderer import PageRenderer
         from ..compiler.vector_scene import VectorSceneCompiler
+        from .preparation_bundle import BundlePreparer
         from .vector_preparation import VectorPreparationService
         if self.execution_context is None:
             raise SecurityError("VECTOR_EXECUTION_CONTEXT", "Trusted execution scope required")
         preparation = VectorPreparationService(project_root=self.project_root,
             allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
-        inputs = VectorSceneCompiler(preparation).validate_execution(scene, lock["execution"], self.execution_context)
+        inputs = VectorSceneCompiler(preparation, BundlePreparer).validate_execution(scene, lock["execution"], self.execution_context)
         page = PageRenderer(preparation).load_verified(receipt["page_output_ref"], self.execution_context)
         if (page["request_ref"] != scene["page_request_ref"] or receipt["renderer_id"] != scene["renderer_id"]
                 or page["environment"] != receipt["runtime"] or page["environment"] != lock["execution"]["environment"]["runtime"]):
