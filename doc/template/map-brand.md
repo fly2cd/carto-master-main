@@ -1,6 +1,6 @@
 # MapBrand 完整说明
 
-> 2026-11-09 设计收敛：采用 Encoding / Appearance / Composition 三个设计维度及独立 Renderer 执行层；模板是组合载体，不与维度一一映射。统一定义见[模板体系设计](../carto-template-dsg.md)，本轮决定及修订范围见[收敛记录](../design-convergence-20261109.md)。新增模型、引用、参数与作用域调整属于目标设计，不改变当前 Schema、能力准入和审批。
+> 2026-11-09 设计收敛：采用 Encoding / Appearance / Composition 三个设计维度及独立 Renderer 执行层；模板是组合载体，不与维度一一映射。统一定义见[模板体系设计](../carto-template-dsg.md)，本轮决定及修订范围见收敛记录 design-convergence-20261109.md（已移除，可从 git 历史取回）。新增模型、引用、参数与作用域调整属于目标设计，不改变当前 Schema、能力准入和审批。
 
 
 ## 1. 文档定位
@@ -291,7 +291,7 @@ attribution:
   data_source_format: 'Synthetic source: {source}'
 ```
 
-完整内嵌示例见 [scenario.yaml](../../skills/carto-agent/templates/map-scenario/urban-flood-risk/1.0.0/contracts/scenario.yaml)。它是合成示例中的中性身份，不是已发布的独立 MapBrand。
+完整内嵌示例（原 `templates/map-scenario/urban-flood-risk/1.0.0/contracts/scenario.yaml`，模板不随仓库附带，可从 git 历史取回）是合成示例中的中性身份，不是已发布的独立 MapBrand。
 
 ### 10.2 建议的资源与角色接口
 
@@ -601,7 +601,7 @@ analyze：分析品牌规范、原始资产与使用依据
 |---|---|
 | identity v1 定义机构、颜色来源、字体角色、可选 Logo、署名及规则 | [identity.schema.json](../../skills/carto-agent/schemas/identity.schema.json) |
 | v1 Scenario 内嵌 identity，所有权组件支持已允许的完整段替换；当前 general 未开放替换 | [scenario.schema.json](../../skills/carto-agent/schemas/scenario.schema.json)、[general_thematic.py](../../skills/carto-agent/scripts/carto_core/scenarios/general_thematic.py) |
-| 栅格页面冻结真实字体并验证字形与输出，不代表通用字体回退或品牌资产解析已完成 | [raster_page_renderer.py](../../skills/carto-agent/scripts/carto_core/adapters/raster_page_renderer.py) |
+| 栅格页面冻结真实字体并验证字形与输出，不代表通用字体回退或品牌资产解析已完成 | [page_renderer.py](../../skills/carto-agent/scripts/carto_core/adapters/page_renderer.py) |
 | 当前业务为用户分类栅格的 general，非旧洪涝演示，仍禁生产数据 | [scenario-capabilities.yaml](../../skills/carto-agent/policies/scenario-capabilities.yaml) |
 
 目标让 Brand 的资产与限制参与统一实例解析；颜色不得覆盖业务/标准语义，字体与 Layout 可读性须共同满足。更换完整身份组件保留兼容性检查，允许的资产变体和参数须声明作用域、记录来源；不能借参数调整绕过字体许可或新增未批准资产。

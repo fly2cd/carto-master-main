@@ -1,6 +1,6 @@
 # 场景实现扩展边界
 
-当前目录没有可用业务实现，`scenario-capabilities.yaml` 的 `profiles` 和 `scenario_registry.py` 的代码白名单均为空。请求通过共享 Schema 并不代表场景可用；未知请求必须拒绝。
+本目录承载场景专属组件；实际准入以 `scenario-capabilities.yaml` 与 `scenario_registry.py` 的受信注册为准，不在本开发说明复制能力名单。请求通过共享 Schema 并不代表场景可用；未知请求必须拒绝。
 
 ## 术语与契约
 
@@ -44,7 +44,7 @@
 
 `compiler/raster_portrayal.py` 根据显式模板角色和已澄清类别显示定义生成 `resolved-portrayal`（geometry=raster 分支）。图体与内部整页渲染只消费该合同；它不提供业务来源准入、审批或正式渲染回执。场景组件可以复用共享表达，不得复制另一套类别颜色/图例实现。
 
-第三批 C 已提供 `RasterBundlePreparer` / `RasterSceneCompiler` 与静态正式后端，详情见 `../../../workflows/raster-classification.md`。已准入场景可以复用：
+已准入场景可复用 `BundlePreparer`（raster 分支）、`RasterSceneCompiler` 与 `FormalRenderer`。分类准备的宿主操作见 [准备与澄清](../../../workflows/raster-classification.md)，正式执行见 [generate-map](../../../workflows/generate-map.md)；内部组件职责见 [研发参考](../../../../../doc/reference/raster-rendering-development.md)，后者仅供开发，不是运行时依赖。接入边界：
 
 - 数据组件继续从通用入口接收 PathGuard、可信 project_root、output_root 和 SchemaRegistry；在 G1 后，以经审批请求的 ExecutionContext 调用 `prepare_request`，不能把 ready 报告当作审批。
 - 候选组件构造器现在接收 `(path_guard, registry, *, project_root, context)`，这两个关键字来自通用工作流，而不是从任意 artifact URI 推断。组件必须接受此接口，不增加旧接口兼容分派；栅格组件用它们构造共享准备/场景编译器。

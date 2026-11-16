@@ -1,6 +1,6 @@
 # 地图制图智能体模板创建路由技术设计
 
-> 2026-11-09 一致性收敛：领域定义采用[模板体系设计](carto-template-dsg.md)中的 Encoding / Appearance / Composition 与独立执行层，变更见[收敛记录](design-convergence-20261109.md)。本轮仅调整设计，不升级机器协议或宣称新能力。旧阶段编号、场景示例和命令是历史/目标说明；当前仅注册 general 分类栅格单图，模板样张及正式渲染框架已存在，未完成的多图、组件、参数和后端组合须另行实现验收。
+> 2026-11-09 一致性收敛：领域定义采用[模板体系设计](carto-template-dsg.md)中的 Encoding / Appearance / Composition 与独立执行层，变更见收敛记录 design-convergence-20261109.md（已移除，可从 git 历史取回）。本轮仅调整设计，不升级机器协议或宣称新能力。旧阶段编号、场景示例和命令是历史/目标说明；当前仅注册 general 分类栅格单图，模板样张及正式渲染框架已存在，未完成的多图、组件、参数和后端组合须另行实现验收。
 
 
 ## 文档信息
@@ -13,14 +13,14 @@
 | 描述对齐 | 2026-11-09：设计三维、模板组合、布局模型与执行层 |
 | 适用对象 | 地图制图智能体、模板设计器、GIS 渲染适配器、模板治理工具 |
 | 领域设计依据 | [地图模板体系设计](carto-template-dsg.md) |
-| 配套实施计划 | [分阶段实施计划](global-implement-plan.md) |
+| 配套实施计划 | 分阶段实施计划 global-implement-plan.md（已移除，可从 git 历史取回） |
 | 核心产物 | 声明式模板包、验证证据、预览产物、不可变版本及发布记录 |
 
 本版将技术实现收敛为“模块化单体内核 + 声明式模板包 + 确定性编译校验 + 独立渲染适配器”。保留四类模板，将单个 MapScenario 统一为六份业务契约；六种规则标签不再作为数值优先级；取消通用动态加载图；以统一发布操作替代独立安装、注册事务。
 
 旧稿中的八契约清单、数值规则优先级、动态加载单元和旧 CLI 不作为并行可选实现。本文描述目标设计；已实现能力及其边界以 `skills/carto-agent/` 下的 Schema、策略、代码和验证证据为准，不能仅凭本文的目录、命令和接口声明已支持。
 
-> **U-P2 实施冻结说明（2026-09-17）**：U-P2 只开放 MapScenario 创建，来源限安全解析的 YAML/JSON、GeoJSON 和 UTF-8 CSV；实际 CLI 使用唯一入口 `carto create-template ...`。本文中更宽的来源和旧 `carto_template.py` 命令保留为后续目标，不属于 U-P2 已开放合同。详细决定见 [U-P2.0 实施说明](impl-log/U-P2.0说明文档.md)。
+> **U-P2 实施冻结说明（2026-09-17）**：U-P2 只开放 MapScenario 创建，来源限安全解析的 YAML/JSON、GeoJSON 和 UTF-8 CSV；实际 CLI 使用唯一入口 `carto create-template ...`。本文中更宽的来源和旧 `carto_template.py` 命令保留为后续目标，不属于 U-P2 已开放合同。详细决定见 U-P2.0 实施说明（impl-log/U-P2.0说明文档.md，已移除，可从 git 历史取回）。
 
 ## 一、结论与设计取舍
 
@@ -1003,7 +1003,7 @@ carto_template.py cancel <workdir>
 - 将旧长状态链映射为作业状态、当前步骤和回执，不继续增加兼容状态。
 - 历史发布包若实际存在，迁移生成新版本并复验，不原地修改；只有草稿可直接改写。
 
-实施阶段以 [全局实施计划](global-implement-plan.md) 统一映射，实际 CLI 沿用 `carto` 单一入口。本文中的目标接口仍须逐项落实并验证；此次描述对齐不改变阶段验收状态。
+实施阶段以 全局实施计划 global-implement-plan.md（已移除，可从 git 历史取回） 统一映射，实际 CLI 沿用 `carto` 单一入口。本文中的目标接口仍须逐项落实并验证；此次描述对齐不改变阶段验收状态。
 
 ## 二十、具体运行示例：城市洪涝风险研判场景
 
@@ -1028,9 +1028,9 @@ D:/carto-input/flood-risk/
 ### 20.2 分析与简报
 
 ```powershell
-python 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/skills/carto-agent/scripts/carto_template.py' analyze 'D:/carto-input/flood-risk/reference.qgz' 'D:/carto-input/flood-risk/requirements.md' 'D:/carto-input/flood-risk/agency-logo.svg' 'D:/carto-input/flood-risk/sample-fields.csv' --workdir 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/projects/_carto_template_builds/urban-flood-risk-20260911' --json
+python 'skills/carto-agent/scripts/carto_template.py' analyze 'D:/carto-input/flood-risk/reference.qgz' 'D:/carto-input/flood-risk/requirements.md' 'D:/carto-input/flood-risk/agency-logo.svg' 'D:/carto-input/flood-risk/sample-fields.csv' --workdir 'projects/_carto_template_builds/urban-flood-risk-20260911' --json
 
-python 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/skills/carto-agent/scripts/carto_template.py' brief 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/projects/_carto_template_builds/urban-flood-risk-20260911' --kind map-scenario --scope library --id urban-flood-risk --version 1.0.0 --json
+python 'skills/carto-agent/scripts/carto_template.py' brief 'projects/_carto_template_builds/urban-flood-risk-20260911' --kind map-scenario --scope library --id urban-flood-risk --version 1.0.0 --json
 ```
 
 简报关键字段：
@@ -1058,9 +1058,9 @@ encodings:
 审批系统在核验用户身份、权限和简报摘要后签发 `approvals/brief.json`。该文件是审批服务产物，不能用文本编辑自行伪造。
 
 ```powershell
-python 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/skills/carto-agent/scripts/carto_template.py' confirm 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/projects/_carto_template_builds/urban-flood-risk-20260911' --action brief --approval-receipt 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/projects/_carto_template_builds/urban-flood-risk-20260911/approvals/brief.json' --json
+python 'skills/carto-agent/scripts/carto_template.py' confirm 'projects/_carto_template_builds/urban-flood-risk-20260911' --action brief --approval-receipt 'projects/_carto_template_builds/urban-flood-risk-20260911/approvals/brief.json' --json
 
-python 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/skills/carto-agent/scripts/carto_template.py' author 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/projects/_carto_template_builds/urban-flood-risk-20260911' --json
+python 'skills/carto-agent/scripts/carto_template.py' author 'projects/_carto_template_builds/urban-flood-risk-20260911' --json
 ```
 
 生成：
@@ -1091,7 +1091,7 @@ staging/package/
 ### 20.4 校验与预览
 
 ```powershell
-python 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/skills/carto-agent/scripts/carto_template.py' validate 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/projects/_carto_template_builds/urban-flood-risk-20260911' --render --target print-a3 --json
+python 'skills/carto-agent/scripts/carto_template.py' validate 'projects/_carto_template_builds/urban-flood-risk-20260911' --render --target print-a3 --json
 ```
 
 预期报告形态：
@@ -1130,11 +1130,11 @@ python 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/skills/carto-agent/
 验证通过后，请有权限的发布者批准同一包摘要、证据摘要和目标库。服务签发 `approvals/publish.json`，然后：
 
 ```powershell
-python 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/skills/carto-agent/scripts/carto_template.py' confirm 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/projects/_carto_template_builds/urban-flood-risk-20260911' --action publish --approval-receipt 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/projects/_carto_template_builds/urban-flood-risk-20260911/approvals/publish.json' --json
+python 'skills/carto-agent/scripts/carto_template.py' confirm 'projects/_carto_template_builds/urban-flood-risk-20260911' --action publish --approval-receipt 'projects/_carto_template_builds/urban-flood-risk-20260911/approvals/publish.json' --json
 
-python 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/skills/carto-agent/scripts/carto_template.py' publish 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/projects/_carto_template_builds/urban-flood-risk-20260911' --repository 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/skills/carto-agent/templates' --dry-run --json
+python 'skills/carto-agent/scripts/carto_template.py' publish 'projects/_carto_template_builds/urban-flood-risk-20260911' --repository 'skills/carto-agent/templates' --dry-run --json
 
-python 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/skills/carto-agent/scripts/carto_template.py' publish 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/projects/_carto_template_builds/urban-flood-risk-20260911' --repository 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/skills/carto-agent/templates' --json
+python 'skills/carto-agent/scripts/carto_template.py' publish 'projects/_carto_template_builds/urban-flood-risk-20260911' --repository 'skills/carto-agent/templates' --json
 ```
 
 最终版本位置：

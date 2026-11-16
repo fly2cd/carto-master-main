@@ -16,7 +16,7 @@
 
 本文面向独立的地图制图智能体，不是 PPT Master 的地图插件或 PPT 生成流程。本文描述目标架构，实际已实现能力及其边界以 `skills/carto-agent/` 下的 Schema、策略、代码和验证证据为准。
 
-本文负责系统级边界和集成关系；具体字段、步骤、门禁和命令继续由两份 TRD 拥有，本文不建立第二套执行规范。模板概念可参考[模板体系设计](carto-template-dsg.md)，表达、符号与图表复用边界见[地图表达与符号设计结论](template/map-expression-and-symbol-design.md)，建设顺序见[全局实施计划](global-implement-plan.md)，LLM 与程序的职责边界原则见[设计原则](design-principles.md)，从零到一的完整制图流程见[海报地图流程说明](海报地图流程说明.md)。旧契约数量、动态加载图或旧命令不作为并行实现；目标设计变为运行能力须经过协议、代码与验证的同步演进。
+本文负责系统级边界和集成关系；具体字段、步骤、门禁和命令继续由两份 TRD 拥有，本文不建立第二套执行规范。模板概念可参考[模板体系设计](carto-template-dsg.md)，表达、符号与图表复用边界见[地图表达与符号设计结论](template/map-expression-and-symbol-design.md)，能力建设路线见[全要素制图能力补齐路线图](全要素制图能力补齐路线图.md)，LLM 与程序的职责边界原则见[设计原则](design-principles.md)。旧契约数量、动态加载图或旧命令不作为并行实现；目标设计变为运行能力须经过协议、代码与验证的同步演进。
 
 本版明确“制图规划 MapPlanner → 图面实现 MapComposer → 冻结后确定性渲染 Renderer”的职责。MapComposer 是对现有 `plan/preview` 内部职责的细化，不新增路由、作业步骤、独立智能体或业务契约；原有两份 TRD 的流程与冻结协议保持不变。
 
@@ -269,7 +269,7 @@ MapPlanner 拥有实际编码、尺度、分母和比较策略的选择，既可
 
 ### 7.1 领域维度与四类模板
 
-2026-11-09 的目标领域定义以[模板体系设计](carto-template-dsg.md)为准，变更见[收敛记录](design-convergence-20261109.md)。设计维度为 Encoding、Appearance、Composition；Renderer 是独立执行层，数据/空间/身份/约束为基础，Delivery 为输出合同。原“布局 × 表达 × 后端”仅作工程覆盖矩阵。
+2026-11-09 的目标领域定义以[模板体系设计](carto-template-dsg.md)为准（历史收敛记录 design-convergence-20261109.md 已移除，可从 git 历史取回）。设计维度为 Encoding、Appearance、Composition；Renderer 是独立执行层，数据/空间/身份/约束为基础，Delivery 为输出合同。原“布局 × 表达 × 后端”仅作工程覆盖矩阵。
 
 四类模板是可复用规范的创作与组合分类，不与三维或运行对象一一映射。一个模板可同时贡献样式和布局，最终统一解析到现有候选/执行快照，不建立并行实例权威。
 

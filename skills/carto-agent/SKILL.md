@@ -64,11 +64,11 @@ version: 0.8.0
 
 ## 分类栅格准备与静态图体（第二批）
 
-- 使用前阅读 `workflows/raster-classification.md`。`data analyze-classification` 经 MCP 统计匹配显式 CSV 列；`data clarify-classification` 接收摘要/身份绑定的回答，产生新的不可变报告。
+- 仅在需要类别码栅格 + CSV 准备时阅读 [分类栅格准备与澄清](workflows/raster-classification.md)。`data analyze-classification` 经 MCP 统计匹配显式 CSV 列；`data clarify-classification` 接收摘要/身份绑定的回答，产生新的不可变报告。continuous 请求不是这条 CSV 澄清流程；底层 Schema 分支存在不等于业务或端到端交付准入。
 - 未定义类别（含 0/255）或缺名称/颜色均生成动态澄清；回答不等于 G1/G2/G3，绝不改写源 NoData。
 - 内部 `RasterMapBodyRenderer` 用 Rasterio + Matplotlib 从冻结数据生成图体 PNG，分类图例共用颜色合同，复用现有 SVG/布局组件；不需要 QGIS 或 MapLibre。
 - 图体本身不开放独立地图导出 CLI，不注册场景，不替代 MapSpecLock/正式 RenderReceipt/成品检查；由下文第三批 C 的适配器接入正式链路。A4 横版的合成测试不等于用户地图交付或实体打印验收。
-- 第三批 A 增加内部 `RasterPageRenderer`：复用冻结图体/布局，输出真实毫米 PDF、整页 PNG、字形路径 SVG，验证固定 pt 字号、字体嵌入标记/字形覆盖、文字换行和溢出；支持显式投影距离比例尺与格网北。详见同一工作流。页面报告不是正式 RenderReceipt，仍不开放导出 CLI 或业务场景。
+- 内部 `PageRenderer` 复用冻结图体/布局，检查字体、字形与内容溢出；页面报告不是正式 RenderReceipt。宿主不直接调用内部渲染 API，准备就绪后按 [generate-map](workflows/generate-map.md) 进入已准入场景的预览、冻结、正式渲染和交付；内部输出不新增导出 CLI 或业务场景。
 
 ## 共享分类着色表达（第三批 B1）
 

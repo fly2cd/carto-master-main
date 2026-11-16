@@ -159,7 +159,7 @@ T3: 程序验证一致性
 | 文档 | 本文与之的关系 |
 |---|---|
 | [carto-agent-architecture.md](carto-agent-architecture.md) 第六节 | 架构文档的 6.4（决策所有权与允许调整范围）、6.7（分层修复与退回条件）是本文原则的架构层面展开。本文为那些决策提供方法论基础 |
-| [design-convergence-20261109.md](design-convergence-20261109.md) | 收敛记录中的 C03（表达目录职责）和 C10（后端选择）直接受本文原则约束 |
+| design-convergence-20261109.md（已移除，可从 git 历史取回） | 收敛记录中的 C03（表达目录职责）和 C10（后端选择）直接受本文原则约束 |
 | [carto-create-template-TRD.md](carto-create-template-TRD.md) | Template authoring 阶段是本文三段式闭环的 T1（注册表达）的实现载体 |
 | [carto-generate-map-TRD.md](carto-generate-map-TRD.md) | Generate 阶段是本文三段式闭环的 T2+T3（选择+验证）的实现载体 |
 | [template/map-expression-and-symbol-design.md](template/map-expression-and-symbol-design.md) | 表达目录是 LLM 的选择空间（catalog），本文定义 catalog 的注册、选择和验证协议 |

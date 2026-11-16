@@ -8,7 +8,7 @@ Carto Agent 是一个**协议先行**的地图制图智能体。它不是"一个
 
 这是一个保留了模板创建发布、地图编译预览、锁驱动渲染和受控交付流程的制图框架。
 
-**当前没有启用业务场景，也不附带业务示例数据或模板。** 场景策略和代码实现白名单均为空；真实数据需配套实现、注册及验收对应场景后才能进入工作流，未注册请求返回 `CAPABILITY_NOT_AVAILABLE`。
+**当前仅准入受限、非生产的通用专题制图，不附带业务示例数据或模板。** 具体数据变体、模板和执行范围以 [Skill](skills/carto-agent/SKILL.md)、场景策略及受信注册表为准；未注册请求返回 `CAPABILITY_NOT_AVAILABLE`。工程能力不代表真实用户地图或生产验收完成。
 
 ## 基础 GIS 数据接入
 
@@ -18,12 +18,12 @@ Carto Agent 是一个**协议先行**的地图制图智能体。它不是"一个
 - 重投影：已实现 ToolGateway 适配能力及任务/二进制校验，仅 nearest；未开放变换 CLI 或业务场景。
 - MCP 不推断类别名或生成地图，排版和渲染仍在 Carto。
 - Carto 第二批新增 `data analyze-classification` / `data clarify-classification`、不可变 TIFF/CSV 快照、类别名称/颜色合同，以及可选 Rasterio + Matplotlib 静态图体与共享 SVG 图例。
-- 第三批 A 的内部 `RasterPageRenderer` 已支持 A4 横版等毫米布局的 PDF/整页 PNG/SVG、固定物理字号、中文字体/图例溢出检查，以及显式投影距离比例尺和格网北；已做合成 PDF 整页视觉检查。
-- 第三批 B1 接入共享 `raster/categorical` 表达及 `resolved-raster-portrayal` 冻结合同；图体/整页共用 `portrayal_ref`，显式区分数据类型、表达、后端与业务用途。显示编译模块更名为 `compiler/raster_portrayal.py`，不做 GIS 重分类。
+- 内部 `PageRenderer` 处理冻结页面、字体与内容测量；内部页面格式不自动成为正式导出目标，仍须匹配场景、后端和锁。
+- 类别栅格复用 `raster/categorical` 表达及 `resolved-portrayal`（geometry=raster）冻结合同；图体与页面使用同一表达来源，数据类型、表达、后端与业务用途各自独立。
 - 第三批 C 已接入共享 PreparedDataBundle / MapSpecLock / RenderScene、闭合后端分派和真实栅格 RenderReceipt，复用 G2、锁驱动渲染、11 项终检、G3 和原子本地交付；临时合成数据已覆盖工作流及中断恢复。
-- 未知像元值动态澄清，不默认隐藏 0/255。**业务场景/模板准入与真实用户地图验收仍未完成**；策略与实现白名单仍为空。内部页面报告不是 RenderReceipt，没有新增绕过审批的地图导出 CLI；静态后端是进程内实现，不提供 OS/网络沙箱。
+- 未知像元值动态澄清，不默认隐藏 0/255。准备就绪和内部页面报告不等于业务批准或 RenderReceipt；正式制图仍受场景准入和既有审批链约束。静态后端是进程内实现，不提供 OS/网络沙箱。
 
-配置、输入合同、命令和边界见 `skills/carto-agent/workflows/geospatial-data.md`、`skills/carto-agent/workflows/raster-classification.md`。基础安装不强制引入 MCP/GIS 依赖，不自动安装独立服务。
+配置与基础读取见 [GIS 数据接入](skills/carto-agent/workflows/geospatial-data.md)，类别分析/澄清见 [分类准备指引](skills/carto-agent/workflows/raster-classification.md)，预览到交付见 [generate-map](skills/carto-agent/workflows/generate-map.md)。基础安装不强制引入 MCP/GIS 依赖，不自动安装独立服务。
 
 ## 业务场景与主题
 
@@ -31,7 +31,7 @@ Carto Agent 是一个**协议先行**的地图制图智能体。它不是"一个
 
 独立意图解析与地图生成复用同一个解析器：`intent resolve` 输入 `text + selection`，生成请求输入 `goal + intent`。先明确实际用户意图，再检查所选模板兼容性；不从模板反填场景或默认任务，也不把主题词等同于业务场景。详见 `skills/carto-agent/workflows/intent-contract.md`。
 
-目录可识别业务用途，不表示具有执行能力。当前能力注册仍为空；意图缺项/歧义先拒绝，就绪但无注册能力才返回 `CAPABILITY_NOT_AVAILABLE`。
+目录可识别业务用途，不表示具有执行能力；意图缺项/歧义先拒绝，就绪但无注册能力才返回 `CAPABILITY_NOT_AVAILABLE`。能力以当前策略和受信注册表为准，不从词表或文件类型推断开放。
 
 ## 核心设计思想
 
@@ -74,10 +74,14 @@ carto-master-main/
 │   ├── Invoke-CartoPreflight.ps1     环境就绪门
 │   ├── Invoke-CartoHostCases.ps1     CLI 契约用例执行器
 │   └── New-CartoProjectSpace.ps1     项目空间脚手架
-├── doc/                              设计文档与实施日志
-│   ├── implement-plan.md             分阶段实施计划（U-P0~U-P6）
-│   ├── impl-log/                      各阶段实施记录 + 架构图
-│   └── dev-log/                       开发日志
+├── doc/                              设计文档与历史记录
+│   ├── design-principles.md          设计原则（LLM 自由与程序验证的决策边界）
+│   ├── adr/                          架构决策记录（ADR）
+│   ├── plan/                         后续整合计划（双分支工具层）
+│   ├── dev-log/                      开发日志（历史留痕）
+│   ├── impl-log/                     阶段实施架构图（历史快照）
+│   ├── reference/                    外部参考与历史推演
+│   └── template/                     模板设计参考
 ├── pyproject.toml                    构建 / 依赖 / 测试配置
 ├── AGENTS.md                         通用智能体入口约束
 └── CLAUDE.md
@@ -159,7 +163,7 @@ intake → brief → compile(G1) → preview → freeze(G2) → render → check
 
 仓库共享任务不写死 Python 路径，不自动选择业务场景，也不自动审批。Codex 使用根目录 `AGENTS.md`；现有 `CLAUDE.md` 引用同一指令入口，两者均读取 `skills/carto-agent/SKILL.md` 并调用相同 CLI。此最小入口不要求先运行下方 Hermes bootstrap，也未注册宿主原生技能命令。
 
-详细步骤、依赖安装、首条对话提示和验收边界见 [IDE 最小接入](doc/ide-minimal-integration.md)。
+IDE 接入的具体约束（解释器确认、任务边界、不自动审批）见 [AGENTS.md](AGENTS.md) 的“IDE 宿主入口”章节与 [SKILL.md](skills/carto-agent/SKILL.md) 的“IDE 宿主最小接入”。
 
 ### CLI
 
@@ -245,8 +249,8 @@ powershell -ExecutionPolicy Bypass -File tools/host/Install-CartoSkill.ps1 -Herm
 
 ## 相关文档
 
-- [实施计划](doc/implement-plan.md) — 分阶段实施路线（U-P0~U-P6）
-- [U-P3 说明文档](doc/impl-log/U-P3说明文档.md) — 首个纵向闭环总结
+- [设计原则](doc/design-principles.md) — LLM 设计自由与程序形式验证的决策边界
+- [全要素制图能力补齐路线图](doc/全要素制图能力补齐路线图.md) — 能力补齐路线（W1–W9）
 - [AGENTS.md](AGENTS.md) — 通用智能体入口约束
 - [SKILL.md](skills/carto-agent/SKILL.md) — Skill 入口文档
 

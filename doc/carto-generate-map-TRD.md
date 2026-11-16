@@ -1,6 +1,6 @@
 # 地图制图智能体地图生成路由技术设计
 
-> 2026-11-09 一致性收敛：领域定义采用[模板体系设计](carto-template-dsg.md)中的 Encoding / Appearance / Composition 与独立执行层，变更见[收敛记录](design-convergence-20261109.md)。本轮仅调整设计，不升级机器协议或宣称新能力。旧阶段编号、场景示例和命令是历史/目标说明；当前仅注册 general 分类栅格单图，模板样张及正式渲染框架已存在，未完成的多图、组件、参数和后端组合须另行实现验收。
+> 2026-11-09 一致性收敛：领域定义采用[模板体系设计](carto-template-dsg.md)中的 Encoding / Appearance / Composition 与独立执行层，变更见收敛记录 design-convergence-20261109.md（已移除，可从 git 历史取回）。本轮仅调整设计，不升级机器协议或宣称新能力。旧阶段编号、场景示例和命令是历史/目标说明；当前仅注册 general 分类栅格单图，模板样张及正式渲染框架已存在，未完成的多图、组件、参数和后端组合须另行实现验收。
 
 
 ## 文档信息
@@ -23,7 +23,7 @@
 
 本文描述目标设计，文中的目录、Schema、命令和服务接口不能单独作为已实现能力的证明。实际能力及其边界以 `skills/carto-agent/` 下的 Schema、策略、代码和验证证据为准。旧领域稿中的 `map_lock.yaml`、未版本化路径等示意不作为另一套执行协议。
 
-> **U-P2 实施冻结说明（2026-09-17）**：U-P2 只实现合成洪涝切片到候选预览和 `MapSpecLock`，来源限安全解析的 YAML/JSON、GeoJSON 和 UTF-8 CSV；实际 CLI 使用唯一入口 `carto generate-map ...`。本文中的 GeoPackage/QGIS、正式 render/check/deliver、G3 和旧 `carto_map.py` 命令均不属于 U-P2 已开放合同。详细决定见 [U-P2.0 实施说明](impl-log/U-P2.0说明文档.md)。
+> **U-P2 实施冻结说明（2026-09-17）**：U-P2 只实现合成洪涝切片到候选预览和 `MapSpecLock`，来源限安全解析的 YAML/JSON、GeoJSON 和 UTF-8 CSV；实际 CLI 使用唯一入口 `carto generate-map ...`。本文中的 GeoPackage/QGIS、正式 render/check/deliver、G3 和旧 `carto_map.py` 命令均不属于 U-P2 已开放合同。详细决定见 U-P2.0 实施说明（impl-log/U-P2.0说明文档.md，已移除，可从 git 历史取回）。
 
 ## 一、设计结论
 
@@ -1663,7 +1663,7 @@ temporal_scope:
 template_selection:
   mode: scenario
   roots:
-    - "D:/IdeaProjects/github/code-reviewer/ppt-master-main/skills/carto-agent/templates/scenarios/urban-flood-risk/1.0.0"
+    - "skills/carto-agent/templates/scenarios/urban-flood-risk/1.0.0"
 outputs:
   - id: print-a3
     required: true
@@ -1685,9 +1685,9 @@ planning_preferences:
 分析与简报命令：
 
 ```powershell
-python 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/skills/carto-agent/scripts/carto_map.py' intake --request 'D:/carto-input/flood-map-example/request.yaml' --project 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/projects/flood-map-example/carto' --json
+python 'skills/carto-agent/scripts/carto_map.py' intake --request 'D:/carto-input/flood-map-example/request.yaml' --project 'projects/flood-map-example/carto' --json
 
-python 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/skills/carto-agent/scripts/carto_map.py' brief 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/projects/flood-map-example/carto' --json
+python 'skills/carto-agent/scripts/carto_map.py' brief 'projects/flood-map-example/carto' --json
 ```
 
 预期 MapIntent 为 `emergency_mapping + hazard_result_map`，灾种为 flood，阶段为 preparedness，数据性质为 simulated；不触发洪涝模拟或自动提取淹没范围。预期接入摘要为九个区域、八个有效风险值、一个缺失值、三个避难点，字段单位为 percent，所有点位于批准范围。G1 明确接受显示 R09 无数据、四级分位数和 A3 横向，不对真实风险作业务结论。
@@ -1695,9 +1695,9 @@ python 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/skills/carto-agent/
 可信确认后执行：
 
 ```powershell
-python 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/skills/carto-agent/scripts/carto_map.py' confirm 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/projects/flood-map-example/carto' --action brief --approval-receipt 'D:/carto-input/flood-map-example/approvals/brief.json' --json
+python 'skills/carto-agent/scripts/carto_map.py' confirm 'projects/flood-map-example/carto' --action brief --approval-receipt 'D:/carto-input/flood-map-example/approvals/brief.json' --json
 
-python 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/skills/carto-agent/scripts/carto_map.py' plan 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/projects/flood-map-example/carto' --json
+python 'skills/carto-agent/scripts/carto_map.py' plan 'projects/flood-map-example/carto' --json
 ```
 
 ### 23.4 计划与可计算结果
@@ -1738,7 +1738,7 @@ classification:
 ### 23.5 预览、G2 与冻结
 
 ```powershell
-python 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/skills/carto-agent/scripts/carto_map.py' preview 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/projects/flood-map-example/carto' --json
+python 'skills/carto-agent/scripts/carto_map.py' preview 'projects/flood-map-example/carto' --json
 ```
 
 预期报告应证明：区间统计正确、空值可见、容量按面积映射、全部必需区域被包含、图例与渲染一致、输出带演示标识、标签/字号/线宽满足目标。
@@ -1765,9 +1765,9 @@ python 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/skills/carto-agent/
 占位摘要必须由工具计算。G2 批准的对象正是该候选执行摘要与预览证据摘要：
 
 ```powershell
-python 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/skills/carto-agent/scripts/carto_map.py' confirm 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/projects/flood-map-example/carto' --action freeze --approval-receipt 'D:/carto-input/flood-map-example/approvals/freeze.json' --json
+python 'skills/carto-agent/scripts/carto_map.py' confirm 'projects/flood-map-example/carto' --action freeze --approval-receipt 'D:/carto-input/flood-map-example/approvals/freeze.json' --json
 
-python 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/skills/carto-agent/scripts/carto_map.py' freeze 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/projects/flood-map-example/carto' --json
+python 'skills/carto-agent/scripts/carto_map.py' freeze 'projects/flood-map-example/carto' --json
 ```
 
 示例返回 `lock-001`。后续使用工具实际返回的 ID，不根据目录数推测编号。
@@ -1775,13 +1775,13 @@ python 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/skills/carto-agent/
 ### 23.6 正式渲染、检查与 G3
 
 ```powershell
-python 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/skills/carto-agent/scripts/carto_map.py' render 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/projects/flood-map-example/carto' --lock lock-001 --json
+python 'skills/carto-agent/scripts/carto_map.py' render 'projects/flood-map-example/carto' --lock lock-001 --json
 
-python 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/skills/carto-agent/scripts/carto_map.py' check 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/projects/flood-map-example/carto' --lock lock-001 --json
+python 'skills/carto-agent/scripts/carto_map.py' check 'projects/flood-map-example/carto' --lock lock-001 --json
 
-python 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/skills/carto-agent/scripts/carto_map.py' confirm 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/projects/flood-map-example/carto' --action deliver --approval-receipt 'D:/carto-input/flood-map-example/approvals/deliver.json' --json
+python 'skills/carto-agent/scripts/carto_map.py' confirm 'projects/flood-map-example/carto' --action deliver --approval-receipt 'D:/carto-input/flood-map-example/approvals/deliver.json' --json
 
-python 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/skills/carto-agent/scripts/carto_map.py' deliver 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/projects/flood-map-example/carto' --lock lock-001 --json
+python 'skills/carto-agent/scripts/carto_map.py' deliver 'projects/flood-map-example/carto' --lock lock-001 --json
 ```
 
 G3 回执在成品摘要确定后签发；若本地已批准政策允许自动交付，可由受信政策评估器完成，同样保留回执。
@@ -1874,7 +1874,7 @@ outputs:
 可先调用拟实现的意图检查接口：
 
 ```powershell
-python 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/skills/carto-agent/scripts/carto_map.py' interpret --request 'D:/carto-input/visit-map-example/request.yaml' --project 'D:/IdeaProjects/github/code-reviewer/ppt-master-main/projects/visit-map-example/carto' --scene leadership_visit --json
+python 'skills/carto-agent/scripts/carto_map.py' interpret --request 'D:/carto-input/visit-map-example/request.yaml' --project 'projects/visit-map-example/carto' --scene leadership_visit --json
 ```
 
 预期主场景为 leadership_visit，主题为 technology_innovation/opening_up，灾种标签为 flood，任务为 itinerary_map/stop_annotation。洪涝仅作为地点主题，此请求未要求绘制灾情范围，不应调用洪涝预测、淹没提取或暴露分析。

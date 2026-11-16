@@ -1,6 +1,6 @@
 # MapLayout 完整说明
 
-> 2026-11-09 设计收敛：采用 Encoding / Appearance / Composition 三个设计维度及独立 Renderer 执行层；模板是组合载体，不与维度一一映射。统一定义见[模板体系设计](../carto-template-dsg.md)，本轮决定及修订范围见[收敛记录](../design-convergence-20261109.md)。完整模型、引用与作用域调整仍是目标设计；S1 后续已落实有限参数化网格，当前边界见第 18 节，不代表其他组合已开放。
+> 2026-11-09 设计收敛：采用 Encoding / Appearance / Composition 三个设计维度及独立 Renderer 执行层；模板是组合载体，不与维度一一映射。统一定义见[模板体系设计](../carto-template-dsg.md)，本轮决定及修订范围见收敛记录 design-convergence-20261109.md（已移除，可从 git 历史取回）。完整模型、引用与作用域调整仍是目标设计；S1 后续已落实有限参数化网格，当前边界见第 18 节，不代表其他组合已开放。
 
 
 ## 1. 文档定位
@@ -710,9 +710,9 @@ Layout 校验可以验证“必需声明被完整放置”，但声明是否法�
 | general 的单个 3.0.0 模板以参数选择 1×1、1×2、2×2 和独立/共享图例；仍是 A4 横向 300 dpi，不允许任意替换内嵌段 | [general_thematic.py](../../skills/carto-agent/scripts/carto_core/scenarios/general_thematic.py) |
 | Layout 在 canvas/frames 基础上增加有限 grid 规则；inset 等其他枚举不等于可执行 | [layout.schema.json](../../skills/carto-agent/schemas/layout.schema.json) |
 | 解析器支持单图及模板声明网格、mm、DPR=1、不重叠区域；ResolvedLayout v2 保存源合同、参数、实例及全部地图框 | [layout.py](../../skills/carto-agent/scripts/carto_core/compiler/layout.py)、[resolved-layout.schema.json](../../skills/carto-agent/schemas/resolved-layout.schema.json) |
-| 静态栅格页面已有真实字体测量和物理尺寸检查，浏览器/SVG 路径仍有保守包络限制 | [raster_page_renderer.py](../../skills/carto-agent/scripts/carto_core/adapters/raster_page_renderer.py) |
+| 静态栅格页面已有真实字体测量和物理尺寸检查，浏览器/SVG 路径仍有保守包络限制 | [page_renderer.py](../../skills/carto-agent/scripts/carto_core/adapters/page_renderer.py) |
 | v1 组件所有权有完整段替换机制，但独立 MapLayout 创建与通用匹配尚未开放 | [ownership.py](../../skills/carto-agent/scripts/carto_core/compiler/ownership.py)、[SKILL.md](../../skills/carto-agent/SKILL.md) |
 
-S1 已通过共享面板/view/Frame 绑定和有限参数规则，复用 MapScenario 发布路径贯通单图、双图、四图；模板验证覆盖声明的六种参数组合。没有另建 subplot 引擎，也没有按组合复制固定模板。独立 Layout 组合、其他模型、自动检索/生成模板仍待按需求实施，不能绕过模板发布或 G1/G2/G3。详情见 [S1-C/D 实施记录](../dev-log/20261109-s1cd-parameterized-grid-and-workflow.md)。
+S1 已通过共享面板/view/Frame 绑定和有限参数规则，复用 MapScenario 发布路径贯通单图、双图、四图；模板验证覆盖声明的六种参数组合。没有另建 subplot 引擎，也没有按组合复制固定模板。独立 Layout 组合、其他模型、自动检索/生成模板仍待按需求实施，不能绕过模板发布或 G1/G2/G3。详情见 S1-C/D 实施记录 20261109-s1cd-parameterized-grid-and-workflow.md（已移除，可从 git 历史取回）。
 
 页面构成由 Layout 提供，用户和 Delivery 只提出兼容条件；输出实例记录最终共同满足的规格。新协议须版本化、提供合法/非法样例和自动测试；旧模板、旧锁不就地补字段或静默迁移。固定自由编排、mosaic/inset 和更复杂约束须分别验收后开放。

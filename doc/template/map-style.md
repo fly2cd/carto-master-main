@@ -1,6 +1,6 @@
 # MapStyle 完整说明
 
-> 2026-11-09 设计收敛：采用 Encoding / Appearance / Composition 三个设计维度及独立 Renderer 执行层；模板是组合载体，不与维度一一映射。统一定义见[模板体系设计](../carto-template-dsg.md)，本轮决定及修订范围见[收敛记录](../design-convergence-20261109.md)。新增模型、引用、参数与作用域调整属于目标设计，不改变当前 Schema、能力准入和审批。
+> 2026-11-09 设计收敛：采用 Encoding / Appearance / Composition 三个设计维度及独立 Renderer 执行层；模板是组合载体，不与维度一一映射。统一定义见[模板体系设计](../carto-template-dsg.md)，本轮决定及修订范围见收敛记录 design-convergence-20261109.md（已移除，可从 git 历史取回）。新增模型、引用、参数与作用域调整属于目标设计，不改变当前 Schema、能力准入和审批。
 
 
 ## 1. 文档定位

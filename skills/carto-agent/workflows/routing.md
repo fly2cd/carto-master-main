@@ -30,6 +30,6 @@
 
 `data inspect-raster` 通过显式配置的独立 MCP 服务读取分类 TIFF 元数据和精确类别统计，使用前阅读 `geospatial-data.md`。这不是第五条业务路由；工具可读栅格不等于任意场景可生成地图，general 的受限组合须走正式工作流。重投影仅有适配器能力，只读 CLI 拒绝变换；不能用单个工具结果替代场景、审批或地图成果证据。
 
-分类准备辅助入口 `data analyze-classification` / `data clarify-classification` 见 `raster-classification.md`。它们只冻结数据与显示合同，不开放业务场景、地图导出或审批旁路。
+类别码栅格 + CSV 的准备辅助入口 `data analyze-classification` / `data clarify-classification` 见 [分类栅格准备与澄清](raster-classification.md)，仅在任务需要该能力时读取。就绪报告只冻结数据与显示合同，不开放业务场景、地图导出或审批旁路；continuous 请求不套用这条 CSV 澄清流程。
 
-内部整页 `PageRenderer` 的 PDF/PNG/SVG 与字体/布局验收见同一 `raster-classification.md`；其页面报告不是正式渲染回执。第三批 C 的 `FormalRenderer` 已将该内部组件接入现有预览、G2、锁驱动渲染、终检和 G3 交付链，但不新增路由、业务场景或审批旁路；仍须由独立准入的业务组件和模板使用。
+准备就绪后的预览、G2 冻结、正式渲染、终检、成品 review 和 G3 交付统一见 [generate-map](generate-map.md)。内部页面报告不是正式渲染回执；宿主只调用已准入工作流，不将内部渲染组件作为独立导出入口。

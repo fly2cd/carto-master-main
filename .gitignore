@@ -17,6 +17,7 @@ build/
 !.vscode/tasks.json
 !.vscode/extensions.json
 *.swp
+.qoder/
 
 # Host bootstrap artifacts (machine-specific, never commit)
 tools/host/carto-host.env.json
@@ -29,6 +30,9 @@ debug.log
 
 # Carto project space (runtime artifacts: runs, receipts, deliverables, immutable repo)
 projects/
+
+# Local run-state visualization MVP (kept machine-local by decision, 2026-11-16)
+web/
 
 # Doc sample assets (do not commit files under sample)
 doc/sample/

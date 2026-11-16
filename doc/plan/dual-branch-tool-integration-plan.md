@@ -9,7 +9,7 @@
 从长远可扩展性看，扩展性来自**准入模型与端口抽象**，不来自已有场景数量：
 
 1. main 已具备可扩展插槽：`ScenarioRegistry` 默认拒绝 + `capability-roadmap` 的 `forbidden` / `not_implemented` 分类 + 四轴分离（数据/表达/后端/版式）+ 受信目录。merge 的扩展方式是 if/elif 链与硬编码常量，新增场景会继续堆积。
-2. main 已有书面领域收敛（`doc/design-convergence-20261109.md` 的 C01–C12 与 Encoding/Appearance/Composition/Renderer 模型），并把"自由编排、受控锚定/求解、freeform/mosaic/inset"明确列为**已采纳未实现**——merge 的 poster 与 annotation solver 正好落入该预留位；反向不成立。
+2. main 已有书面领域收敛（`doc/design-convergence-20261109.md` 的 C01–C12 与 Encoding/Appearance/Composition/Renderer 模型；该文档已移除，可从 git 历史取回），并把"自由编排、受控锚定/求解、freeform/mosaic/inset"明确列为**已采纳未实现**——merge 的 poster 与 annotation solver 正好落入该预留位；反向不成立。
 3. 安全不变量不可回退：main 的摘要绑定与重验链完整；merge 存在全零伪造 digest 与 stub geo_match，若以其为主干等于把证据链缺陷固化为基线。
 4. 回归网密度：main 411 项（398 通过 / 13 外部跳过）；merge 侧测试更少且部分覆盖死代码。
 5. 内核同构使该选择成本极低：不需重写内核，只需扩端口。
@@ -89,7 +89,7 @@
 
 - `SKILL.md` 新增"工具与适配器能力"章节：geocoding / routing / image-basemap / annotation-layout 的能力边界、联网纪律、离线 fail-closed 行为、资产包加载方式。
 - `doc/dev-log/` 增整合记录（血缘事实、54/76 分歧测量、主干选择理由、迁移清单三分类、被拒绝的 merge 放宽项及理由）。
-- 更新 `doc/geospatial-mcp-selective-integration-plan.md` 的能力矩阵；按既有 SVG 规范重渲染架构图并目检文字不溢出。
+- 重建工具能力矩阵（原 `doc/geospatial-mcp-selective-integration-plan.md` 已移除，信息可从 git 历史取回）；按既有 SVG 规范重渲染架构图并目检文字不溢出。
 - 留痕但不迁入：merge 侧 `SKILL.md` 声称「PosterLayoutPlanner 算坐标」而实际生效的是 `LayoutValidator`（缺坐标即报错）这一文档/实现矛盾，记入待办供 P6 处理。
 
 **验收门槛（整合完成的判定）**：main 全量回归零失败；能力并集 15 且全部有授权策略与测试；`schema check` 通过；`tool-result` 无豁免；无新增静默默认；已冻结的旧候选/锁/回执摘要**未因整合失效**。

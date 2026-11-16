@@ -22,7 +22,7 @@ freeze → render → check → 成品 review → 冻结 DeliveryManifest → [G
 
 ### 栅格
 
-- 用户提供已分类 TIFF、精确源绑定、`prepared_raster_bindings` 和就绪分类合同。
+- 用户提供已分类 TIFF、精确源绑定、`prepared_raster_bindings` 和就绪分类合同。若尚需分析或回答类别问题，按 [分类栅格准备与澄清](raster-classification.md) 操作后回到本流程；准备就绪不代替 G1/G2/G3。
 - 面板显式选择 `{"geometry":"raster","kind":"categorical","measurement":"nominal","palette_source":"prepared"}`。
 - 本期只消费准备合同中已确认的类别与配色。连续栅格任意分级、独立栅格配色修订尚未开放，不能描述为完整的事实/表达拆分。
 - 单图使用 `main-view`；多图使用 `view-r{row}-c{column}`。面板标题和页面 `map_title` 职责不同。

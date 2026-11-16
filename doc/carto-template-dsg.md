@@ -8,7 +8,7 @@
 
 这样既能实现复用，又不会让模板绑死具体地区、数据集或渲染引擎。
 
-本文为总体设计，2026-11-09 按[一致性收敛记录](design-convergence-20261109.md)更新领域模型；表达细则见[地图表达目录、内置方法与符号库设计结论](template/map-expression-and-symbol-design.md)。Encoding 指数据到视觉变量的语义映射及比较约束，不等同于完整样式包。目录描述规则，受信方法执行算法，不要求先建设独立发布或安装体系。
+本文为总体设计，2026-11-09 按一致性收敛记录 design-convergence-20261109.md（已移除，可从 git 历史取回）更新领域模型；表达细则见[地图表达目录、内置方法与符号库设计结论](template/map-expression-and-symbol-design.md)。Encoding 指数据到视觉变量的语义映射及比较约束，不等同于完整样式包。目录描述规则，受信方法执行算法，不要求先建设独立发布或安装体系。
 
 下文的候选表达、接口和扩展路线属于目标设计，不等于当前已开放能力。当前运行实现仅位于 `skills/carto-agent/`，机器执行不读取本文；实际能力与已知差距见上述结论文档第 10 节。地图表达和符号资源均不是第五类模板。
 
@@ -18,7 +18,7 @@
 
 ## 2026-11-09 收敛：设计维度、模板与执行层
 
-本节统一目标领域模型；变更追溯见[一致性收敛记录](design-convergence-20261109.md)。下文旧协议形状和示意场景不构成当前能力声明。
+本节统一目标领域模型；变更追溯见一致性收敛记录 design-convergence-20261109.md（已移除，可从 git 历史取回）。下文旧协议形状和示意场景不构成当前能力声明。
 
 ### 1. 三个设计维度与独立执行层
 
@@ -66,7 +66,7 @@ single/grid/mosaic 按声明的规则产生 Frame，freeform 直接声明 Frame 
 
 ### 1. 按“稳定复用的规则”划分模板
 
-PPT Master 把 Brand、Style、Layout、Deck 定义为拥有不同职责的可组合模板类型，而不是同一继承层级中的不同阶段，参见 [模板资源说明](../../skills/ppt-master/templates/README.md)。其中 Deck 是集成应用模板，会同时携带应用、身份和结构，因此这里更准确的概念是“分段所有权”，而不是各维度完全独立。
+PPT Master 把 Brand、Style、Layout、Deck 定义为拥有不同职责的可组合模板类型，而不是同一继承层级中的不同阶段，参见 模板资源说明（ppt-master 外部仓库路径，不在本仓库）。其中 Deck 是集成应用模板，会同时携带应用、身份和结构，因此这里更准确的概念是“分段所有权”，而不是各维度完全独立。
 
 | PPT Master 类型 | 地图智能体中的对应物 | 负责内容 |
 |---|---|---|
@@ -79,7 +79,7 @@ PPT Master 把 Brand、Style、Layout、Deck 定义为拥有不同职责的可�
 | — | 数据空间契约（Data/Spatial Contract） | 字段、单位、几何、CRS、时间、范围和数据质量 |
 | — | 符号与标准目录 | 通用点线面文字资源，以及测绘、地质、规划等权威符号 |
 
-核心判断标准不是“源文件有多完整”，而是“哪些规则值得跨项目稳定复用”。这与 [Create Template 工作流](../../skills/ppt-master/workflows/create-template.md) 的分类原则一致。
+核心判断标准不是“源文件有多完整”，而是“哪些规则值得跨项目稳定复用”。这与 Create Template 工作流（ppt-master 外部仓库路径，不在本仓库） 的分类原则一致。
 
 ### 2. 模板是“语义规范 + 可执行原型”，不是最终作品
 
@@ -91,7 +91,7 @@ PPT Master 把 Brand、Style、Layout、Deck 定义为拥有不同职责的可�
 - JSON 索引：负责模板发现与选择。
 - 校验器：验证规范、原型和资产之间的一致性。
 
-例如，`presentation_core` 在 [Design Spec](../../skills/ppt-master/templates/layouts/presentation_core/templates/design_spec.md) 中声明页面类型和占位槽；具体的 [图表洞察 SVG](../../skills/ppt-master/templates/layouts/presentation_core/templates/19_chart_insight.svg) 又声明结构身份、槽位、边界和原生数据对象。
+例如，`presentation_core` 在 Design Spec（ppt-master 外部仓库，不在本仓库） 中声明页面类型和占位槽；具体的 图表洞察 SVG（ppt-master 外部仓库，不在本仓库） 又声明结构身份、槽位、边界和原生数据对象。
 
 地图模板也应采用相同的双重表达：
 
@@ -100,7 +100,7 @@ PPT Master 把 Brand、Style、Layout、Deck 定义为拥有不同职责的可�
 
 ### 3. 选择模板不等于复制模板
 
-PPT Master 中的图表 SVG 只是灵活参考，项目数据与当前设计规范仍拥有最终语义，参见 [图表模板运行边界](../../skills/ppt-master/templates/charts/README.md#runtime-boundary)。
+PPT Master 中的图表 SVG 只是灵活参考，项目数据与当前设计规范仍拥有最终语义，参见 图表模板运行边界（ppt-master 外部仓库，不在本仓库）。
 
 对应到地图系统：
 
@@ -127,7 +127,7 @@ PPT Master 在模板创建过程中区分四类来源：
 
 ### 5. 明确来源、组件边界与共同约束
 
-PPT Master 不合并多个模板规范正文，而是在消费时确定每个分段的唯一所有者；例如存在 Layout 时由 Layout 拥有结构，参见 [模板应用与优先级规则](../../skills/ppt-master/workflows/stages/apply-template-workspace.md#5-segment-precedence-is-resolved-while-reading)。
+PPT Master 不合并多个模板规范正文，而是在消费时确定每个分段的唯一所有者；例如存在 Layout 时由 Layout 拥有结构，参见 模板应用与优先级规则（ppt-master 外部仓库，不在本仓库）。
 
 地图侧以分段所有权作为 v1 基线；目标把组件来源、声明参数、调整作用域和约束分别解析，不把模板类型等同于所有字段的绝对覆盖权。主要职责如下：
 
@@ -145,7 +145,7 @@ PPT Master 不合并多个模板规范正文，而是在消费时确定每个分
 
 ### 6. 使用统一生命周期管理模板
 
-PPT Master 的模板生命周期是：参考材料分析、基于事实的方案、用户确认、创建、验证、预览、注册和应用，参见 [Create Template 流程概览](../../skills/ppt-master/workflows/create-template.md#process-overview)。
+PPT Master 的模板生命周期是：参考材料分析、基于事实的方案、用户确认、创建、验证、预览、注册和应用，参见 Create Template 流程概览（ppt-master 外部仓库，不在本仓库）。
 
 地图模板也应经过类似流程，避免未经验证的文件直接进入模板库：
 
@@ -214,7 +214,7 @@ PPT Master 的模板生命周期是：参考材料分析、基于事实的方案
 - 锚点、对齐和内容溢出策略。
 - 与其他槽位的排斥、缩放或重排关系。
 
-这相当于 PPT Master 中的 `data-pptx-bounds`：边界代表完整设计区域，而不是示例内容的紧包围盒，参见 [PPTX 结构接口](../../skills/ppt-master/references/pptx-structure-interface.md#2-explicit-pptx-master--layout--placeholder-metadata)。
+这相当于 PPT Master 中的 `data-pptx-bounds`：边界代表完整设计区域，而不是示例内容的紧包围盒，参见 PPTX 结构接口（ppt-master 外部仓库路径，不在本仓库）。
 
 ### 4. 制图场景方案
 

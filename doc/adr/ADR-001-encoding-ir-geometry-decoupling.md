@@ -5,7 +5,7 @@
 - 决策类型：架构 / 协议边界
 - 上游依据（一手决策文档，非二手转述）：
   - [design-principles.md](../design-principles.md)：四层决策模型（§2）、当前违规清单（§5）
-  - [design-convergence-20261109.md](../design-convergence-20261109.md)：Encoding/Appearance/Composition/Renderer 领域模型（§1）、正交定义（L19）、C01/C10、采纳未实现项（§6）、待定细节（§7）、P3.6 Schema 合并（§10）
+  - design-convergence-20261109.md（已移除，可从 git 历史取回）：Encoding/Appearance/Composition/Renderer 领域模型（§1）、正交定义（L19）、C01/C10、采纳未实现项（§6）、待定细节（§7）、P3.6 Schema 合并（§10）
 - 断言标注约定：【源码事实】附文件:行号；【既有决策】附上游文档条目；【领域理论】附权威来源；【设计推断】为本 ADR 提出、尚未验证的设计。
 
 ---
