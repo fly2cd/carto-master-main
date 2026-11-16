@@ -76,12 +76,11 @@ carto-master-main/
 │   └── New-CartoProjectSpace.ps1     项目空间脚手架
 ├── doc/                              设计文档与历史记录
 │   ├── design-principles.md          设计原则（LLM 自由与程序验证的决策边界）
-│   ├── adr/                          架构决策记录（ADR）
 │   ├── plan/                         后续整合计划（双分支工具层）
 │   ├── dev-log/                      开发日志（历史留痕）
-│   ├── impl-log/                     阶段实施架构图（历史快照）
 │   ├── reference/                    外部参考与历史推演
 │   └── template/                     模板设计参考
+│   （doc/adr、doc/impl-log、doc/sample 为本机保留目录，不入库）
 ├── pyproject.toml                    构建 / 依赖 / 测试配置
 ├── AGENTS.md                         通用智能体入口约束
 └── CLAUDE.md

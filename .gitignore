@@ -37,6 +37,10 @@ web/
 # Doc sample assets (do not commit files under sample)
 doc/sample/
 
+# Doc local-only directories (machine-local by decision, 2026-11-16; keep files, never commit)
+doc/adr/
+doc/impl-log/
+
 # Patent prior-art search artifacts (re-downloadable via doc/download-patent-pdfs.ps1 + patent-search/fetch_claims_text.py)
 doc/.venv-pdf/
 doc/patent-search/*.pdf
