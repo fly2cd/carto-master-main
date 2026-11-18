@@ -1,65 +1,15 @@
-"""Explicit thematic semantics and deterministic attribute/encoding execution.
+"""Evidenced exact CSV attribute join (mechanical vector-data infrastructure).
 
-No automatic method selection, unit inference, business-data logging or code evaluation.
-
-This module keeps the parts that are genuinely execution-layer work: request/bundle
-view assembly (``vector_views`` / ``raster_views``) and the evidenced exact CSV
-attribute join (``join_attributes``).
-
-The mechanical derivations moved down into the kernel (Tier-2 去环 Step4) and are
-re-exported here unchanged, so every existing ``from .thematic import ...`` keeps
-working:
-
-* ``metric_value`` / ``finite`` / ``expression_reference`` ->
-  ``carto_core.compiler.portrayal_resolver`` (IR-level value and catalog resolution);
-* ``equal_interval_edges`` / ``resolve_design`` ->
-  ``carto_core.compiler.thematic_design`` (design -> encoding IR). Its ``_domain`` /
-  ``_design_to_ir`` helpers stay private there: nothing outside that module uses them.
-
-New code in ``compiler`` must import them from the kernel directly; that is what
-removed the ``compiler -> workflow`` runtime edge. Per design-principles §2.3 these
-are program-owned mechanical derivations, not orchestration.
+Moved verbatim from ``workflow/thematic.py`` (I-5 dissolution). This is execution-layer
+data-type work, not scenario orchestration: it joins a frozen attribute table to vector
+features by exact string key, snapshots bytes, and never guesses keys/types. The scenario
+request-body view assembly (vector_views/raster_views) moved into the scenario package.
 """
-from copy import deepcopy
+from __future__ import annotations
+
 from ..canonical import sha256_digest
 from ..errors import ProtocolError, SecurityError
-from ..compiler.portrayal_resolver import expression_reference, finite, ir_to_kind, metric_value
-from ..compiler.thematic_design import equal_interval_edges, resolve_design
-
-__all__ = [
-    "equal_interval_edges",
-    "expression_reference",
-    "finite",
-    "join_attributes",
-    "metric_value",
-    "raster_views",
-    "resolve_design",
-    "vector_views",
-]
-
-
-def vector_views(request, bundle, service, context):
-    bindings = {item["source_id"]: item for item in bundle["role_bindings"]}
-    results = []
-    for panel in sorted(request["vector_panels"], key=lambda p:p["id"]):
-        binding = bindings[panel["source_id"]]
-        report = service.load_verified(binding["prepared_ref"], context)
-        encoding, statistics = resolve_design(panel["design"], report, service.registry)
-        results.append({"view_id":panel["id"], "source_id":panel["source_id"], "data_ref":deepcopy(binding["prepared_ref"]),
-                        "design":deepcopy(panel["design"]), "expression_ref":expression_reference(ir_to_kind(encoding),service.registry), "encoding":encoding, "statistics":statistics})
-    return results
-
-
-def raster_views(request, bundle, registry):
-    bindings = {item["source_id"]:item for item in bundle["role_bindings"]}
-    result = []
-    for panel in sorted(request["panels"],key=lambda p:p["id"]):
-        registry.validate("thematic-design",panel["design"])
-        if panel["design"]["geometry"] != "raster":
-            raise ProtocolError("THEMATIC_GEOMETRY_MISMATCH", "Raster panels require an explicit raster design")
-        result.append({"view_id":panel["id"], "source_id":panel["source_id"], "data_ref":deepcopy(bindings[panel["source_id"]]["prepared_ref"]),
-                       "design":deepcopy(panel["design"]), "expression_ref":expression_reference("categorical",registry), "encoding":None, "statistics":None})
-    return result
+from ..compiler.portrayal_resolver import finite
 
 
 def join_attributes(service, report, binding, asset=None):

@@ -8,7 +8,6 @@ from ..contracts.protocols import (BundlePreparerFactory, EnvironmentSnapshotPro
                                    PageContractFactory, VectorPreparationProtocol)
 from .vector_page import validate_page
 from .layout import LayoutResolver
-from .thematic_design import resolve_design
 
 RENDERER_ID = VECTOR_PAGE.renderer_id  # derived; single authority = carto_core.backend_registry
 
@@ -71,7 +70,7 @@ class VectorSceneCompiler:
         if inputs['resources'] != scene['resources'] or inputs['page']['resolved_layout'] != scene['resolved_layout']:
             raise ProtocolError('VECTOR_SCENE_CHANGED', 'Frozen scene sources or layout differ')
         LayoutResolver(self.registry).validate_scene(scene)
-        if not {'pdf', 'png'} <= set(scene['export']['targets']):
+        if not VECTOR_PAGE.export_formats <= set(scene['export']['targets']):
             raise ProtocolError('VECTOR_TARGETS_REQUIRED', 'PDF and PNG must both be requested')
         return inputs
 
@@ -95,31 +94,4 @@ class VectorSceneCompiler:
         expected = self.bind_execution(execution, scene, context)
         if expected != execution or execution['shared_semantics']['data_nature'] != inputs['bundle']['summary']['data_nature']:
             raise ProtocolError('VECTOR_EXECUTION_CHANGED', 'Execution views, inputs or environment differ')
-        return inputs
-
-    def validate_generation(self, scene, execution, request, context):
-        inputs = self.validate_execution(scene, execution, context)
-        self.bundles(self.preparation, "vector").validate_request(request, inputs['bundle'], context)
-        requested = {p['id']: p for p in request['vector_panels']}
-        if set(requested) != set(inputs['layers']) or request['layout_parameters'] != scene['resolved_layout']['parameters']:
-            raise ProtocolError('VECTOR_GENERATION_CHANGED', 'Panel selection differs')
-        for panel in inputs['page']['panels']:
-            source = requested[panel['view_id']]; stack = inputs['layers'][panel['view_id']]
-            # First version: the generate workflow binds one source per panel;
-            # stacked panels are composed at compile_page level (request-level
-            # multi-layer declaration is a later orchestration step).
-            layer = stack[0]
-            expected_encoding,_=resolve_design(source['design'],layer['report'],self.registry)
-            if (source['source_id'] != layer['report']['source']['source_id'] or expected_encoding != layer['portrayal']['encoding']
-                    or source['extent'] != panel['extent']):
-                raise ProtocolError('VECTOR_GENERATION_CHANGED', 'Panel source, encoding or extent differs')
-        from ..scenario_registry import ScenarioRegistry
-        notice = ScenarioRegistry(self.registry).for_generate(request).notice
-        expected_texts = {'title': request['map_title'], 'source': notice}
-        if len(requested) > 1:
-            expected_texts.update({p['id'].replace('view-', 'caption-', 1): p['title'] for p in request['vector_panels']})
-        if {p['content_id']: p['text'] for p in inputs['page']['texts']} != expected_texts:
-            raise ProtocolError('VECTOR_GENERATION_CHANGED', 'Frozen titles or notice differ from the request')
-        if sorted(request['requested_outputs']) != scene['export']['targets']:
-            raise ProtocolError('VECTOR_GENERATION_CHANGED', 'Requested outputs differ')
         return inputs

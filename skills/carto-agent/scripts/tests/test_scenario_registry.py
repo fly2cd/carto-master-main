@@ -72,9 +72,10 @@ class ScenarioRegistryTests(unittest.TestCase):
         self.schemas.validate("template-brief", brief)
 
     def test_undeclared_source_binding_fields_are_rejected(self):
-        request = deepcopy(VALID_CASES["generate-request"])
+        # source_bindings is a scenario body field: closure lives in the profile, not the open envelope.
+        request = deepcopy(VALID_CASES["general-generate-request"])
         request["source_bindings"][0]["temporary_override"] = True
-        self.assert_code("SCHEMA_VALIDATION_FAILED", lambda: self.schemas.validate("generate-request", request))
+        self.assert_code("SCHEMA_VALIDATION_FAILED", lambda: self.schemas.validate("general-generate-request", request))
 
     def test_empty_policy_requires_explicit_default_deny(self):
         policy = deepcopy(VALID_CASES["scenario-capabilities"])

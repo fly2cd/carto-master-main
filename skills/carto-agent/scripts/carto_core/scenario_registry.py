@@ -13,21 +13,49 @@ from .schema_registry import SchemaRegistry, load_document
 # Code identifiers are a closed allowlist, never import paths supplied by a request/policy.
 # One bundle per business purpose: geometry (raster | vector) is a strategy branch inside
 # the bundle, never a second registration of the same purpose.
-_COMPONENTS: dict[str, dict[str, tuple[str, str]]] = {
-    "general-thematic": {
-        name: (".scenarios.general_dispatch", attribute)
-        for name, attribute in (
-            ("data_preparer", "GeneralDataPreparer"),
-            ("planner", "GeneralPlanner"),
-            ("candidate_compiler", "GeneralCandidateCompiler"),
-            ("legend_checker", "legend_checker"),
-            ("source_contract", "SOURCE_CONTRACT"),
-            ("author", "GeneralAuthor"),
-            ("validation_data_checker", "validation_data_checker"),
-            ("validation_scene", "validation_scene"),
-        )
-    },
+#
+# A new scenario is registered by adding ONE line here (its constants-only manifest module)
+# plus its own scenarios/<name>/ package. The kernel never imports a concrete scenario
+# module statically; component() imports the manifest's target modules lazily.
+_IMPLEMENTATIONS: dict[str, str] = {
+    "general-thematic": ".scenarios.general_thematic.manifest",
 }
+
+
+def _load_components() -> dict[str, dict[str, tuple[str, str]]]:
+    """Load each registered manifest and merge inherited defaults with own components.
+
+    Manifests are constants-only modules, so loading them here does not import the heavy
+    strategy modules (component() imports those lazily). ``DEFAULTS`` lets a scenario reuse
+    another registered implementation's components; own entries override. Completeness is
+    validated as own + defaults by the registration check below.
+    """
+    manifests = {impl: import_module(path, package=__package__)
+                 for impl, path in _IMPLEMENTATIONS.items()}
+    resolved: dict[str, dict[str, tuple[str, str]]] = {}
+    resolving: set[str] = set()
+
+    def resolve(impl: str) -> dict[str, tuple[str, str]]:
+        if impl in resolved:
+            return resolved[impl]
+        if impl in resolving:
+            raise ProtocolError("SCENARIO_DEFAULTS_CYCLE", f"Component defaults cycle at {impl}")
+        resolving.add(impl)
+        manifest = manifests[impl]
+        merged: dict[str, tuple[str, str]] = {}
+        for parent in getattr(manifest, "DEFAULTS", ()):
+            if parent not in manifests:
+                raise ProtocolError("SCENARIO_DEFAULTS_UNKNOWN", f"Defaults source {parent} is not registered")
+            merged.update(resolve(parent))
+        merged.update(getattr(manifest, "COMPONENTS", {}))
+        resolving.discard(impl)
+        resolved[impl] = merged
+        return merged
+
+    return {impl: resolve(impl) for impl in _IMPLEMENTATIONS}
+
+
+_COMPONENTS: dict[str, dict[str, tuple[str, str]]] = _load_components()
 
 REQUIRED_COMPONENTS = {
     # Always required — data admission and safety are universal.
@@ -35,11 +63,22 @@ REQUIRED_COMPONENTS = {
     # create-template route (T1 → author → validate → TP).
     "create-template": ("author", "validation_data_checker", "validation_scene"),
     # generate-map route (G1 → data-prep → plan → compile → G2 → render → check → G3).
-    "generate-map": ("data_preparer", "planner", "candidate_compiler", "legend_checker"),
+    # request_contract supplies request-body understanding (source plan, validation, overrides).
+    "generate-map": ("data_preparer", "planner", "candidate_compiler", "legend_checker", "request_contract", "revision_contract"),
 }
 
 # Geometries a profile may admit. A bundle registers code; policy admits geometries.
 GEOMETRIES = ("raster", "vector")
+
+
+def _request_geometry(request: dict[str, Any]) -> str:
+    # Geometry is an envelope-level admission field (closed raster|vector enum), so the kernel
+    # discriminates it generically — no scenario component or import required. Scenario-specific
+    # request-body understanding lives in the request_contract component, not here.
+    geometry = request.get("geometry")
+    if geometry not in GEOMETRIES:
+        raise ProtocolError("SCENARIO_GEOMETRY_REQUIRED", "Declare an admitted geometry explicitly")
+    return geometry
 
 # Disclosure-only fields: editing them must not invalidate frozen executions.
 DISCLOSURE_FIELDS = ("notice", "licenses")
@@ -249,11 +288,10 @@ class ScenarioRegistry:
         if request["profile"] != profile.definition["authoring_profile"]:
             raise ProtocolError("CAPABILITY_NOT_AVAILABLE", "Authoring profile does not match the template")
         self.registry.validate(profile.definition["request_schemas"]["create-template"], request)
-        from .scenarios.general_dispatch import geometry_of_request
         # One geometry gate: a capability's allowed set is exactly the geometry of the
         # variant that registered the requested template asset, so a second
         # template_geometry comparison could never disagree with this one.
-        self.require_geometry(profile, geometry_of_request(request))
+        self.require_geometry(profile, _request_geometry(request))
         return profile
 
     def resolve_generate(self, request: dict[str, Any]) -> tuple[ScenarioCapability, dict[str, Any]]:
@@ -266,8 +304,7 @@ class ScenarioRegistry:
         self.intent_resolver.require_current_intent(intent)
         profile = self.for_template(request.get("template", {}))
         self.registry.validate(profile.definition["request_schemas"]["generate-map"], request)
-        from .scenarios.general_dispatch import geometry_of_request
-        self.require_geometry(profile, geometry_of_request(request))
+        self.require_geometry(profile, _request_geometry(request))
         return profile, profile.bind_intent(intent)
 
     @staticmethod

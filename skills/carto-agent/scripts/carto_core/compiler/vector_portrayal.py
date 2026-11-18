@@ -24,7 +24,7 @@ def compiler_digest():
     root = Path(__file__).resolve().parents[3]
     return sha256_digest({'version': '2.0.0', 'files': {
         path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in
-        [Path(__file__), Path(__file__).resolve().parent / 'portrayal_resolver.py', Path(__file__).resolve().parent / 'thematic_design.py', Path(__file__).resolve().parents[1] / 'workflow/thematic.py', root / 'schemas/encoding-ir.schema.json', root / 'schemas/resolved-portrayal.schema.json']}})
+        [Path(__file__), Path(__file__).resolve().parent / 'portrayal_resolver.py', Path(__file__).resolve().parent / 'thematic_design.py', root / 'schemas/encoding-ir.schema.json', root / 'schemas/resolved-portrayal.schema.json']}})
 
 
 def resolve_labels(report, label_source):

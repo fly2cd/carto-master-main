@@ -128,6 +128,38 @@
           ]
         }
       ]
+    },
+    {
+      "if": {
+        "properties": {
+          "geometry": {
+            "const": "raster"
+          }
+        },
+        "required": [
+          "geometry"
+        ]
+      },
+      "then": {
+        "required": [
+          "panels"
+        ],
+        "not": {
+          "required": [
+            "vector_panels"
+          ]
+        }
+      },
+      "else": {
+        "required": [
+          "vector_panels"
+        ],
+        "not": {
+          "required": [
+            "panels"
+          ]
+        }
+      }
     }
   ],
   "$defs": {
@@ -191,6 +223,413 @@
           "$ref": "https://schemas.carto-agent.local/v1/grid-parameters.schema.json"
         }
       }
+    }
+  },
+  "type": "object",
+  "unevaluatedProperties": false,
+  "properties": {
+    "source_bindings": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "role",
+              "source_ref",
+              "path",
+              "format",
+              "crs",
+              "geometry_types",
+              "field_bindings",
+              "unit_bindings",
+              "freshness",
+              "join"
+            ],
+            "properties": {
+              "role": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+              },
+              "source_ref": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024
+              },
+              "format": {
+                "const": "geojson"
+              },
+              "crs": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/crs"
+              },
+              "geometry_types": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "enum": [
+                    "point",
+                    "multipoint",
+                    "polygon",
+                    "multipolygon"
+                  ]
+                }
+              },
+              "field_bindings": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "semantic_role",
+                    "source_field",
+                    "value_type"
+                  ],
+                  "properties": {
+                    "semantic_role": {
+                      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+                    },
+                    "source_field": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                    },
+                    "value_type": {
+                      "enum": [
+                        "integer",
+                        "number"
+                      ]
+                    }
+                  }
+                }
+              },
+              "unit_bindings": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "semantic_role",
+                    "unit"
+                  ],
+                  "properties": {
+                    "semantic_role": {
+                      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+                    },
+                    "unit": {
+                      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+                    }
+                  }
+                }
+              },
+              "freshness": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "observed_at",
+                  "max_age_days"
+                ],
+                "properties": {
+                  "observed_at": {
+                    "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/timestamp"
+                  },
+                  "max_age_days": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 3650
+                  }
+                }
+              },
+              "join": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "required"
+                ],
+                "properties": {
+                  "required": {
+                    "type": "boolean"
+                  },
+                  "key": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "coverage": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "minimum_coverage": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          },
+          {
+            "$ref": "https://schemas.carto-agent.local/v1/raster-input.schema.json"
+          }
+        ]
+      }
+    },
+    "prepared_raster_bindings": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "prepared_ref",
+          "source_id"
+        ],
+        "properties": {
+          "role": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+          },
+          "prepared_ref": {
+            "allOf": [
+              {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+              },
+              {
+                "required": [
+                  "uri"
+                ],
+                "properties": {
+                  "id": {
+                    "const": "raster-prepared-data"
+                  },
+                  "version": {
+                    "const": "1.0.0"
+                  }
+                }
+              }
+            ]
+          },
+          "source_id": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+          }
+        }
+      }
+    },
+    "layout_parameters": {
+      "anyOf": [
+        {
+          "$ref": "https://schemas.carto-agent.local/v1/grid-parameters.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "panels": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "source_id",
+          "title",
+          "design"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+          },
+          "source_id": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          },
+          "design": {
+            "$ref": "https://schemas.carto-agent.local/v1/thematic-design.schema.json"
+          }
+        }
+      }
+    },
+    "vector_sources": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "items": {
+        "$ref": "https://schemas.carto-agent.local/v1/vector-input.schema.json"
+      }
+    },
+    "charts": {
+      "type": "array",
+      "maxItems": 4,
+      "description": "E6 chart core declarations placed into layout chart slots; optional.",
+      "items": {
+        "$ref": "https://schemas.carto-agent.local/v1/chart.schema.json"
+      }
+    },
+    "basemap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "image",
+        "crs",
+        "extent"
+      ],
+      "description": "Geographic base map rendered beneath thematic layers; a reference resource (not thematic data). First version: static image with explicit georeferencing.",
+      "properties": {
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            }
+          }
+        },
+        "crs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "authority",
+            "code"
+          ],
+          "properties": {
+            "authority": {
+              "const": "EPSG"
+            },
+            "code": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            }
+          }
+        },
+        "extent": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "number"
+          }
+        },
+        "style": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Visual grounding constraints applied by the renderer; the figure-ground relation is a programmatic contract, not a provider promise.",
+          "properties": {
+            "desaturate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "lighten": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            }
+          }
+        }
+      }
+    },
+    "vector_panels": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "source_id",
+          "title",
+          "extent",
+          "design"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+          },
+          "source_id": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "extent": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/bbox"
+          },
+          "design": {
+            "$ref": "https://schemas.carto-agent.local/v1/thematic-design.schema.json"
+          },
+          "labels": {
+            "description": "Optional feature-label annotation: name the property field whose values are drawn as labels. Absent means no feature labels.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "field"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "max_labels": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000
+              }
+            }
+          }
+        }
+      }
+    },
+    "revised_cartography": {
+      "description": "Design revision cartography overrides applied during re-compile (R6). Only present on revised requests.",
+      "$ref": "https://schemas.carto-agent.local/v2/cartography.schema.json"
+    },
+    "output_profile": {
+      "description": "Optional page size override. When absent, the template's declared A4 landscape (297×210 mm) is used. Width/height must be within the scenario's output_constraints envelope (max 420×297 mm).",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "width_mm": {
+          "type": "number",
+          "minimum": 100,
+          "maximum": 420
+        },
+        "height_mm": {
+          "type": "number",
+          "minimum": 100,
+          "maximum": 297
+        }
+      }
+    },
+    "map_title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 60,
+      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
     }
   }
 }

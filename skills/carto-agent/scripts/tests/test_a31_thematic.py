@@ -20,11 +20,12 @@ from carto_core.schema_registry import SchemaRegistry
 from carto_core.security.paths import PathGuard
 from carto_core.contracts.execution import ExecutionContext
 from carto_core.workflow.vector_preparation import VectorPreparationService
-from carto_core.workflow.thematic import resolve_design, metric_value
+from carto_core.compiler.thematic_design import resolve_design
+from carto_core.compiler.portrayal_resolver import metric_value
 from carto_core.workflow.preparation_bundle import BundlePreparer
 from carto_core.compiler.vector_portrayal import resolve_features
 from carto_core.compiler.portrayal_resolver import radius
-from carto_core.scenarios.general_dispatch import geometry_of_request, geometry_of_profile
+from carto_core.scenarios.general_thematic.dispatch import geometry_of_request, geometry_of_profile
 
 
 def symbol(color):
@@ -96,7 +97,7 @@ class ThematicDataTests(unittest.TestCase):
         self.assertEqual({'count':3,'minimum':5,'maximum':10},stats)
         styles=resolve_features(report,encoding,self.registry)
         self.assertEqual(3,styles['counts']['visible_count'])
-        self.assertEqual('graduated-color',__import__('carto_core.workflow.thematic',fromlist=['expression_reference']).expression_reference('choropleth')['id'])
+        self.assertEqual('graduated-color',__import__('carto_core.compiler.portrayal_resolver',fromlist=['expression_reference']).expression_reference('choropleth')['id'])
 
     def test_same_data_different_metric_changes_execution_values(self):
         _,report=self.prepared();d=density_design();normalized,_=resolve_design(d,report,self.registry)
@@ -175,12 +176,12 @@ class TemplateContractMergeTests(unittest.TestCase):
         self.generic_request=deepcopy(VALID_CASES['template-create-request'])
 
     def author(self):
-        from carto_core.scenarios.general_vector import GeneralVectorAuthor
+        from carto_core.scenarios.general_thematic.vector import GeneralVectorAuthor
         return GeneralVectorAuthor(self.guard,self.work,self.registry)
 
     def test_vector_author_is_standalone_and_idempotent(self):
-        from carto_core.scenarios.general_vector import GeneralVectorAuthor
-        from carto_core.scenarios.general_thematic import GeneralThematicAuthor
+        from carto_core.scenarios.general_thematic.vector import GeneralVectorAuthor
+        from carto_core.scenarios.general_thematic.raster import GeneralThematicAuthor
         # 项②(4): no inheritance in either direction; the shared source is the
         # geometry-free module-level contract functions, not a base class.
         self.assertEqual((object,),GeneralVectorAuthor.__bases__)
@@ -192,7 +193,7 @@ class TemplateContractMergeTests(unittest.TestCase):
 
     def test_vector_template_declares_only_geometry_adaptation_differences(self):
         from carto_core.schema_registry import load_document
-        from carto_core.scenarios.general_thematic import scenario_contract, spatial_behavior_contract
+        from carto_core.scenarios.general_thematic.raster import scenario_contract, spatial_behavior_contract
         package=self.author().author(self.request,self.brief)
         root=Path(package['package_path'])
         scenario=load_document(root/'contracts/scenario.yaml')
@@ -242,7 +243,7 @@ class TemplateContractMergeTests(unittest.TestCase):
         # The shared gate pins version/profile from module constants; the versioned
         # capability policy stays the authority, so the two may never drift apart.
         from carto_core.scenario_registry import ScenarioRegistry
-        from carto_core.scenarios import general_thematic, general_vector
+        from carto_core.scenarios.general_thematic import raster as general_thematic, vector as general_vector
         scenarios=ScenarioRegistry(self.registry)
         for module in (general_thematic,general_vector):
             profile=scenarios.for_template({'kind':'map-scenario','id':'general-thematic-map',
@@ -282,7 +283,7 @@ class ThematicWorkflowTests(unittest.TestCase):
         from tests.test_general_thematic import (find_cjk_font, SCENE_TEXT, GOAL,
             build_installation, GenerationTests)
         from tests.fixtures.schema_cases import VALID_CASES, VARIANT_CASES
-        from carto_core.scenarios.general_vector import GeneralVectorAuthor
+        from carto_core.scenarios.general_thematic.vector import GeneralVectorAuthor
         from carto_core.scenario_registry import ScenarioRegistry
         from carto_core.compiler.map_candidate import MapCandidateCompiler
         from carto_core.schema_registry import load_document

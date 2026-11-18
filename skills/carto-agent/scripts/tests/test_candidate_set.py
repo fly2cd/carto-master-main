@@ -79,7 +79,8 @@ class CompileVariantsTests(unittest.TestCase):
     def setUp(self) -> None:
         self.registry = SchemaRegistry()
         self.compiler = MapCandidateCompiler(path_guard=mock.MagicMock(), registry=self.registry)
-        self.request = {"run_id": "run-one", "project_id": "project-one"}
+        self.request = {"run_id": "run-one", "project_id": "project-one",
+                        "template": {"kind": "map-scenario", "id": "general-thematic-map", "version": "3.0.0"}}
         self.contracts = {"scenario": {"embedded": {}}}
         self.seen_contracts = []
 

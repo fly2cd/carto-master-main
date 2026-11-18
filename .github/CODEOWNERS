@@ -1,0 +1,64 @@
+# Carto-Agent CODEOWNERS
+# GitHub CODEOWNERS does NOT support {a,b} brace expansion — every path is literal.
+# Last matching pattern wins. P3 (kernel steward) is the default owner and sole merger.
+#
+# TODO(multi-person): replace the placeholder P1/P2 handles below with real GitHub
+# accounts/teams, then uncomment their territory lines. Until then P3 owns everything
+# so review enforcement is functional from day one.
+
+# --- P3 kernel steward: default + spine + governance (sole merge authority) ---
+*                                                                       @liudakemgslab
+/skills/carto-agent/scripts/carto_core/errors.py                        @liudakemgslab
+/skills/carto-agent/scripts/carto_core/canonical.py                     @liudakemgslab
+/skills/carto-agent/scripts/carto_core/schema_registry.py               @liudakemgslab
+/skills/carto-agent/scripts/carto_core/scenario_registry.py             @liudakemgslab
+/skills/carto-agent/scripts/carto_core/backend_registry.py              @liudakemgslab
+/skills/carto-agent/scripts/carto_core/security/                        @liudakemgslab
+/skills/carto-agent/scripts/carto_core/repository/                      @liudakemgslab
+/skills/carto-agent/scripts/carto_core/validation/                      @liudakemgslab
+/skills/carto-agent/scripts/carto_core/contracts/                       @liudakemgslab
+/skills/carto-agent/scripts/carto_core/workflow/                        @liudakemgslab
+/skills/carto-agent/scripts/carto_core/compiler/                        @liudakemgslab
+/skills/carto-agent/scripts/carto_core/cli/                             @liudakemgslab
+/skills/carto-agent/scripts/carto_core/scenarios/                       @liudakemgslab
+/skills/carto-agent/schemas/                                            @liudakemgslab
+/skills/carto-agent/scripts/tests/                                      @liudakemgslab
+# Policy steward: semantic fields are digest-bound into frozen executions; single owner.
+/skills/carto-agent/policies/                                           @liudakemgslab
+/skills/carto-agent/SKILL.md                                            @liudakemgslab
+/AGENTS.md                                                              @liudakemgslab
+/.github/                                                               @liudakemgslab
+
+# --- Frozen spine: changes require full-panel review (P1+P2+P3) ---
+# Uncomment with real handles when the team exists:
+# /skills/carto-agent/scripts/carto_core/errors.py        @p1-owner @p2-owner @liudakemgslab
+# /skills/carto-agent/scripts/carto_core/canonical.py     @p1-owner @p2-owner @liudakemgslab
+# /skills/carto-agent/scripts/carto_core/schema_registry.py @p1-owner @p2-owner @liudakemgslab
+# /skills/carto-agent/schemas/common.schema.json          @p1-owner @p2-owner @liudakemgslab
+
+# --- P1 data territory (uncomment with real handle) ---
+# /skills/carto-agent/scripts/carto_core/workflow/data_preparation.py      @p1-owner
+# /skills/carto-agent/scripts/carto_core/workflow/map_data_preparation.py  @p1-owner
+# /skills/carto-agent/scripts/carto_core/workflow/preparation_bundle.py    @p1-owner
+# /skills/carto-agent/scripts/carto_core/workflow/preparation_services.py  @p1-owner
+# /skills/carto-agent/scripts/carto_core/workflow/raster_preparation.py    @p1-owner
+# /skills/carto-agent/scripts/carto_core/workflow/vector_preparation.py    @p1-owner
+# /skills/carto-agent/scripts/carto_core/adapters/geospatial_mcp.py        @p1-owner
+# /skills/carto-agent/scripts/carto_core/compiler/raster_portrayal.py      @p1-owner
+# /skills/carto-agent/scripts/carto_core/compiler/vector_portrayal.py      @p1-owner
+# /skills/carto-agent/scripts/carto_core/compiler/thematic_design.py       @p1-owner
+
+# --- P2 render territory (uncomment with real handle) ---
+# /skills/carto-agent/scripts/carto_core/compiler/layout.py                @p2-owner
+# /skills/carto-agent/scripts/carto_core/compiler/grid_layout.py           @p2-owner
+# /skills/carto-agent/scripts/carto_core/compiler/page_bindings.py         @p2-owner
+# /skills/carto-agent/scripts/carto_core/compiler/raster_scene.py          @p2-owner
+# /skills/carto-agent/scripts/carto_core/compiler/vector_scene.py          @p2-owner
+# /skills/carto-agent/scripts/carto_core/adapters/page_renderer.py         @p2-owner
+# /skills/carto-agent/scripts/carto_core/adapters/formal_renderer.py       @p2-owner
+# /skills/carto-agent/scripts/carto_core/adapters/static_page_renderer.py  @p2-owner
+
+# --- Scenario teams own only their package (uncomment as scenarios land) ---
+# /skills/carto-agent/scripts/carto_core/scenarios/general_thematic/       @general-team
+# /skills/carto-agent/scripts/carto_core/scenarios/government/             @government-team
+# /skills/carto-agent/scripts/carto_core/scenarios/leadership/             @leadership-team

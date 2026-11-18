@@ -15,7 +15,7 @@ from carto_core.compiler.layout import LayoutResolver
 from carto_core.compiler.raster_page_contract import compile_page_request, validate_page_request
 from carto_core.compiler.raster_scene import RasterSceneCompiler
 from carto_core.errors import CartoError, ProtocolError
-from carto_core.scenarios.general_thematic import layout_contract
+from carto_core.scenarios.general_thematic.raster import layout_contract
 from carto_core.workflow.preparation_bundle import BundlePreparer
 from tests.fixtures.schema_cases import VALID_CASES
 from tests.test_raster_classification import PreparationFixture

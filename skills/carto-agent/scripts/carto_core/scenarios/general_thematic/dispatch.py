@@ -11,12 +11,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from ..errors import ProtocolError
-from ..schema_registry import SchemaRegistry
-from ..security.paths import PathGuard
-from ..contracts.execution import ExecutionContext
-from . import general_thematic as raster
-from . import general_vector as vector
+from ...errors import ProtocolError
+from ...schema_registry import SchemaRegistry
+from ...security.paths import PathGuard
+from ...contracts.execution import ExecutionContext
+from . import raster
+from . import vector
 
 GEOMETRIES = ("raster", "vector")
 
@@ -107,6 +107,12 @@ class GeneralCandidateCompiler:
                 else raster.GeneralThematicCandidateCompiler)
         return impl(guard, registry, project_root=project, context=context).compile(
             request, intent, plan, bundle, installation, contracts, font_path)
+
+    def verify_request(self, request: dict[str, Any], scene: dict[str, Any],
+                       inputs: dict[str, Any]) -> None:
+        guard, registry, project, context = self._args
+        impl = (vector.verify_request if geometry_of_request(request) == "vector" else raster.verify_request)
+        impl(request, scene, inputs, guard, registry, project, context)
 
 
 class GeneralAuthor:

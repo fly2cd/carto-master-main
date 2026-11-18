@@ -30,7 +30,7 @@ from carto_core.errors import CartoError, ProtocolError, SecurityError
 from carto_core.repository.template_installer import ProjectTemplateInstaller
 from carto_core.scenario_registry import ScenarioCapability, ScenarioRegistry
 from carto_core.schema_registry import SchemaRegistry, load_document
-from carto_core.scenarios.general_thematic import (
+from carto_core.scenarios.general_thematic.raster import (
     GeneralThematicAuthor, GeneralThematicCandidateCompiler, GeneralThematicDataPreparer,
     GeneralThematicPlanner, SOURCE_CONTRACT, legend_checker,
     validation_data_checker, validation_scene,
@@ -42,6 +42,7 @@ from carto_core.contracts.execution import ExecutionContext
 from carto_core.validation.map_checks import MapQualityChecks
 from carto_core.workflow.map_generation import MapGenerationWorkflow
 from carto_core.workflow.preparation_bundle import BundlePreparer
+from carto_core.scenarios.general_thematic import request_binding
 from carto_core.workflow.material_evidence import verify_material_facts
 from carto_core.workflow.preparation_services import preparation_service
 from carto_core.adapters.formal_renderer import environment_snapshot
@@ -175,9 +176,12 @@ class AdmissionTests(unittest.TestCase):
         from carto_core import scenario_registry
         entry = scenario_registry._COMPONENTS["general-thematic"]
         self.assertEqual({"data_preparer", "planner", "candidate_compiler", "legend_checker",
-                          "source_contract", "author", "validation_data_checker", "validation_scene"},
+                          "source_contract", "request_contract", "revision_contract", "author",
+                          "validation_data_checker", "validation_scene"},
                          set(entry))
-        self.assertEqual({".scenarios.general_dispatch"}, {module for module, _ in entry.values()})
+        self.assertEqual({".scenarios.general_thematic.dispatch", ".scenarios.general_thematic.request_contract",
+                          ".scenarios.general_thematic.revision"},
+                         {module for module, _ in entry.values()})
         with self.assertRaisesRegex(ProtocolError, "CAPABILITY_NOT_AVAILABLE"):
             self.profile.component("renderer")
         with patch("carto_core.scenario_registry.import_module") as importer:
@@ -759,7 +763,7 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
         request_ref = artifact_ref("generate-request", self.generate)
         prepared = preparer.prepare(self.generate, request_ref)
         self.assertEqual(request_ref, prepared["request_ref"])
-        bundle = BundlePreparer(self.service, "raster").prepare_request(self.generate, self.context)["bundle"]
+        bundle = request_binding.prepare_request(BundlePreparer(self.service, "raster"), self.generate, self.context)["bundle"]
         self.assertEqual(bundle, prepared["bundle"])
         self.assertEqual("user-provided", prepared["bundle"]["summary"]["data_nature"])
         drifted = dict(request_ref, digest="sha256:" + "0" * 64)
@@ -810,9 +814,12 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
         self.assertEqual(self.scenarios.for_template(deepcopy(TEMPLATE)).ref, profile.ref)
         profile.require_scene(scene)
         MapCandidateCompiler.require_execution_intent(execution, self.intent)
-        RasterSceneCompiler(self.service, bundles=BundlePreparer, pages=PageRenderer,
-                            environment=environment_snapshot).validate_generation(
-            scene, execution, self.generate, self.context)
+        inputs = RasterSceneCompiler(self.service, bundles=BundlePreparer, pages=PageRenderer,
+                            environment=environment_snapshot).validate_execution(scene, execution, self.context)
+        from carto_core.scenarios.general_thematic.dispatch import GeneralCandidateCompiler
+        GeneralCandidateCompiler(self.service.guard, self.service.registry,
+                                 project_root=self.service.project,
+                                 context=self.context).verify_request(self.generate, scene, inputs)
 
     def test_consistent_but_foreign_appearance_is_rejected_by_template_check(self):
         from carto_core.compiler.raster_page_contract import compile_page_request

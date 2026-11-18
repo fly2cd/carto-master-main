@@ -288,7 +288,7 @@ class VectorFixture:
 
     def page(self, modes=("single", "categorical", "choropleth", "proportional"), shared=False):
         from carto_core.compiler.layout import LayoutResolver
-        from carto_core.scenarios.general_thematic import cartography_contract, layout_contract
+        from carto_core.scenarios.general_thematic.raster import cartography_contract, layout_contract
         from carto_core.compiler.vector_portrayal import VectorPortrayalCompiler
         from carto_core.compiler.vector_page import compile_page
         from carto_core.artifacts import file_digest

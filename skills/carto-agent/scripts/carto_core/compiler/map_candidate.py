@@ -153,19 +153,10 @@ class MapCandidateCompiler:
 
     def check_candidate(self, request, candidate, scene, contracts, *, bundle=None):
         """Recompute the preflight so G2/replay bind actual gates, policy and inputs."""
-        overrides = request.get("revised_cartography") or request.get("output_profile")
-        if overrides:
-            contracts = deepcopy(contracts)
-            if request.get("revised_cartography"):
-                contracts["scenario"]["embedded"]["cartography"] = deepcopy(request["revised_cartography"])
-            if request.get("output_profile"):
-                contracts.setdefault("scenario", {}).setdefault("embedded", {}).setdefault("layout", {}).setdefault("canvas", {})
-                op = request["output_profile"]
-                if "width_mm" in op:
-                    contracts["scenario"]["embedded"]["layout"]["canvas"]["width"] = op["width_mm"]
-                if "height_mm" in op:
-                    contracts["scenario"]["embedded"]["layout"]["canvas"]["height"] = op["height_mm"]
         profile = ScenarioRegistry(self.registry).for_execution(candidate["execution"])
+        request_contract = profile.component("request_contract")
+        if any(request.get(key) for key in request_contract.override_keys()):
+            contracts = request_contract.apply_overrides(request, deepcopy(contracts))
         profile.require_contract(contracts["scenario"])
         profile.require_scene(scene)
         self.registry.validate("resolved-map", candidate)
@@ -186,8 +177,10 @@ class MapCandidateCompiler:
                 "raster", project_root=self.project_root,
                 allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
             inputs = RasterSceneCompiler(preparation, bundles=self._require_port("bundles"),
-                pages=self._require_port("pages"), environment=self._require_port("environment")).validate_generation(
-                scene, candidate["execution"], request, self.context)
+                pages=self._require_port("pages"), environment=self._require_port("environment")).validate_execution(
+                scene, candidate["execution"], self.context)
+            profile.component("candidate_compiler")(self.path_guard, self.registry,
+                project_root=self.project_root, context=self.context).verify_request(request, scene, inputs)
             template_style = contracts["scenario"].get("embedded", {}).get("cartography")
             if scene['resolved_layout']['template_contract'] != contracts['scenario']['embedded']['layout']:
                 raise ProtocolError('LAYOUT_TEMPLATE_MISMATCH','Layout differs from installed template')
@@ -204,7 +197,9 @@ class MapCandidateCompiler:
                 "vector", project_root=self.project_root,
                 allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
             vector = VectorSceneCompiler(service, bundles=self._require_port("bundles"),
-                pages=self._require_port("pages"), environment=self._require_port("environment")).validate_generation(scene, candidate["execution"], request, self.context)
+                pages=self._require_port("pages"), environment=self._require_port("environment")).validate_execution(scene, candidate["execution"], self.context)
+            profile.component("candidate_compiler")(self.path_guard, self.registry,
+                project_root=self.project_root, context=self.context).verify_request(request, scene, vector)
             if (scene["resolved_layout"]["template_contract"] != contracts["scenario"]["embedded"]["layout"]
                     or vector["page"]["cartography"] != contracts["scenario"]["embedded"]["cartography"]):
                 raise ProtocolError("VECTOR_TEMPLATE_MISMATCH", "Page layout or appearance differs from the installed template")
@@ -222,26 +217,6 @@ class MapCandidateCompiler:
                 or execution.get("profile_refs") != [intent["evidence_refs"][0], intent["evidence_refs"][-1]]):
             raise ProtocolError("CANDIDATE_INTENT_MISMATCH", "Execution must preserve the resolved user intent")
 
-    @staticmethod
-    def _apply_design_overrides(contracts, variant):
-        # Inject one externally supplied variant's cartography/output_profile into a copy
-        # of the contracts, mirroring the single-candidate override path. Deterministic;
-        # never ranks or selects among variants.
-        contracts = deepcopy(contracts)
-        cartography = variant.get("revised_cartography")
-        output_profile = variant.get("output_profile")
-        if cartography:
-            contracts.setdefault("scenario", {}).setdefault("embedded", {})
-            contracts["scenario"]["embedded"]["cartography"] = deepcopy(cartography)
-        if output_profile:
-            canvas = contracts.setdefault("scenario", {}).setdefault("embedded", {})
-            canvas = canvas.setdefault("layout", {}).setdefault("canvas", {})
-            if "width_mm" in output_profile:
-                canvas["width"] = output_profile["width_mm"]
-            if "height_mm" in output_profile:
-                canvas["height"] = output_profile["height_mm"]
-        return contracts
-
     def compile_variants(self, request, intent, plan, bundle, installation, contracts,
                          font_path, variants):
         # Deterministically compile each externally supplied design variant into its own
@@ -255,21 +230,20 @@ class MapCandidateCompiler:
         seen = set()
         entries = []
         compiled_by_variant = {}
+        request_contract = ScenarioRegistry(self.registry).for_template(request["template"]).component("request_contract")
+        override_keys = request_contract.override_keys()
         for variant in variants:
             variant_id = variant.get("variant_id")
             if not isinstance(variant_id, str) or variant_id in seen:
                 raise ProtocolError("CANDIDATE_VARIANT_DUPLICATE", "Variant ids must be unique strings")
             seen.add(variant_id)
             variant_request = deepcopy(request)
-            if variant.get("revised_cartography"):
-                variant_request["revised_cartography"] = deepcopy(variant["revised_cartography"])
-            else:
-                variant_request.pop("revised_cartography", None)
-            if variant.get("output_profile"):
-                variant_request["output_profile"] = deepcopy(variant["output_profile"])
-            else:
-                variant_request.pop("output_profile", None)
-            variant_contracts = self._apply_design_overrides(contracts, variant)
+            for key in override_keys:
+                if variant.get(key):
+                    variant_request[key] = deepcopy(variant[key])
+                else:
+                    variant_request.pop(key, None)
+            variant_contracts = request_contract.apply_overrides(variant, deepcopy(contracts))
             compiled = self.compile(variant_request, intent, plan, bundle, installation,
                                     variant_contracts, font_path)
             candidate = compiled["candidate"]

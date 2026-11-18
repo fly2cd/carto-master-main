@@ -108,7 +108,7 @@ class SemanticDigestTest(unittest.TestCase):
 
 class SingleBundleGeometryDispatchTest(unittest.TestCase):
     def test_one_bundle_provides_every_route_component(self):
-        from carto_core.scenarios import general_dispatch, general_thematic
+        from carto_core.scenarios.general_thematic import dispatch as general_dispatch, raster as general_thematic
         cap = scenario_registry.ScenarioCapability({"implementation": "general-thematic"})
         for name in ("data_preparer", "planner", "candidate_compiler", "legend_checker",
                      "source_contract", "author", "validation_data_checker", "validation_scene"):
@@ -119,7 +119,7 @@ class SingleBundleGeometryDispatchTest(unittest.TestCase):
             cap.component("no-such-component")
 
     def test_geometry_dispatch_is_explicit_not_guessed(self):
-        from carto_core.scenarios import general_dispatch
+        from carto_core.scenarios.general_thematic import dispatch as general_dispatch
         # Explicit geometry field (primary path)
         self.assertEqual("raster", general_dispatch.geometry_of_request({"geometry": "raster", "panels": [1]}))
         self.assertEqual("vector", general_dispatch.geometry_of_request({"geometry": "vector", "vector_panels": [1]}))

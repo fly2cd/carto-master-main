@@ -22,6 +22,8 @@
 ## 组件与职责
 
 - `source_contract`：提供 `suggestions(profile_definition)`、`validate_role_bindings(request, summaries)`、`brief_roles(request)`；必须提供 `validate_source_profile(source, request)`，在读取源文件前判定来源声明、许可、敏感性及 CRS 是否允许，拒绝时抛出协议/安全错误。来源声明不是安全证明；具体场景还须验证实际内容。
+- `request_contract`（I-3）：场景对自身请求体的理解，单例组件。提供 `geometry(request)`、`required_fields()`、`required_capabilities(request)`（仅场景增量，内核并基线并持有授权门禁）、`validate_body(request)`（源引用跨字段校验）、`source_plan(request, path_guard, project_root)`（brief 源计划）、`override_keys()`、`apply_overrides(overrides, contracts)`。几何判别本身是信封级准入，由内核 `scenario_registry._request_geometry` 通用处理，不依赖本组件。
+- `candidate_compiler` 除 `compile(...)` 外还提供 `verify_request(request, scene, inputs)`（I-4）：对内核 request-free `validate_execution` 产出的 `inputs` 做请求感知重验证（移动自原 `validate_generation` 尾部）。内核 `check_candidate`/`_verify_page_inputs` 调 `validate_execution` + 本方法，不再读场景请求体。
 - `author`：由 `workflow/template_author.py` 调用，按已审批简报确定性生成闭合 draft 包，不能携带隐式业务数据或默认示例。
 - `validation_data_checker(package_root, snapshot, expected)`：模板静态校验的必需组件，解析声明的验证输入并校验格式、来源 CRS、字段类型、角色覆盖、许可及敏感性。不得把未经授权的业务数据嵌入待发布包。共享校验器不再假定输入为特定 FeatureCollection，也不计算默认 extent；失败必须阻断。
 - `validation_scene(package_root, snapshot, targets, font, validator_version)`：按场景规则读取获准的验证输入、计算范围并构建 RenderScene；必须复用公共布局解析器，不得重建硬编码模块位置。
@@ -52,3 +54,15 @@
 - 图例检查器接收通用终检上下文；静态分支附有经重验的 `context["raster"]`（bundle/page/portrayal/body/output）。共性分类检查已执行，但仍必须提供用途相关的标签、类别和声明核验。
 
 真正业务用途、模板创建/发布及真实数据的准入另行按上述顺序完成，不能从 TIFF 类型反推用途。
+
+## 场景包与自报清单（I-2）
+
+每个场景是一个独立包 `scenarios/<name>/`，含纯常量、轻 import 的 `manifest.py`，导出 `COMPONENTS`（组件名→(模块, 属性)）与 `DEFAULTS`（继承的其它已注册实现，own 覆盖）。`scenario_registry._IMPLEMENTATIONS` 是封闭代码白名单：登记新场景只加一行 `{implementation: manifest 模块路径}`，注册表加载各 manifest 合并 own+defaults 构建 `_COMPONENTS`。`__init__.py` 必须轻 import（不得 eager 导入策略模块），否则与注册表构建循环。请求 Schema 采用信封/信纸拆分：`generate-request` 为开放信封（几何等准入字段），场景体字段与封闭（`unevaluatedProperties: false`）在 `<scene>-generate-request` profile。
+
+## 当前解耦状态与延后项
+
+已落地：场景包+自报清单（I-2）、`request_contract` 请求理解插槽+信封拆分（I-3）、`candidate_compiler.verify_request` 渲染重验证插槽（I-4a）、`request_binding` 数据准备请求体搬场景（I-4b，`BundlePreparer` 仅留 build_many/load_verified/save_bundle 机械）、`revision_contract` 修订插槽+`revision_graph` 参数化+`workflow/thematic.py` 解散（I-5，views 搬场景、`join_attributes` 搬内核 `attribute_join.py`）、map_candidate overrides 走 `request_contract`、输出目标去硬编码（I-6）。内核几何判别通用化（`_request_geometry`）。边界由 `tests/test_scenario_boundary.py` 棘轮守护。
+
+延后：
+- **渲染器适配器**：`page_renderer`/`static_page_renderer` 仍读 `panels`/`basemap`/`charts`（守护 B 仅存 4 项）。属共享渲染基础设施，归 Part II 产品回路重设计时解耦。
+- 表达目录菜单对齐、线几何、敏感领导场景能力准入、session_id 上下文工具：见总体计划延后清单（Part II）。

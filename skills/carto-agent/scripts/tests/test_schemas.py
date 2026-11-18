@@ -53,10 +53,13 @@ class SchemaTests(unittest.TestCase):
             with self.subTest(schema=name):
                 value = load_document(root / f"{name}.valid.json")
                 self.registry.validate(name, value)
+                # generate-request is an OPEN envelope; unknown-field closure and body-field
+                # constraints live in the closed profile (general-generate-request).
+                closure_schema = "general-generate-request" if name == "generate-request" else name
                 with self.assertRaises(ProtocolError):
-                    self.registry.validate(name, load_document(root / f"{name}.invalid.json"))
+                    self.registry.validate(closure_schema, load_document(root / f"{name}.invalid.json"))
                 value["unknown"] = True
-                with self.assertRaises(ProtocolError): self.registry.validate(name, value)
+                with self.assertRaises(ProtocolError): self.registry.validate(closure_schema, value)
 
     def test_semantic_invalid_fixtures_are_rejected(self) -> None:
         for fixture_name, (schema_name, instance) in SEMANTIC_INVALID_CASES.items():

@@ -301,9 +301,11 @@ class IntentSemanticsTests(unittest.TestCase):
                     "preflight": deepcopy(VALID_CASES["validation-report"])}
         component = Mock()
         component.compile.return_value = envelope
+        from carto_core.scenarios.general_thematic.request_contract import REQUEST_CONTRACT
         with tempfile.TemporaryDirectory() as temp, patch(
                 "carto_core.compiler.map_candidate.ScenarioRegistry", return_value=registry), patch.object(
-                ScenarioCapability, "component", return_value=Mock(return_value=component)):
+                ScenarioCapability, "component",
+                side_effect=lambda name: REQUEST_CONTRACT if name == "request_contract" else Mock(return_value=component)):
             compiler = MapCandidateCompiler(PathGuard([temp]), self.schemas,
                                             material_facts=verify_material_facts)
             self.assertIs(envelope, compiler.compile(request, intent, plan, {}, {}, contracts, Path(temp) / "unused"))
@@ -330,6 +332,9 @@ class IntentSemanticsTests(unittest.TestCase):
         request["template"]["digest"] = "sha256:" + "a" * 64
         request["intent"]["theme_tags"] = ["flood", "economic-development"]
         intent = registry.generate_intent(request)
+        # brief obtains the source plan through the scenario request_contract hook; supply the
+        # general implementation as the stand-in for this isolated brief-construction test.
+        from carto_core.scenarios.general_thematic.request_contract import REQUEST_CONTRACT
         # Isolate only brief construction, not workflow authorization or any source data read.
         workflow = object.__new__(MapGenerationWorkflow)
         workflow.registry = self.schemas
@@ -345,8 +350,9 @@ class IntentSemanticsTests(unittest.TestCase):
         receipt.to_dict.return_value = {}
         workflow.state_store.complete_step.return_value = (state, receipt)
         with patch("carto_core.workflow.map_generation.ScenarioRegistry", return_value=registry), patch(
-                "carto_core.workflow.map_generation.file_digest", return_value="sha256:" + "b" * 64), patch(
-                "carto_core.workflow.map_generation.atomic_yaml") as persist:
+                "carto_core.scenarios.general_thematic.request_contract.file_digest", return_value="sha256:" + "b" * 64), patch(
+                "carto_core.workflow.map_generation.atomic_yaml") as persist, patch.object(
+                ScenarioCapability, "component", return_value=REQUEST_CONTRACT):
             result = MapGenerationWorkflow.brief.__wrapped__(workflow, "unused-request")
         self.assertEqual("government_thematic", result["brief"]["business_scene"])
         for key in ("business_scene", "theme_tags", "tasks"):

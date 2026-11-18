@@ -205,7 +205,7 @@ class CheckerConsolidationTests(unittest.TestCase):
                 CheckerRegistry(path)
 
     def test_legend_and_classification_checks_use_content_not_just_ids(self):
-        from carto_core.scenarios.general_thematic import legend_checker
+        from carto_core.scenarios.general_thematic.raster import legend_checker
         class Profile:
             def component(self, name):
                 if name != "legend_checker":

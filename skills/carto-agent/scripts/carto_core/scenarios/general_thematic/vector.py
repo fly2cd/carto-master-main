@@ -6,22 +6,23 @@ request overlays and normal T1/TP/G1/G2/G3 gates are still required.
 from copy import deepcopy
 import json
 from pathlib import Path
-from ..canonical import sha256_digest
-from ..artifacts import artifact_ref, file_digest
-from ..errors import ProtocolError
-from ..schema_registry import SchemaRegistry
-from ..scenario_registry import ScenarioRegistry
-from ..compiler.layout import LayoutResolver
-from ..compiler.page_bindings import index_by, validate_bindings
-from ..compiler.vector_portrayal import VectorPortrayalCompiler
-from ..compiler.portrayal_resolver import ir_to_kind
-from ..compiler.vector_page import compile_page
-from ..compiler.vector_scene import VectorSceneCompiler, RENDERER_ID
-from ..repository.map_expression_catalog import MapExpressionCatalog
-from ..workflow.vector_preparation import VectorPreparationService
-from ..workflow.preparation_bundle import BundlePreparer
-from ..contracts.execution import ExecutionContext
-from .general_thematic import (
+from ...canonical import sha256_digest
+from ...artifacts import artifact_ref, file_digest
+from ...errors import ProtocolError
+from ...schema_registry import SchemaRegistry
+from ...scenario_registry import ScenarioRegistry
+from ...compiler.layout import LayoutResolver
+from ...compiler.page_bindings import index_by, validate_bindings
+from ...compiler.vector_portrayal import VectorPortrayalCompiler
+from ...compiler.portrayal_resolver import ir_to_kind
+from ...compiler.vector_page import compile_page
+from ...compiler.vector_scene import VectorSceneCompiler, RENDERER_ID
+from ...repository.map_expression_catalog import MapExpressionCatalog
+from ...workflow.vector_preparation import VectorPreparationService
+from ...workflow.preparation_bundle import BundlePreparer
+from ...contracts.execution import ExecutionContext
+from . import request_binding
+from .raster import (
     FIXTURE_PATH, GATE_LEGEND, GATE_PROTOCOL, LAYOUT_ID, author_context,
     data_schema_contract, delivery_contract, dependency_lock, fixture_csv,
     package_identity, package_manifest, prototype_contract, quality_gates_contract,
@@ -58,7 +59,7 @@ class GeneralVectorSourceContract:
 
     def validate_source_profile(self, source, request):
         """Validate a template-authoring source profile (legend sample CSV)."""
-        from ..errors import SecurityError  # noqa: F811  — re-import for standalone use
+        from ...errors import SecurityError  # noqa: F811  — re-import for standalone use
         profile = source.get("data_profile")
         if source.get("kind") != "csv":
             raise ProtocolError("SOURCE_TYPE_UNSUPPORTED",
@@ -101,7 +102,7 @@ def expression_ref(registry):return MapExpressionCatalog(registry).reference('ca
 
 
 def make_bindings(request, layout, bundle, contracts, registry):
-    from ..workflow.thematic import expression_reference
+    from ...compiler.portrayal_resolver import expression_reference
     sources = index_by(bundle['role_bindings'], 'source_id')
     panels = index_by(request['vector_panels'], 'id')
     maps = {f['content_id']: f for f in layout['contract']['frames'] if f['type'] == 'map'}
@@ -133,7 +134,7 @@ class GeneralVectorDataPreparer:
 
     def prepare(self, request, request_ref):
         if request_ref['digest'] != sha256_digest(request):raise ProtocolError('VECTOR_REQUEST_CHANGED', 'Request digest differs')
-        result = BundlePreparer(self.service, "vector").prepare_request(request, ExecutionContext.from_generate_request(request))
+        result = request_binding.prepare_request(BundlePreparer(self.service, "vector"), request, ExecutionContext.from_generate_request(request))
         return {**result, 'request_ref': request_ref}
 
 
@@ -143,9 +144,8 @@ class GeneralVectorPlanner:
         self.project_root = project_root
 
     def build(self, request, intent, brief, bundle, installation, contracts):
-        from ..workflow.thematic import vector_views
         # Preparation refs are immutable and identify the approved project root.
-        from ..security.paths import PathGuard
+        from ...security.paths import PathGuard
         project = self.project_root
         if project is None:
             raise ProtocolError('THEMATIC_CONTEXT_REQUIRED', 'Planner needs trusted project context')
@@ -179,10 +179,9 @@ class GeneralVectorCandidateCompiler:
             raise ProtocolError('VECTOR_SCOPE_MISMATCH', 'Compiler requires the trusted execution context')
         service = VectorPreparationService(project_root=self.project, allowed_roots=list(self.guard.allowed_roots), registry=self.registry)
         preparer = BundlePreparer(service, "vector")
-        preparer.validate_request(request, bundle, context)
+        request_binding.validate_request(preparer, request, bundle, context)
         if any(b['crs'] != contracts['spatial_behavior']['display_crs'] for b in bundle['role_bindings']):
             raise ProtocolError('VECTOR_CRS_MISMATCH', 'Native source CRS must match template display CRS')
-        from ..workflow.thematic import vector_views
         expected_views=vector_views(request,bundle,service,context)
         if plan['decisions']['thematic_views']!=expected_views:
             raise ProtocolError('THEMATIC_PLAN_DRIFT','Plan differs from the selected data and design')
@@ -223,11 +222,11 @@ class GeneralVectorCandidateCompiler:
                             charts=request.get('charts'), basemap=frozen_basemap)
         if plan['bindings'] != page['bindings'] or plan['layout_parameters'] != request['layout_parameters'] or plan['decisions']['title'] != request['map_title']:
             raise ProtocolError('VECTOR_PLAN_MISMATCH', 'Plan does not describe the compiled page')
-        from ..adapters.formal_renderer import environment_snapshot
-        from ..adapters.page_renderer import PageRenderer
+        from ...adapters.formal_renderer import environment_snapshot
+        from ...adapters.page_renderer import PageRenderer
         compiler = VectorSceneCompiler(service, bundles=BundlePreparer, pages=PageRenderer,
                                        environment=environment_snapshot)
-        from ..workflow.map_data_preparation import bundle_core
+        from ...workflow.map_data_preparation import bundle_core
         # The scene verifies the GIS core; adopted material facts are separately bound
         # into execution and verified by the shared generation workflow.
         scene = compiler.compile(bundle_ref=service.save('prepared-data-bundle', bundle_core(bundle)).ref(), page_request=page, context=context,
@@ -242,6 +241,51 @@ class GeneralVectorCandidateCompiler:
         return {'scene': scene, 'candidate': {'schema_version': 1, 'candidate_id': 'candidate-' + request['run_id'],
                     'project_id': request['project_id'], 'run_id': request['run_id'], 'execution_digest': sha256_digest(execution),
                     'execution': execution, 'open_issues': [], 'created_at': request['requested_at']}}
+
+
+def vector_views(request, bundle, service, context):
+    """Scenario request-body view assembly (moved from workflow/thematic.py, I-5)."""
+    from ...compiler.thematic_design import resolve_design
+    from ...compiler.portrayal_resolver import expression_reference, ir_to_kind
+    bindings = {item["source_id"]: item for item in bundle["role_bindings"]}
+    results = []
+    for panel in sorted(request["vector_panels"], key=lambda p: p["id"]):
+        binding = bindings[panel["source_id"]]
+        report = service.load_verified(binding["prepared_ref"], context)
+        encoding, statistics = resolve_design(panel["design"], report, service.registry)
+        results.append({"view_id": panel["id"], "source_id": panel["source_id"], "data_ref": deepcopy(binding["prepared_ref"]),
+                        "design": deepcopy(panel["design"]), "expression_ref": expression_reference(ir_to_kind(encoding), service.registry),
+                        "encoding": encoding, "statistics": statistics})
+    return results
+
+
+def verify_request(request, scene, inputs, path_guard, registry, project_root, context):
+    """Request-aware revalidation tail (moved from VectorSceneCompiler.validate_generation, I-4)."""
+    from ...workflow.preparation_bundle import BundlePreparer
+    from ...workflow.vector_preparation import VectorPreparationService
+    from ...compiler.thematic_design import resolve_design
+    from ...scenario_registry import ScenarioRegistry
+    preparation = VectorPreparationService(project_root=project_root,
+        allowed_roots=list(path_guard.allowed_roots), registry=registry)
+    request_binding.validate_request(BundlePreparer(preparation, "vector"), request, inputs['bundle'], context)
+    requested = {p['id']: p for p in request['vector_panels']}
+    if set(requested) != set(inputs['layers']) or request['layout_parameters'] != scene['resolved_layout']['parameters']:
+        raise ProtocolError('VECTOR_GENERATION_CHANGED', 'Panel selection differs')
+    for panel in inputs['page']['panels']:
+        source = requested[panel['view_id']]; stack = inputs['layers'][panel['view_id']]
+        layer = stack[0]
+        expected_encoding, _ = resolve_design(source['design'], layer['report'], registry)
+        if (source['source_id'] != layer['report']['source']['source_id'] or expected_encoding != layer['portrayal']['encoding']
+                or source['extent'] != panel['extent']):
+            raise ProtocolError('VECTOR_GENERATION_CHANGED', 'Panel source, encoding or extent differs')
+    notice = ScenarioRegistry(registry).for_generate(request).notice
+    expected_texts = {'title': request['map_title'], 'source': notice}
+    if len(requested) > 1:
+        expected_texts.update({p['id'].replace('view-', 'caption-', 1): p['title'] for p in request['vector_panels']})
+    if {p['content_id']: p['text'] for p in inputs['page']['texts']} != expected_texts:
+        raise ProtocolError('VECTOR_GENERATION_CHANGED', 'Frozen titles or notice differ from the request')
+    if sorted(request['requested_outputs']) != scene['export']['targets']:
+        raise ProtocolError('VECTOR_GENERATION_CHANGED', 'Requested outputs differ')
 
 
 def legend_checker(context):
@@ -275,7 +319,7 @@ class GeneralVectorAuthor:
     def _payloads(self, request, brief):
         require_admitted(request, brief, version=VERSION, profile=AUTHORING_PROFILE)
         self.registry.validate('general-template-create-request', request)
-        from ..workflow.thematic import expression_reference
+        from ...compiler.portrayal_resolver import expression_reference
         options=[expression_reference(kind,self.registry) for kind in EXPRESSION_KINDS]
         identity = package_identity(VERSION)
         portrayal = {'schema_version': 1, 'layers': [{'id': LAYER_ID, 'data_role': ROLE, 'geometry': 'vector', 'z_order': 0,
@@ -300,9 +344,9 @@ class GeneralVectorAuthor:
 def validation_scene(package_root, snapshot, targets, font, validator_version, *, context, workspace, registry,
                      layout_parameters=None, validation_expression='single'):
     """Synthetic sample, never a template copy of user geometry or attribute rows."""
-    from ..geospatial_deps import dependencies
-    from ..compiler.grid_layout import grid_cases
-    from ..security.paths import PathGuard
+    from ...geospatial_deps import dependencies
+    from ...compiler.grid_layout import grid_cases
+    from ...security.paths import PathGuard
     fiona, _, _, _, _, CRS = dependencies()
     workspace = Path(workspace); workspace.mkdir(parents=True, exist_ok=True)
     docs = snapshot['documents']; template = docs['scenario']
@@ -364,8 +408,8 @@ def validation_scene(package_root, snapshot, targets, font, validator_version, *
         font={'path': str(font), 'digest': service.digest_bytes(font_bytes), 'size_bytes': len(font_bytes)}, texts=texts,
         legend_titles={f['content_id']: 'Legend' for f in layout['contract']['frames'] if f['type'] == 'legend'}, context=context)
     bundle = BundlePreparer(service, "vector").build_many([prepared.ref()], context)
-    from ..adapters.formal_renderer import environment_snapshot
-    from ..adapters.page_renderer import PageRenderer
+    from ...adapters.formal_renderer import environment_snapshot
+    from ...adapters.page_renderer import PageRenderer
     return VectorSceneCompiler(service, bundles=BundlePreparer, pages=PageRenderer,
         environment=environment_snapshot).compile(bundle_ref=service.save('prepared-data-bundle', bundle).ref(), page_request=page,
         context=context, scene_id='validation-' + sha256_digest({'package': snapshot['package_digest'], 'params': params, 'expression': validation_expression})[7:31], targets=tuple(targets))

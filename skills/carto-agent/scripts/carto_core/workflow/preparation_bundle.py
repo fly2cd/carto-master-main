@@ -48,7 +48,7 @@ class BundlePreparer:
     def _scope(self, context: ExecutionContext) -> dict[str, Any]:
         return {key: getattr(context, key) for key in ("run_id", "tenant_id", "project_id", "subject_id")}
 
-    def _save_bundle(self, body: dict[str, Any]) -> dict[str, Any]:
+    def save_bundle(self, body: dict[str, Any]) -> dict[str, Any]:
         """Persist the bundle through the geometry-appropriate save path."""
         if self.geometry == "vector":
             ref = self.preparation.save('prepared-data-bundle', body).ref()
@@ -176,50 +176,6 @@ class BundlePreparer:
         return body
 
     # ------------------------------------------------------------------
-    # prepare_request
-    # ------------------------------------------------------------------
-
-    def prepare_request(self, request: dict[str, Any], context: ExecutionContext):
-        """Validate request bindings, build and persist the bundle."""
-        self.preparation.registry.validate('generate-request', request)
-        if self.geometry == "vector":
-            return self._prepare_request_vector(request, context)
-        return self._prepare_request_raster(request, context)
-
-    def _prepare_request_raster(self, request, context):
-        bindings = index_by(request.get('prepared_raster_bindings', []), 'source_id')
-        bundle = self.build_many([b['prepared_ref'] for _, b in sorted(bindings.items())], context)
-        self.validate_request(request, bundle, context)
-        return self._save_bundle(bundle)
-
-    def _prepare_request_vector(self, request, context):
-        sources = index_by(request['vector_sources'], 'source_id')
-        panels = index_by(request['vector_panels'], 'id')
-        if {p['source_id'] for p in panels.values()} != set(sources):
-            raise ProtocolError('VECTOR_SOURCE_BINDING', 'Every declared source must be used by a panel')
-        refs = [self.preparation.prepare(source, context).ref()
-                for _, source in sorted(sources.items())]
-        bundle = self.build_many(refs, context)
-        self.validate_request(request, bundle, context)
-        return self._save_bundle(bundle)
-
-    # ------------------------------------------------------------------
-    # validate_request
-    # ------------------------------------------------------------------
-
-    def validate_request(self, request: dict[str, Any], bundle: dict[str, Any],
-                         context: ExecutionContext) -> None:
-        """Cross-check the request bindings against the frozen bundle. Geometry-
-        specific binding layouts are verified against the appropriate preparation
-        service.
-        """
-        self.preparation.registry.validate('generate-request', request)
-        if self.geometry == "vector":
-            self._validate_request_vector(request, bundle, context)
-        else:
-            self._validate_request_raster(request, bundle, context)
-
-    # ------------------------------------------------------------------
     # Semantic helper
     # ------------------------------------------------------------------
 
@@ -253,47 +209,6 @@ class BundlePreparer:
             'attributes': [f['properties'] for f in report.get('features', [])],
             'attribute_evidence': report.get('attribute_evidence'),
         })
-
-    # ------------------------------------------------------------------
-    # Geometry-specific request verification
-    # ------------------------------------------------------------------
-
-    def _validate_request_raster(self, request, bundle, context):
-        sources: dict[str, Any] = {}
-        for source in request.get('source_bindings', []):
-            sid = source['source_ref']['id']
-            if sid in sources:
-                raise ProtocolError('RASTER_SOURCE_ID_DUPLICATE', 'Source IDs must be unique')
-            sources[sid] = source
-        declared = index_by(request.get('prepared_raster_bindings', []), 'source_id')
-        actual = index_by(bundle['role_bindings'], 'source_id')
-        if not 1 <= len(actual) <= 4 or set(sources) != set(actual) or set(declared) != set(actual):
-            raise ProtocolError('RASTER_GENERATE_BINDING_REQUIRED', 'Explicit sources and preparations must match')
-        roots = index_by(request['sources'], 'id')
-        if set(roots) != set(actual):
-            raise ProtocolError('RASTER_GENERATE_SOURCE_MISMATCH', 'Source references differ')
-        for sid, binding in actual.items():
-            expected = {'source_id': sid, 'role': binding['role'], 'prepared_ref': binding['prepared_ref']}
-            if declared[sid] != expected:
-                raise ProtocolError('RASTER_GENERATE_BINDING_MISMATCH', 'Preparation binding differs')
-            report, _ = self.preparation.load_verified(binding['prepared_ref'])
-            if sources[sid] != report['request']['source'] or roots[sid] != sources[sid]['source_ref']:
-                raise SecurityError('RASTER_GENERATE_SOURCE_MISMATCH', 'Declared source differs from frozen preparation')
-        if (request.get('run_id') != context.run_id or request['project_id'] != context.project_id
-                or request['subject']['tenant_id'] != context.tenant_id
-                or request['subject']['subject_id'] != context.subject_id):
-            raise SecurityError('RASTER_GENERATE_SOURCE_MISMATCH', 'Request scope differs')
-
-    def _validate_request_vector(self, request, bundle, context):
-        sources = index_by(request['vector_sources'], 'source_id')
-        actual = index_by(bundle['role_bindings'], 'source_id')
-        roots = index_by(request['sources'], 'id')
-        if set(sources) != set(actual) or set(roots) != set(sources):
-            raise ProtocolError('VECTOR_SOURCE_BINDING', 'Source identities differ')
-        for sid, source in sources.items():
-            report = self.preparation.load_verified(actual[sid]['prepared_ref'], context)
-            if report['source'] != source or roots[sid]['digest'] != sha256_digest(source):
-                raise ProtocolError('VECTOR_SOURCE_BINDING', 'Declared source contract changed')
 
     # ------------------------------------------------------------------
     # load_verified

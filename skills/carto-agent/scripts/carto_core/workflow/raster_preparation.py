@@ -160,7 +160,7 @@ class RasterPreparationService(StaticAssetStore):
 
     def _continuous_encoding(self, request: dict[str, Any], cont: dict[str, Any]) -> dict[str, Any]:
         """Build the interval encoding IR from a continuous request + MCP continuous statistics."""
-        from .thematic import equal_interval_edges
+        from ..compiler.thematic_design import equal_interval_edges
         classification = request["classification"]
         if classification["method"] == "equal-interval":
             edges, labels = equal_interval_edges(cont["min"], cont["max"], classification["class_count"])

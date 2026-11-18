@@ -48,7 +48,7 @@ def crs_contract(report: dict[str, Any]) -> dict[str, Any]:
 def reader_digest():
     return sha256_digest({'version': '1.0.0', 'files': {
         path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in
-        [Path(__file__), Path(__file__).with_name('thematic.py'), Path(__file__).with_name('material_extraction.py'),
+        [Path(__file__), Path(__file__).with_name('attribute_join.py'), Path(__file__).with_name('material_extraction.py'),
          # finite/metric_value moved to the kernel in Tier-2 去环 Step4: the reader's
          # attribute join calls finite(), so the fingerprint must follow the code.
          Path(__file__).resolve().parents[1] / 'compiler' / 'portrayal_resolver.py', *[Path(__file__).resolve().parents[3] / 'schemas' / (name + '.schema.json')
@@ -251,7 +251,7 @@ class VectorPreparationService(StaticAssetStore):
         if source.get('attribute_join'):
             if 'join' not in context.authorized_capabilities:
                 raise SecurityError('CAPABILITY_NOT_AUTHORIZED', 'Attribute join was not authorized')
-            from .thematic import join_attributes
+            from .attribute_join import join_attributes
             body['attribute_evidence'] = join_attributes(self, body, source['attribute_join'])
         return self.save('vector-prepared-data', body)
 
@@ -277,7 +277,7 @@ class VectorPreparationService(StaticAssetStore):
                 raise ProtocolError('VECTOR_SNAPSHOT_CHANGED', 'Frozen sidecar changed')
         rebuilt = self._read(value['source'], value['source_assets'])
         if value['source'].get('attribute_join'):
-            from .thematic import join_attributes
+            from .attribute_join import join_attributes
             if 'attribute_evidence' not in value:
                 raise ProtocolError('THEMATIC_EVIDENCE_MISSING', 'Joined data must retain its source evidence')
             evidence = join_attributes(self, rebuilt, value['source']['attribute_join'], value['attribute_evidence']['asset'])

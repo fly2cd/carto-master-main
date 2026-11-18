@@ -100,15 +100,3 @@ class RasterSceneCompiler:
             or any(t['display_crs']!=crs for t in execution['targets'].values())):
             raise ProtocolError('RASTER_EXECUTION_SEMANTICS_DRIFT','CRS, nature or outputs differ')
         return inputs
-
-    def validate_generation(self,scene,execution,request,context):
-        inputs=self.validate_execution(scene,execution,context)
-        self.bundles(self.preparation, "raster").validate_request(request,inputs['bundle'],context)
-        actual={v['id']:v['source_id'] for v in request['panels']}
-        data={v['id']:v['source_id'] for v in inputs['page']['bindings']['data_bindings']}
-        layers={v['id']:data[v['data_binding_id']] for v in inputs['page']['bindings']['layers']}
-        expected={v['id']:layers[v['layer_ids'][0]] for v in inputs['page']['bindings']['views']}
-        if actual!=expected or request['layout_parameters']!=scene['resolved_layout']['parameters']:
-            raise ProtocolError('RASTER_GENERATE_BINDING_MISMATCH','Panel assignment or layout selection differs')
-        if sorted(request['requested_outputs'])!=scene['export']['targets']:raise ProtocolError('RASTER_GENERATE_TARGET_MISMATCH','Requested outputs differ')
-        return inputs

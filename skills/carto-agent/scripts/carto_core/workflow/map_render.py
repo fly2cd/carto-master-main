@@ -76,8 +76,9 @@ class FormalMapRenderService:
         profile = ScenarioRegistry(self.registry).for_execution(execution)
         profile.require_scene(scene)
         self.backend.validate_scene(scene, execution)
-        if not REQUIRED_TARGETS.issubset(scene["export"]["targets"]):
-            raise ProtocolError("ENCODING_SEMANTICS_INVALID", "Formal rendering requires locked PDF and PNG targets")
+        required_targets = set(profile.definition.get("output_constraints", {}).get("allowed_formats", REQUIRED_TARGETS))
+        if not required_targets.issubset(scene["export"]["targets"]):
+            raise ProtocolError("ENCODING_SEMANTICS_INVALID", "Formal rendering requires the scenario's locked output targets")
         if self.backend.scene_texts(scene).count(profile.notice) != 1:
             raise ProtocolError("ENCODING_SEMANTICS_INVALID", "Locked scene must contain the scenario disclosure exactly once")
 

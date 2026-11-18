@@ -121,10 +121,6 @@ class BundlePreparerProtocol(Protocol):
     def load_verified(self, ref: dict[str, str], context: Any) -> dict[str, Any]:
         """Load a frozen bundle and assert it equals a rebuild from its sources."""
 
-    def validate_request(self, request: dict[str, Any], bundle: dict[str, Any],
-                         context: Any) -> None:
-        """Cross-check generate-request bindings against the frozen bundle."""
-
 
 @runtime_checkable
 class BundlePreparerFactory(Protocol):

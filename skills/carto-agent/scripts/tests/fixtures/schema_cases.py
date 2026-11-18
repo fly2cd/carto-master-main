@@ -316,6 +316,11 @@ for name, case in VALID_CASES.items():
     invalid = deepcopy(case)
     invalid["unexpected_parallel_protocol"] = True
     INVALID_CASES[name] = invalid
+# generate-request is an OPEN envelope: an unknown field is admitted (unknown-field closure
+# is the profile's job, tested via general-generate-request). Its invalid fixture must
+# violate an ENVELOPE-level constraint instead — here, the required geometry field.
+INVALID_CASES["generate-request"] = {k: v for k, v in deepcopy(VALID_CASES["generate-request"]).items()
+                                     if k != "geometry"}
 SEMANTIC_INVALID_CASES = {}
 
 _invalid_manifest = deepcopy(VALID_CASES["manifest"])
@@ -562,9 +567,9 @@ SEMANTIC_INVALID_CASES["map-intent-topic-label-as-id"] = ("map-intent", _wrong_t
 _missing_scene = deepcopy(VALID_CASES["map-intent"])
 _missing_scene["business_scene"] = None
 SEMANTIC_INVALID_CASES["map-intent-resolved-without-scene"] = ("map-intent", _missing_scene)
-_old_hint = deepcopy(VALID_CASES["generate-request"])
+_old_hint = deepcopy(VALID_CASES["general-generate-request"])
 _old_hint["scene_hint"] = "government_thematic"
-SEMANTIC_INVALID_CASES["generate-request-legacy-scene-hint"] = ("generate-request", _old_hint)
+SEMANTIC_INVALID_CASES["generate-request-legacy-scene-hint"] = ("general-generate-request", _old_hint)
 
 # Missing geometry field: generate-request now requires explicit geometry.
 _missing_geom = deepcopy(VALID_CASES["general-generate-request"])
@@ -614,18 +619,19 @@ VALID_CASES['encoding-ir'] = json.loads((Path(__file__).parent / "encoding-ir.va
 INVALID_CASES['encoding-ir'] = json.loads((Path(__file__).parent / "encoding-ir.invalid.json").read_text(encoding="utf-8"))
 
 # Geometry-vs-panels conflict: explicit geometry field must match the panel/source family.
-# These are rejected by the allOf constraint in generate-request.schema.json.
+# These are rejected by the allOf conditional + oneOf in general-generate-request.schema.json
+# (the open generate-request envelope no longer carries body-field constraints).
 _raster_geom_vector_panels = deepcopy(VALID_CASES["general-generate-request"])
 _p = {"id": "conflict-view", "source_id": "raster-source", "title": "Conflict", "extent": [-1, -1, 2, 2],
       "encoding": deepcopy(VALID_CASES["vector-encoding"])}
 _raster_geom_vector_panels["vector_panels"] = [_p]
-SEMANTIC_INVALID_CASES["generate-request-raster-geometry-with-vector-panels"] = ("generate-request", _raster_geom_vector_panels)
+SEMANTIC_INVALID_CASES["generate-request-raster-geometry-with-vector-panels"] = ("general-generate-request", _raster_geom_vector_panels)
 
 _vector_geom_raster_panels = deepcopy(VALID_CASES["general-generate-request"])
 _vector_geom_raster_panels["geometry"] = "vector"
 for _f in ("source_bindings", "prepared_raster_bindings"):
     _vector_geom_raster_panels.pop(_f, None)
-SEMANTIC_INVALID_CASES["generate-request-vector-geometry-with-raster-panels"] = ("generate-request", _vector_geom_raster_panels)
+SEMANTIC_INVALID_CASES["generate-request-vector-geometry-with-raster-panels"] = ("general-generate-request", _vector_geom_raster_panels)
 
 # Capability roadmap declares queueable not-implemented features (admission_class taxonomy).
 for _name in ("capability-roadmap",):
@@ -684,7 +690,7 @@ if 'design-revision-proposal' in VALID_CASES:
 VALID_CASES["map-plan"]["bindings"] = deepcopy(VALID_CASES["page-bindings"])
 VALID_CASES["map-plan"]["layout_parameters"] = {"rows":1,"columns":1,"legend_mode":"independent"}
 
-from carto_core.workflow.thematic import expression_reference
+from carto_core.compiler.portrayal_resolver import expression_reference
 VALID_CASES["map-plan"]["decisions"]["thematic_views"][0]["expression_ref"] = expression_reference("categorical")
 
 VALID_CASES['product-review']={'schema_version':1,'review_id':'review-one','run_id':'run-one','project_id':'project-one',

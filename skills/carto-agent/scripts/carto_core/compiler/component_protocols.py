@@ -53,6 +53,38 @@ class SourceContract(Protocol):
 
 
 @runtime_checkable
+class RequestContract(Protocol):
+    """Scenario understanding of its request body (I-3).
+
+    The kernel keeps security gates, digest gates and the state machine; this component
+    supplies geometry discrimination, required fields, derived capability additions,
+    source-reference cross-checks, brief source-plan construction and design overrides.
+    Ready-made instance (like SourceContract); no construction half.
+    """
+
+    def geometry(self, request: dict[str, Any]) -> str: ...
+    def required_fields(self) -> frozenset[str]: ...
+    def required_capabilities(self, request: dict[str, Any]) -> set[str]: ...
+    def validate_body(self, request: dict[str, Any]) -> None: ...
+    def source_plan(self, request: dict[str, Any], path_guard: Any,
+                    project_root: Path) -> list[dict[str, Any]]: ...
+    def override_keys(self) -> tuple[str, ...]: ...
+    def apply_overrides(self, overrides: dict[str, Any],
+                        contracts: dict[str, Any]) -> dict[str, Any]: ...
+
+
+@runtime_checkable
+class RevisionContract(Protocol):
+    """Scenario design-revision semantics (I-5): change vocabulary, bundle-input keys,
+    change application and brief source-plan refresh. Ready-made instance."""
+
+    def rules(self) -> dict[str, tuple[str, ...]]: ...
+    def bundle_input_keys(self) -> tuple[str, ...]: ...
+    def apply_changes(self, request: dict[str, Any], changes: dict[str, Any]) -> dict[str, Any]: ...
+    def refresh_brief(self, brief: dict[str, Any], revised_request: dict[str, Any]) -> dict[str, Any]: ...
+
+
+@runtime_checkable
 class Author(Protocol):
     """Template authoring — produces a deterministic, closed draft package.
 
@@ -111,6 +143,8 @@ class CandidateCompiler(Protocol):
     def compile(self, request: dict[str, Any], intent: dict[str, Any], plan: dict[str, Any],
                 bundle: dict[str, Any], installation: dict[str, Any],
                 contracts: dict[str, Any], font_path: Path) -> dict[str, Any]: ...
+    def verify_request(self, request: dict[str, Any], scene: dict[str, Any],
+                       inputs: dict[str, Any]) -> None: ...
 
 
 @runtime_checkable
@@ -171,6 +205,8 @@ COMPONENT_PROTOCOLS: dict[str, Any] = {
     "candidate_compiler": CandidateCompiler,
     "legend_checker": LegendChecker,
     "source_contract": SourceContract,
+    "request_contract": RequestContract,
+    "revision_contract": RevisionContract,
     "author": Author,
     "validation_data_checker": ValidationDataChecker,
     "validation_scene": ValidationScene,

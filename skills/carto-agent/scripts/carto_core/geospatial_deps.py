@@ -2,7 +2,7 @@
 
 A leaf module: it imports only ``carto_core.errors``. Relocated from
 ``workflow.vector_preparation`` (P1 Step C) because ``adapters.formal_renderer``,
-``adapters.page_renderer`` and ``scenarios.general_vector`` all need the reader's
+``adapters.page_renderer`` and ``scenarios.general_thematic.vector`` all need the reader's
 dependency handles, and a dependency accessor is not orchestration -- leaving it in
 ``workflow`` forced two adapters and one scenario to import the execution layer for it.
 

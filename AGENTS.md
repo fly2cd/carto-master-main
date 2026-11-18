@@ -36,3 +36,11 @@
 - 不得把密钥、完整行程、应急敏感坐标或业务数据行写入普通日志、Fixture 或模板包。
 - 新增协议必须同时提供合法样例、非法样例和自动测试；未知字段默认拒绝。
 - 本仓库与 PPT 体系（外部仓库的 `skills/ppt-master/`）相互独立；不引用其文件路径、不为旧命名或旧锁格式新增并行兼容实现。
+
+## 策略治理与场景登记
+
+- `policies/*.yaml` 的语义字段经摘要绑定进入冻结意图/锁/回执（`scenario-capabilities` 的 profile 语义、`intent-profiles` 全文目录摘要）。修改任一语义字段会使全部既有冻结执行漂移，必须由唯一策略 steward（见 `.github/CODEOWNERS`）评审；`notice`/`licenses` 等披露字段不计入 digest。
+- 代码与 Schema 重构不得改变策略语义字段；请求/提案等协议文档必须保持形状不变以维持产物摘要稳定。代码指纹随被改源文件变化，旧内部快照按现行 doctrine 重新准备/编译，不自动迁移。
+- 登记新场景 = 场景包（`scenarios/<name>/`）+ 代码白名单一行 + 策略 profile + 严格 Schema + 合法/非法样例与自动测试；除此之外不得修改内核文件。内核不得 import 具体场景模块或直读场景请求体词汇，由 `tests/test_scenario_boundary.py` 棘轮强制。
+- 新增 intent profile 会改变整目录摘要，既有冻结运行须先完成或按现行 doctrine 重新冻结，不自动迁移。这是目录绑定设计的固有治理成本。
+- 边界守护测试（`test_layer_ports`/`test_encapsulation`/`test_digest_coverage`/`test_scenario_boundary`）只紧不松；修复一处违规必须同步删除其允许清单条目。

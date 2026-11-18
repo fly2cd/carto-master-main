@@ -35,11 +35,6 @@ TOOL_VERSION = "0.4.0"
 class MapGenerationWorkflow:
     """Map generation through exact approvals, final checks and recoverable local delivery."""
 
-    REQUIRED_REQUEST_FIELDS = {
-        "run_id", "audience", "scope", "environment", "requested_at", "template",
-        "allowed_capabilities", "font", "intent",
-    }
-
     def __init__(self, *, allowed_roots: list[str | Path], project_root: str | Path,
                  workdir: str | Path, repository_root: str | Path | None = None,
                  repository_scope: str | None = None, registry: SchemaRegistry | None = None) -> None:
@@ -103,30 +98,8 @@ class MapGenerationWorkflow:
                                                 template_id=request["template"]["id"],
                                                 version=request["template"]["version"])
             template_ref["digest"] = entry["digest"]
-        source_plan = []
-        for binding in sorted(request.get("source_bindings", []), key=lambda item: item["role"]):
-            operations = [item for item in ("read", "filter", "join", "classify", "reproject")
-                          if item in request["allowed_capabilities"]]
-            source_plan.append({"role": binding["role"], "source_ref": binding["source_ref"],
-                                "allowed_operations": operations, "path_digest": file_digest(
-                                    self.path_guard.resolve(binding["path"], base_root=self.project_root, must_exist=True)),
-                                "field_bindings": [{"semantic_role": item["semantic_role"],
-                                                    "source_field": item["source_field"]}
-                                                   for item in binding.get("field_bindings", [])]})
-        if "vector_sources" in request:
-            for source in sorted(request["vector_sources"], key=lambda item: item["source_id"]):
-                actual = []
-                for item in sorted(source["files"], key=lambda item: item["extension"]):
-                    path = self.path_guard.resolve(item["path"], base_root=self.project_root, must_exist=True)
-                    if path.stat().st_size != item["size_bytes"] or file_digest(path) != item["digest"]:
-                        raise ProtocolError("VECTOR_SOURCE_CHANGED", "Vector sidecars differ from their declaration")
-                    actual.append({"extension": item["extension"], "digest": item["digest"], "size_bytes": item["size_bytes"]})
-                fields = sorted({p["design"]["field"] for p in request["vector_panels"] if p["source_id"] == source["source_id"] and p["design"]["field"] is not None})
-                fields = sorted(set(fields) | {p["design"]["normalization"]["denominator_field"]
-                    for p in request["vector_panels"] if p["source_id"] == source["source_id"] and p["design"].get("normalization")})
-                source_plan.append({"role": source["role"], "source_ref": next(r for r in request["sources"] if r["id"] == source["source_id"]),
-                                    "allowed_operations": [v for v in ("read", "join", "classify") if v in request["allowed_capabilities"]], "path_digest": sha256_digest({"geometry":actual,"attribute_join":source.get("attribute_join")}),
-                                    "field_bindings": [{"semantic_role": "thematic-value", "source_field": f} for f in fields]})
+        request_contract = ScenarioRegistry(self.registry).for_generate(request).component("request_contract")
+        source_plan = request_contract.source_plan(request, self.path_guard, self.project_root)
         brief = {
             "schema_version": 1, "brief_id": f"brief-{request['run_id']}", "revision": 1,
             "intent_ref": artifact_ref("map-intent", intent), "purpose": request["goal"],
@@ -229,22 +202,9 @@ class MapGenerationWorkflow:
         atomic_yaml(bundle_target, bundle)
         compiler = self._candidate_compiler(request)
         contracts = compiler.load_contracts(installation)
-        # R6: merge revised_cartography from the request into contracts so
-        #     design-revision cartography changes are applied at compile time.
-        if request.get("revised_cartography"):
-            contracts.setdefault("scenario", {}).setdefault("embedded", {})
-            contracts["scenario"]["embedded"]["cartography"] = deepcopy(request["revised_cartography"])
-        # R6b: optional output_profile overrides the template's default canvas
-        #     dimensions.  The template declares A4 landscape (297×210 mm) as its
-        #     default; the request may supply a different page size within the
-        #     scenario's output_constraints envelope (max 420×297 mm).
-        if request.get("output_profile"):
-            contracts.setdefault("scenario", {}).setdefault("embedded", {}).setdefault("layout", {}).setdefault("canvas", {})
-            op = request["output_profile"]
-            if "width_mm" in op:
-                contracts["scenario"]["embedded"]["layout"]["canvas"]["width"] = op["width_mm"]
-            if "height_mm" in op:
-                contracts["scenario"]["embedded"]["layout"]["canvas"]["height"] = op["height_mm"]
+        # R6/R6b: design-revision cartography + optional page-size overrides are scenario
+        # request-body semantics, applied through the request_contract hook.
+        ScenarioRegistry(self.registry).for_generate(request).component("request_contract").apply_overrides(request, contracts)
         plan = MapPlanner(self.registry, project_root=self.project_root).build(request, intent, brief, bundle, installation, contracts)
         plan_target = self.path_guard.resolve(self._design_path("plan/map-plan.yaml"))
         atomic_yaml(plan_target, plan)
@@ -1028,17 +988,8 @@ class MapGenerationWorkflow:
         brief = self._load("brief/map-brief.yaml", "map-brief")
         if proposal["run_id"] != state.run_id or proposal["parent_revision"] != brief["revision"]:
             raise ProtocolError("REVISION_PARENT_DRIFT", "Proposal must identify the current design")
-        revised = deepcopy(request)
-        for key, change in proposal["changes"].items():
-            if key == "panel_designs":
-                panels = revised.get("vector_panels", revised.get("panels", []))
-                if set(change["new_value"]) - {p["id"] for p in panels}:
-                    raise ProtocolError("THEMATIC_VIEW_UNKNOWN", "Proposal refers to an unknown view")
-                for panel in panels:
-                    if panel["id"] in change["new_value"]:
-                        panel["design"] = deepcopy(change["new_value"][panel["id"]])
-            else:
-                revised["revised_cartography" if key == "cartography" else key] = deepcopy(change["new_value"])
+        revision_contract = ScenarioRegistry(self.registry).for_generate(request).component("revision_contract")
+        revised = revision_contract.apply_changes(request, proposal["changes"])
         self.registry.validate("generate-request", revised)
         self._validate_runtime_request(revised)
         result = deepcopy(brief)
@@ -1046,21 +997,7 @@ class MapGenerationWorkflow:
                       brief_id=f"brief-{request['run_id']}-r{brief['revision'] + 1}",
                       request_ref=artifact_ref("generate-request", revised),
                       revision_proposal_ref=artifact_ref("design-revision-proposal", proposal))
-        # A different thematic field changes the business binding shown to the approver.
-        if revised["geometry"] == "vector":
-            for source in result["source_plan"]:
-                sid = source["source_ref"]["id"]
-                fields = set()
-                for panel in revised["vector_panels"]:
-                    if panel["source_id"] != sid:
-                        continue
-                    design = panel["design"]
-                    if design["field"] is not None:
-                        fields.add(design["field"])
-                    if design.get("normalization"):
-                        fields.add(design["normalization"]["denominator_field"])
-                source["field_bindings"] = [{"semantic_role": "thematic-value", "source_field": f}
-                                            for f in sorted(fields)]
+        result = revision_contract.refresh_brief(result, revised)
         self.registry.validate("map-brief", result)
         return request, state, proposal, brief, revised, result
 
@@ -1107,10 +1044,11 @@ class MapGenerationWorkflow:
         # recorded when a bundle already exists (revising before a first compile
         # stays valid without one).
         from .revision_graph import bundle_input_digest, compute_invalidation
-        analysis = compute_invalidation(proposal["changes"])
+        revision_contract = ScenarioRegistry(self.registry).for_generate(request).component("revision_contract")
+        analysis = compute_invalidation(proposal["changes"], revision_contract.rules())
         graph = {"schema_version": 1, "revision": revision, "run_id": request["run_id"],
                  "proposal_id": proposal["proposal_id"], **analysis,
-                 "bundle_input_digest": bundle_input_digest(revised),
+                 "bundle_input_digest": bundle_input_digest(revised, revision_contract.bundle_input_keys()),
                  "created_at": utc_now()}
         previous_bundle_path = self.path_guard.resolve(self._design_path("data/prepared-data-bundle.yaml"))
         if previous_bundle_path.is_file():
@@ -1165,7 +1103,8 @@ class MapGenerationWorkflow:
         if not reference:
             return None
         from .revision_graph import bundle_input_digest
-        if bundle_input_digest(request) != graph["bundle_input_digest"]:
+        revision_contract = ScenarioRegistry(self.registry).for_generate(request).component("revision_contract")
+        if bundle_input_digest(request, revision_contract.bundle_input_keys()) != graph["bundle_input_digest"]:
             return None
         source = self.path_guard.resolve(reference["uri"], must_exist=True)
         document = load_document(source)
@@ -1404,8 +1343,8 @@ class MapGenerationWorkflow:
         return request, state
 
     def _validate_runtime_request(self, request: dict[str, Any]) -> None:
-        ScenarioRegistry(self.registry).for_generate(request)
-        missing = sorted(self.REQUIRED_REQUEST_FIELDS - set(request))
+        request_contract = ScenarioRegistry(self.registry).for_generate(request).component("request_contract")
+        missing = sorted(request_contract.required_fields() - set(request))
         if missing:
             raise ProtocolError("GENERATE_REQUEST_INCOMPLETE", ",".join(missing))
         if request["template"]["kind"] != "map-scenario":
@@ -1417,31 +1356,15 @@ class MapGenerationWorkflow:
             raise ProtocolError("APPROVER_REQUIRED", "subject.approver_subject_id")
         if subject["approver_subject_id"] == subject["subject_id"]:
             raise SecurityError("APPROVER_NOT_INDEPENDENT", "The operator cannot approve their own map")
-        required_capabilities = {"read", "render-preview"}
-        if request.get("geometry") == "raster" or any(p.get("design", {}).get("kind") == "choropleth" for p in request.get("vector_panels", [])):
-            required_capabilities.add("classify")
-        if any(s.get("attribute_join") for s in request.get("vector_sources", [])):
-            required_capabilities.add("join")
-        if any(item.get("join", {}).get("required") for item in request.get("source_bindings", [])):
-            required_capabilities.add("join")
+        required_capabilities = {"read", "render-preview"} | request_contract.required_capabilities(request)
         missing_capabilities = required_capabilities - set(request["allowed_capabilities"])
         if missing_capabilities:
             raise SecurityError("CAPABILITY_NOT_AUTHORIZED", ",".join(sorted(missing_capabilities)))
-        if set(request["requested_outputs"]) - {"svg", "png", "pdf"}:
+        from ..backend_registry import resolve as _resolve_backend, renderer_ids as _renderer_ids
+        allowed_outputs = set().union(*(_resolve_backend(rid).export_formats for rid in _renderer_ids()))
+        if set(request["requested_outputs"]) - allowed_outputs:
             raise ProtocolError("RENDER_TARGET_UNSUPPORTED", str(request["requested_outputs"]))
-        def identity(ref: dict[str, Any]) -> tuple[str, str, str]:
-            return ref["id"], ref["version"], ref["digest"]
-        if "vector_sources" in request:
-            from ..compiler.page_bindings import index_by
-            sources = index_by(request["vector_sources"], "source_id")
-            roots = index_by(request["sources"], "id")
-            if request.get("source_bindings") or set(sources) != set(roots) or any(roots[sid]["version"] != "1.0.0" or roots[sid]["digest"] != sha256_digest(source) for sid, source in sources.items()):
-                raise ProtocolError("GENERATE_SOURCE_REF_MISMATCH", "Vector source declarations must match root references")
-            return
-        if not request.get("source_bindings"):
-            raise ProtocolError("GENERATE_REQUEST_INCOMPLETE", "source_bindings")
-        if {identity(item) for item in request["sources"]} != {identity(item["source_ref"]) for item in request["source_bindings"]}:
-            raise ProtocolError("SOURCE_REFERENCE_SET_MISMATCH", request["request_id"])
+        request_contract.validate_body(request)
 
     def _intent(self, request: dict[str, Any]) -> dict[str, Any]:
         value = ScenarioRegistry(self.registry).generate_intent(request)
@@ -1503,26 +1426,28 @@ class MapGenerationWorkflow:
                 raise ProtocolError("CANDIDATE_RESOURCE_DRIFT", ref["id"])
 
     def _verify_page_inputs(self, execution, scene, request):
-        if scene["renderer_id"] == VECTOR_PAGE.renderer_id:
-            from ..adapters.formal_renderer import environment_snapshot
-            from ..adapters.page_renderer import PageRenderer
+        from ..adapters.formal_renderer import environment_snapshot
+        from ..adapters.page_renderer import PageRenderer
+        from ..backend_registry import resolve as resolve_backend
+        from .preparation_bundle import BundlePreparer
+        context = ExecutionContext.from_generate_request(request)
+        verifier = ScenarioRegistry(self.registry).for_generate(request).component("candidate_compiler")(
+            self.path_guard, self.registry, project_root=self.project_root, context=context)
+        if resolve_backend(scene["renderer_id"]).geometry == "vector":
             from ..compiler.vector_scene import VectorSceneCompiler
-            from .preparation_bundle import BundlePreparer
             from .vector_preparation import VectorPreparationService
             service = VectorPreparationService(project_root=self.project_root,
                 allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
-            VectorSceneCompiler(service, bundles=BundlePreparer, pages=PageRenderer,
-                environment=environment_snapshot).validate_generation(scene, execution, request, ExecutionContext.from_generate_request(request))
-            return
-        from ..adapters.formal_renderer import environment_snapshot
-        from ..adapters.page_renderer import PageRenderer
-        from ..compiler.raster_scene import RasterSceneCompiler
-        from .preparation_bundle import BundlePreparer
-        from .raster_preparation import RasterPreparationService
-        preparation = RasterPreparationService(project_root=self.project_root,
-            allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
-        RasterSceneCompiler(preparation, bundles=BundlePreparer, pages=PageRenderer,
-            environment=environment_snapshot).validate_generation(scene, execution, request, ExecutionContext.from_generate_request(request))
+            inputs = VectorSceneCompiler(service, bundles=BundlePreparer, pages=PageRenderer,
+                environment=environment_snapshot).validate_execution(scene, execution, context)
+        else:
+            from ..compiler.raster_scene import RasterSceneCompiler
+            from .raster_preparation import RasterPreparationService
+            preparation = RasterPreparationService(project_root=self.project_root,
+                allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
+            inputs = RasterSceneCompiler(preparation, bundles=BundlePreparer, pages=PageRenderer,
+                environment=environment_snapshot).validate_execution(scene, execution, context)
+        verifier.verify_request(request, scene, inputs)
 
     def _resolve_project_path(self, value: str | Path, *, must_exist: bool = False) -> Path:
         return self.path_guard.resolve(value, base_root=self.project_root, must_exist=must_exist)

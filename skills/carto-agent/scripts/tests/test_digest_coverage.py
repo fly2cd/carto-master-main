@@ -126,7 +126,7 @@ class PreparationDigestCoverageTests(unittest.TestCase):
     def test_reader_digest_covers_the_attribute_join_and_its_predicate(self):
         # join_attributes lives in thematic.py and calls finite(), which moved to
         # portrayal_resolver.py in Tier-2 Step4; both must stay fingerprinted.
-        required = {"vector_preparation.py", "thematic.py", "material_extraction.py",
+        required = {"vector_preparation.py", "attribute_join.py", "material_extraction.py",
                     "portrayal_resolver.py"}
         missing = required - read_by(reader_digest)
         self.assertEqual(set(), missing)

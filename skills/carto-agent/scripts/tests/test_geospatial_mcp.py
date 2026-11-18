@@ -378,8 +378,11 @@ class GeospatialAdapterTests(unittest.TestCase):
         request["source_bindings"] = [self.source]
         self.schemas.validate("generate-request", request)
         self.assert_code("CAPABILITY_NOT_AVAILABLE", lambda: ScenarioRegistry(self.schemas).for_generate(request))
-        request["source_bindings"][0]["geometry_types"] = ["polygon"]
-        self.assert_code("SCHEMA_VALIDATION_FAILED", lambda: self.schemas.validate("generate-request", request))
+        # Body-field closure lives in the closed profile, not the open envelope: a raster source
+        # evolved to polygon geometry_types is rejected by general-generate-request.
+        profile_request = deepcopy(VALID_CASES["general-generate-request"])
+        profile_request["source_bindings"][0]["geometry_types"] = ["polygon"]
+        self.assert_code("SCHEMA_VALIDATION_FAILED", lambda: self.schemas.validate("general-generate-request", profile_request))
 
     def test_unrecognized_contract_options_are_rejected(self):
         for field, value in [("band", 2), ("mask_policy", "zero-is-nodata"), ("value_semantics", "continuous"),

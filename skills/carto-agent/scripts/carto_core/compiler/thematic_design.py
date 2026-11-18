@@ -4,10 +4,9 @@
 parameters" in the mechanical-derivation layer: program-owned, deterministic, and
 injecting zero design preference. That is exactly what ``resolve_design`` does, so
 it lives here in the kernel next to the IR primitives it produces, rather than in
-the orchestration layer. ``workflow.thematic`` keeps a re-export shim so existing
-``from .thematic import resolve_design`` paths keep working; ``compiler`` code
-imports it from here, which is what removed the ``compiler -> workflow`` runtime
-edge (Tier-2 去环 Step4).
+the orchestration layer. The former ``workflow.thematic`` re-export shim was dissolved
+(I-5): callers import ``resolve_design`` / ``equal_interval_edges`` from here directly,
+which is what removed the ``compiler -> workflow`` runtime edge (Tier-2 去环 Step4).
 
 Nothing here selects a method, infers a unit, computes an undeclared statistic or
 evaluates code: the design states kind / field / measurement / unit / breaks, the

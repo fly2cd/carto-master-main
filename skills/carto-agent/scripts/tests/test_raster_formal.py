@@ -38,6 +38,7 @@ from carto_core.workflow.map_final_check import FinalMapCheckService
 from carto_core.workflow.map_preview import MapPreviewService, freeze_object_digest
 from carto_core.workflow.map_render import FormalMapRenderService
 from carto_core.workflow.preparation_bundle import BundlePreparer
+from carto_core.scenarios.general_thematic import request_binding
 from carto_core.workflow.material_evidence import verify_material_facts
 from carto_core.workflow.preparation_services import preparation_service
 from tests.fixtures.schema_cases import VALID_CASES
@@ -65,6 +66,12 @@ class SyntheticCapability:
         assert scene["resolved_layout"]["page"]["height_mm"] == 210
 
     def component(self, name):
+        if name == "candidate_compiler":
+            from carto_core.scenarios.general_thematic.dispatch import GeneralCandidateCompiler
+            return GeneralCandidateCompiler
+        if name == "request_contract":
+            from carto_core.scenarios.general_thematic.request_contract import REQUEST_CONTRACT
+            return REQUEST_CONTRACT
         assert name == "legend_checker"
         # This synthetic purpose explicitly checks its test display labels.
         return lambda ctx: (ctx["raster"]["layers"]["main-view"]["portrayal"]["legend_items"][0]["label"] == "Category A",
@@ -385,7 +392,7 @@ class RasterFormalTests(PreparationFixture, unittest.TestCase):
         plan = deepcopy(VALID_CASES["map-plan"])
         for key in ("business_scene", "tasks", "theme_tags"): plan[key] = intent[key]
         plan["intent_ref"]["digest"] = sha256_digest(intent)
-        prepared = self.bundle_preparer.prepare_request(self.generate, self.context)
+        prepared = request_binding.prepare_request(self.bundle_preparer,self.generate, self.context)
         envelope = {"candidate": self.candidate, "scene": self.scene,
                     "preflight": deepcopy(VALID_CASES["validation-report"])}
         owner = self
@@ -394,6 +401,7 @@ class RasterFormalTests(PreparationFixture, unittest.TestCase):
                 owner.assertEqual(owner.root, project_root)
                 owner.assertIs(owner.context, context)
             def compile(self, *args): return envelope
+            def verify_request(self, *args): pass
         def projection(document, supplied_intent, *, kind):
             ScenarioCapability.require_intent_projection(document, supplied_intent, kind=kind)
         original_component = self.capability.component
@@ -433,26 +441,31 @@ class RasterFormalTests(PreparationFixture, unittest.TestCase):
         self.assertFalse(list(self.work.rglob("delivery-manifest*.yaml")))
         with self.assertRaises(CartoError): workflow.retry()
 
+    def _verify_request(self, request, inputs):
+        from carto_core.scenarios.general_thematic.dispatch import GeneralCandidateCompiler
+        GeneralCandidateCompiler(self.service.guard, self.registry, project_root=self.root,
+                                 context=self.context).verify_request(request, self.scene, inputs)
+
     def test_generation_requires_exact_preparation_source_and_requested_outputs(self):
         request = self.generation_request()
-        ready = self.bundle_preparer.prepare_request(request, self.context)
+        ready = request_binding.prepare_request(self.bundle_preparer,request, self.context)
         self.assertEqual(self.bundle_ref, ready["bundle_ref"])
-        self.compiler.validate_generation(self.scene, self.execution, request, self.context)
+        self._verify_request(request, self.compiler.validate_execution(self.scene, self.execution, self.context))
         # Malformed contracts must fail before opening or materializing preparation artifacts.
         malformed = deepcopy(request)
         malformed["prepared_raster_bindings"][0]["unexpected"] = True
         with patch.object(self.bundle_preparer, "build", side_effect=AssertionError("Must reject before I/O")):
             with self.assertRaises(ProtocolError):
-                self.bundle_preparer.prepare_request(malformed, self.context)
+                request_binding.prepare_request(self.bundle_preparer,malformed, self.context)
         for field in ("prepared_raster_bindings", "source_bindings", "sources"):
             wrong = deepcopy(request)
             if field == "prepared_raster_bindings": wrong[field][0]["role"] = "another-role"
             elif field == "source_bindings": wrong[field][0]["path"] = "another.tif"
             else: wrong[field][0]["digest"] = "sha256:"+"0"*64
-            with self.assertRaises(CartoError): self.bundle_preparer.prepare_request(wrong, self.context)
+            with self.assertRaises(CartoError): request_binding.prepare_request(self.bundle_preparer,wrong, self.context)
         request["requested_outputs"].append("svg")
         with self.assertRaisesRegex(ProtocolError, "RASTER_GENERATE_TARGET_MISMATCH"):
-            self.compiler.validate_generation(self.scene, self.execution, request, self.context)
+            self._verify_request(request, self.compiler.validate_execution(self.scene, self.execution, self.context))
 
     def test_formal_g2_render_check_g3_atomic_delivery_and_recovery(self):
         r = self.freeze_and_render()

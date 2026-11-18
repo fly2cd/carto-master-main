@@ -30,25 +30,26 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from ..adapters.tool_gateway import ToolGateway
-from ..canonical import sha256_digest
-from ..compiler.dependencies import DependencyResolver
-from ..compiler.layout import LayoutResolver
-from ..compiler.page_bindings import build_page_bindings, index_by
-from ..compiler.raster_page_contract import compile_page_request
-from ..compiler.raster_portrayal import RasterPortrayalCompiler
-from ..compiler.raster_scene import RASTER_RENDERER_ID, RasterSceneCompiler
-from ..errors import ProtocolError, SecurityError
-from ..repository.immutable_store import ImmutableArtifactStore
-from ..repository.map_expression_catalog import MapExpressionCatalog
-from ..repository.staging_package import StagingPackageWriter
-from ..scenario_registry import ScenarioRegistry
-from ..schema_registry import SchemaRegistry
-from ..security.paths import PathGuard
-from ..artifacts import artifact_ref
-from ..contracts.execution import ExecutionContext
-from ..workflow.preparation_bundle import BundlePreparer
-from ..workflow.raster_preparation import RasterPreparationService
+from ...adapters.tool_gateway import ToolGateway
+from ...canonical import sha256_digest
+from ...compiler.dependencies import DependencyResolver
+from ...compiler.layout import LayoutResolver
+from ...compiler.page_bindings import build_page_bindings, index_by
+from ...compiler.raster_page_contract import compile_page_request
+from ...compiler.raster_portrayal import RasterPortrayalCompiler
+from ...compiler.raster_scene import RASTER_RENDERER_ID, RasterSceneCompiler
+from ...errors import ProtocolError, SecurityError
+from ...repository.immutable_store import ImmutableArtifactStore
+from ...repository.map_expression_catalog import MapExpressionCatalog
+from ...repository.staging_package import StagingPackageWriter
+from ...scenario_registry import ScenarioRegistry
+from ...schema_registry import SchemaRegistry
+from ...security.paths import PathGuard
+from ...artifacts import artifact_ref
+from ...contracts.execution import ExecutionContext
+from ...workflow.preparation_bundle import BundlePreparer
+from ...workflow.raster_preparation import RasterPreparationService
+from . import request_binding
 
 SCENARIO_ID = "general-thematic-map"
 VERSION = "3.0.0"
@@ -124,7 +125,7 @@ class GeneralThematicDataPreparer:
         preparation = RasterPreparationService(
             project_root=self.project_root,
             allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
-        prepared = BundlePreparer(preparation, "raster").prepare_request(request, context)
+        prepared = request_binding.prepare_request(BundlePreparer(preparation, "raster"), request, context)
         return {"bundle": prepared["bundle"], "bundle_ref": prepared["bundle_ref"],
                 "request_ref": deepcopy(request_ref)}
 
@@ -136,7 +137,6 @@ class GeneralThematicPlanner:
         self.registry = registry or SchemaRegistry()
 
     def build(self,request,intent,brief,bundle,installation,contracts):
-        from ..workflow.thematic import raster_views
         if not bundle.get("role_bindings"):
             raise ProtocolError("RASTER_BUNDLE_UNSUPPORTED","No bound data")
         profile=ScenarioRegistry(self.registry).for_template(request['template'])
@@ -168,8 +168,7 @@ class GeneralThematicCandidateCompiler:
         self.context = context
 
     def compile(self,request,intent,plan,bundle,installation,contracts,font_path):
-        from ..adapters.static_page_renderer import FONT_LIMIT
-        from ..workflow.thematic import raster_views
+        from ...adapters.static_page_renderer import FONT_LIMIT
         if self.project_root is None or self.context is None:
             raise SecurityError('RASTER_EXECUTION_CONTEXT_REQUIRED','Trusted project context required')
         context=ExecutionContext.from_generate_request(request)
@@ -177,8 +176,8 @@ class GeneralThematicCandidateCompiler:
             raise SecurityError('CLASSIFICATION_SCOPE_MISMATCH','Execution scope differs')
         self.registry.validate('map-plan',plan)
         preparation=RasterPreparationService(project_root=self.project_root,allowed_roots=list(self.path_guard.allowed_roots),registry=self.registry)
-        prepared=BundlePreparer(preparation, "raster").prepare_request(request,context)
-        from ..workflow.map_data_preparation import bundle_core
+        prepared=request_binding.prepare_request(BundlePreparer(preparation, "raster"), request,context)
+        from ...workflow.map_data_preparation import bundle_core
         if bundle_core(bundle)!=bundle_core(prepared['bundle']):raise ProtocolError('RASTER_CANDIDATE_BUNDLE_MISMATCH','Bundle differs from exact inputs')
         profile=ScenarioRegistry(self.registry).for_template(request['template']);output=profile.definition['output_profile']
         if any(b['crs']!=contracts['spatial_behavior']['display_crs'] for b in bundle['role_bindings']):
@@ -202,8 +201,8 @@ class GeneralThematicCandidateCompiler:
             or plan['decisions']['title'] != request['map_title']
             or plan['decisions']['legend_capacity']!=resolved['contract']['capacity']['legend_items']):
             raise ProtocolError('PLAN_BINDING_MISMATCH','Plan differs from verified template and data')
-        from ..adapters.formal_renderer import environment_snapshot
-        from ..adapters.page_renderer import PageRenderer
+        from ...adapters.formal_renderer import environment_snapshot
+        from ...adapters.page_renderer import PageRenderer
         compiler=RasterSceneCompiler(preparation,bundles=BundlePreparer,pages=PageRenderer,environment=environment_snapshot)
         scene=compiler.compile(bundle_ref=prepared['bundle_ref'],page_request=page,context=context,scene_id=f"scene-{request['run_id']}",targets=tuple(sorted(request['requested_outputs'])))
         base=self._execution_base(intent,installation,bundle,profile,contracts)
@@ -228,6 +227,42 @@ class GeneralThematicCandidateCompiler:
                                  "data_nature": bundle["summary"]["data_nature"]},
             "material_facts_refs": [deepcopy(bundle["data_facts"])] if bundle.get("data_facts") else [],
         }
+
+
+def raster_views(request, bundle, registry):
+    """Scenario request-body view assembly (moved from workflow/thematic.py, I-5)."""
+    from ...compiler.portrayal_resolver import expression_reference
+    bindings = {item["source_id"]: item for item in bundle["role_bindings"]}
+    result = []
+    for panel in sorted(request["panels"], key=lambda p: p["id"]):
+        registry.validate("thematic-design", panel["design"])
+        if panel["design"]["geometry"] != "raster":
+            raise ProtocolError("THEMATIC_GEOMETRY_MISMATCH", "Raster panels require an explicit raster design")
+        result.append({"view_id": panel["id"], "source_id": panel["source_id"], "data_ref": deepcopy(bindings[panel["source_id"]]["prepared_ref"]),
+                       "design": deepcopy(panel["design"]), "expression_ref": expression_reference("categorical", registry),
+                       "encoding": None, "statistics": None})
+    return result
+
+
+def verify_request(request, scene, inputs, path_guard, registry, project_root, context):
+    """Request-aware revalidation tail (moved from RasterSceneCompiler.validate_generation, I-4).
+
+    ``inputs`` comes from the kernel's request-free validate_execution; this tail cross-checks
+    the scenario request body against the frozen page/bundle. Error codes preserved verbatim.
+    """
+    from ...workflow.preparation_bundle import BundlePreparer
+    from ...workflow.raster_preparation import RasterPreparationService
+    preparation = RasterPreparationService(project_root=project_root,
+        allowed_roots=list(path_guard.allowed_roots), registry=registry)
+    request_binding.validate_request(BundlePreparer(preparation, "raster"), request, inputs['bundle'], context)
+    actual = {v['id']: v['source_id'] for v in request['panels']}
+    data = {v['id']: v['source_id'] for v in inputs['page']['bindings']['data_bindings']}
+    layers = {v['id']: data[v['data_binding_id']] for v in inputs['page']['bindings']['layers']}
+    expected = {v['id']: layers[v['layer_ids'][0]] for v in inputs['page']['bindings']['views']}
+    if actual != expected or request['layout_parameters'] != scene['resolved_layout']['parameters']:
+        raise ProtocolError('RASTER_GENERATE_BINDING_MISMATCH', 'Panel assignment or layout selection differs')
+    if sorted(request['requested_outputs']) != scene['export']['targets']:
+        raise ProtocolError('RASTER_GENERATE_TARGET_MISMATCH', 'Requested outputs differ')
 
 
 def legend_checker(context: dict[str, Any]) -> tuple[bool, dict[str, Any], None]:
@@ -771,7 +806,8 @@ def _fixture_gateway(preparation: RasterPreparationService, workspace: Path) -> 
     input/output schemas and immutable evidence; no second GIS reader is admitted
     and no evidence value is hardcoded.
     """
-    policy_path = Path(__file__).resolve().parents[3] / "policies/tool-bindings.yaml"
+    # parents[4] == skills/carto-agent (raster.py sits at carto_core/scenarios/general_thematic/).
+    policy_path = Path(__file__).resolve().parents[4] / "policies/tool-bindings.yaml"
     config_digest = "sha256:" + hashlib.sha256(policy_path.read_bytes()).hexdigest()
     store = ImmutableArtifactStore(workspace / ".carto/geospatial/evidence", path_guard=PathGuard([workspace]))
     gateway = ToolGateway(policy_path, store, preparation.registry)
@@ -843,7 +879,7 @@ def validation_scene(package_root: Path, snapshot: dict[str, Any], targets: list
     time without the authoring host's font. No business data, no production
     claim, no fabricated evidence.
     """
-    from ..adapters.static_page_renderer import FONT_LIMIT
+    from ...adapters.static_page_renderer import FONT_LIMIT
     if context is None or workspace is None:
         raise SecurityError("RASTER_EXECUTION_CONTEXT_REQUIRED",
                             "Fixture rendering requires the trusted validation context and workspace")
@@ -963,8 +999,8 @@ def validation_scene(package_root: Path, snapshot: dict[str, Any], targets: list
         "validator_version": validator_version,
         "layout_parameters": resolved_layout["parameters"],
     })[7:23]
-    from ..adapters.formal_renderer import environment_snapshot
-    from ..adapters.page_renderer import PageRenderer
+    from ...adapters.formal_renderer import environment_snapshot
+    from ...adapters.page_renderer import PageRenderer
     return RasterSceneCompiler(preparation, bundles=BundlePreparer, pages=PageRenderer,
                                environment=environment_snapshot).compile(
         bundle_ref=deepcopy(bundle_ref), page_request=page_request, context=context,
