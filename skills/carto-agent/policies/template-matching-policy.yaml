@@ -1,0 +1,18 @@
+schema_version: 1
+policy_id: template-matching
+version: 0.3.0
+# S0: numeric decision parameters migrated from the 2026Oct prototype matcher.
+# None of these values has business justification yet; they are declared here
+# instead of hardcoded so review can adjust them without touching algorithm code.
+# This policy only governs advisory read-only scoring (CLI `template match`);
+# it never admits a capability, selects a template, or relaxes any gate.
+# 0.2.0: color_delta_e_max is now calibrated in CIELAB CIE76 ΔE units (the
+# matcher converts sRGB->CIELAB per CIE 15); 0.1.0 measured sRGB channel
+# distance, where this tolerance was effectively unreachable.
+# 0.3.0: font_weight_tolerance removed together with the map-brand segment
+# (2026-11-18, user-authorized); it was only consumed by the brand scorer.
+confirmation_status: pending-business-review
+match_threshold: 0.80
+color_delta_e_max: 4.0
+defaults_relative_deviation_max: 0.15
+capacity_relative_deviation_max: 0.30

@@ -1,0 +1,88 @@
+schema_version: 1
+style_id: guangdong-admin-area-style
+version: 0.1.0
+visual_language: editorial
+symbolization:
+  color_system: qualitative
+  symbol_catalogs:
+  - fills/admin@1.0.0
+  - markers/places@1.0.0
+  default_opacity: 1.0
+labeling:
+  density: high
+  collision_policy: allow-explicit
+  font_role: label
+generalization:
+  scale_dependent: false
+  strategy: simplify
+defaults:
+  line_width_mm: 0.5
+  point_size_mm: 2.5
+  opacity: 1.0
+symbol_definitions:
+- symbol_id: admin-region-fill
+  symbol_type: fill
+  geometry_types:
+  - polygon
+  - multipolygon
+  channels:
+    fill_color:
+      source: categorical-match
+      property: admin_level_type
+      ramp_ref: fills/admin@1.0.0
+    fill_opacity:
+      source: fixed
+      value: 1.0
+    outline_color:
+      source: fixed
+      value: '#ffffff'
+    outline_width:
+      source: fixed
+      value: 0.2
+- symbol_id: prefecture-boundary-line
+  symbol_type: line
+  geometry_types:
+  - line
+  channels:
+    line_color:
+      source: fixed
+      value: '#4a3b32'
+    line_width:
+      source: fixed
+      value: 0.8
+    line_opacity:
+      source: fixed
+      value: 1.0
+- symbol_id: capital-marker
+  symbol_type: marker
+  geometry_types:
+  - point
+  channels:
+    marker_color:
+      source: fixed
+      value: '#000000'
+    marker_size:
+      source: fixed
+      value: 2.5
+- symbol_id: place-name-label
+  symbol_type: label
+  geometry_types:
+  - point
+  - polygon
+  channels:
+    label_field:
+      source: property
+      property: name
+    label_color:
+      source: fixed
+      value: '#000000'
+    label_size:
+      source: fixed
+      value: 9
+rules:
+- id: synthetic-preview-only
+  strength: hard_rule
+  path: /application/excluded_uses
+  description: Draft package is limited to synthetic engineering previews and is not
+    a published product.
+  value: true

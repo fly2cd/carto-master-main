@@ -126,7 +126,12 @@ def resolve_classes(request: dict[str, Any], legend: list[dict[str, Any]], stati
                    "label": definition["label"], "color": color, "order": definition["order"],
                    "include_in_legend": bool(observed or request["legend_policy"] == "all")}
         if value in overrides:
-            row.update(deepcopy(overrides[value]))
+            override = deepcopy(overrides[value])
+            # Canonical hex: parse_legend normalizes CSV colors, so answers must too.
+            # Otherwise the same color written two ways yields two frozen digests.
+            if override.get("color"):
+                override["color"] = override["color"].upper()
+            row.update(override)
         kinds = []
         if row["semantic"] is None:
             kinds.append("unmapped-value")
@@ -204,6 +209,13 @@ class RasterPortrayalCompiler:
             return self._build_continuous(portrayal, layer, layer_id, prepared_ref, report)
         rows = [{key: row[key] for key in ("value", "display", "label", "color", "order", "include_in_legend")}
                 for row in report["rows"]]
+        # Colour redlines: ordered categorical colours must stay distinguishable
+        # (normal and dichromatic vision) before the portrayal is frozen. No R1
+        # here — qualitative classes carry no lightness-order semantics.
+        from .color_checks import ColorRedlinesPolicy, check_color_sequence, enforce
+        ordered_colors = [row["color"] for row in sorted(rows, key=lambda row: row["order"])
+                          if row["display"] == "color" and row["color"] is not None]
+        enforce(check_color_sequence(ordered_colors, ColorRedlinesPolicy.load(registry=self.preparation.registry)))
         # A display-only semantic such as 'nodata' never changes source metadata.
         return {"schema_version": 1, "kind": "resolved-portrayal",
                 "geometry": "raster", "key_mode": "discrete",

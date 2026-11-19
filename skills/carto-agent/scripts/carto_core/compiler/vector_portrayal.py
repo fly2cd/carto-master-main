@@ -128,6 +128,12 @@ class VectorPortrayalCompiler:
 
     def compile(self, prepared_ref, ir, context, label_source=None):
         report = self.preparation.load_verified(prepared_ref, context)
+        # Colour redlines: ordered class colours (discrete/interval) must stay
+        # distinguishable before freezing; scaling encodes size, not colour order.
+        if ir['key_mode'] in ('discrete', 'interval') and len(ir['channels']['symbols']) >= 2:
+            from .color_checks import ColorRedlinesPolicy, check_color_sequence, enforce
+            colors = [symbol['color'] for symbol in ir['channels']['symbols']]
+            enforce(check_color_sequence(colors, ColorRedlinesPolicy.load(registry=self.preparation.registry)))
         body = {'schema_version': 1, 'kind': 'resolved-portrayal', 'geometry': 'vector',
                 'key_mode': ir['key_mode'], 'compiler_version': '1.0.0',
                 'prepared_ref': deepcopy(prepared_ref),

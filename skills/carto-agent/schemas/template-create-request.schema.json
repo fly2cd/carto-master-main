@@ -40,7 +40,6 @@
     },
     "kind": {
       "enum": [
-        "map-brand",
         "map-style",
         "map-layout",
         "map-scenario"
@@ -233,6 +232,25 @@
     },
     "requested_at": {
       "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/timestamp"
+    },
+    "segment_refs": {
+      "description": "Optional S2 segment references: each listed segment is sourced from an exactly pinned published segment template instead of being embedded by the author. Same shape and kind binding as scenario.segment_refs.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cartography": {
+          "allOf": [
+            {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/templateRef"},
+            {"properties": {"kind": {"const": "map-style"}}}
+          ]
+        },
+        "layout": {
+          "allOf": [
+            {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/templateRef"},
+            {"properties": {"kind": {"const": "map-layout"}}}
+          ]
+        }
+      }
     },
     "geometry": {
       "enum": [

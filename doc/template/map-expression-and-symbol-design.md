@@ -1,6 +1,8 @@
 # 地图表达目录、内置方法与符号库设计结论
 
-> 2026-11-09 设计收敛：采用 Encoding / Appearance / Composition 三个设计维度及独立 Renderer 执行层；模板是组合载体，不与维度一一映射。统一定义见[模板体系设计](../carto-template-dsg.md)，本轮决定及修订范围见收敛记录 design-convergence-20261109.md（已移除，可从 git 历史取回）。新增模型、引用、参数与作用域调整属于目标设计，不改变当前 Schema、能力准入和审批。
+> **状态公告（2026-11-18）**：品牌段（map-brand/identity）已经用户授权整体移除——它在渲染链中无消费者，移除不改变成图外观。本文已同步清理品牌遗留描述；当前协议以 `skills/carto-agent/schemas/` 与 SKILL.md 为准。
+
+> 2026-11-09 设计收敛：采用 Encoding / Appearance / Composition 三个设计维度及独立 Renderer 执行层；模板是组合载体，不与维度一一映射。统一定义见[模板体系设计](../carto-template-dsg.md)。**本文是三类模板说明（scenario/style/layout）的共同边界仲裁者：所有权与权威源见第 11 节单表，`rules` 可执行性见第 12 节，词表与概念单源见第 15 节，历次修订记录见第 14 节**（原收敛记录文件已不存在，不再作为依据）。新增模型、引用、参数与作用域调整属于目标设计，不改变当前 Schema、能力准入和审批。
 
 
 更新日期：2026-10-22
@@ -11,7 +13,7 @@
 
 ## 1. 文档定位与结论
 
-本文汇总地图表达目录、内置表达方法、通用图表、符号库和四类模板之间的关系，说明如何复用能力、保留模型的表达设计空间，以及如何验证模型生成的方案和候选实现。
+本文汇总地图表达目录、内置表达方法、通用图表、符号库和三类模板（scenario/style/layout）之间的关系，说明如何复用能力、保留模型的表达设计空间，以及如何验证模型生成的方案和候选实现。
 
 本文不讨论专利。下文的职责划分和执行链路是建议设计，当前实现状态集中列在第 10 节。文中的候选方法名称、数据组织和调用步骤均用于解释设计，不是新增运行时协议，也不能直接作为当前 CLI 的输入。运行时仍以 `skills/carto-agent/` 下的 Schema、策略和代码为准，不读取本文作为机器协议。
 
@@ -27,7 +29,7 @@
 4. **表达方法应与业务主题分离。** “按地区展示分类数值”可以复用于行业产值、游客量等主题；地区、年份、单位和 Top K 规则由场景及本次任务提供。
 5. **主图区内的小图表与页面旁的辅助图表可以共用绘图核心。** 两者分别使用地理放置和页面放置，数据范围、比例尺度及标签策略可以不同。
 6. **符号库提供资源，专题表达方法决定如何使用资源。** 图标本身不负责判断字段含义，也不自动完成分类、比例缩放或图例生成。
-7. **地图表达和符号资源均不是第五类模板。** MapScenario、MapStyle、MapLayout、MapBrand 的职责保持清晰；是否进一步独立管理表达资源，取决于实际复用和维护需求。
+7. **地图表达和符号资源均不是独立的模板类别。** MapScenario、MapStyle、MapLayout 的职责保持清晰（品牌段 MapBrand 已于 2026-11-18 移除）；是否进一步独立管理表达资源，取决于实际复用和维护需求。
 8. **规则约束与表达设计分开。** 任务要求和有条件的映射规则提供判断依据，模型在其范围内提出方案；成熟预设是可复用起点，不自动成为所有任务的强制形式。
 9. **不预先穷举完整绘图函数。** 优先复用成熟方法和可组合的基础能力，缺少能力时允许模型辅助开发候选实现；“受信”描述验证和执行条件，不以代码作者是人还是模型区分。
 10. **输入输出结构不足以证明正确。** 还要明确语义、特殊情况、执行范围、验证依据和复现条件。每次制图动态执行模型代码是另需建设的扩展，当前未开放。
@@ -52,7 +54,7 @@
 
 保留现有机器名称 `map-expression-catalog.yaml`、`expression_id`，无需因英文术语统一而迁移运行时字段。
 
-原始设计曾使用 Map Encoding Catalog，后续 MapStyle 文档使用 Map Expression Catalog。现已将[模板体系设计](../carto-template-dsg.md)、四类模板说明、总体架构及两份 TRD 的相关描述对齐为 Map Expression Catalog。此次只统一设计描述，运行时字段、Schema、策略和实现不随之变更。
+原始设计曾使用 Map Encoding Catalog，后续 MapStyle 文档使用 Map Expression Catalog。现已将[模板体系设计](../carto-template-dsg.md)、三类模板说明、总体架构及两份 TRD 的相关描述对齐为 Map Expression Catalog。此次只统一设计描述，运行时字段、Schema、策略和实现不随之变更。
 
 ### 2.2 一个容易混淆的区别
 
@@ -79,7 +81,7 @@
 
 ### 3.1 业务、表达、样式和放置
 
-下表为目标职责划分，与现有四类模板设计衔接。
+下表为目标职责划分，与现有三类模板设计（scenario/style/layout）衔接。
 
 | 部分 | 应负责的内容 | 示例 |
 |---|---|---|
@@ -91,7 +93,6 @@
 | 内置表达方法 | 执行编码计算，调用图表或符号能力 | 计算柱高、类别颜色映射或比例符号尺寸 |
 | MapStyle | 在业务和表达约束内提供颜色、字体、线条、符号选择及视觉默认值 | 行业配色、柱宽、边框、标签格式 |
 | MapLayout | 页面与 Frame 的空间组织、容量和溢出处理 | 主图在左侧，省级汇总图在右侧辅助区域 |
-| MapBrand | 机构标识、字体资源、品牌色及使用限制 | 报告 Logo、机构字体和身份色 |
 | 空间规划与地图编译 | 视图、投影、地理锚点解析、地理位置到输出位置的转换 | 把城市代表点转换为主图中的图表锚点 |
 | 图表核心、符号加载器与 Renderer | 测量和绘制图形，实例化资源，合成输出 | 绘制三根柱、加载图标、输出 SVG 或地图图层 |
 | 质量验证与执行快照 | 检查实际映射、放置和资源一致性，固定本次选择 | 断点、尺度、数据摘要、方法与符号版本可追溯 |
@@ -148,7 +149,7 @@ Layout 提供容器和排版约束，不能替代数据汇总或分类算法。�
 
 建议让方法标识到代码实现的绑定保持简单，不额外建立一套独立维护的业务规则表。需要对目录参数、方法支持范围和验证要求进行一致性检查。
 
-目录不得嵌入任意 Python、Shell、SQL 或浏览器脚本。声明式组合只能调用平台已经注册且允许的操作。这与现有实施计划对表达目录的约束（u-p2-implementation-plan.md（已移除，可从 git 历史取回））一致。
+目录不得嵌入任意 Python、Shell、SQL 或浏览器脚本。声明式组合只能调用平台已经注册且允许的操作。这与 [SKILL.md](../../skills/carto-agent/SKILL.md)「受信注册表只使用代码内白名单，不接受请求或配置给出任意 Python 导入路径」一致，并由 `schemas/map-expression.schema.json` 的封闭字段集强制。（原引用的 u-p2-implementation-plan.md 已不存在，不再作为依据。）
 
 ### 4.3 智能体怎样使用目录
 
@@ -442,7 +443,7 @@ value = 400 → 直径 8 mm，面积为原来的 4 倍
 | 类别编码 | 同一类别使用稳定映射，未知类别和缺失类别有明确规则 |
 | 图例 | 图例来自实际执行的映射，展示必要单位、阈值和例外说明 |
 | 图表放置 | 锚定关系正确；任务要求图形跨对象数量比较时保持兼容尺度，碰撞处理符合任务约束 |
-| 符号资源 | 实际资源与引用版本一致，参数合法，遵守标准或品牌限制 |
+| 符号资源 | 实际资源与引用版本一致，参数合法，遵守标准限制 |
 | 可复现性 | 输入快照、方法版本、参数、资源和必要的布局决定可追溯 |
 | 不支持情况 | 缺失能力时明确报告，不悄悄改用不同语义的表达 |
 
@@ -467,19 +468,22 @@ value = 400 → 直径 8 mm，面积为原来的 4 倍
 
 ## 10. 当前仓库状态与设计差距
 
-本节于 2026-11-09 静态核对后替换旧洪涝演示的状态与半径算法诊断；历史诊断不代表当前注册链路。
+本节于 2026-11-18 重新静态核对（上一版为 2026-11-09）；历史诊断不代表当前注册链路。每条事实附代码/策略锚点，可逐条核对；本文不复制目录计数以外的清单，也不把已声明未消费字段当作能力。
 
 | 已有基础 | 当前边界 |
 |---|---|
-| [表达目录](../../skills/carto-agent/policies/map-expression-catalog.yaml) 有 choropleth/sequential、proportional-symbol/count、raster/categorical | 目录登记不等于 general 已接入全部表达；当前仅接入分类栅格 |
-| [RasterPortrayalCompiler](../../skills/carto-agent/scripts/carto_core/compiler/raster_portrayal.py) 冻结类别表、颜色与图例 | 仅一个栅格图层，不执行影像分类、重分类或通用 GIS 分析 |
-| [portrayal Schema](../../skills/carto-agent/schemas/portrayal.schema.json) 有矢量/栅格分支 | 不等于矢量准备、符号计算、共享映射和正式交付已准入 |
-| [general 场景](../../skills/carto-agent/scripts/carto_core/scenarios/general_thematic.py) 已构建分类栅格模板样张和候选 | 单图、固定 A4 横向 300 dpi PDF+PNG；无生产能力声明 |
-| [后端分派](../../skills/carto-agent/scripts/carto_core/adapters/render_backend.py) 有浏览器和静态栅格分支 | 后端能力不等于表达能力；检查不能永远按 renderer_id 推断专题类型 |
+| [表达目录](../../skills/carto-agent/policies/map-expression-catalog.yaml) 共 7 条：active 为 `categorical@2.0.0`（raster/vector/line）、`graduated-color@2.0.0`（polygon/raster）、`proportional-symbol@2.0.0`（point）；其余 4 条 deprecated 并带 `superseded_by` | 目录登记不等于准入。几何准入在 **layer 家族粒度**（[map_expression_catalog.py:100-105](../../skills/carto-agent/scripts/carto_core/repository/map_expression_catalog.py)），粗于 IR 的 `geometry_role` |
+| [能力策略](../../skills/carto-agent/policies/scenario-capabilities.yaml) 登记唯一档案 `general-thematic-mapping@5.0.0`，implementation `general-thematic`；两个 `geometry_variants`：raster→`general-thematic-map@3.0.0`/`rasterio-matplotlib-page`，vector→`@4.0.0`/`matplotlib-vector-page` | `production_enabled: false`；`output_profile` 将 297×210mm / 300dpi / 3508×2480px 声明一遍（:40-45） |
+| [RasterPortrayalCompiler](../../skills/carto-agent/scripts/carto_core/compiler/raster_portrayal.py) 冻结类别表、颜色与图例 | 不执行影像分类、重分类或通用 GIS 分析 |
+| 矢量路径已存在：[general_vector.py](../../skills/carto-agent/scripts/carto_core/scenarios/general_vector.py)、[vector_portrayal.py](../../skills/carto-agent/scripts/carto_core/compiler/vector_portrayal.py)、[encoding-ir.schema.json](../../skills/carto-agent/schemas/encoding-ir.schema.json) | 已登记为**受限工程能力**（SKILL.md S2），不等于生产准入 |
+| [portrayal Schema](../../skills/carto-agent/schemas/portrayal.schema.json) 四个层分支：vectorLayer / rasterLayer / rasterContinuousLayer / explicitVectorLayer | `vectorLayer.geometry` 仅 point/polygon；线要素经 `explicitVectorLayer`（geometry=vector）+ IR `geometry_role=line` 承载 |
+| [版式解析器](../../skills/carto-agent/scripts/carto_core/compiler/layout.py) 支持 mm、DPR=1、单图或模板声明网格；页面框默认不重叠，`frames[].inside_frame` 声明的完整包含经几何核验后豁免 | px 画布、shrink/paginate、inset 类型均被拒；多图网格基座不接受包含声明 |
+| 段引用协议（S2）已接入 validate/publish/generate 三个边界：[template_validation.py:416-422](../../skills/carto-agent/scripts/carto_core/workflow/template_validation.py)、[map_candidate.py:111-114](../../skills/carto-agent/scripts/carto_core/compiler/map_candidate.py)、[template_repository.py:247-261](../../skills/carto-agent/scripts/carto_core/repository/template_repository.py) | 全内嵌旧路径零改动；无仓库或引用漂移一律失败关闭 |
+| [后端分派](../../skills/carto-agent/scripts/carto_core/adapters/render_backend.py) 有浏览器与静态页分支 | 后端能力不等于表达能力；检查不能永远按 renderer_id 推断专题类型 |
 
 ### 10.1 目标差距
 
-1. Encoding 决定字段/单位、视觉变量、映射与比较语义；Appearance 提供兼容外观，不另存一套分类或缩放算法。当前 portrayal/cartography 字段须明确迁移与唯一有效来源。
+1. Encoding 决定字段/单位、视觉变量、映射与比较语义；Appearance 提供兼容外观，不另存一套分类或缩放算法。**每项决策的唯一权威见第 11 节单表**；该表中标为“冲突待收敛”或“已声明未消费”的项，不得在任何模板文档中被描述为已具备能力。
 2. 多面板须引用表达实例和独立共享组；地理视图、颜色/大小映射、图例共享分别验证，不能只合并图例外观。
 3. 单一符号、矢量类别、面分级设色、点比例符号需要补齐实际准备、编译、绘制和检查；连续栅格显示及专项表达按需求后续准入。选择颜色不等于计算密度、等值线或影像分类。
 4. 共享符号/图表、地图锚定、辅助区域与标签避让仍需独立验收；freeform 或海报布局不自动赋予这些内容能力。
@@ -487,9 +491,149 @@ value = 400 → 直径 8 mm，面积为原来的 4 倍
 
 本节不宣称测试通过或真实用户地图已交付；当前运行准入仍以 Schema、策略及代码白名单为准。
 
-## 11. 后续落地顺序与目录位置
+## 11. 所有权与权威源单表
 
-### 11.1 建议实施顺序
+本节是三类模板说明的**共同边界仲裁表**。[MapStyle §1](map-style.md) 已指定本文为表达目录、内置方法、图表与符号资源的共同边界依据；所有权争议以本表为准。
+
+**使用规则**：
+
+1. 每项决策在本表中**恰好一个唯一权威**。其余文档提到该项时只能引用本表，不得重复定义数值范围、枚举词表或默认值。
+2. 状态分四档：`executed`（有消费点，并在适用条件下影响输出、可验证解析/绑定结果或触发拒绝）、`declared-unconsumed`（Schema/策略合法但无执行消费点）、`conflict`（多源并存且已漂移）、`target-only`（文档提案，Schema 尚无字段）。
+3. **`declared-unconsumed` 与 `target-only` 不得被描述为能力**。目录登记、Schema 枚举存在、文档写了示例，三者都不等于可执行。
+4. 本表只记录权威与消费点，不记录整改清单；具体缺口归 `policies/capability-roadmap.yaml`、审计记录或测试守卫。
+
+### 11.1 编码与表达语义
+
+| 决策项 | 唯一权威 | 执行消费点 | 其他组件的角色 | 状态 |
+|---|---|---|---|---|
+| 视觉变量→数据字段映射 | `encoding-ir` 的 `domain.field` + `scale` + `channels.symbols` | portrayal_resolver.py:66-97；vector_portrayal.py:59-123；raster_renderer.py:167-186 | Style 不得重定义；Scenario/请求提供字段绑定 | executed |
+| 分类断点 / 类别表 | IR `scale.edges` / `scale.categories`；栅格取自已澄清显示合同 | raster_portrayal.py；vector_portrayal.py | Style 不得存断点（map-style.md §5.2） | executed |
+| 分类方法 | catalog `validation.rules[parameter_enum]` | expression_validator.py:103-114 | 本次选择在 plan/portrayal；Style 不得再写一份允许集 | executed（仅 portrayal 层路径） |
+| 类数上限 | **catalog `validation.rules[class_count_range]`（语义权威，2..12）**；三个 schema 的结构界与之相等，由棘轮守卫保持 | portrayal 层路径：expression_validator.py:61-75；IR 路径：encoding-ir / thematic-design / vector-encoding 的 `maxItems` | Style 不得再写一份范围 | executed（已单一权威化） |
+| 缺失值策略 | IR `missing.policy ∈ {reject, symbol}` | vector_portrayal.py:88-90 | catalog `missing_value_policy`、`outlier_policy` 均 **0 消费点**；Style 提供缺失符号外观 | executed（词表待统一） |
+| 缺失值标签文本 | IR `missing.label`（required） | vector_portrayal.py:78 | 属实例内容，不属 Style | executed |
+| 几何适用性 | catalog `applicable_geometry` / `geometry_types` | map_expression_catalog.py:100-105 | 粒度为 layer 家族（vector），粗于 IR `geometry_role` | executed |
+| 目录 `field_requirements`、`visual_variables[].variable/source_role`、`checker_refs`、`parameter_definitions.{allowed_values,minimum,maximum,default}` | 无 | **全仓 0 消费点**（`visual_variables` 仅 `[0].algorithm_id` 在 adapter fallback 被读） | — | **declared-unconsumed** |
+
+### 11.2 外观常量
+
+| 决策项 | 唯一权威 | 执行消费点 | 其他组件的角色 | 状态 |
+|---|---|---|---|---|
+| 分类栅格色值 | 就绪显示合同：CSV 颜色列 / 澄清答案；缺色且选择 palette 时才使用 `PALETTE` 兜底 | raster_portrayal.py:83-88,122-134（含大写归一化） | 可复用外观目标归 Style；palette 枚举只是兜底选择器，不是唯一颜色输入 | **conflict**：兜底色仍由代码持有，Style 资产来源链未贯通 |
+| 连续色带色值 | 请求 `color_ramp.{scheme,colors}` → 冻结 encoding | raster_preparation.py:169-172,215-223（请求、摘要和 encoding 均保存） | 本次实例可追溯；模板级 Style 色带来源与复用治理仍未贯通，不等于请求颜色无法审计 | executed（模板级资产链待实现） |
+| 符号尺寸 / 线宽 | IR `channels.symbols[].{radius_mm, stroke_width_pt}` | page_renderer.py:355-359、371-372 | `cartography.defaults.*` **0 渲染消费点** | executed |
+| 字号 / 行距 | `cartography.typography` | appearance.py:15-16 → static_page_renderer.py:179/185/193/209/217/233/265/281 | Layout 不得定义字号 | executed |
+| 页级基础外观绑定 | `page-request.appearance` → `resolved-appearance.style_ref`（单一引用） | appearance.py:9-20；static_page_renderer.py:90,179-193 | 目标按内容角色选规则，不为每个 Frame 复制整套 Style；多套局部 Style 未开放 | executed（角色化扩展另行演进） |
+| 注记光晕 | `cartography.labeling.halo` | page_renderer.py:435-440（仅矢量要素注记） | `width_mm` 为向外半径（代码 ×2 转描边宽） | executed |
+| 注记优先级 / 避让 / 密度 / 字体角色 | **无执行权威**；行为硬编码 | page_renderer.py:451-457 贪心丢弃；`cartography.labeling.{density,collision_policy,font_role}` 仅被匹配器读取 | 目标归 Style（map-layout.md §4） | **declared-unconsumed** |
+| 色带感知校验（R1 明度单调 / R2 相邻可区分 / R4 色盲安全） | **`policies/color-redlines-policy.yaml`**（全部数值参数，代码不持有） | `color_checks.check_ramp` / `check_color_sequence` / `enforce`；活门禁三处：vector_portrayal.py:131-136、raster_portrayal.py:212-218、raster_preparation.py:172-177 | Style 声明色带，本策略只收紧接受度，**不选色、不准入能力** | executed |
+| 色度学原语（sRGB→Lab、ΔE76、对比度、CVD 模拟） | **`carto_core/color_science.py`**（单一真源） | `template_matching.py:32` 重导出；`color_checks.py:27` 消费同一原语 | 不得另写第二套色度公式 | executed |
+| `cartography.visual_language`、`symbolization.color_system`、`symbol_catalogs`、`default_opacity`、`generalization.*` | 无渲染权威 | 仅 template_matching.py:255-295 评分；`symbol_catalogs` 的 11 个 ref **无实体注册表** | — | **declared-unconsumed** |
+
+**色值所有权的阶段障碍（重要）**：分类栅格的颜色在**数据准备阶段**就被冻结——`raster_preparation._resolve` 调 `resolve_classes(base["request"], ...)`，而该 request 是分类请求，**不携带任何模板/cartography 引用**（`raster-classification-request.schema.json` 的 palette 是兜底选择器，CSV/澄清仍可提供显式颜色）。cartography 直到 `compile_page_request` / `resolve_appearance` 才被读取，**晚于颜色冻结**。
+
+因此“让 Style 成为色值权威”**不是改一个消费点就能完成**，必须先解决阶段顺序，二选一：
+
+1. 给分类请求增加显式色带入参（镜像连续分支已有的 `color_ramp.{scheme,colors}`），由规划层从 Style 资产取值后传入；
+2. 把颜色赋值从准备阶段后移到 portrayal 编译阶段。
+
+两者都是协议变更，需版本策略与横切面同步。在此之前，`PALETTE` 保留在代码中并作为**已登记冲突**，不得宣称 Style 已能影响分类栅格成图。连续栅格分支不受此障碍影响（色带已由请求 `color_ramp.colors` 传入并进入 IR `channels.symbols[].color`）。
+
+作者 Style 与编译后的 IR 可保留同一色值，只要来源唯一、摘要绑定且不能独立改写，不构成双重权威。资产迁移必须发生在相关输出冻结前，不能在页渲染时覆盖已冻结颜色。实例请求可追溯、模板资产可复用、模板发布已审批是三个不同判断；不能互相替代。
+
+### 11.3 空间与版式
+
+| 决策项 | 唯一权威 | 执行消费点 | 其他组件的角色 | 状态 |
+|---|---|---|---|---|
+| 画布与框几何 | `layout.canvas` + `layout.frames[].bounds` | layout.py:125-217 | Delivery 提出兼容条件；固定尺寸合法（map-layout.md §2、§5.3） | executed |
+| 有意重叠 | `layout.frames[].inside_frame`（声明）+ 程序几何核验 | layout.py:149-171、192-203 | 仅非地图框位于未被包含的地图框内；全部仍为页面坐标，不是通用父子布局 | executed |
+| 通用 Frame 父子组合 / 局部坐标 | Layout 作者结构（目标），程序推导页面坐标并验证内容 | 当前无通用消费者；目标见 MapLayout §6.7–§6.8 | 只保留一种 Frame；不以 inside_frame 或 chart 枚举冒充嵌套能力 | target-only |
+| 容器内边距 | `layout.content_padding_mm` | appearance.py:13-16 | Style 不得定义 | executed |
+| 图例列数 / 列间距 | `layout.frames[].legend_columns`、`grid.shared_legend_columns`/`legend_gap_mm` | static_page_renderer.py:186-196；grid_layout.py:62-69 | — | executed |
+| 图例项与标签 | `resolved-portrayal.legend_items` | raster_page_contract.py:72-76；vector_page.py:62-70 | Layout 只提供容器 | executed |
+| 空间容量 | **当前为手写 `layout.capacity`（计数门禁）** | raster_page_contract.py:74-76；page_renderer.py:150-151 | 目标：由程序从 frame×typography×字体度量推导（design-principles §2.3） | **conflict**：实测可声明物理上放不下的值并通过计数门禁 |
+| 尺度分段与综合 | `spatial-behavior.scale_bands`（Schema required） | **无消费点**：仅 general_thematic.py:516-517 生产单波段；`cartography.generalization` 同样无消费点 | 两份声明均空转 | **declared-unconsumed** |
+| 图层顺序 | `portrayal.layers[].z_order` + **数组声明顺序** | page_renderer.py:340-342 | Style 不得另立第三套相对约束 | executed |
+| 比例尺长度 | 由所绑定视图计算 | static_page_renderer.py:69 `grid_scale_length`、:261 | Layout 只安排位置；多图时必须绑视图 | executed（单图） |
+| 指北针方向 | **当前为固定向上箭头**，未按视图真北旋转 | static_page_renderer.py:274-277 | 目标由编译器按视图计算（map-layout.md §8.2） | **target-only**（旋转未实现） |
+| DPI / 幅面 / 输出格式 | `scenario-capabilities.output_profile` + Delivery | general_thematic.py:949-955 校验 layout 与 output_profile 一致 | Layout 不得拥有 DPI | executed |
+
+### 11.4 内容与业务约束
+
+| 决策项 | 唯一权威 | 执行消费点 | 其他组件的角色 | 状态 |
+|---|---|---|---|---|
+| 字体文件 | generate 请求 `font.path`（冻结摘要） | map_generation.py:251；static_page_renderer._font（单面 TTF、字形覆盖、无静默回退） | 品牌段已移除，无其他解析途径 | executed |
+| 署名 / 声明文本 | 场景策略 `notice` + 请求 `map_title` | general_thematic.py:965（notice）；general_vector.py:201（map_title + notice） | 品牌段已移除，无格式消费 | executed |
+| 品牌色 / Logo | 已随品牌段移除（2026-11-18 用户授权） | identity 契约与 Schema 已删除 | 移除前即无渲染消费点，移除不改变成图外观 | **removed** |
+| 字段名 / 数据路径 / 许可 | 请求 `source_bindings` / `field_bindings` | map_generation.py:109-123 | Style/Layout 不得拥有 | executed |
+| 业务硬上限（必需元素与数量） | Scenario + 适用标准 | scenario.schema.json、质量门禁 | Layout 的容量提示不得冒充业务上限 | 需明确（见 map-layout.md §7.1） |
+
+### 11.5 页面、内容角色与嵌套的共同边界（2026-11-19）
+
+本节只仲裁所有权；完整字段说明与例子分别由 [MapStyle §8、§10.3](map-style.md#103-maplayout-接口) 和 [MapLayout §5.4、§6.7–§6.8](map-layout.md#67-复合内容与-frame-嵌套目标设计) 拥有，不建立第二套机器协议。
+
+1. **Style 与 Layout 独立组合。** 模板库中可多对多兼容；本次页面选基础 Style，内容角色使用对应规则。Frame 移位或增加父容器不改变内容角色，也不自动获得一套完整子 Style。局部作用域/级联未实现，须另行定义并验证。
+2. **Frame 承载组件，不接管组件内部。** 是否拆框取决于是否需要独立布局、绑定和测量边界。文字运行、图表轴/柱子/标签通常归内容组件；图文卡片可由父容器组织子内容。容器 Frame 只组织子节点、内容 Frame 绑定内容；不重复拥有整份内容和子内容，也不新增 SubFrame 类型/模板/执行器。
+3. **几何与内容各有唯一作者来源。** 固定毫米几何合法；网格/父子结构的展开坐标是程序结果。作者树与独立 parent 引用、组件内部布局与页面布局不能各保存一份可修改的同义权威。目标局部原点和测量传播由 Layout §6.7 规定，当前 page 坐标协议不变。
+4. **共享关系分开。** 共享图例、共享编码尺度和相同地图比例尺不等同。业务可比性由 Scenario/表达决定，图例合并由编译器核验，Layout 只组织已获语义许可的内容与视图关系。
+5. **复用和执行效力有前提。** 模板只需在声明的适用范围内稳定，不要求换纸张/主题后无条件成立。无可见要素、无碰撞或未触及限制时像素可不变；用可触发用例、实际消费者、来源和失败结果验证，不以单次图片哈希判定字段生死。设计理由归 design_spec，不能伪装成执行参数。
+6. **生命周期属于证据链。** 设计选择须在相关产物冻结前进入唯一来源链；内容、字体、样式、几何和相关环境变化后，测量与受影响实例结果失效重算。继续沿用 resolved-appearance / resolved-portrayal / resolved-layout 和 MapSpecLock，不新增第四种同职责产物或第二套锁；未知字段和未准入能力继续拒绝。
+
+## 12. 规则可执行性规范
+
+本节是三类模板契约（scenario/style/layout）中 `rules` 的共同规范。依据：[design-principles §2.2](../design-principles.md)「验证是封闭世界…不允许静默降级或自动修正」、AGENTS.md「未知字段默认拒绝」、原 map-brand.md §6.5「初期只开放已经具备确定性校验能力的规则，未知约束不能静默忽略」（该文档已随品牌段移除删除，2026-11-18；规则封闭世界原则由 design-principles 与 AGENTS.md 继续承载）。
+
+### 12.1 五条硬规范
+
+1. **指针必须段内可解析**。`rules[].path` 必须是 RFC 6901 指针，且在**该段自身文档**内可解析。禁止跨段指针：`/application/excluded_uses` 只存在于 scenario 契约，不得复制进 cartography / layout。
+2. **强语义规则必须带可比较值**。`strength ∈ {hard_rule, forbidden, mandatory, binding}` 的规则必须携带 `value`，且 `value` 是被指向路径上可比较的值，不是散文。现有门禁已如此要求（[map_candidate.py:133-140](../../skills/carto-agent/scripts/carto_core/compiler/map_candidate.py) `_validate_rules`）。
+3. **只开放具备确定性校验器的规则**。无校验器的约束只能写进 `design_spec.md` 解释理由，不得进入机器契约的 `rules` 并标为强语义。
+4. **未知规则名与未知校验器必须拒绝**。不得以 forward-compat 为由静默跳过；否则一个拼写错误就能让整条约束失效。
+5. **自由文本约束必须标 advisory**。字符串列表（如 `logo.placement_rules`）不构成已校验事实，不得据此声称合规。
+
+### 12.2 合法与非法样例
+
+```yaml
+# 合法：指针在本段内可解析，强规则带可比较值
+rules:
+  - id: token-overrides-forbidden
+    strength: hard_rule
+    path: /extension_policy/token_overrides
+    description: 外观常量不可被实例覆盖
+    value: forbidden
+
+# 非法一：跨段指针（本段无 application 键）
+rules:
+  - id: synthetic-preview-only
+    strength: hard_rule
+    path: /application/excluded_uses   # 只存在于 scenario
+    value: true
+
+# 非法二：强语义规则缺 value
+rules:
+  - id: color-priority
+    strength: forbidden
+    path: /symbolization
+    description: 禁止改变色带优先级   # 散文，无校验器，无 value
+```
+
+### 12.3 实测基线（2026-11-18 品牌段移除前，只读探针；历史存档）
+
+| 核对项 | 实测结果 | 锚点 |
+|---|---|---|
+| 14 项迁移资产的 `rules[].path` 段内可解析数 | **0 / 20** | 14×`/application/excluded_uses` + 6×`/brand/*`（identity 无 `brand` 键） |
+| 唯一品牌资产强语义规则带 `value` 数 | **1 / 7** | 6 条缺 value；调用真实 `_validate_rules` 返回 `TEMPLATE_RULE_UNRESOLVED: identity:color-priority` |
+| 该品牌段可否作为 `segment_refs` 使用 | **否**，进入候选装载即失败关闭 | 同上 |
+| `logo.asset_ref.digest` | 等于 **sha256(空输入)**；`uri` 为散文而非可解析路径 | 违反 map-brand.md §10.3「不得用示意摘要完成冻结」 |
+| 未知规则名处理 | **静默放行**：将 `parameter_enum` 拼为 `parameter_enm`，非法值 → `findings=[]` | expression_validator.py:47-49，与本节第 4 条冲突，属待修缺陷 |
+
+注：品牌资产与 identity 契约已于 2026-11-18 整体移除（用户授权），表中品牌相关行为移除前实测；迁移资产现为 13 项（6 风格/7 版式）。
+
+上述基线是**已知缺陷登记**，不是能力声明。整改项归路线图与测试守卫；新增资产必须满足本节五条硬规范后方可发布。
+
+## 13. 后续落地顺序与目录位置
+
+### 13.1 建议实施顺序
 
 | 阶段 | 工作 | 完成判据 |
 |---|---|---|
@@ -504,23 +648,23 @@ value = 400 → 直径 8 mm，面积为原来的 4 倍
 
 不需要一次实现所有地图类型，也不需要先建设一个完整表达平台，才能验证图表和符号复用是否成立。
 
-### 11.2 在本项目中的位置
+### 13.2 在本项目中的位置
 
 | 内容 | 合适位置 | 说明 |
 |---|---|---|
 | 本次结论与后续概念设计 | `doc/template/` | 人类阅读的设计说明，不作为运行协议 |
-| 场景、样式、版式、品牌的职责说明 | 现有 `map-scenario.md`、`map-style.md`、`map-layout.md`、`map-brand.md` | 已同步职责边界；后续能力落地仍须同步协议、实现和验证，详细公共规则以本文为设计参考 |
+| 场景、样式、版式的职责说明 | 现有 `map-scenario.md`、`map-style.md`、`map-layout.md`（原 `map-brand.md` 已随品牌段移除删除） | 已同步职责边界；**所有权争议以本文第 11 节单表为准，`rules` 可执行性以第 12 节为准**；后续能力落地仍须同步协议、实现和验证 |
 | 当前表达定义 | `skills/carto-agent/policies/map-expression-catalog.yaml` | 保留既有入口；能力成熟后按版本演进 |
 | 实例及参数的结构约束 | `skills/carto-agent/schemas/` | 只在正式引入能力时修改 Schema，不把文档示例当作合法协议 |
 | 表达计算、图表核心、资源解析、放置与编译 | `skills/carto-agent/scripts/carto_core/` | 按职责拆分模块；工作流负责组织，算法保持可复用 |
 | 符号资源 | 既有模板资源包与资源引用机制，加载代码仍位于运行根目录 | 具体包内结构随资源协议确定，不在仓库根另建执行体系 |
 | 方法和资源的自动检查、合成案例 | `skills/carto-agent/scripts/tests/` 及现有 Fixture 位置 | 新协议同时提供合法样例、非法样例和自动测试 |
 
-MapLayout 的 Frame 与内容角色关系见 [MapLayout 完整说明](map-layout.md)，品牌资源约束见 [MapBrand 完整说明](map-brand.md)。
+MapLayout 的 Frame 与内容角色关系见 [MapLayout 完整说明](map-layout.md)。品牌资源约束原见 MapBrand 完整说明；品牌段已于 2026-11-18 经用户授权整体移除（无渲染消费者），该文档已删除。
 
 实施前按仓库要求阅读 `skills/carto-agent/SKILL.md`。运行能力只在 `skills/carto-agent/` 下扩展，不在历史占位目录或仓库根目录建设第二套实现。
 
-### 11.3 下一轮设计应确定的最小事项
+### 13.3 下一轮设计应确定的最小事项
 
 1. 选择一个符号案例和一个柱状图案例，明确输入语义、参数及不支持情况。
 2. 确定图表核心的最小接口及语义契约，以及地理放置、页面放置各自负责的部分；明确哪些使用预设、哪些允许组合。
@@ -530,9 +674,9 @@ MapLayout 的 Frame 与内容角色关系见 [MapLayout 完整说明](map-layout
 6. 用共享尺度与独立归一化的反例验证语义检查，区分默认建议、任务硬要求和具体映射条件。
 7. 为组合方案明确计划承载和复现方式；只有实际存在需求时，另行评估动态代码执行的隔离及验收成本。
 
-## 12. 文档统一记录
+## 14. 文档统一记录
 
-### 12.1 术语与职责统一（2026-10-21）
+### 14.1 术语与职责统一（2026-10-21）
 
 本轮检查原始设计、四类模板说明、总体架构及两份 TRD，统一了以下影响理解和后续实现的表述。它们是设计层面的修订，不表示新增运行能力。
 
@@ -542,16 +686,16 @@ MapLayout 的 Frame 与内容角色关系见 [MapLayout 完整说明](map-layout
 | 原始目录树预设独立表达包、多套注册入口，容易把目录项理解为可执行实现 | 使用现有轻量目录与受信内置方法；独立发布按实际需求演进，目录声明不等于运行能力 | [原始设计](../carto-template-dsg.md)、[模板创建 TRD](../carto-create-template-TRD.md) |
 | Style 既被说成外观配置，又承担算法、符号资源与表达语义的全部定义 | 表达定义约束语义，Style 配置允许的外观和参数；算法由受信代码实现，符号资源按明确所有权引用 | [MapStyle](map-style.md) |
 | 场景绑定、表达发现与 Style Profile 的选择关系不清 | Scenario/任务提供业务语义与字段绑定；固定表达执行解析与校验，未固定时发现候选；Profile 不得突破表达和业务约束 | [MapScenario](map-scenario.md)、[地图生成 TRD](../carto-generate-map-TRD.md) |
-| 地图小图表、页面辅助图表、静态图表图标容易被归为同一类资源 | 图表核心可复用，地理与页面放置分责；静态图标属于资源，独立辅助图表无需强制登记地图表达 | [MapStyle](map-style.md)、[MapLayout](map-layout.md)、[MapBrand](map-brand.md) |
-| 原始问答把 Brand 解释为所有颜色和背景的最高所有者 | Brand 只拥有身份资源及允许消费的角色；专题颜色受表达、场景和标准约束，冲突不能简单覆盖 | [原始设计](../carto-template-dsg.md)、[MapBrand](map-brand.md) |
+| 地图小图表、页面辅助图表、静态图表图标容易被归为同一类资源 | 图表核心可复用，地理与页面放置分责；静态图标属于资源，独立辅助图表无需强制登记地图表达 | [MapStyle](map-style.md)、[MapLayout](map-layout.md) |
+| 原始问答把 Brand 解释为所有颜色和背景的最高所有者 | Brand 只拥有身份资源及允许消费的角色；专题颜色受表达、场景和标准约束，冲突不能简单覆盖（品牌段已于 2026-11-18 移除） | [原始设计](../carto-template-dsg.md) |
 | Style 的“冲突优先级”与六种规则标签、完整段所有权混用 | 分别处理分段所有权、必须共同满足的硬约束及可调默认值，不用通用覆盖阶梯解除硬约束 | [MapStyle](map-style.md)、[原始设计](../carto-template-dsg.md) |
 | 原始设计仍有旧锁文件名、并行 YAML 清单和必选原型描述 | 锁统一引用 MapSpecLock 正式 Schema；版式由机器契约拥有，原型和说明不构成另一套执行规则 | [原始设计](../carto-template-dsg.md) |
 | 目标设计、Schema 枚举和演示结果有时被混写成已实现能力 | 当前仍为两项表达的有限基线；通用图表、符号资源实际绘制及面积比例修正分别记录为待落实能力 | 四类模板的当前状态章节及本文第 10 节 |
 | 模板说明引用已不存在的补充设计文件，部分实施计划链接过期 | 改为现有原始设计、统一结论和全局实施计划的链接 | 四类模板说明、总体架构和模板创建 TRD |
 
-后续实现优先验证第 10.2 节的面积比例问题，再以一个真实加载符号的案例和一个图表复用案例推进。当前文档中的目标接口、扩展标识和示意流程仍需经过正式协议设计，不能直接传给现有 CLI。
+后续实现优先验证第 6.3 节的面积比例问题，再以一个真实加载符号的案例和一个图表复用案例推进。当前文档中的目标接口、扩展标识和示意流程仍需经过正式协议设计，不能直接传给现有 CLI。
 
-### 12.2 表达设计与受信实现补充（2026-10-22）
+### 14.2 表达设计与受信实现补充（2026-10-22）
 
 本次补充讨论结论：
 
@@ -560,3 +704,221 @@ MapLayout 的 Frame 与内容角色关系见 [MapLayout 完整说明](map-layout
 - 采用成熟方法、基础能力组合、按需开发新实现三条路径；代码作者与执行信任分开，输入输出结构不是正确性的充分条件。
 - 以同一浙江合成案例补充设计、执行、验证和饼图分母说明，不新增业务主题专用模板或绘图函数。
 - 同步模板总设计、总体架构、Scenario、Style 及创建和生成 TRD；沿用 MapPlanner／MapComposer／Renderer 分工，未更改运行代码、Schema 或策略。
+
+### 14.3 所有权单表与规则可执行性规范（2026-11-18）
+
+本轮为 P0 文档修订，依据只读探针与源码核对，**未修改任何运行代码、Schema、策略或 Fixture**：
+
+- 新增第 11 节「所有权与权威源单表」，作为四类模板说明的共同边界仲裁表；每项决策恰好一个唯一权威，并标注 executed / declared-unconsumed / conflict / target-only 四档状态。
+- 新增第 12 节「规则可执行性规范」：指针段内可解析、强规则带可比较值、只开放有校验器的规则、未知规则名必须拒绝、自由文本标 advisory；附合法/非法样例与当前实测基线。
+- 重写第 10 节状态表：目录 active/deprecated 区分、能力档案 `@5.0.0` 与两个几何变体、矢量路径、四个 portrayal 层分支、`inside_frame` 包含豁免、段引用 S2 三边界。
+- 原第 11、12 节顺延为第 13、14 节；修正指向不存在的「第 10.2 节」的内部引用为第 6.3 节。
+- 同步更新 `map-style.md` §17、`map-layout.md` §18、`map-brand.md` §18、`map-scenario.md` §18 四份状态节，并改为引用本文第 11、12 节，不再各自重复定义所有权。
+
+本轮登记的主要冲突与空转项（整改归路线图与测试守卫，不在本文维护清单）：类数上限三源不一致、定性色值由代码常量持有、空间容量为手写计数而非推导量、尺度分段两份声明均无消费点、注记避让无渲染消费点（品牌段无消费点问题已随 2026-11-18 品牌段移除解决）。
+
+### 14.4 词表单源化与概念删除（2026-11-18）
+
+新增第 15 节「词表与概念单源规范」（规范性附录）：确立唯一词表权威，并**删除 18 项重复或无必要概念**。依据“非必要勿增实体”：概念重复与交叉描述会成倍增加理解成本，且已实测到漂移。同步修订 `map-style.md` §8/§15/§17 与 `map-layout.md` §7/§10。
+
+### 14.5 hex 大小写收敛与悬空引用清理（2026-11-18）
+
+**hex 收敛原则**：输入边界宽进并归一化，冻结产物与作者契约严格大写。理由是**摘要稳定性**：本仓一切审计均绑定 sha256，同一颜色写成 `#ff0000` 与 `#FF0000` 会产生两个不同冻结摘要。
+
+- 收紧 9 处 schema pattern 为 `^#[0-9A-F]{6}$`：identity(1)、resolved-portrayal(2)、raster-prepared-data(2)、render-scene(2)、raster-map-body(1)、page-request(1)。
+- 保留两处**输入边界**为宽正则：CSV 图例色（`raster_portrayal.py:37`，已在 `:88` 做 `.upper()`）与澄清答案 schema。
+- **修复一处真实不对称**：`resolve_classes` 原先直接 `row.update(overrides[value])`，未归一化答案颜色（CSV 路径已归一化）。现补齐，并新增测试证明大写/小写答案产生**相同 rows 与相同摘要**。
+- `svg_compositor.py:15` 收紧为大写（它校验冻结场景，不是原始输入）。
+- 新增非法样例 `SEMANTIC_INVALID_CASES["identity-lowercase-hex"]`（已随品牌段移除删除）。
+- 存量核查：lowercase hex **仅存在于 `original.yaml` 溯源件**（运行时不消费、不做 schema 校验），全部 fixture 与适配件均为大写，因此收紧零回归风险。
+
+**悬空引用清理**：五份文档头部的 `design-convergence-20261109.md（已移除）`、map-brand.md 的 urban-flood-risk 模板包引用、本文 §4.2 的 `u-p2-implementation-plan.md（已移除）` 共 7 处，全部改为可核对的活锚点（本文 §11/§12/§14/§15、SKILL.md、`general_thematic.py`、`schema_cases.py`）。
+
+**附带修复**：`schemas/template-match-request.schema.json` 首行开括号 `{` 丢失（外部损坏，非本轮改动引入），导致 SchemaRegistry 无法加载全部 schema。已补回。
+
+### 14.6 段引用仓库依赖回归修复（2026-11-18）
+
+**缺陷**：S2 改动将 5 处 `load_contracts(installation)` 改为 `load_contracts(installation, repository=self._repository())`。`_repository()` 在未配置 root/scope 时无条件抛 `TEMPLATE_REPOSITORY_REQUIRED`，而它是**作为实参被 eagerly 求值**的——即使 `load_contracts` 已被测试 mock，实参仍先报错。后果：**全内嵌 legacy 包也被强制要求模板仓库**，与 `map_candidate.py:111-117` 自述“Legacy fully embedded packages never need a repository”相矛盾，6 个未修改的 `test_raster_formal` 端到端用例报错。
+
+**修法**：新增 `_repository_optional()`（未配置时返回 `None`），5 处 `load_contracts` 调用改用它。失败关闭职责回归到被调用方：`load_contracts` 仅在 `scenario.segment_refs` 存在且 `repository is None` 时抛 `SEGMENT_REPOSITORY_REQUIRED`。真正需要发现能力的步骤（brief 缺 digest、模板安装）仍用严格形式，**配置了仓库时任何校验都未被削弱**。
+
+**同时修复两处测试断言缺陷**（`test_segment_refs.py`，均为新增未跟踪文件）：
+
+1. 将 `lock` 列入“引用包与全内嵌包契约必须相等”的循环。但 lock **按设计就应不同**：引用包必须钉住段依赖（`OwnershipResolver.validate_segment_lock`），且 `lock_id`/`package.digest`/`generated_at` 是每包身份与作者时间。改为：**正向断言**段依赖恰等于声明的 ref，再比较非段依赖、`resources` 与 `resolver_version`。
+2. `contract_path.write_text(original + b"\n# tampered")` 向 `write_text` 传入 bytes（`original` 来自 `read_bytes`）。改为 `write_bytes`。此笔误此前被更早的 lock 断言失败掩盖。
+
+**验证**：`test_raster_formal` 16 项全绿；`test_segment_refs` 9 项全绿；失败关闭路径仍由 `test_segment_refs.py:276/364` 覆盖。
+
+### 14.7 表达目录封闭世界化（2026-11-18）
+
+**缺陷**：`expression_validator.py:47-49` 对未知规则名 `return None`（注释自称 forward-compat）。而该校验器是**活门禁**：`template_validation.py:497-501` 在模板验证时逐层调用并将任何 finding 抛为 `ProtocolError`。因此一个规则名拼写错误就能**让整条约束在 T1/TP 验证中静默失效**，违反 design-principles §2.2「验证是封闭世界」与 AGENTS.md「未知字段默认拒绝」。
+
+**修法**：未知规则名返回 `blocker` / `EXPRESSION_RULE_UNKNOWN`。现有目录全部规则名（`parameter_enum`、`parameter_range`、`class_count_range`、`parameter_relation`、`explicit_encoding_defined`）均有 handler，因此零行为变更。
+
+**新增** `tests/test_expression_validator.py`（7 项），包括：
+
+- **棘轮守卫**：目录中声明的每个规则名必须有 handler，防止未来新增规则静默自失效。
+- 未知规则名 → blocker（用 stub catalog 注入拼写错误 `parameter_enm`）。
+- enum / range / required 缺失三类违规各自被拦；合法参数零 finding。
+- **记录校验器职责边界**：`class_count_range` 仅在 layer 携带 `classification.class_count` 时触发；IR 路径携带的是 `scale.categories`，由 IR schema 的结构界负责（见 §14.9，已单一权威化）。
+
+**同时记录的阶段障碍**：分类栅格颜色在数据准备阶段冻结，早于 cartography 被读取（见 §11.2 末注）。因此“Style 成为色值权威”需先解决阶段顺序，不是改一个消费点就能完成。
+
+### 14.8 与 color-redlines 特性对齐（2026-11-18）
+
+仓库并发落地了 `color_science.py`、`compiler/color_checks.py`、`policies/color-redlines-policy.yaml` 与其 schema/测试。按 §15 单源规范逐项核对：
+
+| 核对项 | 结果 |
+|---|---|
+| 色度公式是否重复 | **无重复**。`color_science.py` 为单一真源，`template_matching.py:32` 改为重导出，`color_checks.py:27` 消费同一原语 |
+| 是否活门禁 | **是**，三处：vector_portrayal.py:131-136、raster_portrayal.py:212-218、raster_preparation.py:172-177 |
+| 数值参数是否在代码 | **否**，全部在 policy；`confirmation_status: pending-business-review`，与匹配策略同一惯例 |
+| hex 收敛是否被破坏 | **否**。未新增宽 pattern；`simulate_cvd` 返回大写 hex |
+| 是否封闭世界 | **是**。未知 scheme 抛 `COLOR_RAMP_SCHEME_UNKNOWN` |
+| 是否引入已删概念 | **否**。无 tokens/Profile/新 resolved-* 产物 |
+| 感知缺口是否已关闭 | **已关闭**。重跑旧反例：`#0000FF`/`#0000FE`（ΔE76=0.4232）现报 `COLOR_ADJACENT_INDISTINGUISHABLE` 而不再被接受 |
+
+**自我纠正**：本文早先提案的 `ramps[].perceptual_type ∈ {sequential, diverging, qualitative}` **与现有活词表 `color_ramp.scheme ∈ {sequential, diverging}` 重复**，违反 §15 自身原则。已改为采用 `scheme`；定性色带不带 scheme（有序/定性之分已由 `key_mode` 与是否调用 `check_ramp` 表达）。同步修订 §11.2、§15.1、§15.2 #5、§15.3 与 `map-style.md` §8.2。
+
+**新增权威入表**：§11.2 增加两行——色带感知校验（权威 `color-redlines-policy.yaml`）与色度学原语（权威 `color_science.py`），均为 executed。
+
+**阈值单位提醒**：该策略用 **CIELAB CIE76 ΔE**，与匹配器一致。实测 ΔE76 数值比 ΔE2000 大 1.5–3.3 倍，**若日后改用 ΔE2000，`adjacent_delta_e_min` 与 `cvd_delta_e_min` 必须重新标定**，不得直接沿用。
+
+### 14.9 类数上限单一权威化（2026-11-18）
+
+**缺陷**：catalog 声明类数 2..12，但 `encoding-ir`、`thematic-design`、`vector-encoding` 三个 schema 的 `categories maxItems` 均为 **32**，`encoding-ir` 的 `channels.symbols maxItems` 也是 32。而 `expression_validator._check_class_count_range` **仅当 layer 携带 `classification.class_count` 时触发**，IR 路径携带的是 `scale.categories`，因此看不到。实测：**13 类经真实编译被接受**。
+
+**修法**：以 catalog 为语义权威，将四个结构界收紧到 12（`edges` 为 13 = 12 区间 + 1）：
+
+| schema | 字段 | 旧 | 新 |
+|---|---|---|---|
+| encoding-ir | `discreteScale.categories.maxItems` | 32 | **12** |
+| encoding-ir | `channels.symbols.maxItems` | 32 | **12** |
+| thematic-design | `categories.maxItems` | 32 | **12** |
+| vector-encoding | `categories.maxItems` | 32 | **12** |
+
+**为何不把 catalog 值注入 schema**：JSON Schema 无法在验证时读取 YAML 策略。因此保留两处界（结构界 + 语义界），但用**棘轮守卫**强制相等，而不是任由其漂移：`test_class_count_upper_bound_has_a_single_authority` 递归扫描三个 schema 的 `categories/symbols/labels/edges` 的 `maxItems`，断言均等于 catalog 唯一最大值（`edges` 为 max+1）。单符号模式的 `categories maxItems: 0` 是更紧的约束，允许存在。
+
+**验证**：重跑探针，13 类现报 `SCHEMA_VALIDATION_FAILED: encoding-ir/channels/symbols … is too long`；新增 `test_ir_rejects_more_classes_than_the_catalog_allows` 钉住 13 拒 / 12 过。
+
+**剩余较低优先级缺口（已登记，本轮未改）**：catalog 的类数**下限** 2 在 IR 路径仍未被强制（`categories` 无 `minItems`，因单符号模式要求为空，需 if/then 才能表达）。上限是已实测造成漂移的那一项，下限未观察到实际危害。
+
+### 14.10 catalog 内部去重（2026-11-18）
+
+**缺陷**：`parameter_definitions` 的 `allowed_values` / `minimum` / `maximum` 与 `validation.rules` 的 `parameter_enum.allowed` / `parameter_range.min,max` 是**同一约束的两份副本**。前者除 `required` 外 **0 消费点**（expression_validator.py:85-89 只读 `name` 与 `required`），后者才是活门禁。
+
+**去重范围**（共 8 处，4 个模式 × 2 个条目）：
+
+| 位置 | 删除字段 | 保留的权威副本 |
+|---|---|---|
+| classification-method（deprecated + active） | `allowed_values`（4 值） | `validation.rules[parameter_enum].allowed` |
+| class-count（deprecated + active） | `minimum: 2` / `maximum: 12` | `validation.rules[parameter_range].min,max` |
+| minimum-size-mm（×2） | `minimum: 0.1` / `maximum: 50` | 同上 |
+| maximum-size-mm（×2） | `minimum: 0.1` / `maximum: 50` | 同上 |
+
+**保留**：`name` / `type` / `required` / `default`。`default` **不是重复**（validation.rules 无对应项），属 declared-unconsumed，不在本次去重范围。
+
+**不得误删**：`field_requirements.minimum/maximum` 是**数据值域**（如 count-value ≥ 0），与参数约束是不同概念，已保留并在 catalog 头部注释说明。
+
+**无信息损失验证**：新增 `test_dedup_dropped_no_constraint`——每个 enum/integer/number 参数必须仍被某条 `parameter_enum`/`parameter_range` 约束。另一条 `test_parameter_definitions_carry_no_duplicate_constraints` 钉住字段集只能是 `{name,type,required,default}`。
+
+**schema 同步收紧**：`map-expression.schema.json` 的 `parameter_definitions` 删除这三个属性；因 `additionalProperties: false`，**今后再写入副本会直接被拒**。同步更新两个 catalog fixture 与 `schema_cases.MAP_EXPRESSION`，并新增非法样例 `map-expression-duplicated-constraint`。
+
+**并发变更提醒**：本轮发现 `identity.schema.json` 已被外部重构**删除**（git 状态 `D`），`common`/`manifest`/`template-index`/`dependency-lock` 等也被修改。因此：① 本文早先引用的 `identity.schema.json:16` 已失效；② 基于它的 hex 非法样例已移除（不得恢复别人有意删除的文件）；③ hex 收敛原则本身**未被破坏**，反而被推广到更多 schema。（2026-11-18 更新：该删除已经用户授权确认为品牌段整体移除的一部分，非外部意外变更。）
+
+### 14.11 Style/Layout 设计讨论归档（2026-11-19）
+
+- 明确页面基础 Style、内容角色、Layout/Frame 的关系；同页多图与共享图例不自动推出相同编码/地图比例尺。
+- 明确固定几何合法，复用受适用范围约束，执行作用须有触发条件；设计说明和机器合同分责。
+- 修正颜色来源陈述：CSV、澄清、请求和 palette 兜底分开；请求/encoding 已冻结不等于 Style 模板资产链已贯通。迁移仍须解决准备阶段冻结时序。
+- 在 MapStyle 收敛最小字段和联合密度图例子，删除相冲突的现行示例用法（品牌角色、Profile、token 追溯、Style 分类数覆盖和手写容量）；保持历史删除登记。
+- 在 MapLayout 增加“同一种 Frame 的父子组合”目标、内容组件拆分边界、局部坐标与测量传播、图文/图表结构例子；明确它不是当前 inside_frame，亦不注册新字段或能力。
+- 本次只编辑设计文档并检查文本一致性/引用；不运行制图、生成业务数据、修改 Schema/代码/策略或声称已通过新能力验收。新协议实施时仍须合法/非法样例与自动测试。
+
+## 15. 词表与概念单源规范（规范性附录）
+
+本节与第 11、12 节同为三类模板说明（scenario/style/layout）的共同约束。**原则：非必要勿增实体**。一个概念只有在①有唯一权威、②有执行消费点或已登记的路线图目标、③不与现有概念交叉描述时，才允许存在。
+
+### 15.1 词表权威表
+
+枚举词表、字段名与数据形状**以 `skills/carto-agent/schemas/` 为唯一权威**。文档示例与之不同时，必须标为“目标 vN 提案”并列出迁移横切面。
+
+| 概念 | 唯一词表 | 应废弃的同义词/变体 | 证据 |
+|---|---|---|---|
+| 颜色字面量 | **冻结产物与作者契约：严格大写 `^#[0-9A-F]{6}$`**；**输入边界：宽进 + 归一化为大写** | 无（已收敛）。输入边界仅两处：CSV 图例色（`raster_portrayal.py:37` 宽正则 + `:88` `.upper()`）、澄清答案（`raster-classification-answers` 宽 pattern ×2 + `resolve_classes` 归一化） | 严格大写现覆盖 11 个 schema（含 thematic-design / vector-encoding 各 16 处）；`svg_compositor.py:15` 已收紧。注：`identity.schema.json` 已随品牌段移除删除（2026-11-18 用户授权），其 pattern 随之消失 |
+| 色带感知方案 | **`scheme ∈ {sequential, diverging}`**（请求 `color_ramp.scheme`，`color_checks.check_ramp` 消费，未知值抛 `COLOR_RAMP_SCHEME_UNKNOWN`） | **`perceptual_type`**（本文早先提案）、`color_system` | 定性色带**不带 scheme**，直接走 `check_color_sequence`；有序/定性之分已由 `key_mode` 与是否调用 `check_ramp` 表达，无需第三个枚举值 |
+| 缺失值策略 | IR `missing.policy ∈ {reject, symbol}` | `explicit-symbol`（catalog 与 map-style.md §8.4） | catalog 同名字段 0 消费点；活路径为 vector_portrayal.py:88-90 |
+| 几何 | IR `geometry_role ∈ {point, line, polygon, raster-cell}` | `point/anchor`（map-style.md §7.4）；`vector` 是 **layer 家族名**，不是几何 | encoding-ir.schema.json:12；portrayal.schema.json:475-477 |
+| 测量层次 | IR `measurement` 7 值：nominal/ordinal/count/rate/ratio/density/normalized-index | `semantic_types` 的 `ordered-numeric`/`nonnegative-count`/`category`/`signed numeric` | encoding-ir.schema.json:57；`place hierarchy` **不是测量层次**，归 labeling 角色 |
+| 表达标识 | catalog `expression_id` + `version`；执行层为 IR `key_mode` | `kind`（single/categorical/choropleth/proportional）仅为请求侧别名，必须显式映射 | thematic_design.py:44；映射：single→discrete(field=null)、categorical→discrete、choropleth→interval、proportional→scaling |
+| frame 类型 | layout.schema.json 8 值：map/title/legend/scale-bar/north-arrow/inset/marginalia/chart | `logo`/`text`/`table`（map-layout.md §6.2） | `text→marginalia`；`logo`/`table` 无枚举，属目标 |
+| 框几何形状 | common `$defs/pageBox` 数组 `[x, y, w, h]` | 对象 `{x, y, width, height}`（map-layout.md §10.2） | layout.py:188 按数组解包 |
+| 溢出 | `overflow.actions[]`（有序动作列表） | `overflow_policy` 单值枚举 | 动作列表严格更强，且 §3.4 要求记录选择原因 |
+| 空间容量 | **程序推导**，写入 `resolved-layout` | 手写 `capacity` / `capacity_hints` | design-principles §2.3 将字体度量列为机械推导 |
+| 图层顺序 | `portrayal.layers[]` **数组声明顺序** + `z_order` | `layer_order.constraints` 相对约束 | page_renderer.py:340-342 |
+| 尺度分段与综合 | `spatial-behavior.scale_bands` | `cartography.generalization`、`style.scale_behavior` | 两者均 0 消费点 |
+| 实例外观产物 | **`resolved-appearance`**（已有 Schema v2） | `ResolvedCartography` / `resolved-cartography.yaml` | resolved-appearance.schema.json 已存在；appearance.py:9-21 已生产 |
+| 实例表达产物 | `resolved-portrayal`（图例项、断点、符号） | “图例实际结果”另立产物 | resolved-portrayal.schema.json |
+| 实例排版产物 | `resolved-layout` | “实例排版结果”另立产物 | resolved-layout.schema.json |
+
+### 15.2 概念删除登记
+
+以下概念**从目标设计中删除**，不再出现在契约结构、示例或接口声明中。删除不是“暂缓实现”，而是认定其**不必要**：要么已有唯一权威，要么可被现有概念表达，要么是无法校验的形容词。
+
+| # | 删除的概念 | 删除理由 | 证据 | 替代物 |
+|---|---|---|---|---|
+| 1 | `ResolvedCartography`（及 `resolved-cartography.yaml`） | **重复实体**：已有同职责产物 | resolved-appearance.schema.json v2；appearance.py:9-21 | `resolved-appearance` |
+| 2 | `cartography.generalization` | 与 spatial-behavior 交叉，且**两者均无消费点** | 全仓 grep 0；spatial-behavior.schema.json:11 | `spatial-behavior.scale_bands` |
+| 3 | `style.scale_behavior` | 同上；Style 不得自造比例尺分母 | 同上 | 引用 `scale_band id` |
+| 4 | `cartography.defaults.{line_width_mm,point_size_mm,opacity}` | 与 IR 符号通道重复；实测 pixel-identical | encoding-ir:29-38；page_renderer.py:355-359、371-372 | IR `channels.symbols[]` |
+| 5 | `cartography.symbolization.color_system` | **可由色带感知类型推导**；手写分类已漂移 | `kernel-density-sequential-style` 的 color_system 实为 `mixed` | `ramps[].scheme`（仅有序色带） |
+| 6 | `cartography.symbolization.symbol_catalogs` 及“符号库注册表”作为独立实体 | 11 个 ref **0 实体**；本文 §1 结论 7 与 §4.1/4.4 已反对过早建独立资源系统 | `Glob **/*symbol*` → 0 文件 | `symbol_roles[].asset_ref`（可选） |
+| 7 | `cartography.symbolization.default_opacity` | 0 消费点；透明度属符号通道 | 实测 pixel-identical | `symbol_roles[].opacity` |
+| 8 | `cartography.visual_language` | 散文形容词，0 渲染消费点；无法形式校验 | 实测 pixel-identical；仅 template_matching.py:255 | 若需检索，由 tokens/ramps 推导 |
+| 9 | `cartography.labeling.density` | 与请求 `labels.max_labels` **重复表达同一数量** | test_labels_protocol.py:37；general-generate-request `vector_panels[].labels` | `labels.max_labels` |
+| 10 | `cartography.labeling.font_role` | 与 §8.5 `text_styles[].font.role_ref` 重复；角色定义权归外部字体声明（品牌段已移除） | 原 identity.typography[].role（已删除） | `labeling.hierarchy[].font_role_ref` |
+| 11 | `cartography.labeling.collision_policy`（三值枚举） | **一个枚举混了两个正交轴**（是否允许重叠 / 如何排序），且行为硬编码 | page_renderer.py:451-457；Mapbox 用 `text-allow-overlap`(bool) + `symbol-sort-key` | `allow_overlap: bool` + `priority: int` |
+| 12 | `portrayal_profiles` / “Profile” | **其组成全部已有权威**：expression_ref→portrayal、accepts→catalog、parameter_constraints→catalog、missing_value→IR；仅余命名层 | 0 消费点；§8.4 与 catalog `parameter_definitions`/`validation.rules` 重复 | `symbol_roles[]` + `accepts` |
+| 13 | `tokens` 通用间接层（colors/dimensions/opacities + `token_ref`） | 多一层解析即多一类悬挂引用风险，`symbol_catalogs` 已演示该失败 | 11 个悬挂 ref | 标量常量**内联**于 symbol_roles；仅保留 `ramps`（分级必需有序序列） |
+| 14 | `text_styles` 作为独立顶层名 | 与 `labeling` 同义 | §8.5 与 cartography.labeling 描述同一事物 | 合并为 `labeling.hierarchy[]` |
+| 15 | `layer_order.constraints` | 与数组顺序 + z_order 重复；偏序需程序选拓扑序，违反零设计偏好 | design-principles §2.3；page_renderer.py:340-342 | 声明顺序 + 可验证谓词 |
+| 16 | `layout.placeholders` | **无替换引擎**；`content_slots` 覆盖同一需求 | 实测全量替换 → pixel-identical | `content_slots[]` + 实例绑定 |
+| 17 | `layout.category` | 0 渲染消费点；§8.4 自认“声明 web/mobile 分类不等于具备能力” | 实测 pixel-identical；7/7 资产 general vs 现役 report 导致匹配不可达 | `compatibility.media` |
+| 18 | `layout.capacity` / `capacity_hints`（手写空间容量） | 推导量不应 authored；乐观提示比无提示更糟 | 实测 4/7 物理不可实现；声明 200 字于 277×10mm 框被放行 | 程序推导值入 `resolved-layout`；业务上限归 Scenario |
+
+上表共 18 项（含两项同名合并）。**删除后不得以别名重新引入**；若未来确需某概念，必须先在本表登记撤销理由与新增消费点。
+
+### 15.3 保留的最小概念集
+
+**MapStyle（契约名 `cartography`）**
+
+| 保留概念 | 职责 | 状态 |
+|---|---|---|
+| `typography` | 字号/行距常量 | executed |
+| `labeling.halo` | 注记光晕颜色与向外半径 | executed（仅矢量注记） |
+| `labeling.hierarchy[]` | 注记角色、字号、颜色、`priority`、`allow_overlap`、`font_role_ref` | target（合并原 text_styles） |
+| `ramps[]` | 有序 hex 序列 + `scheme`（仅有序色带）+ `reversible` + `provenance` | target |
+| `symbol_roles[]` | 按几何与编码声明符号外观；标量常量内联；可选 `asset_ref` | target（合并原 symbol_definitions + tokens） |
+| `accepts` | measurement × geometry_role × key_mode，**唯一硬匹配依据** | target |
+| `compatibility` / `extension_policy` / `standard_refs` | 能力要求、覆盖治理、标准引用 | target |
+| `rules` | 硬约束，须满足 §12 五条 | 现有结构门禁不等于所有声明语义已执行；逐条按 §12 核对 |
+
+**MapLayout（契约名 `layout`）**
+
+| 保留概念 | 职责 |
+|---|---|
+| `canvas` | 幅面、方向、单位、坐标约定、四边安全边距 |
+| `frames[]` | 固定几何 + 类型 + 内容绑定 + 溢出/排版 + 受控包含 + 视图关联；字段运行状态见 §11，通用父子组合仍为目标 |
+| `content_slots[]` | 内容角色接口（accepts / min_items / max_items） |
+| `grid` | 模数网格语义（区域、行列、间距、合法形状、图例共享） |
+| `content_padding_mm` | 容器内边距 |
+| `constraints` | 重叠许可（**带类型**）、必需内容与地图覆盖保留 |
+| `compatibility` / `extension_policy` / `rules` | 同上 |
+
+**不得新增的实体**：第五类模板、第二套实例锁、第四种同职责 `resolved-*` 产物、独立符号库注册表、通用 token 间接层、Profile 命名层、独立 SubFrame 协议或布局执行器。父子组合在现有 Frame/实例协议中演进，不从概念图推定能力开放。
+
+### 15.4 理解成本收益
+
+删除前，MapStyle 目标结构有 **13 个顶层概念**（visual_language/tokens/symbol_definitions/portrayal_profiles/text_styles/layer_order/legend/scale_behavior/standard_refs/compatibility/extension_policy/rules + 身份字段），MapLayout 示例有 **9 个**；其中至少 11 个与现有权威交叉。
+
+删除后：MapStyle **8 个**、MapLayout **7 个**，且每个概念要么有执行消费点，要么有已登记的路线图目标，**无一与现有权威交叉**。交叉描述消除后，“谁是权威”不再需要阅读多份文档才能回答。

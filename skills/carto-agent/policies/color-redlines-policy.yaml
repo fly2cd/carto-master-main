@@ -1,0 +1,21 @@
+schema_version: 1
+policy_id: color-redlines
+version: 0.1.0
+# Cartographic colour redlines for the generate chain (map-style.md §8.2 target
+# design, verifiable part). Every numeric parameter lives here, never in code.
+# Values are prototype calibrations pending business review; this policy only
+# tightens colour acceptance, it never admits a capability or selects colours.
+# Calibration evidence: projects/.carto-dev/_cr_calibrate.py —
+#   adjacent_delta_e_min=10.0 sits below every existing legitimate set
+#   (Blues5 min 12.88, Tol bright 34.90, migrated styles >= 14.90);
+#   cvd_delta_e_min=12.0 (raised from the drafted 8.0) because the red/green
+#   counterexample measures 10.92 under deuteranopia and must be flagged,
+#   while the lowest legitimate CVD distance is 19.18 (Tol bright).
+confirmation_status: pending-business-review
+enforcement:
+  ramp_semantics: blocker
+  adjacent_distinguishability: blocker
+  cvd_safety: warning
+lightness_monotonic_tolerance: 0.5
+adjacent_delta_e_min: 10.0
+cvd_delta_e_min: 12.0

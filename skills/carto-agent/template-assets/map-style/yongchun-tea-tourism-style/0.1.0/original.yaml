@@ -1,0 +1,148 @@
+schema_version: 1
+style_id: yongchun-tea-tourism-style
+version: 0.1.0
+visual_language: technical
+symbolization:
+  color_system: mixed
+  symbol_catalogs:
+  - ramps/terrain@1.0.0
+  - lines/boundary@1.0.0
+  - markers/settlement@1.0.0
+  - lines/route@1.0.0
+  default_opacity: 0.9
+labeling:
+  density: high
+  collision_policy: avoid
+  font_role: label
+generalization:
+  scale_dependent: true
+  strategy: simplify
+defaults:
+  line_width_mm: 0.3
+  point_size_mm: 2.0
+  opacity: 1.0
+symbol_definitions:
+- symbol_id: land-background
+  symbol_type: fill
+  geometry_types:
+  - polygon
+  channels:
+    fill_color:
+      source: fixed
+      value: '#f4f7f4'
+    fill_opacity:
+      source: fixed
+      value: 1.0
+- symbol_id: county-boundary-thick
+  symbol_type: line
+  geometry_types:
+  - line
+  channels:
+    line_color:
+      source: fixed
+      value: '#d68c76'
+    line_width:
+      source: fixed
+      value: 0.8
+    line_opacity:
+      source: fixed
+      value: 1.0
+- symbol_id: river-network
+  symbol_type: line
+  geometry_types:
+  - line
+  channels:
+    line_color:
+      source: fixed
+      value: '#8bbce0'
+    line_width:
+      source: fixed
+      value: 0.2
+    line_opacity:
+      source: fixed
+      value: 1.0
+- symbol_id: route-tea-tour
+  symbol_type: line
+  geometry_types:
+  - line
+  channels:
+    line_color:
+      source: fixed
+      value: '#a93226'
+    line_width:
+      source: fixed
+      value: 0.6
+    line_opacity:
+      source: fixed
+      value: 1.0
+- symbol_id: route-tea-eco
+  symbol_type: line
+  geometry_types:
+  - line
+  channels:
+    line_color:
+      source: fixed
+      value: '#27ae60'
+    line_width:
+      source: fixed
+      value: 0.6
+    line_opacity:
+      source: fixed
+      value: 1.0
+- symbol_id: marker-county-seat
+  symbol_type: marker
+  geometry_types:
+  - point
+  channels:
+    marker_color:
+      source: fixed
+      value: '#c0392b'
+    marker_size:
+      source: fixed
+      value: 3.5
+- symbol_id: marker-township
+  symbol_type: marker
+  geometry_types:
+  - point
+  channels:
+    marker_color:
+      source: fixed
+      value: '#555555'
+    marker_size:
+      source: fixed
+      value: 2.0
+- symbol_id: label-place-name
+  symbol_type: label
+  geometry_types:
+  - point
+  channels:
+    label_field:
+      source: property
+      property: name
+    label_color:
+      source: fixed
+      value: '#333333'
+    label_size:
+      source: fixed
+      value: 8
+- symbol_id: label-neighbor-name
+  symbol_type: label
+  geometry_types:
+  - polygon
+  channels:
+    label_field:
+      source: property
+      property: name
+    label_color:
+      source: fixed
+      value: '#2980b9'
+    label_size:
+      source: fixed
+      value: 11
+rules:
+- id: synthetic-preview-only
+  strength: hard_rule
+  path: /application/excluded_uses
+  description: Draft package is limited to synthetic engineering previews and is not
+    a published product.
+  value: true

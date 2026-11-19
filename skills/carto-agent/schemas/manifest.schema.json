@@ -12,7 +12,7 @@
       "required": ["namespace", "kind", "id", "version", "status", "summary"],
       "properties": {
         "namespace": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
-        "kind": {"enum": ["map-brand", "map-style", "map-layout", "map-scenario"]},
+        "kind": {"enum": ["map-style", "map-layout", "map-scenario"]},
         "id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
         "version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"},
         "status": {"enum": ["draft", "validated", "published"]},

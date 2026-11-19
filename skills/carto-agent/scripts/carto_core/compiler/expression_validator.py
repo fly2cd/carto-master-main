@@ -46,7 +46,11 @@ class ExpressionValidator:
         name = rule["name"]
         handler = _RULE_HANDLERS.get(name)
         if handler is None:
-            return None  # forward-compat: unknown rules are not errors
+            # Closed world (design-principles §2.2, AGENTS.md "unknown fields rejected").
+            # An unrecognized rule name must not silently disable a constraint: a typo
+            # would otherwise let a template pass validation with that rule unchecked.
+            return {"severity": "blocker", "code": "EXPRESSION_RULE_UNKNOWN",
+                    "message": f"Catalog declares unsupported validation rule '{name}'"}
         try:
             return handler(rule, layer, entry, self._catalog)
         except ProtocolError as exc:

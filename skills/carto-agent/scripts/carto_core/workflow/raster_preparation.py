@@ -169,6 +169,12 @@ class RasterPreparationService(StaticAssetStore):
         colors = request["color_ramp"]["colors"]
         if len(colors) != len(edges) - 1:
             raise ProtocolError("RASTER_RAMP_CLASS_MISMATCH", "Color ramp must provide exactly one color per class interval")
+        # Colour redlines (map-style.md §8.2): the declared scheme must match the
+        # ramp's perceptual structure before the encoding is frozen. Parameters
+        # and enforcement levels come from policies/color-redlines-policy.yaml.
+        from ..compiler.color_checks import ColorRedlinesPolicy, check_ramp, enforce
+        enforce(check_ramp(colors, request["color_ramp"]["scheme"],
+                           ColorRedlinesPolicy.load(registry=self.registry)))
         symbols = [{"color": c, "stroke": c, "stroke_width_pt": 0.0, "radius_mm": 1.0} for c in colors]
         return {"schema_version": 1, "key_mode": "interval", "geometry_role": "raster-cell",
                 "domain": {"field": "value", "measurement": request["measurement"], "unit": request["unit"], "normalization": None},

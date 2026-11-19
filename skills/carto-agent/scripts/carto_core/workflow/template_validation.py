@@ -23,6 +23,7 @@ from ..errors import CartoError, ProtocolError, SecurityError
 from ..scenario_registry import ScenarioRegistry
 from ..schema_registry import SchemaRegistry, load_document
 from ..security.paths import PathGuard
+from ..repository.template_repository import TemplateRepository
 from ..validation.registry import CheckerRegistry
 from ..validation.map_checks import MapQualityChecks
 from ..contracts.execution import ExecutionContext
@@ -61,7 +62,8 @@ class TemplatePackageValidator:
                  browser: str | Path | None = None, font_path: str | Path | None = None,
                  limits: BrowserLimits | None = None,
                  render_hook: Callable[[], None] | None = None,
-                 context: ExecutionContext | None = None) -> None:
+                 context: ExecutionContext | None = None,
+                 repository: TemplateRepository | None = None) -> None:
         if len(attestation_key) < 32:
             raise SecurityError("RENDER_ATTESTATION_KEY_WEAK", "Attestation key must be at least 32 bytes")
         self.path_guard = path_guard
@@ -75,6 +77,9 @@ class TemplatePackageValidator:
         self.limits = limits or BrowserLimits()
         self.render_hook = render_hook
         self.resolver = DependencyResolver()
+        # S2: referenced segments are resolved from this published repository at
+        # the admission boundary; packages without segment_refs never need it.
+        self.repository = repository
         # Raster fixture scenes are built, frozen and re-verified inside this isolated
         # workspace; its context is the trusted validation execution scope.
         self.context = context
@@ -406,6 +411,19 @@ class TemplatePackageValidator:
             value = load_document(self.package_root / manifest["business_contracts"][key])
             self.registry.validate(schema_name, value)
             documents[key] = value
+        scenario = documents["scenario"]
+        snapshot["scenario_source"] = scenario
+        if scenario.get("segment_refs"):
+            # S2: materialize referenced segments once at the admission boundary so
+            # every downstream embedded consumer sees a complete scenario. The
+            # on-disk package keeps segment_refs; semantic gates use scenario_source.
+            if self.repository is None:
+                raise ProtocolError("SEGMENT_REPOSITORY_REQUIRED",
+                                    "Referenced segments require the published template repository")
+            resolved = self.repository.resolve_scenario_segments(
+                scenario, namespace=manifest["package"]["namespace"], lock=lock)
+            self.registry.validate("scenario", resolved)
+            documents["scenario"] = resolved
         MapQualityChecks(self.registry).selection(documents["quality_gates"])
         prototypes = sorted(path for path in manifest["files"]
                             if path.startswith("prototypes/") and path.endswith((".yaml", ".yml")))
@@ -430,6 +448,7 @@ class TemplatePackageValidator:
             raise ProtocolError("DEPENDENCY_LOCK_PACKAGE_MISMATCH", manifest["package"]["id"])
         if lock["dependencies"] != manifest.get("dependencies", []):
             raise ProtocolError("DEPENDENCY_LOCK_SET_MISMATCH", manifest["package"]["id"])
+        OwnershipResolver().validate_segment_lock(snapshot["scenario_source"], lock)
         from ..repository.map_expression_catalog import MapExpressionCatalog
         catalog = MapExpressionCatalog(self.registry)
         portrayal_refs = catalog.references(docs["portrayal"])
@@ -448,10 +467,18 @@ class TemplatePackageValidator:
             raise ProtocolError("TEMPLATE_IDENTITY_MISMATCH", f"expected={expected_identity}; actual={identity}")
         if package["kind"] != "map-scenario" or package["status"] != "draft":
             raise ProtocolError("TEMPLATE_KIND_STATUS_INVALID", f"{package['kind']}:{package['status']}")
-        scenario = snapshot["documents"]["scenario"]
-        composed = OwnershipResolver().compose_scenario(scenario, [])
-        if set(composed["ownership"].values()) != {"map-scenario"}:
-            raise ProtocolError("TEMPLATE_OWNERSHIP_INVALID", str(composed["ownership"]))
+        scenario = snapshot["scenario_source"]
+        resolver = OwnershipResolver()
+        # S2: ownership derives from the source composition — embedded segments stay
+        # map-scenario-owned, referenced segments transfer to their segment kind.
+        # Fully embedded packages derive the same all-map-scenario map as before.
+        ownership = resolver.validate_segment_refs(scenario)
+        # compose_scenario only re-checks that the resolved view carries three complete
+        # segments; its ownership output always reads map-scenario for embedded content
+        # and is not the authority for referenced packages.
+        composed = resolver.compose_scenario(snapshot["documents"]["scenario"], [])
+        if composed["segments"] != snapshot["documents"]["scenario"]["embedded"]:
+            raise ProtocolError("TEMPLATE_OWNERSHIP_INVALID", str(ownership))
         if scenario["scenario_id"] != package["id"] or scenario["version"] != package["version"]:
             raise ProtocolError("SCENARIO_IDENTITY_MISMATCH", package["id"])
 

@@ -1,0 +1,92 @@
+schema_version: 1
+layout_id: a4-landscape-comparison
+version: 0.1.0
+category: general
+canvas:
+  width: 297
+  height: 210
+  unit: mm
+  orientation: landscape
+  safe_margin: 0
+frames:
+- id: main-title
+  type: title
+  bounds:
+  - 48.5
+  - 5
+  - 200
+  - 12
+  coordinate_space: page
+  overflow_policy: shrink
+- id: left-north-arrow
+  type: north-arrow
+  bounds:
+  - 12
+  - 6
+  - 8
+  - 8
+  coordinate_space: page
+  overflow_policy: clip
+- id: right-north-arrow
+  type: north-arrow
+  bounds:
+  - 279
+  - 6
+  - 8
+  - 8
+  coordinate_space: page
+  overflow_policy: clip
+- id: left-map
+  type: map
+  bounds:
+  - 10
+  - 22
+  - 133
+  - 155
+  coordinate_space: page
+  overflow_policy: clip
+- id: right-map
+  type: map
+  bounds:
+  - 153
+  - 22
+  - 133
+  - 155
+  coordinate_space: page
+  overflow_policy: clip
+- id: shared-legend
+  type: legend
+  bounds:
+  - 10
+  - 179
+  - 277
+  - 18
+  coordinate_space: page
+  overflow_policy: shrink
+- id: shared-scale-bar
+  type: scale-bar
+  bounds:
+  - 120
+  - 199
+  - 57
+  - 5
+  coordinate_space: page
+  overflow_policy: clip
+placeholders:
+- '{{MAP_TITLE}}'
+- '{{LEGEND_TITLE}}'
+- '{{DATA_SOURCE}}'
+- '{{AUTHOR}}'
+- '{{DATE}}'
+- '{{SCALE}}'
+- '{{PROJECTION}}'
+capacity:
+  legend_items: 12
+  title_characters: 30
+rules:
+- id: synthetic-preview-only
+  strength: hard_rule
+  path: /application/excluded_uses
+  description: Draft package is limited to synthetic engineering previews and is not
+    a published product.
+  value: true

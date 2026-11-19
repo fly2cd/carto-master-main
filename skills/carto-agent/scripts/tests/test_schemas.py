@@ -14,7 +14,10 @@ from carto_core.compiler.dependencies import DependencyResolver
 from carto_core.compiler.ownership import OwnershipResolver
 from carto_core.errors import ProtocolError
 from carto_core.schema_registry import SchemaRegistry, load_document
-from tests.fixtures.schema_cases import A, D, INVALID_CASES, SEMANTIC_INVALID_CASES, VALID_CASES
+from tests.fixtures.schema_cases import (
+    A, D, INVALID_CASES, REFERENCED_LOCK, REFERENCED_SCENARIO, SEGMENT_REF_LAYOUT,
+    SEMANTIC_INVALID_CASES, VALID_CASES,
+)
 
 
 class SchemaTests(unittest.TestCase):
@@ -330,7 +333,7 @@ class SchemaTests(unittest.TestCase):
         self.assertEqual(result["segments"]["cartography"], {"style_id": "replacement-only"})
         self.assertNotIn("symbolization", result["segments"]["cartography"])
         self.assertEqual(result["ownership"]["cartography"], "map-style")
-        self.assertEqual(result["ownership"]["identity"], "map-scenario")
+        self.assertEqual(result["ownership"]["layout"], "map-scenario")
 
     def test_scenario_ownership_rejects_duplicate_kind_and_boundary_violation(self) -> None:
         resolver = OwnershipResolver()
@@ -363,6 +366,97 @@ class SchemaTests(unittest.TestCase):
         with self.assertRaises(ProtocolError) as raised:
             resolver.compose_scenario(VALID_CASES["scenario"], [incompatible])
         self.assertEqual(raised.exception.code, "TEMPLATE_INCOMPATIBLE")
+
+
+class SegmentReferenceProtocolTests(unittest.TestCase):
+    """S1: segment_refs protocol shape, semantic rules and lock binding.
+
+    compose_scenario itself still demands fully embedded segments; since S2 the
+    validator materializes referenced segments from the published repository
+    before this gate, so referenced packages are admitted through resolution,
+    never by relaxing the whole-segment composition invariant.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.registry = SchemaRegistry()
+        cls.resolver = OwnershipResolver()
+
+    def test_referenced_scenario_passes_schema_and_legacy_embedded_still_passes(self) -> None:
+        self.registry.validate("scenario", REFERENCED_SCENARIO)
+        self.registry.validate("scenario", VALID_CASES["scenario"])
+        self.registry.validate("dependency-lock", REFERENCED_LOCK)
+
+    def test_schema_rejects_kind_boundary_missing_coverage_and_unknown_segment(self) -> None:
+        wrong_kind = deepcopy(REFERENCED_SCENARIO)
+        wrong_kind["segment_refs"]["layout"]["kind"] = "map-scenario"
+        missing = deepcopy(REFERENCED_SCENARIO)
+        missing["segment_refs"].pop("layout")
+        unknown = deepcopy(REFERENCED_SCENARIO)
+        unknown["segment_refs"]["portrayal"] = deepcopy(SEGMENT_REF_LAYOUT)
+        for case in (wrong_kind, missing, unknown):
+            with self.assertRaises(ProtocolError):
+                self.registry.validate("scenario", case)
+
+    def test_semantic_rules_derive_ownership_for_embedded_and_referenced(self) -> None:
+        ownership = self.resolver.validate_segment_refs(REFERENCED_SCENARIO)
+        self.assertEqual(ownership, {"cartography": "map-scenario", "layout": "map-layout"})
+        legacy = self.resolver.validate_segment_refs(VALID_CASES["scenario"])
+        self.assertEqual(set(legacy.values()), {"map-scenario"})
+
+    def test_semantic_rules_reject_double_source_missing_source_and_non_replaceable(self) -> None:
+        double = deepcopy(REFERENCED_SCENARIO)
+        double["embedded"]["layout"] = deepcopy(VALID_CASES["scenario"]["embedded"]["layout"])
+        with self.assertRaises(ProtocolError) as raised:
+            self.resolver.validate_segment_refs(double)
+        self.assertEqual(raised.exception.code, "SEGMENT_DOUBLE_SOURCED")
+
+        missing = deepcopy(REFERENCED_SCENARIO)
+        missing["segment_refs"].pop("layout")
+        with self.assertRaises(ProtocolError) as raised:
+            self.resolver.validate_segment_refs(missing)
+        self.assertEqual(raised.exception.code, "SEGMENT_SOURCE_MISSING")
+
+        locked = deepcopy(REFERENCED_SCENARIO)
+        locked["replaceable_segments"].remove("layout")
+        with self.assertRaises(ProtocolError) as raised:
+            self.resolver.validate_segment_refs(locked)
+        self.assertEqual(raised.exception.code, "SEGMENT_NOT_REPLACEABLE")
+
+    def test_semantic_rules_reject_unpinned_and_kind_mismatched_reference(self) -> None:
+        floating = deepcopy(REFERENCED_SCENARIO)
+        floating["segment_refs"]["layout"]["version"] = "latest"
+        with self.assertRaises(ProtocolError) as raised:
+            self.resolver.validate_segment_refs(floating)
+        self.assertEqual(raised.exception.code, "DEPENDENCY_VERSION_NOT_EXACT")
+
+        wrong_kind = deepcopy(REFERENCED_SCENARIO)
+        wrong_kind["segment_refs"]["layout"]["kind"] = "map-style"
+        with self.assertRaises(ProtocolError) as raised:
+            self.resolver.validate_segment_refs(wrong_kind)
+        self.assertEqual(raised.exception.code, "KIND_BOUNDARY_VIOLATION")
+
+    def test_lock_binding_requires_exact_segment_dependency_set(self) -> None:
+        self.resolver.validate_segment_lock(REFERENCED_SCENARIO, REFERENCED_LOCK)
+        self.resolver.validate_segment_lock(VALID_CASES["scenario"], VALID_CASES["dependency-lock"])
+
+        absent = deepcopy(REFERENCED_LOCK)
+        absent["dependencies"] = []
+        drifted = deepcopy(REFERENCED_LOCK)
+        drifted["dependencies"][0]["digest"] = "sha256:" + "1" * 64
+        extra = deepcopy(REFERENCED_LOCK)
+        extra["dependencies"].append({"kind": "map-style", "id": "extra-style", "version": "1.0.0", "digest": D})
+        for lock in (absent, drifted, extra):
+            with self.assertRaises(ProtocolError) as raised:
+                self.resolver.validate_segment_lock(REFERENCED_SCENARIO, lock)
+            self.assertEqual(raised.exception.code, "SEGMENT_LOCK_MISMATCH")
+
+    def test_compose_scenario_still_requires_fully_embedded_segments(self) -> None:
+        # Whole-segment composition invariant: compose_scenario never consumes
+        # segment_refs directly; resolution must happen before it (S2 boundary).
+        with self.assertRaises(ProtocolError) as raised:
+            self.resolver.compose_scenario(REFERENCED_SCENARIO, [])
+        self.assertEqual(raised.exception.code, "SCENARIO_EMBEDDED_INVALID")
 
 
 if __name__ == "__main__":

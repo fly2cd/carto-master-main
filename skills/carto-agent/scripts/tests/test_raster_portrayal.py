@@ -149,7 +149,9 @@ class RasterPortrayalCompilerTests(PreparationFixture, unittest.TestCase):
         lock.update(package={**identity, "digest": sha256_digest(identity)},
                     dependencies=manifest.get("dependencies", []),
                     resources=[deepcopy(self.contract["layers"][0]["map_expression_ref"])])
-        snapshot = {"manifest": manifest, "documents": {"portrayal": deepcopy(self.contract), "dependency_lock": lock}}
+        snapshot = {"manifest": manifest,
+                    "scenario_source": deepcopy(VALID_CASES["scenario"]),
+                    "documents": {"portrayal": deepcopy(self.contract), "dependency_lock": lock}}
         validator._check_dependencies(snapshot)
         snapshot["documents"]["portrayal"]["layers"][0]["map_expression_ref"]["digest"] = "sha256:" + "0"*64
         lock["resources"][0]["digest"] = "sha256:" + "0"*64

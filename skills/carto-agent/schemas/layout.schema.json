@@ -93,6 +93,10 @@
             "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier",
             "description": "Explicit binding to one view or overlay id."
           },
+          "inside_frame": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier",
+            "description": "Declared intentional containment: this frame sits entirely inside the referenced map frame (e.g. a north arrow placed within the map). The resolver verifies the reference, the frame types and full geometric enclosure; undeclared or partial overlap stays rejected."
+          },
           "type": {
             "enum": [
               "map",

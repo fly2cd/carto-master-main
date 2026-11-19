@@ -113,9 +113,10 @@ class LayoutResolver:
     """One layout-contract interpreter shared by compilation, rendering and checks.
 
     The supported subset is one map or a template-declared finite grid,
-    disjoint page frames, millimetres, DPR=1,
-    map clipping and reject-only overlays. No automatic shrink, pagination,
-    overlap exceptions, real content measurement or layout search is implied.
+    page frames that are disjoint unless a full containment is explicitly declared,
+    millimetres, DPR=1, map clipping and reject-only overlays. No automatic shrink,
+    pagination, partial-overlap regions, real content measurement or layout search
+    is implied.
     """
 
     def __init__(self, registry: SchemaRegistry | None = None) -> None:
@@ -145,6 +146,28 @@ class LayoutResolver:
         page = {"width_mm": width, "height_mm": height, "dpi": dpi,
                 "width_px": raster_size(_pixels(width, dpi)), "height_px": raster_size(_pixels(height, dpi)),
                 "device_pixel_ratio": 1, "safe_margin_px": _pixels(margin, dpi)}
+        # Declared intentional containment (map-layout design §8.3): an adornment may sit
+        # inside a map frame only when the contract says so AND the geometry really encloses
+        # it. The declaration is semantic; enclosure is verified mechanically. Undeclared or
+        # partial overlap stays a permanent prohibition, never a silent exception.
+        by_id = {item["id"]: item for item in contract["frames"]}
+        for frame in contract["frames"]:
+            container_id = frame.get("inside_frame")
+            if container_id is None:
+                continue
+            container = by_id.get(container_id)
+            if container is None or container_id == frame["id"] or "inside_frame" in container:
+                raise ProtocolError("LAYOUT_CONTAINMENT_REFERENCE",
+                    f"{frame['id']}: inside_frame must name a different, non-contained frame")
+            if container["type"] != "map" or frame["type"] == "map":
+                raise ProtocolError("LAYOUT_CONTAINMENT_TYPE",
+                    f"{frame['id']}: only a non-map frame may be declared inside a map frame")
+            cx, cy, cw, ch = frame["bounds"]
+            mx, my, mw, mh = container["bounds"]
+            if not (cx >= mx - 1e-9 and cy >= my - 1e-9
+                    and cx + cw <= mx + mw + 1e-9 and cy + ch <= my + mh + 1e-9):
+                raise ProtocolError("LAYOUT_CONTAINMENT_NOT_ENCLOSED",
+                    f"{frame['id']}: declared containment requires full enclosure by {container_id}")
         frames: list[dict[str, Any]] = []
         ids: set[str] = set()
         contents: set[str] = set()
@@ -169,10 +192,16 @@ class LayoutResolver:
                 original = next(item for item in contract["frames"] if item["id"] == other["id"])
                 ox, oy, ow, oh = original["bounds"]
                 if x < ox + ow and ox < x + w and y < oy + oh and oy < y + h:
-                    raise ProtocolError("LAYOUT_FRAME_OVERLAP", f"{other['id']}:{frame['id']}")
-            frames.append({"id": frame["id"], "content_id": frame["content_id"], "type": kind,
-                           "bounds_px": [_pixels(v, dpi) for v in frame["bounds"]],
-                           "overflow_policy": frame["overflow_policy"]})
+                    declared = (frame.get("inside_frame") == other["id"]
+                                or original.get("inside_frame") == frame["id"])
+                    if not declared:
+                        raise ProtocolError("LAYOUT_FRAME_OVERLAP", f"{other['id']}:{frame['id']}")
+            resolved_frame = {"id": frame["id"], "content_id": frame["content_id"], "type": kind,
+                              "bounds_px": [_pixels(v, dpi) for v in frame["bounds"]],
+                              "overflow_policy": frame["overflow_policy"]}
+            if "inside_frame" in frame:
+                resolved_frame["inside_frame"] = frame["inside_frame"]
+            frames.append(resolved_frame)
             if kind == "map":
                 maps.append(frame["id"])
         if len(maps) != 1 and parameters is None:

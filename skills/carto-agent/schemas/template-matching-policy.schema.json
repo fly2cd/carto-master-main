@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/template-matching-policy.schema.json",
+  "description": "Advisory segment-matching parameters (S0). Declares every numeric decision parameter used by repository/template_matching.py; pending-business-review values are prototype migrations, not accepted business thresholds. This policy never admits capabilities or selects templates.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "policy_id",
+    "version",
+    "confirmation_status",
+    "match_threshold",
+    "color_delta_e_max",
+    "defaults_relative_deviation_max",
+    "capacity_relative_deviation_max"
+  ],
+  "properties": {
+    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
+    "policy_id": {"const": "template-matching"},
+    "version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"},
+    "confirmation_status": {"enum": ["pending-business-review", "confirmed"]},
+    "match_threshold": {"type": "number", "minimum": 0, "maximum": 1},
+    "color_delta_e_max": {"description": "Colour-match tolerance in CIELAB CIE76 ΔE units (sRGB converted per CIE 15, D65). Upper bound 150 covers the maximum ΔE76 attainable between sRGB colours.", "type": "number", "exclusiveMinimum": 0, "maximum": 150},
+    "defaults_relative_deviation_max": {"type": "number", "minimum": 0, "maximum": 1},
+    "capacity_relative_deviation_max": {"type": "number", "minimum": 0, "maximum": 1}
+  }
+}

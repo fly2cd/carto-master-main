@@ -51,7 +51,6 @@
           },
           "kind": {
             "enum": [
-              "map-brand",
               "map-style",
               "map-layout",
               "map-scenario"

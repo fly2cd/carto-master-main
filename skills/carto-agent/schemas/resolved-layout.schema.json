@@ -91,6 +91,10 @@
           "content_id": {
             "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
           },
+          "inside_frame": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier",
+            "description": "Verified intentional containment carried from the template contract so snapshot re-validation re-derives the same exemption."
+          },
           "type": {
             "enum": [
               "map",

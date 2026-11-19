@@ -1,0 +1,36 @@
+schema_version: 2
+style_id: yongchun-tea-tourism-style
+version: 0.1.0
+visual_language: technical
+symbolization:
+  color_system: mixed
+  symbol_catalogs:
+  - ramps/terrain@1.0.0
+  - lines/boundary@1.0.0
+  - markers/settlement@1.0.0
+  - lines/route@1.0.0
+  default_opacity: 0.9
+labeling:
+  density: high
+  collision_policy: avoid
+  font_role: label
+generalization:
+  scale_dependent: true
+  strategy: simplify
+defaults:
+  line_width_mm: 0.3
+  point_size_mm: 2.0
+  opacity: 1.0
+rules:
+- id: synthetic-preview-only
+  strength: hard_rule
+  path: /application/excluded_uses
+  description: Draft package is limited to synthetic engineering previews and is not
+    a published product.
+  value: true
+typography:
+  title_pt: 18
+  body_pt: 9
+  legend_pt: 10
+  legend_heading_pt: 11
+  line_spacing: 1.25

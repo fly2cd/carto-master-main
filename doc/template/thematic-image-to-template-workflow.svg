@@ -197,13 +197,13 @@
 <g id="brand" data-box="1435,1700,405,245">
 <rect x="1435" y="1700" width="405" height="245" rx="17" fill="#F5F0FA" stroke="#D6E2EC" stroke-width="1.5" />
 <rect x="1435" y="1700" width="6" height="245" rx="3" fill="#7252A0" stroke="#7252A0" stroke-width="1.5" />
-<text x="1460" y="1739" class="card-title">MapBrand · 身份资源</text>
-<text x="1460" y="1780" class="body">机构名称、字体、Logo、署名</text>
-<text x="1460" y="1811" class="body">资产来源与允许使用方式</text>
-<text x="1460" y="1842" class="body">本例不足以提炼独立品牌</text>
-<text x="1460" y="1873" class="body">QGIS 标识不证明制图机构</text>
+<text x="1460" y="1739" class="card-title">MapBrand · 已移除</text>
+<text x="1460" y="1780" class="body">品牌段 2026-11-18 整体移除</text>
+<text x="1460" y="1811" class="body">渲染链无消费者，不影响成图</text>
+<text x="1460" y="1842" class="body">字体由 generate 请求显式提供</text>
+<text x="1460" y="1873" class="body">署名文本来自场景策略 notice</text>
 <path d="M1459 1897 L1816 1897" fill="none" stroke="#DCE5EF" stroke-width="1.5" />
-<text x="1460" y="1925" class="small" style="fill:#7252A0">可用最小身份基线；不强行新建</text>
+<text x="1460" y="1925" class="small" style="fill:#7252A0">若未来需要，以带消费者的新协议重建</text>
 </g>
 <path class="link" d="M302.5 1945 V1970 H960 V1985" />
 <path class="link" d="M747.5 1945 V1970 H960 V1985" />
@@ -407,7 +407,7 @@
 <text x="1090" y="4261" class="label" style="fill:#7252A0">配套但不增加模板种类</text>
 <text x="1090" y="4298" class="body">表达定义、受信方法，以及实际使用的视觉资源</text>
 <text x="1090" y="4332" class="body">轻量目录即可；不为每种图形组合建立服务</text>
-<text x="1090" y="4366" class="body">本例不必新建 MapBrand；字体资源需明确</text>
+<text x="1090" y="4366" class="body">品牌段已移除；字体由请求显式提供</text>
 <text x="1090" y="4400" class="body">未来使用时绑定兼容任务、数据与地图视图</text>
 <text x="1090" y="4434" class="body">可设计完整组件；当前独立创建路由仍待实现</text>
 <path class="link" d="M960 4489 V4560" />

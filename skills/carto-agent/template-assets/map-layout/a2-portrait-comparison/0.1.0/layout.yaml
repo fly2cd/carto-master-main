@@ -1,0 +1,99 @@
+schema_version: 1
+layout_id: a2-portrait-comparison
+version: 0.1.0
+category: general
+canvas:
+  width: 420
+  height: 594
+  unit: mm
+  orientation: portrait
+  safe_margin: 0
+frames:
+- id: map-left
+  type: map
+  bounds:
+  - 5
+  - 69
+  - 200
+  - 480
+  coordinate_space: page
+  overflow_policy: clip
+  content_id: map-left
+- id: map-right
+  type: map
+  bounds:
+  - 207
+  - 69
+  - 200
+  - 480
+  coordinate_space: page
+  overflow_policy: clip
+  content_id: map-right
+- id: title
+  type: title
+  bounds:
+  - 20
+  - 559
+  - 380
+  - 30
+  coordinate_space: page
+  overflow_policy: shrink
+  content_id: title
+- id: legend
+  type: legend
+  bounds:
+  - 5
+  - 5
+  - 150
+  - 55
+  coordinate_space: page
+  overflow_policy: shrink
+  content_id: legend
+- id: scale-bar
+  type: scale-bar
+  bounds:
+  - 157
+  - 5
+  - 120
+  - 10
+  coordinate_space: page
+  overflow_policy: clip
+  content_id: scale-bar
+- id: north-arrow
+  type: north-arrow
+  bounds:
+  - 383
+  - 5
+  - 30
+  - 30
+  coordinate_space: page
+  overflow_policy: clip
+  content_id: north-arrow
+- id: marginalia
+  type: marginalia
+  bounds:
+  - 157
+  - 17
+  - 224
+  - 50
+  coordinate_space: page
+  overflow_policy: shrink
+  content_id: marginalia
+placeholders:
+- '{{MAP_TITLE}}'
+- '{{LEGEND_TITLE}}'
+- '{{DATA_SOURCE}}'
+- '{{AUTHOR}}'
+- '{{DATE}}'
+- '{{SCALE}}'
+- '{{PROJECTION}}'
+capacity:
+  legend_items: 4
+  title_characters: 30
+rules:
+- id: synthetic-preview-only
+  strength: hard_rule
+  path: /application/excluded_uses
+  description: Draft package is limited to synthetic engineering previews and is not
+    a published product.
+  value: true

@@ -1,0 +1,82 @@
+schema_version: 1
+layout_id: portrait-admin-with-legend
+version: 0.1.0
+category: general
+canvas:
+  width: 2500
+  height: 3535
+  unit: px
+  orientation: portrait
+  safe_margin: 0
+frames:
+- id: title
+  type: title
+  bounds:
+  - 68
+  - 3352
+  - 330
+  - 78
+  coordinate_space: page
+  overflow_policy: clip
+- id: main-map
+  type: map
+  bounds:
+  - 120
+  - 50
+  - 2180
+  - 3300
+  coordinate_space: page
+  overflow_policy: shrink
+- id: legend-box
+  type: legend
+  bounds:
+  - 1725
+  - 2935
+  - 640
+  - 440
+  coordinate_space: page
+  overflow_policy: clip
+- id: scale-text
+  type: scale-bar
+  bounds:
+  - 1740
+  - 3377
+  - 120
+  - 20
+  coordinate_space: page
+  overflow_policy: clip
+- id: footer-approval
+  type: marginalia
+  bounds:
+  - 42
+  - 3485
+  - 155
+  - 20
+  coordinate_space: page
+  overflow_policy: clip
+- id: footer-publisher
+  type: marginalia
+  bounds:
+  - 2085
+  - 3485
+  - 200
+  - 20
+  coordinate_space: page
+  overflow_policy: clip
+placeholders:
+- '{{TITLE_TEXT}}'
+- '{{LEGEND_TITLE}}'
+- '{{SCALE_RATIO}}'
+- '{{DISCLAIMER_TEXT}}'
+- '{{APPROVAL_NUMBER}}'
+- '{{PUBLISHER_NAME}}'
+capacity:
+  legend_items: 16
+  title_characters: 10
+rules:
+- id: synthetic-preview-only
+  strength: hard_rule
+  path: /application/excluded_uses
+  description: Draft package is limited to synthetic engineering previews and is not
+    a published product.
+  value: true

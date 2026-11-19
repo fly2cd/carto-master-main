@@ -11,10 +11,11 @@
 - `validate` 先执行模板包闭合、Schema、依赖锁、类型所有权、业务语义和目标能力校验；静态检查通过后，由注册场景的样张渲染分支生成预览及带签名的 RenderReceipt。已注册的 `general_thematic_mapping` 从包内图例样本派生确定性合成栅格（展示 CRS 为地理坐标系、缺栅格渲染依赖或缺可嵌入字体时失败关闭），经授权 MCP 网关测量统计后以 `rasterio-matplotlib-page` 后端渲染 PDF+PNG，并冻结渲染场景供发布复核。
 - `publish` 会重新核验模板包、依赖锁、Fixture、检查器集合、RenderReceipt、预览成果和渲染器环境绑定；栅格样张还须按冻结的 `render_scene_ref` 从冻结页面复现并比对输出摘要（不依赖作者宿主字体），再验证 TP `approve-template-publish` 回执并写入不可变模板仓库及权威索引。
 - 已发布模板使用 `namespace + kind + id + version` 精确标识；同版本内容不可覆盖，发布请求必须携带幂等键。
+- 段引用（S2）：创建请求可用可选 `segment_refs` 将 cartography/layout 逐段指向已发布段模板（cartography→map-style、layout→map-layout），作者只内嵌其余段并把引用段标记为 replaceable，引用同时钉入 `manifest.dependencies` 与依赖锁。`validate` 需额外提供 `--repository-root/--repository-scope`，从仓库按摘要拉取段包并复验完整性后物化为完整场景再走全部静态门禁与样张渲染；`publish` 复核时重新解析，段包篡改、摘要漂移或缺仓库一律失败关闭。引用段所有权归对应段类型；包本体不改写，全内嵌旧路径零改动。品牌段（map-brand/identity）已于 2026-11-18 经用户授权整体移除（无渲染消费者）。
 
 ## 能力边界
 
-- `map-brand`、`map-style`、`map-layout` 尚未开放业务创建流程。
+- `map-style`、`map-layout` 尚未开放业务创建流程。
 - 不提供独立的 `create-template render`；Fixture 渲染只能在 `validate` 内受控执行。
 - 验证渲染不代表生产数据地图生成，也不提供真实 CRS 转换或正式交付。
 - 地图候选生成与冻结由独立的 `generate-map` 路由负责，不得复用模板创建审批或暂存包。

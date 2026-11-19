@@ -62,7 +62,6 @@ LAYER_ID = "raster-layer"
 EXPRESSION_ID = "categorical"
 EXPRESSION_VERSION = "2.0.0"
 LAYOUT_ID = "general-thematic-a4-landscape"
-IDENTITY_ID = "general-thematic-identity"
 STYLE_ID = "general-thematic-style"
 PROTOTYPE_ID = "general-thematic-prototype"
 LOCK_ID = "general-thematic-map-lock"
@@ -70,9 +69,7 @@ BASELINE_ID = "general-thematic-map-baseline"
 TARGET_IDS = ("a4-pdf", "a4-png")
 NAMESPACE = "local"
 KIND = "map-scenario"
-FONT_FAMILY = "Noto Sans SC"
 LEGEND_TITLE = "图例"
-ORGANIZATION = "carto-general-thematic"
 FIXTURE_PATH = "fixtures/validation-input.csv"
 FIXTURE_HEADER = ("category_value", "category_label")
 FIXTURE_ROWS = (
@@ -415,27 +412,6 @@ def require_admitted(request: dict[str, Any], brief: dict[str, Any], *,
         raise ProtocolError("TEMPLATE_BRIEF_MISMATCH", "Brief does not describe this template")
 
 
-def identity_contract(*, version: str = VERSION) -> dict[str, Any]:
-    return {
-        "schema_version": 1,
-        "identity_id": IDENTITY_ID,
-        "version": version,
-        "organization": ORGANIZATION,
-        "colors": [{
-            "role": "primary",
-            "hex": "#1F4E79",
-            "provenance": {"source_type": "internal",
-                           "source_ref": f"template:{SCENARIO_ID}@{version}",
-                           "classification": "internal"},
-        }],
-        "typography": [{"role": "title", "family": FONT_FAMILY, "weight": 700},
-                       {"role": "body", "family": FONT_FAMILY, "weight": 400}],
-        "attribution": {"organization_format": "制图：{organization}",
-                        "data_source_format": "数据来源：{source}"},
-        "rules": [],
-    }
-
-
 def cartography_contract(*, version: str = VERSION) -> dict[str, Any]:
     return {
         "schema_version": 2,
@@ -490,6 +466,18 @@ def layout_contract(*, version: str = VERSION) -> dict[str, Any]:
 
 def scenario_contract(request: dict[str, Any], *, version: str = VERSION,
                       data_role: str = DATA_ROLE) -> dict[str, Any]:
+    # S2: segments declared in request.segment_refs are sourced from published
+    # segment templates; the author embeds only the remaining segments and marks
+    # the referenced ones replaceable. Absent refs keep the legacy full embedding.
+    # The map-brand/identity segment was removed (2026-11-18, user-authorized):
+    # it had no rendering consumer; attribution comes from the scenario notice
+    # and fonts from the generate request.
+    refs = {segment: deepcopy(reference)
+            for segment, reference in sorted(request.get("segment_refs", {}).items())}
+    embedded = {"cartography": cartography_contract(version=version),
+                "layout": layout_contract(version=version)}
+    for segment in refs:
+        embedded.pop(segment)
     return {
         "schema_version": 1,
         "scenario_id": SCENARIO_ID,
@@ -498,10 +486,9 @@ def scenario_contract(request: dict[str, Any], *, version: str = VERSION,
         "tasks": [TASK],
         "owned_segments": ["scenario", "data", "spatial-behavior", "portrayal",
                            "delivery", "quality-gates"],
-        "embedded": {"identity": identity_contract(version=version),
-                     "cartography": cartography_contract(version=version),
-                     "layout": layout_contract(version=version)},
-        "replaceable_segments": [],
+        "embedded": embedded,
+        **({"segment_refs": refs} if refs else {}),
+        "replaceable_segments": sorted(refs),
         "data_role_refs": [data_role],
         "target_ids": list(TARGET_IDS),
         "application": {"supported_uses": sorted(request["supported_uses"]),
@@ -510,6 +497,12 @@ def scenario_contract(request: dict[str, Any], *, version: str = VERSION,
                           "placeholders": ["{{MAP_TITLE}}", "{{MAP_FRAME}}", "{{LEGEND}}"]},
         "rules": [],
     }
+
+
+def segment_dependencies(request: dict[str, Any]) -> list[dict[str, Any]]:
+    """S2: the exact pinned segment refs, deterministically ordered for both the
+    manifest and the dependency lock (their equality is a validate gate)."""
+    return [deepcopy(reference) for _, reference in sorted(request.get("segment_refs", {}).items())]
 
 
 def data_schema_contract(*, data_role: str = DATA_ROLE, geometry_types=("raster",),
@@ -628,7 +621,7 @@ def dependency_lock(identity: dict[str, Any], request: dict[str, Any],
         "schema_version": 1,
         "lock_id": lock_id,
         "package": {**identity, "digest": sha256_digest(identity)},
-        "dependencies": [],
+        "dependencies": segment_dependencies(request),
         "resources": [_catalog_reference(registry)] if resources is None else list(resources),
         "resolver_version": "1.0.0",
         "generated_at": request["requested_at"],
@@ -640,7 +633,7 @@ def package_manifest(identity: dict[str, Any], request: dict[str, Any]) -> dict[
         "schema_version": 1,
         "package": {**identity, "status": "draft", "summary": request["purpose"][:500]},
         "business_contracts": dict(DependencyResolver.MAP_SCENARIO_CONTRACTS),
-        "dependencies": [],
+        "dependencies": segment_dependencies(request),
         "dependency_lock": "dependencies.lock.yaml",
         "targets": sorted(request["targets"]),
     }

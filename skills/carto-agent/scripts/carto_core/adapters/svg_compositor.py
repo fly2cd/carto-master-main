@@ -12,7 +12,9 @@ from ..compiler.layout import FONT_SIZE_PX, LayoutResolver
 from ..errors import ProtocolError, SecurityError
 from ..security.paths import PathGuard
 
-_COLOR = re.compile(r"^#[0-9A-Fa-f]{6}$")
+# Canonical uppercase hex only: this validates frozen scene artifacts, not raw user
+# input. Input boundaries (CSV legend, clarification answers) normalize before freezing.
+_COLOR = re.compile(r"^#[0-9A-F]{6}$")
 _FONT_FAMILY = re.compile(r"^[\w .-]{1,128}$", re.UNICODE)
 
 

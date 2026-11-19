@@ -199,13 +199,13 @@ class TemplateContractMergeTests(unittest.TestCase):
         scenario=load_document(root/'contracts/scenario.yaml')
         self.assertEqual('4.0.0',scenario['version'])
         self.assertEqual(['thematic-features'],scenario['data_role_refs'])
-        for name in ('identity','cartography','layout'):
+        for name in ('cartography','layout'):
             self.assertEqual('4.0.0',scenario['embedded'][name]['version'],name)
-        # The embedded provenance names the template version actually being authored;
+        # The embedded segments name the template version actually being authored;
         # before 项② the vector package carried a stale "@3.0.0" reference because the
-        # inherited raster declaration was patched after the fact.
-        self.assertEqual('template:general-thematic-map@4.0.0',
-                         scenario['embedded']['identity']['colors'][0]['provenance']['source_ref'])
+        # inherited raster declaration was patched after the fact. (The identity
+        # provenance assertion was removed with the map-brand segment, 2026-11-18;
+        # version binding is covered by the per-segment loop above.)
         gates=load_document(root/'contracts/quality-gates.yaml')
         self.assertEqual(['protocol.schema-valid','cartography.legend-consistency'],
                          [check['id'] for check in gates['checks']])
@@ -236,7 +236,6 @@ class TemplateContractMergeTests(unittest.TestCase):
         normalized['version']='3.0.0'
         normalized['data_role_refs']=['classified-surface']
         for component in normalized['embedded'].values():component['version']='3.0.0'
-        normalized['embedded']['identity']['colors'][0]['provenance']['source_ref']='template:general-thematic-map@3.0.0'
         self.assertEqual(raster_scenario,normalized)
 
     def test_author_constants_match_the_registered_capability_profiles(self):

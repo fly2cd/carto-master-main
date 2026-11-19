@@ -1,0 +1,155 @@
+schema_version: 1
+style_id: pastel-admin-area-style
+version: 0.1.0
+visual_language: technical
+symbolization:
+  color_system: mixed
+  symbol_catalogs:
+  - maps/admin@1.0.0
+  - maps/transport@1.0.0
+  default_opacity: 1.0
+labeling:
+  density: high
+  collision_policy: avoid
+  font_role: label
+generalization:
+  scale_dependent: true
+  strategy: select
+defaults:
+  line_width_mm: 0.3
+  point_size_mm: 3.0
+  opacity: 1.0
+symbol_definitions:
+- symbol_id: admin-district-fill
+  symbol_type: fill
+  geometry_types:
+  - polygon
+  - multipolygon
+  channels:
+    fill_color:
+      source: categorical-match
+      property: district_name
+      ramp_ref: ramps/pastel_qualitative@1.0.0
+    fill_opacity:
+      source: fixed
+      value: 0.25
+    outline_color:
+      source: fixed
+      value: '#CCCCCC'
+    outline_width:
+      source: fixed
+      value: 0.5
+- symbol_id: water-body-fill
+  symbol_type: fill
+  geometry_types:
+  - polygon
+  - multipolygon
+  channels:
+    fill_color:
+      source: fixed
+      value: '#E6F7FF'
+    fill_opacity:
+      source: fixed
+      value: 1.0
+- symbol_id: province-boundary
+  symbol_type: line
+  geometry_types:
+  - line
+  channels:
+    line_color:
+      source: fixed
+      value: '#999999'
+    line_width:
+      source: fixed
+      value: 1.2
+    line_opacity:
+      source: fixed
+      value: 1.0
+- symbol_id: district-boundary
+  symbol_type: line
+  geometry_types:
+  - line
+  channels:
+    line_color:
+      source: fixed
+      value: '#CCCCCC'
+    line_width:
+      source: fixed
+      value: 0.5
+    line_opacity:
+      source: fixed
+      value: 1.0
+- symbol_id: highway-line
+  symbol_type: line
+  geometry_types:
+  - line
+  channels:
+    line_color:
+      source: fixed
+      value: '#FFD700'
+    line_width:
+      source: fixed
+      value: 1.0
+    line_opacity:
+      source: fixed
+      value: 1.0
+- symbol_id: railway-line
+  symbol_type: line
+  geometry_types:
+  - line
+  channels:
+    line_color:
+      source: fixed
+      value: '#800080'
+    line_width:
+      source: fixed
+      value: 0.8
+    line_opacity:
+      source: fixed
+      value: 1.0
+- symbol_id: city-center-marker
+  symbol_type: marker
+  geometry_types:
+  - point
+  channels:
+    marker_color:
+      source: fixed
+      value: '#FF0000'
+    marker_size:
+      source: fixed
+      value: 5.0
+- symbol_id: district-label
+  symbol_type: label
+  geometry_types:
+  - polygon
+  channels:
+    label_field:
+      source: property
+      property: district_name
+    label_color:
+      source: fixed
+      value: '#CC0000'
+    label_size:
+      source: fixed
+      value: 14
+- symbol_id: town-label
+  symbol_type: label
+  geometry_types:
+  - point
+  channels:
+    label_field:
+      source: property
+      property: town_name
+    label_color:
+      source: fixed
+      value: '#333333'
+    label_size:
+      source: fixed
+      value: 8
+rules:
+- id: synthetic-preview-only
+  strength: hard_rule
+  path: /application/excluded_uses
+  description: Draft package is limited to synthetic engineering previews and is not
+    a published product.
+  value: true

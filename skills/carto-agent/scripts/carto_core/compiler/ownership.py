@@ -4,15 +4,16 @@ from copy import deepcopy
 from typing import Any
 
 from ..errors import ProtocolError
+from .dependencies import DependencyResolver
 
 
 class OwnershipResolver:
-    OWNERS = {"platform", "map-brand", "map-style", "map-layout", "map-scenario", "project"}
+    OWNERS = {"platform", "map-style", "map-layout", "map-scenario", "project"}
     KIND_TO_SEGMENT = {
-        "map-brand": "identity",
         "map-style": "cartography",
         "map-layout": "layout",
     }
+    SEGMENT_TO_KIND = {segment: kind for kind, segment in KIND_TO_SEGMENT.items()}
 
     def merge(self, segments: list[tuple[str, dict[str, Any]]]) -> dict[str, Any]:
         """Preserve the U-P1 flat merge contract for existing compiler callers."""
@@ -81,6 +82,60 @@ class OwnershipResolver:
             ownership[expected_segment] = kind
 
         return {"segments": composed, "ownership": ownership}
+
+    def validate_segment_refs(self, scenario: dict[str, Any]) -> dict[str, str]:
+        """S1 semantic rules for referenced segments; returns the derived ownership map.
+
+        Rules: a segment is sourced exactly once (embedded XOR segment_refs);
+        referenced segments must be replaceable and kind-bound; every reference
+        is exactly pinned. Pure protocol check consumed by the validate/publish
+        and generate admission boundaries (S2).
+        """
+        embedded = scenario.get("embedded")
+        if not isinstance(embedded, dict):
+            raise ProtocolError("SCENARIO_EMBEDDED_MISSING", "scenario.embedded must be an object")
+        refs = scenario.get("segment_refs", {})
+        if not isinstance(refs, dict):
+            raise ProtocolError("SEGMENT_REFS_INVALID", "segment_refs must be an object")
+        replaceable = scenario.get("replaceable_segments", [])
+        if not isinstance(replaceable, list):
+            raise ProtocolError("SCENARIO_REPLACEABLE_INVALID", "replaceable_segments must be an array")
+        ownership: dict[str, str] = {}
+        for segment in self.KIND_TO_SEGMENT.values():
+            in_embedded = segment in embedded
+            in_refs = segment in refs
+            if in_embedded and in_refs:
+                raise ProtocolError("SEGMENT_DOUBLE_SOURCED", segment)
+            if not in_embedded and not in_refs:
+                raise ProtocolError("SEGMENT_SOURCE_MISSING", segment)
+            if in_embedded:
+                if not isinstance(embedded[segment], dict):
+                    raise ProtocolError("SCENARIO_EMBEDDED_INVALID", segment)
+                ownership[segment] = "map-scenario"
+                continue
+            reference = refs[segment]
+            if segment not in replaceable:
+                raise ProtocolError("SEGMENT_NOT_REPLACEABLE", segment)
+            expected_kind = self.SEGMENT_TO_KIND[segment]
+            if not isinstance(reference, dict) or reference.get("kind") != expected_kind:
+                raise ProtocolError("KIND_BOUNDARY_VIOLATION", f"{segment} must reference {expected_kind}")
+            DependencyResolver.require_pinned(reference)
+            ownership[segment] = expected_kind
+        return ownership
+
+    def validate_segment_lock(self, scenario: dict[str, Any], lock: dict[str, Any]) -> None:
+        """S1 lock rule: segment_refs must equal the segment-kind entries pinned in
+        dependency-lock.dependencies (which must also equal manifest.dependencies).
+        No floating or extra segment dependency is accepted."""
+        refs = scenario.get("segment_refs", {})
+        if not isinstance(refs, dict):
+            raise ProtocolError("SEGMENT_REFS_INVALID", "segment_refs must be an object")
+        expected = sorted(refs.values(), key=lambda item: (item["kind"], item["id"], item["version"], item["digest"]))
+        actual = sorted((item for item in lock.get("dependencies", [])
+                         if item.get("kind") in self.KIND_TO_SEGMENT),
+                        key=lambda item: (item["kind"], item["id"], item["version"], item["digest"]))
+        if expected != actual:
+            raise ProtocolError("SEGMENT_LOCK_MISMATCH", str(scenario.get("scenario_id", "")))
 
     @staticmethod
     def _require_compatible(scenario: dict[str, Any], template: dict[str, Any]) -> None:

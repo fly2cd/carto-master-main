@@ -37,7 +37,7 @@ version: 0.8.0
 - 独立图例使用对应面板的已确认类别；共享图例要求完整类别定义（编码、语义、显示、名称、颜色、顺序）及 legend_policy 一致。observed 使用已确认图例项并集；all 还要求逐类纳入标志一致。冲突拒绝，不改色、不重新分类、不降级。
 - 字号/行距唯一来自 cartography，内边距来自 Layout，类别颜色来自已确认 portrayal；最终 appearance、模板布局、参数与全部关系随页面冻结并重验。类别统计与模板图例容量分开。
 - 模板 `validate/publish` 覆盖声明的六种参数组合，每种都有冻结场景和真实渲染回执；不能用单图样张证明多图能力。正式渲染、终检和交付验证每个面板，不只检查第一幅图。
-- 本期一页一个静态后端，每面板一层分类栅格；普通单图也走同一内核。浏览器多图、任意共享组、多图比例尺/指北针、矢量、mosaic/freeform/inset、内容策划、独立 Style/Layout 创建及生产能力仍未开放。
+- 本期一页一个静态后端，每面板一层分类栅格；普通单图也走同一内核。浏览器多图、任意共享组、多图比例尺/指北针、矢量、mosaic/inset 与自由编排（层级/裁剪/任意覆盖区域）、内容策划、独立 Style/Layout 创建及生产能力仍未开放。
 
 ## S2 工程候选：合成回归通过，尚未正式准入
 
@@ -101,8 +101,12 @@ version: 0.8.0
 - 只使用 `business_scene` 表达业务用途分类，不增加业务域层级。场景 ID、用途词、任务和必需信息由 `policies/intent-profiles.yaml` 统一声明；共享 Schema 检查 ID 形状，解析器检查目录成员资格。
 - 主题统一使用 `theme_tags`（可多值的机器 ID）；中文显示名在目录的 `themes[].label`，不得混用为协议 ID。主题词识别内容，用途词识别业务场景；不以“洪涝”等主题词或通用“专题”一词直接决定业务场景。
 - `intent resolve` 使用 `intent-request` 的 `text + selection`；`generate-request` 使用 `goal + intent`，二者复用同一个 `intentSelection` 和解析器。`tasks` 缺失必须澄清，不取任务列表第一项作为默认值。
-- 生成时先解析用户意图，再验证用户明确选择的模板是否兼容；模板能力的 `intent_constraints` 只能限制可接受的场景、主题和任务，不得替用户补写或改写意图。当前不实现自动模板检索/选择。
+- 生成时先解析用户意图，再验证用户明确选择的模板是否兼容；模板能力的 `intent_constraints` 只能限制可接受的场景、主题和任务，不得替用户补写或改写意图。当前不实现自动模板检索/选择；只读辅助命令 `template match`（S0）仅对已发布段契约做相似度评分，不选择模板、不写仓库状态、不替代显式模板选择；其全部数值阈值在 `policies/template-matching-policy.yaml` 声明，`confirmation_status: pending-business-review`，尚无业务依据；色差容差自策略 0.2.0 起以 CIELAB CIE76 ΔE 为单位（sRGB 按 CIE 15 转换）。
+- **品牌段（map-brand/identity）已整体移除**（2026-11-18 用户授权）：它在渲染链中无任何消费者（署名来自场景策略 notice、字体来自 generate 请求），移除不改变成图外观。identity Schema、品牌评分器、品牌资产与 map-brand.md 设计文档均已删除；旧包含 identity 的包不被新协议接纳，不自动迁移。若未来需要品牌影响成图，须以带真实消费者的新协议重建，不恢复旧形状。
 - `MapScenario.scenario_id` 是模板方案身份，`RenderScene.scene_id` 是渲染实例身份，二者不是业务分类。Brief、Plan 与 execution 保留同一业务场景、主题标签和任务，并绑定原意图摘要。
+- 段引用协议（S1 定义、S2 接入）：`scenario.segment_refs` 允许 cartography/layout 逐段以已发布段模板引用（cartography→map-style、layout→map-layout）替代内嵌，每段恰好一个来源（embedded 与 segment_refs 互斥），引用段必须在 `replaceable_segments` 内、精确钉住 `{kind,id,version,digest}` 并与 `manifest.dependencies`/`dependency-lock.dependencies` 逐条一致，所有权随段转移。create-template 请求可用可选 `segment_refs` 声明；validate/publish 与 generate 在准入/装载边界从已发布仓库按摘要拉取并复验完整性后物化为完整场景，包本体不改写；无仓库或引用漂移一律失败关闭。全内嵌旧路径零改动；段模板的自动检索/选择仍未开放（`template match` 仅只读评分）。
+- 迁移段资产（2026-11-17 用户授权）：`template-assets/` 存放从 2026Oct 项目迁入的 13 项段资产（6 风格/7 版式；原品牌资产已随品牌段移除删除），每项含逐字节原件与适配主仓 Schema 的契约，`MIGRATION.yaml` 记录源摘要与适配规则，守卫测试防漂移。它们是库参考资产：仅供只读匹配与段引用消费，未过 T1/TP 与验证渲染门禁，不是生产可用模板；入库走真实 publish 路径（开发种子脚本见 `template-assets/README.md`）。
+- 配色红线（map-style.md §8.2 目标设计的可校验部分）：generate 链在色值冻结前执行三条检查——顺序/分歧色带须与声明的感知结构一致（sequential 的 L* 单调、diverging 的亮心中点，CIE 15 CIELAB）、相邻类 ΔE76 可区分、二色觉模拟（Machado 2009）后仍可区分；离散类别色查后两条，不查单调性。参数与执行级别全部在 `policies/color-redlines-policy.yaml`（`pending-business-review`；R1/R2 阻断、色觉安全首期警告）；blocker 失败关闭，warning 不阻断。模板包不含实例颜色，故 template validate/publish 零改动；WCAG 对比度公式已就绪但未接线（契约尚未声明文字/背景色对）；不自动选色、不改写通过检查的色值。
 - 不接纳旧 `scene_hint`、单值 `theme` 或 `fields.theme`；不自动迁移旧输入、候选或锁。详见 `workflows/intent-contract.md`。
 - 识别词表不等于可执行能力：现有分类保留为目录词汇；业务能力注册表和代码实现白名单当前只登记 `general-thematic-mapping`（实现 `general-thematic`），其余场景与组件一律默认拒绝。
 
@@ -110,7 +114,8 @@ version: 0.8.0
 
 - `scenario.embedded.layout.frames[].content_id` 显式绑定 view/overlay，公共 `compiler/layout.py` 将毫米 frame 解析为像素位置；场景构建器不再硬编码模块的页面位置。
 - 类型化 `resolved_layout` 同时保存模板源合同、显式参数及实例框，并进入 RenderScene 和 execution，预览、锁驱动渲染及终检重新验证同一布局快照；缺少快照的旧候选/锁不得自动补齐。
-- 当前支持毫米画布、DPR=1、单图及模板声明的有限网格，页面框互不重叠；地图使用 `clip`，其他内容使用 `reject`。多图由静态后端消费；浏览器仍只接受单图，其他溢出策略和 inset 明确拒绝。
+- 当前支持毫米画布、DPR=1、单图及模板声明的有限网格，页面框默认互不重叠；地图使用 `clip`，其他内容使用 `reject`。多图由静态后端消费；浏览器仍只接受单图，其他溢出策略和 inset 明确拒绝。
+- **有意重叠只接受显式声明的完整包含**：`layout.frames[].inside_frame` 声明某个非地图框完全位于某个地图框内（如地图内置指北针/图例）。声明是语义，包含是机械核验：程序检查引用存在、非自引用、非链式、容器为 `map`、被包含者非 `map`，并验证几何完整包含；解析快照携带该声明，重验时重新推导同一豁免。未声明的重叠、部分重叠、被包含框之间互相遮盖仍报 `LAYOUT_FRAME_OVERLAP`（永久禁止，不是可排期缺口）；声明不合法分别报 `LAYOUT_CONTAINMENT_REFERENCE`、`LAYOUT_CONTAINMENT_TYPE`、`LAYOUT_CONTAINMENT_NOT_ENCLOSED`。有限网格的多图基座不接受该声明（`GRID_BASE_INVALID`），因为网格会重建地图框。包含不放宽内容适配门禁：被包含框仍按自身边界拒绝溢出。任意覆盖区域、层级声明与裁剪仍未开放。
 - 浏览器后端先按地图框视口截图再合成整页；静态栅格后端直接消费同一物理版面。纸张与 DPI 均受场景策略限制。
 - 浏览器/SVG 路径仍使用固定图元保守包络；静态栅格整页使用实际字体测量、显式换行和溢出拒绝。两者均未实现自动布局候选搜索或复合布局求解。
 - 不可覆盖已发布模板或冻结锁；采用新版契约须重新验证、发布、编译、预览并获取相应精确审批。

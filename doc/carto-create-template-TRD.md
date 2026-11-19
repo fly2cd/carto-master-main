@@ -1,5 +1,7 @@
 # 地图制图智能体模板创建路由技术设计
 
+> **状态公告（2026-11-18）**：品牌段（map-brand/identity）已经用户授权整体移除——它在渲染链中无消费者，移除不改变成图外观。本文已同步清理品牌遗留描述；当前协议以 `skills/carto-agent/schemas/` 与 SKILL.md 为准。
+
 > 2026-11-09 一致性收敛：领域定义采用[模板体系设计](carto-template-dsg.md)中的 Encoding / Appearance / Composition 与独立执行层，变更见收敛记录 design-convergence-20261109.md（已移除，可从 git 历史取回）。本轮仅调整设计，不升级机器协议或宣称新能力。旧阶段编号、场景示例和命令是历史/目标说明；当前仅注册 general 分类栅格单图，模板样张及正式渲染框架已存在，未完成的多图、组件、参数和后端组合须另行实现验收。
 
 
@@ -16,7 +18,7 @@
 | 配套实施计划 | 分阶段实施计划 global-implement-plan.md（已移除，可从 git 历史取回） |
 | 核心产物 | 声明式模板包、验证证据、预览产物、不可变版本及发布记录 |
 
-本版将技术实现收敛为“模块化单体内核 + 声明式模板包 + 确定性编译校验 + 独立渲染适配器”。保留四类模板，将单个 MapScenario 统一为六份业务契约；六种规则标签不再作为数值优先级；取消通用动态加载图；以统一发布操作替代独立安装、注册事务。
+本版将技术实现收敛为“模块化单体内核 + 声明式模板包 + 确定性编译校验 + 独立渲染适配器”。保留三类模板（品牌段已移除），将单个 MapScenario 统一为六份业务契约；六种规则标签不再作为数值优先级；取消通用动态加载图；以统一发布操作替代独立安装、注册事务。
 
 旧稿中的八契约清单、数值规则优先级、动态加载单元和旧 CLI 不作为并行可选实现。本文描述目标设计；已实现能力及其边界以 `skills/carto-agent/` 下的 Schema、策略、代码和验证证据为准，不能仅凭本文的目录、命令和接口声明已支持。
 
@@ -24,14 +26,13 @@
 
 ## 一、结论与设计取舍
 
-地图模板创建是独立路由 `Create Map Template`，四个互斥子路由根据“稳定复用什么”选择：
+地图模板创建是独立路由 `Create Map Template`，三个互斥子路由根据“稳定复用什么”选择：
 
-- `create-map-brand`：地图身份模板，复用组织身份。
 - `create-map-style`：制图表达规范，复用表达判断与视觉默认。
-- `create-map-layout`：地图版式模板，复用品牌中性的版面或视口结构。
+- `create-map-layout`：地图版式模板，复用内容中性的版面或视口结构。
 - `create-map-scenario`：制图场景方案，复用明确业务场景及其集成规则。
 
-四个子路由只是同一流程的作者策略，不是四套编排系统。公共流程固定为：
+三个子路由只是同一流程的作者策略，不是三套编排系统（原 create-map-brand 已随品牌段移除）。公共流程固定为：
 
 ```text
 来源分析 → 简报确认 → 模板编写 → 校验与样例渲染 → 发布
@@ -41,7 +42,7 @@
 
 | 保留 | 简化为 | 首期不建设 |
 |---|---|---|
-| 四类模板及分段所有权 | 一个编排器、四个作者策略 | 四套重复流程或微服务 |
+| 三类模板及分段所有权 | 一个编排器、三个作者策略 | 三套重复流程或微服务 |
 | 六种规则语义 | 注册检查器、Schema、显式参数及字段绑定 | 任意表达式解释器、通用冲突求解器 |
 | 确认边界与按需上下文 | 小契约一次解析，大资源延迟加载 | 动态触发器图及收敛循环 |
 | 可复现执行 | 契约 → MapPlan → MapSpecLock | Markdown 与 YAML 双重执行权威 |
@@ -56,7 +57,7 @@
 
 ### 2.1 目标
 
-1. 从文字、参考地图、GIS 工程、样式和品牌材料创建可移植模板。
+1. 从文字、参考地图、GIS 工程和样式创建可移植模板。
 2. 以机器契约保存执行约束，以 Design Spec 解释设计理由。
 3. 发布前完成适用的数据、空间、表达、视觉、许可与目标引擎验证。
 4. 支持库级复用和项目私有使用，保持版本、证据与审批可追溯。
@@ -106,7 +107,7 @@ MapSpecLock
 
 | 模块 | 内部职责 | 主要输出 |
 |---|---|---|
-| 工作流编排 `workflow` | 路由、来源分析、简报、确认、四种作者策略、步骤恢复 | 作业记录、已批准简报、模板草稿 |
+| 工作流编排 `workflow` | 路由、来源分析、简报、确认、三种作者策略、步骤恢复 | 作业记录、已批准简报、模板草稿 |
 | 契约编译 `compiler` | Schema、固定依赖、所有权、标准适用性、参数归一化、目标选择 | `CompiledTemplate`、冲突清单 |
 | 统一校验 `validation` | 注册检查器、Fixture、样例渲染、覆盖矩阵、统一报告 | 验证证据、预览、失败修复位置 |
 | 渲染适配器 `adapters` | 能力探测、渲染包编译、隔离执行、产物检查 | 地图产物和引擎诊断 |
@@ -126,7 +127,7 @@ skills/carto-agent/
 ├─ workflows/
 │  ├─ routing.md
 │  ├─ create-template.md
-│  └─ create-template/              # 四类策略只记录差异
+│  └─ create-template/              # 三类策略只记录差异
 ├─ references/
 │  ├─ template-contracts.md
 │  ├─ cartographic-quality.md
@@ -144,7 +145,6 @@ skills/carto-agent/
 ├─ schemas/
 │  ├─ manifest.schema.json
 │  ├─ template-brief.schema.json
-│  ├─ identity.schema.json
 │  ├─ cartography.schema.json
 │  ├─ layout.schema.json
 │  ├─ scenario.schema.json
@@ -213,18 +213,17 @@ projects/<project-id>/carto/
 
 模板作者不需要枚举所有业务主题和完整图形。可复用定义保存语义约束与成熟预设；本次表达组合由生成侧计划承载，基础能力须已实现并获准。模型可以辅助开发方法，但不能将新代码夹带进模板包作为发布后可执行资源；动态生成代码的执行机制不属于当前模板创建能力。
 
-### 5.2 四种作者策略
+### 5.2 三种作者策略（品牌段已移除）
 
 | 类型 | 拥有 | 不拥有 | 包内业务契约 |
 |---|---|---|---|
-| MapBrand | 组织色板、字体、Logo、署名风格 | 风险色语义、CRS、图层、业务数据、地图结构 | `identity.yaml` |
-| MapStyle | 在表达与业务约束内配置视觉层级、符号、标注、概化及允许默认值 | 固定业务应用、组织身份、固定画布、表达算法实现 | `cartography.yaml` |
+| MapStyle | 在表达与业务约束内配置视觉层级、符号、标注、概化及允许默认值 | 固定业务应用、固定画布、表达算法实现 | `cartography.yaml` |
 | MapLayout | 中性画布、地图框、标题、图例槽、附图槽、容量与响应布局 | 业务图层、专题编码、实际地理范围 | `layout.yaml` |
-| MapScenario | 场景合同、数据角色、空间行为、业务表达、集成身份和结构 | 当前项目数据、实际范围、最终分类断点 | 第十节六份契约 |
+| MapScenario | 场景合同、数据角色、空间行为、业务表达、集成表达和结构 | 当前项目数据、实际范围、最终分类断点 | 第十节六份契约 |
 
-先判断用户是否明确只复用身份、表达规范或中性结构；否则，若存在与数据角色、结构或身份关联的重复业务场景，选择 MapScenario。仍有歧义时只询问“要复用哪个范围”，不根据文件格式或源工程完整度猜测。
+先判断用户是否明确只复用表达规范或中性结构；否则，若存在与数据角色或结构关联的重复业务场景，选择 MapScenario。仍有歧义时只询问“要复用哪个范围”，不根据文件格式或源工程完整度猜测。
 
-身份、表达规范和版式的独立作者策略不能生成虚假的场景契约。Brand 和 Style 不需要地图原型，但其资产、字体、规则及依赖仍须验证。
+表达规范和版式的独立作者策略不能生成虚假的场景契约。Style 不需要地图原型，但其资产、规则及依赖仍须验证。
 
 ## 六、来源模型与创建模式
 
@@ -236,7 +235,7 @@ projects/<project-id>/carto/
 | 样式文件 | 符号、过滤、标签、比例尺和表达式 | 未审查表达式不得直接执行 |
 | SVG、PDF、PNG 等地图成品 | 可见结构、文字和视觉事实 | 不证明隐藏数据和空间精度 |
 | 地理数据、CSV | 几何、字段、CRS、分布和质量 | 默认不进入发布包 |
-| 文档、直接文本、品牌资产 | 用途、受众、规则、身份和许可 | 记录事实与建议的区别 |
+| 文档、直接文本 | 用途、受众、规则和许可 | 记录事实与建议的区别 |
 
 每项来源记录规范化路径或 URI、媒体类型、内容哈希、提取器版本、许可、时间和可信程度。结论标记为 `fact`、`decision`、`suggested` 或 `derived`。敏感路径只保存在受控作业记录中，日志和发布包使用脱敏标识。
 
@@ -320,8 +319,7 @@ last_receipt: steps/author.json
 - 在 `<build-workdir>/staging/package/` 创建草稿；选择唯一 kind 作者策略。
 - 生成第九、十节规定的 Manifest、契约、必要资产和完整原型。
 - 固定依赖版本及摘要，生成 `dependencies.lock.yaml`。
-- Brand/Style 不生成地图原型；Layout/Scenario 使用合成数据展示完整地图或视图。
-- MapBrand 仅使用 `primary/accent/surface/ink` 等身份 token；水体、风险级别不是身份 token。
+- Style 不生成地图原型；Layout/Scenario 使用合成数据展示完整地图或视图。
 - 印刷结构分别声明物理尺寸与 SVG 逻辑坐标。例如 A3 横向为 420 × 297 mm，`viewBox` 可以为 4200 × 2970，不能混用两种单位。
 
 ### Step 4：统一校验与样例渲染
@@ -333,7 +331,7 @@ last_receipt: steps/author.json
 → 目标能力协商 → Fixture 渲染 → 视觉/性能/产物检查 → 验证证据
 ```
 
-静态失败时不启动昂贵渲染。Brand/Style 输出规范和资产检查报告；Layout/Scenario 在每个正式目标上验证原型及必要边界 Fixture。
+静态失败时不启动昂贵渲染。Style 输出规范和资产检查报告；Layout/Scenario 在每个正式目标上验证原型及必要边界 Fixture。
 
 预览、报告和 Fixture 执行锁写入作业目录，不回写模板包。验证前后复核包摘要，避免验证期间内容被改写。证据绑定包摘要、依赖摘要、Fixture 摘要、基线及检查器版本、适配器和环境指纹；证据摘要按排除摘要字段自身的规范化证据清单计算。报告中的 `blocker/error` 非零不能通过。
 
@@ -454,13 +452,13 @@ MapScenario 的 `contracts/` 恰好包含六份业务契约：
 - 原 `spatial.yaml` 与 `multiscale.yaml` 合为 `spatial-behavior.yaml`。
 - 原 `layer-graph.yaml` 与 `encoding-bindings.yaml` 合为 `portrayal.yaml`。
 
-加上其他三类模板各自的 `identity.yaml`、`cartography.yaml`、`layout.yaml`，整个系统共九种业务契约文件类型，而不是每个模板都有九份。MapScenario 的内置身份、表达和版式放在 `scenario.yaml`，复用相应 Schema 定义，不再额外复制三份文件。
+加上其他两类模板各自的 `cartography.yaml`、`layout.yaml`，整个系统共八种业务契约文件类型，而不是每个模板都有八份。MapScenario 的内置表达和版式放在 `scenario.yaml`，复用相应 Schema 定义，不再额外复制两份文件（品牌段 identity 已移除）。
 
-Manifest、依赖锁、Schema、平台检查器注册表、质量报告和 MapSpecLock 都不计入这六份契约。Brand、Style、Layout 的通用门禁由平台根据 kind 和交付目标施加，不为满足数量统一而创建空的 `quality-gates.yaml`。
+Manifest、依赖锁、Schema、平台检查器注册表、质量报告和 MapSpecLock 都不计入这六份契约。Style、Layout 的通用门禁由平台根据 kind 和交付目标施加，不为满足数量统一而创建空的 `quality-gates.yaml`。
 
 ### 10.2 场景契约
 
-`scenario.yaml` 持有场景目标、适用条件、禁用条件和三个完整内置分段：
+`scenario.yaml` 持有场景目标、适用条件、禁用条件和两个完整内置分段（品牌段已移除）：
 
 ```yaml
 application:
@@ -469,10 +467,9 @@ application:
   required_roles: [risk_regions, shelters]
   excluded_uses: [法定灾害预警发布, 工程测量]
 embedded:
-  identity: {}       # 此处简写；实际须符合 identity Schema
   cartography: {}    # 实际须符合 cartography Schema
   layout: {}         # 实际须符合 layout Schema
-replaceable_segments: [identity, cartography, layout]
+replaceable_segments: [cartography, layout]
 ```
 
 上述片段仅说明结构，不是可通过 Schema 的完整文件。独立模板可以整段替换内置分段，但不能删除场景所必需的数据角色、预警语义或交付义务；替换后不兼容应报错，而不是从被替换分段偷偷补字段。
@@ -684,7 +681,7 @@ retry_from: author
 | 分段 | 决策来源 |
 |---|---|
 | 场景合同、必需业务角色 | MapScenario |
-| 组织身份 | 显式 MapBrand，否则场景内置身份 |
+| 字体与署名 | 字体来自 generate 请求，署名来自场景策略 notice（品牌段已移除） |
 | 制图表达规范 | 显式 MapStyle，否则场景内置规范 |
 | 版面结构 | 显式 MapLayout，否则场景内置结构 |
 | 字段含义、单位、时间和空间前提 | 数据契约及预检证据 |
@@ -711,7 +708,6 @@ compiled_template:
   dependency_refs: []
   ownership: {}
   scenario: {}
-  identity: {}
   cartography: {}
   layout: {}
   data_roles: {}
@@ -740,7 +736,7 @@ compiled_template:
 
 ### 11.3 目标组件包与组合证据
 
-模板是部分规范、约束、参数接口与依赖的组合载体，四类模板为创作/检索分类，不要求四套运行对象。Scenario 目标可精确引用或内嵌组件；v1 的六契约与强制内嵌仍是当前基线，只有版本化协议落地后才可使用新形状。
+模板是部分规范、约束、参数接口与依赖的组合载体，三类模板为创作/检索分类，不要求三套运行对象（品牌段已移除）。Scenario 目标可精确引用或内嵌组件；v1 的六契约与强制内嵌仍是当前基线，只有版本化协议落地后才可使用新形状。
 
 Layout 声明 single/grid/mosaic/freeform 的已支持子集，inset 为附加结构；固定模板与有限变体合法。显式组合/分面属于项目规划，不把年份筛选、实际断点或业务数据写进 Layout。Style 主要提供 Appearance，引用编码机制，不复制算法或形成双份映射。
 
@@ -750,11 +746,10 @@ Layout 声明 single/grid/mosaic/freeform 的已支持子集，inset 为附加�
 
 ### 12.1 索引与确认边界
 
-四类发现视图仍为：
+三类发现视图仍为：
 
 ```text
 templates/indexes/
-├─ map-brands.index.json
 ├─ map-styles.index.json
 ├─ map-layouts.index.json
 └─ map-scenarios.index.json
@@ -868,7 +863,7 @@ carto_template.py cancel <workdir>
 
 `confirm` 验证外部可信审批回执；本地交互确认模式由宿主获取登录身份并记录动作，不能靠模型生成回执。发布审批请求可从验证结果获取待批准的包、证据和目标库摘要。
 
-`validate --render` 包含预览，无需单独的预览状态或 `preview` 命令。`--target` 只控制本次验证子集，发布仍要求覆盖全部正式目标。Brand/Style 自动执行适用检查，不启动虚构的地图渲染。
+`validate --render` 包含预览，无需单独的预览状态或 `preview` 命令。`--target` 只控制本次验证子集，发布仍要求覆盖全部正式目标。Style 自动执行适用检查，不启动虚构的地图渲染。
 
 `publish` 内部完成安装与注册，不再暴露需要用户串联的 `install/register` 创建命令。地图生成所需的包安装是仓库模块的独立读包操作，不改变发布状态。
 
@@ -955,7 +950,7 @@ carto_template.py cancel <workdir>
 
 ### 18.1 必需测试
 
-1. 四类路由及契约边界：合法、非法、缺字段、未知字段和版本差异。
+1. 三类路由及契约边界：合法、非法、缺字段、未知字段和版本差异。
 2. 六份场景契约：字段引用、Schema 和依赖一致性。
 3. 组合：结构性替换、引用/内嵌互斥、声明参数和作用域、标准冲突与绑定失配；拒绝任意深层合并，验证最终值来源唯一。
 4. 检查器：参数越界、最低基线不可降低、未知检查 ID、适用/不适用边界。
@@ -964,7 +959,7 @@ carto_template.py cancel <workdir>
 7. 表达交付：分类并列值、无数据、比例符号面积、图例同步、字号线宽和印刷尺寸。
 8. 安全：越界路径、恶意归档、脚本/表达式注入、审批伪造及摘要篡改。
 9. 故障恢复：进程崩溃、取消、磁盘满、发布提交超时、并发同版本发布和索引更新失败。
-10. 端到端：四类最小模板各一个；场景完成 MapLibre Web/SVG 预览验证、发布、项目安装和 Fixture 重放。
+10. 端到端：三类最小模板各一个；场景完成 MapLibre Web/SVG 预览验证、发布、项目安装和 Fixture 重放。
 
 视觉回归比较语义稳定区域并给定容差，不能只做逐像素比较，也不能只检查文件是否存在。扩展其他引擎后增加共享语义一致性测试，不以视觉相同替代语义验证。
 
@@ -986,9 +981,9 @@ carto_template.py cancel <workdir>
 
 | 阶段 | 范围 | 退出条件 |
 |---|---|---|
-| P0：规范收敛 | 对齐三份文档、四类命名、六契约、Schema、审批和仓库治理规则 | 无并行旧模型，测试位置和代码入口获准 |
+| P0：规范收敛 | 对齐三份文档、三类命名（原四类，品牌段后移除）、六契约、Schema、审批和仓库治理规则 | 无并行旧模型，测试位置和代码入口获准 |
 | P1～P3：内核 | 五模块边界、状态与回执、编译器、注册检查器、简化加载、单一发布 | 无渲染器的完整生命周期和故障恢复通过 |
-| P4～P6：首个生产闭环 | 四类作者策略、两种必要地图表达（顺序分级设色、容量比例符号）、MapLibre Web/SVG overlay、洪涝场景、可信审批、隔离与运维基线 | 从来源到发布及项目 Fixture 重放通过 |
+| P4～P6：首个生产闭环 | 三类作者策略（原四类，品牌段后移除）、两种必要地图表达（顺序分级设色、容量比例符号）、MapLibre Web/SVG overlay、洪涝场景、可信审批、隔离与运维基线 | 从来源到发布及项目 Fixture 重放通过 |
 | P7：多终端 | Web/移动端、第二适配器、响应式与性能、跨引擎语义 | 每个新增正式目标均有完整验证 |
 | P8：行业与规模治理 | 适用标准目录扩展、迁移、广泛签名分发、受支持 mirror 与 ArcGIS | 按具体行业及部署需求验收 |
 
@@ -1021,7 +1016,7 @@ D:/carto-input/flood-risk/
 
 用户要复用“城市洪涝应急研判”场景，故选择 MapScenario，而不是因为输入包含完整 QGIS 工程。QGIS 工程在这里仅作为受支持子集的来源输入；正式目标为 A3 印刷，由 Web 渲染场景生成中间 SVG 并派生交付产物。
 
-角色为行政区风险率 `risk_regions.risk_rate` 和避难场所容量 `shelters.capacity`。容量表达为符号面积；空风险值显示无数据纹理。Logo 须有分发许可；地图不冒充法定预警发布。
+角色为行政区风险率 `risk_regions.risk_rate` 和避难场所容量 `shelters.capacity`。容量表达为符号面积；空风险值显示无数据纹理。地图不冒充法定预警发布。
 
 以下 PowerShell 命令使用绝对路径，不依赖当前目录。输入、工具及可信审批系统需在实现后实际存在。
 
@@ -1167,9 +1162,9 @@ skills/carto-agent/templates/scenarios/urban-flood-risk/1.0.0/
 1. 用户提出“制作某日城市洪涝风险 A3 研判图”，系统只用索引和 Manifest 展示候选。
 2. 确认本次受众、指标、日期、范围、数据权限与精确模板版本。
 3. 将 `urban-flood-risk/1.0.0` 安装到项目私有目录，验包与固定依赖摘要。
-4. 一次解析六契约，结合显式 Brand/Style/Layout 解析所有权，不启动其他适配器。
+4. 一次解析六契约，结合显式 Style/Layout 解析所有权，不启动其他适配器。
 5. 绑定真实风险率和容量字段，检查单位、时效、CRS、几何和可用性。
-6. 计算实际范围与分类断点，形成候选计划；加载引用的 Logo、符号和渲染资源，编译 `RenderScene` 并生成预览。
+6. 计算实际范围与分类断点，形成候选计划；加载引用的符号和渲染资源，编译 `RenderScene` 并生成预览。
 7. 预览与门禁通过后冻结 MapSpecLock，再按固定参数生成正式产物。
 8. 模板、数据、目标或参数变化时建立新计划和锁；不能修改既有发布包来“临时适配”。
 
