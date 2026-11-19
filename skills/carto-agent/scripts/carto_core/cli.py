@@ -9,6 +9,7 @@ from pathlib import Path
 from .adapters.renderer_probe import RendererCapabilityProbe
 from .adapters.host_probe import HermesHostProbe
 from .errors import CartoError, ProtocolError
+from .repository.template_repository import TemplateRepository
 from .schema_registry import SchemaRegistry, load_document
 from .security.approval import ApprovalReceipt, verify_receipt
 from .security.paths import PathGuard
@@ -68,6 +69,14 @@ def build_parser() -> argparse.ArgumentParser:
     resolve = intent_sub.add_parser("resolve", help="Resolve business purpose and topic IDs, without enabling a capability")
     resolve.add_argument("request", help="intent-request JSON/YAML: schema_version, text, selection (fields/tasks/business_scene/theme_tags)")
     resolve.add_argument("--allowed-root", action="append", required=True)
+
+    template = sub.add_parser("template", help="Read-only template library queries; no selection, no state change")
+    template_sub = template.add_subparsers(dest="template_command", required=True)
+    match = template_sub.add_parser("match", help="Score a segment against published library contracts (advisory only)")
+    match.add_argument("request", help="template-match-request JSON/YAML: schema_version, kind, segment")
+    match.add_argument("--repository-root", required=True)
+    match.add_argument("--repository-scope", required=True)
+    match.add_argument("--allowed-root", action="append", required=True)
 
     environment = sub.add_parser("environment", help="Inspect host installation or renderer capabilities")
     environment_sub = environment.add_subparsers(dest="environment_command", required=True)
@@ -131,6 +140,8 @@ def build_parser() -> argparse.ArgumentParser:
     validate_template.add_argument("--attestation-key-env", default="CARTO_RENDER_ATTESTATION_KEY")
     validate_template.add_argument("--browser")
     validate_template.add_argument("--font")
+    validate_template.add_argument("--repository-root", help="Published repository required when the scenario references segments")
+    validate_template.add_argument("--repository-scope")
     publish = create_sub.add_parser("publish", help="Publish an exactly validated template version")
     _add_template_paths(publish)
     publish.add_argument("--approval", required=True)
@@ -248,6 +259,31 @@ def main(argv: list[str] | None = None) -> int:
                 raise ValueError("Intent request must be an object")
             result = IntentResolver(_policy_path("intent-profiles.yaml")).resolve(request)
             return _success({"intent": result})
+        if args.command == "template" and args.template_command == "match":
+            from .repository.template_matching import MatchingPolicy, SEGMENT_CONTRACTS, rank_segment_candidates
+
+            guard = PathGuard(args.allowed_root)
+            path = guard.resolve(args.request, must_exist=True)
+            request = load_document(path)
+            registry = SchemaRegistry()
+            registry.validate("template-match-request", request)
+            _, segment_schema = SEGMENT_CONTRACTS[request["kind"]]
+            registry.validate(segment_schema, request["segment"])
+            policy = MatchingPolicy.load(registry=registry)
+            repository = TemplateRepository(
+                path_guard=guard, root=args.repository_root,
+                repository_scope=args.repository_scope, registry=registry,
+            )
+            candidates = repository.segment_candidates(kind=request["kind"])
+            result = {
+                "schema_version": 1, "kind": request["kind"],
+                "policy_version": policy.version,
+                "confirmation_status": policy.confirmation_status,
+                "match_threshold": policy.match_threshold,
+                "candidates": rank_segment_candidates(request["kind"], request["segment"], candidates, policy),
+            }
+            registry.validate("template-match-result", result)
+            return _success({"match": result})
         if args.command == "environment" and args.environment_command == "probe-host":
             probe = HermesHostProbe(allowed_roots=args.allowed_root, project_root=args.project_root, host_home=args.host_home)
             report = probe.run(verify_local_tools=args.verify_local_tools, host_python=args.host_python, timeout=args.timeout)
@@ -420,6 +456,7 @@ def main(argv: list[str] | None = None) -> int:
                 key = os.environ.get(args.attestation_key_env, "").encode("utf-8")
                 return _success(workflow.validate(
                     args.request, attestation_key=key, browser=args.browser, font_path=args.font,
+                    repository_root=args.repository_root, repository_scope=args.repository_scope,
                 ))
             if args.create_command == "publish":
                 approval_key = os.environ.get(args.key_env, "").encode("utf-8")

@@ -1,0 +1,120 @@
+schema_version: 1
+layout_id: main-map-with-right-info-panel
+version: 0.1.0
+category: general
+canvas:
+  width: 1536
+  height: 1024
+  unit: px
+  orientation: landscape
+  safe_margin: 0
+frames:
+- id: title-block
+  type: title
+  bounds:
+  - 20
+  - 25
+  - 175.0
+  - 40.0
+  coordinate_space: page
+  overflow_policy: clip
+  content_id: title-block
+- id: north-arrow
+  type: north-arrow
+  bounds:
+  - 25
+  - 115
+  - 40
+  - 60
+  coordinate_space: page
+  overflow_policy: clip
+  content_id: north-arrow
+- id: main-map
+  type: map
+  bounds:
+  - 90
+  - 80
+  - 1130
+  - 900
+  coordinate_space: page
+  overflow_policy: shrink
+  content_id: main-map
+- id: inset-location
+  type: inset
+  bounds:
+  - 1260
+  - 20
+  - 256
+  - 220
+  coordinate_space: page
+  overflow_policy: clip
+  content_id: inset-location
+- id: legend-elevation
+  type: legend
+  bounds:
+  - 1260
+  - 260
+  - 256
+  - 290
+  coordinate_space: page
+  overflow_policy: clip
+  content_id: legend-elevation
+- id: marginalia-stats
+  type: marginalia
+  bounds:
+  - 1260
+  - 560
+  - 256
+  - 180
+  coordinate_space: page
+  overflow_policy: clip
+  content_id: marginalia-stats
+- id: marginalia-coords
+  type: marginalia
+  bounds:
+  - 1260
+  - 750
+  - 256
+  - 130
+  coordinate_space: page
+  overflow_policy: clip
+  content_id: marginalia-coords
+- id: scale-bar
+  type: scale-bar
+  bounds:
+  - 1260
+  - 910
+  - 256
+  - 50
+  coordinate_space: page
+  overflow_policy: clip
+  content_id: scale-bar
+- id: marginalia-source
+  type: marginalia
+  bounds:
+  - 20
+  - 920
+  - 150
+  - 80
+  coordinate_space: page
+  overflow_policy: clip
+  content_id: marginalia-source
+placeholders:
+- '{{TITLE_TEXT}}'
+- '{{SUBTITLE_TEXT}}'
+- '{{LOCATION_LABEL}}'
+- '{{LEGEND_LABEL}}'
+- '{{STATS_LABEL}}'
+- '{{COORD_LABEL}}'
+- '{{SOURCE_TEXT}}'
+- '{{DATE_TEXT}}'
+capacity:
+  legend_items: 8
+  title_characters: 40
+rules:
+- id: synthetic-preview-only
+  strength: hard_rule
+  path: /application/excluded_uses
+  description: Draft package is limited to synthetic engineering previews and is not
+    a published product.
+  value: true

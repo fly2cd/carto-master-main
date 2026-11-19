@@ -1,6 +1,10 @@
 schema_version: 1
 catalog_id: carto-map-expressions
 version: 2.0.0
+# Constraint authority: validation.rules is the ONLY place where allowed sets and
+# numeric ranges are declared. parameter_definitions carries name/type/required/default
+# only. Duplicating constraints there has no consumer and drifts from the enforced copy.
+# field_requirements.minimum/maximum are a DIFFERENT concept (data value domain) and stay.
 entries:
 - schema_version: 1
   expression_id: choropleth/sequential
@@ -20,17 +24,10 @@ entries:
     type: enum
     required: true
     default: quantile
-    allowed_values:
-    - equal-interval
-    - quantile
-    - jenks
-    - manual
   - name: class-count
     type: integer
     required: true
     default: 5
-    minimum: 2
-    maximum: 12
   visual_variables:
   - variable: fill-color
     source_role: thematic-value
@@ -78,14 +75,10 @@ entries:
     type: number
     required: true
     default: 2
-    minimum: 0.1
-    maximum: 50
   - name: maximum-size-mm
     type: number
     required: true
     default: 12
-    minimum: 0.1
-    maximum: 50
   visual_variables:
   - variable: symbol-area
     source_role: count-value
@@ -261,17 +254,10 @@ entries:
     type: enum
     required: true
     default: quantile
-    allowed_values:
-    - equal-interval
-    - quantile
-    - jenks
-    - manual
   - name: class-count
     type: integer
     required: true
     default: 5
-    minimum: 2
-    maximum: 12
   visual_variables:
   - variable: fill-color
     source_role: thematic-value
@@ -318,14 +304,10 @@ entries:
     type: number
     required: true
     default: 2
-    minimum: 0.1
-    maximum: 50
   - name: maximum-size-mm
     type: number
     required: true
     default: 12
-    minimum: 0.1
-    maximum: 50
   visual_variables:
   - variable: symbol-area
     source_role: count-value

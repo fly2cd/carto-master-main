@@ -1,0 +1,63 @@
+schema_version: 1
+layout_id: yongchun-tea-tourism-layout
+version: 0.1.0
+category: general
+canvas:
+  width: 1653
+  height: 1080
+  unit: px
+  orientation: landscape
+  safe_margin: 0
+frames:
+- id: main-map-area
+  type: map
+  bounds:
+  - 50
+  - 60
+  - 1595
+  - 1010
+  coordinate_space: page
+  overflow_policy: shrink
+- id: legend-panel
+  type: legend
+  bounds:
+  - 73
+  - 583
+  - 178
+  - 375
+  coordinate_space: page
+  overflow_policy: clip
+- id: north-arrow
+  type: north-arrow
+  bounds:
+  - 883
+  - 93
+  - 50
+  - 70
+  coordinate_space: page
+  overflow_policy: clip
+- id: scale-bar
+  type: scale-bar
+  bounds:
+  - 683
+  - 883
+  - 250
+  - 130
+  coordinate_space: page
+  overflow_policy: clip
+placeholders:
+- '{{LEGEND_TITLE}}'
+- '{{LEGEND_ITEMS}}'
+- '{{SCALE_VALUES}}'
+- '{{NORTH_INDICATOR}}'
+- '{{MAP_LABELS}}'
+capacity:
+  legend_items: 5
+  title_characters: 30
+rules:
+- id: synthetic-preview-only
+  strength: hard_rule
+  path: /application/excluded_uses
+  description: Draft package is limited to synthetic engineering previews and is not
+    a published product.
+  value: true

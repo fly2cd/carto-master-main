@@ -190,25 +190,6 @@
               "boolean",
               "string"
             ]
-          },
-          "minimum": {
-            "type": "number"
-          },
-          "maximum": {
-            "type": "number"
-          },
-          "allowed_values": {
-            "type": "array",
-            "minItems": 1,
-            "uniqueItems": true,
-            "items": {
-              "type": [
-                "integer",
-                "number",
-                "boolean",
-                "string"
-              ]
-            }
           }
         }
       }

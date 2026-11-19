@@ -36,12 +36,11 @@ EXECUTION = {
 }
 EXECUTION_DIGEST = sha256_digest(EXECUTION)
 
-IDENTITY = {"schema_version": 1, "identity_id": "government-blue", "version": "1.0.0", "organization": "示例机构", "colors": [{"role": "primary", "hex": "#005EA8", "provenance": P}], "typography": [{"role": "title", "family": "Noto Sans CJK SC", "weight": 700}], "attribution": {"organization_format": "制图：{organization}", "data_source_format": "数据来源：{source}"}, "rules": [R]}
 CARTOGRAPHY = {"schema_version": 1, "style_id": "technical-map", "version": "1.0.0", "visual_language": "technical", "symbolization": {"color_system": "sequential", "symbol_catalogs": ["ramps/test-theme@1.0.0"], "default_opacity": 0.8}, "labeling": {"density": "medium", "collision_policy": "prioritize", "font_role": "body"}, "generalization": {"scale_dependent": True, "strategy": "simplify"}, "defaults": {"line_width_mm": 0.2, "point_size_mm": 3, "opacity": 0.8}, "rules": [R]}
 LAYOUT = {"schema_version": 1, "layout_id": "a3-landscape", "version": "1.0.0", "category": "report", "canvas": {"width": 420, "height": 297, "unit": "mm", "orientation": "landscape", "safe_margin": 10}, "frames": [{"id": "main-map", "content_id": "main-view", "type": "map", "coordinate_space": "page", "bounds": [20, 30, 380, 230], "overflow_policy": "clip"}], "placeholders": ["{{MAP_TITLE}}", "{{MAP_FRAME}}"], "capacity": {"legend_items": 12, "title_characters": 40}, "rules": [R]}
 BUSINESS_CONTRACTS = {"scenario": "contracts/scenario.yaml", "data_schema": "contracts/data.schema.yaml", "spatial_behavior": "contracts/spatial-behavior.yaml", "portrayal": "contracts/portrayal.yaml", "delivery": "contracts/delivery.yaml", "quality_gates": "contracts/quality-gates.yaml"}
 PACKAGE_FILES = [*BUSINESS_CONTRACTS.values(), "dependencies.lock.yaml"]
-MAP_EXPRESSION = {"schema_version": 1, "expression_id": "choropleth/sequential", "version": "1.0.0", "title": "Sequential choropleth", "status": "active", "geometry_types": ["polygon"], "field_requirements": [{"semantic_role": "thematic-value", "value_type": "number", "required": True, "nullable": True}], "parameter_definitions": [{"name": "class-count", "type": "integer", "required": True, "default": 5, "minimum": 2, "maximum": 12}], "visual_variables": [{"variable": "fill-color", "source_role": "thematic-value", "algorithm_id": "sequential-classification"}], "legend": {"type": "classed-color", "show_no_data": True, "label_source": "class-breaks"}, "missing_value_policy": "explicit-symbol", "outlier_policy": "clip-to-domain", "checker_refs": [{"id": "protocol.schema-valid", "version": "1.0.0"}], "fixture_refs": [A]}
+MAP_EXPRESSION = {"schema_version": 1, "expression_id": "choropleth/sequential", "version": "1.0.0", "title": "Sequential choropleth", "status": "active", "geometry_types": ["polygon"], "field_requirements": [{"semantic_role": "thematic-value", "value_type": "number", "required": True, "nullable": True}], "parameter_definitions": [{"name": "class-count", "type": "integer", "required": True, "default": 5}], "visual_variables": [{"variable": "fill-color", "source_role": "thematic-value", "algorithm_id": "sequential-classification"}], "legend": {"type": "classed-color", "show_no_data": True, "label_source": "class-breaks"}, "missing_value_policy": "explicit-symbol", "outlier_policy": "clip-to-domain", "checker_refs": [{"id": "protocol.schema-valid", "version": "1.0.0"}], "fixture_refs": [A]}
 
 TEMPLATE_CREATE_REQUEST = {
     "schema_version": 1,
@@ -153,11 +152,10 @@ VALID_CASES = {
     "template-analysis": TEMPLATE_ANALYSIS,
     "template-brief": TEMPLATE_BRIEF,
     "prototype-description": PROTOTYPE_DESCRIPTION,
-    "identity": IDENTITY,
     "cartography": CARTOGRAPHY,
     "layout": LAYOUT,
     "resolved-layout": RESOLVED_LAYOUT,
-    "scenario": {"schema_version": 1, "scenario_id": "test-scenario", "version": "1.0.0", "business_scene": "general_thematic_mapping", "tasks": ["thematic-map"], "owned_segments": ["scenario", "data", "spatial-behavior", "portrayal", "delivery", "quality-gates"], "embedded": {"identity": IDENTITY, "cartography": CARTOGRAPHY, "layout": LAYOUT}, "replaceable_segments": ["identity", "cartography", "layout"], "data_role_refs": ["area-role", "point-role"], "target_ids": ["a3-pdf", "a3-png"], "application": {"supported_uses": ["engineering-preview"], "excluded_uses": ["navigation", "formal-delivery"]}, "compatibility": {"target_profiles": ["a3-landscape"], "placeholders": ["{{MAP_TITLE}}", "{{MAP_FRAME}}"]}, "rules": [R]},
+    "scenario": {"schema_version": 1, "scenario_id": "test-scenario", "version": "1.0.0", "business_scene": "general_thematic_mapping", "tasks": ["thematic-map"], "owned_segments": ["scenario", "data", "spatial-behavior", "portrayal", "delivery", "quality-gates"], "embedded": {"cartography": CARTOGRAPHY, "layout": LAYOUT}, "replaceable_segments": ["cartography", "layout"], "data_role_refs": ["area-role", "point-role"], "target_ids": ["a3-pdf", "a3-png"], "application": {"supported_uses": ["engineering-preview"], "excluded_uses": ["navigation", "formal-delivery"]}, "compatibility": {"target_profiles": ["a3-landscape"], "placeholders": ["{{MAP_TITLE}}", "{{MAP_FRAME}}"]}, "rules": [R]},
     "data-role": {"schema_version": 1, "roles": [{"id": "area-role", "required": True, "geometry_types": ["polygon", "multipolygon"], "fields": [{"name": "thematic_value", "type": "number", "unit": "percent", "nullable": True, "semantic_role": "thematic-value"}], "join": {"key": "admin_code", "minimum_coverage": 0.98}, "freshness": {"max_age_days": 30}, "license_policy": "project-approved"}]},
     "spatial-behavior": {"schema_version": 1, "source_crs_policy": "reproject-approved", "display_crs": {"authority": "EPSG", "code": "4490"}, "extent_policy": "administrative-boundary", "scale_bands": [{"id": "regional", "min_denominator": 10000, "max_denominator": 1000000, "generalization": "simplify"}], "topology": {"preserve_adjacency": True, "preserve_route_order": False}, "rules": [R]},
     "portrayal": {"schema_version": 1, "layers": [{"id": "area-layer", "data_role": "area-role", "geometry": "polygon", "z_order": 10, "map_expression_ref": {"id": "choropleth/sequential", "version": "1.0.0", "digest": D}, "value_role": "thematic-value", "symbol": {"catalog_ref": "ramps/test-theme@1.0.0", "parameters": {"opacity": 0.8}}, "classification": {"method": "quantile", "classes": 4, "field_role": "thematic-value"}, "no_data": "explicit-symbol"}], "legend": {"generated_from_layers": True, "show_no_data": True, "overflow_policy": "reject"}, "rules": [R]},
@@ -311,6 +309,56 @@ VALID_CASES["chart"] = {
     ],
 }
 
+# S0 advisory segment matching: protocol-only fixtures, no bundled library assets.
+VALID_CASES["template-matching-policy"] = {
+    "schema_version": 1, "policy_id": "template-matching", "version": "0.1.0",
+    "confirmation_status": "pending-business-review", "match_threshold": 0.80,
+    "color_delta_e_max": 4.0,
+    "defaults_relative_deviation_max": 0.15, "capacity_relative_deviation_max": 0.30,
+}
+VALID_CASES["template-match-request"] = {
+    "schema_version": 1, "kind": "map-layout", "segment": deepcopy(LAYOUT),
+}
+VALID_CASES["template-match-result"] = {
+    "schema_version": 1, "kind": "map-layout", "policy_version": "0.1.0",
+    "confirmation_status": "pending-business-review", "match_threshold": 0.80,
+    "candidates": [{"template_ref": {"kind": "map-layout", "id": "test-layout", "version": "1.0.0", "digest": D},
+                    "score": 0.92, "matched": True}],
+}
+
+VALID_CASES["color-redlines-policy"] = {
+    "schema_version": 1, "policy_id": "color-redlines", "version": "0.1.0",
+    "confirmation_status": "pending-business-review",
+    "enforcement": {"ramp_semantics": "blocker", "adjacent_distinguishability": "blocker", "cvd_safety": "warning"},
+    "lightness_monotonic_tolerance": 0.5, "adjacent_delta_e_min": 10.0, "cvd_delta_e_min": 12.0,
+}
+
+# S1 segment-reference protocol reservation: referenced layout, embedded cartography.
+# Additive constants — the canonical VALID_CASES stay fully embedded so every existing
+# consumer (compose_scenario, lock fixtures) passes unchanged. Runtime admission of
+# referenced packages stays closed until S2 wires the validate/publish chain.
+SEGMENT_REF_LAYOUT = {"kind": "map-layout", "id": "test-layout", "version": "1.0.0", "digest": D}
+REFERENCED_SCENARIO = deepcopy(VALID_CASES["scenario"])
+REFERENCED_SCENARIO["embedded"].pop("layout")
+REFERENCED_SCENARIO["segment_refs"] = {"layout": deepcopy(SEGMENT_REF_LAYOUT)}
+REFERENCED_LOCK = deepcopy(VALID_CASES["dependency-lock"])
+REFERENCED_LOCK["dependencies"] = [deepcopy(SEGMENT_REF_LAYOUT)]
+
+# Declared intentional containment (additive layout protocol, map-layout design §8.3).
+# Legal sample: a north arrow fully enclosed by the map frame and explicitly declared.
+# Kept outside VALID_CASES so the schema-coverage invariant (registry schemas == fixture
+# keys) stays exact; the resolver-level illegal variants live in test_layout_contract.
+LAYOUT_CONTAINMENT_VALID = {
+    **deepcopy(VALID_CASES["layout"]),
+    "layout_id": "a3-landscape-contained-north",
+    "frames": [
+        {"id": "main-map", "content_id": "main-view", "type": "map", "coordinate_space": "page",
+         "bounds": [20, 30, 380, 230], "overflow_policy": "clip"},
+        {"id": "north", "content_id": "north", "type": "north-arrow", "coordinate_space": "page",
+         "bounds": [360, 40, 30, 30], "overflow_policy": "reject", "inside_frame": "main-map"},
+    ],
+}
+
 INVALID_CASES = {}
 for name, case in VALID_CASES.items():
     invalid = deepcopy(case)
@@ -333,6 +381,16 @@ SEMANTIC_INVALID_CASES["cartography-open-defaults"] = ("cartography", _invalid_c
 _invalid_layout = deepcopy(VALID_CASES["layout"])
 _invalid_layout["frames"][0]["bounds"] = [-1, 30, 380, 230]
 SEMANTIC_INVALID_CASES["layout-non-page-bounds"] = ("layout", _invalid_layout)
+
+_invalid_containment = deepcopy(LAYOUT_CONTAINMENT_VALID)
+_invalid_containment["frames"][1]["inside_frame"] = "Not A Valid Identifier"
+SEMANTIC_INVALID_CASES["layout-containment-invalid-identifier"] = ("layout", _invalid_containment)
+
+# Constraint single authority: allowed sets and numeric ranges live ONLY in
+# validation.rules. parameter_definitions must not carry a second copy.
+_duplicated_constraint = deepcopy(VALID_CASES["map-expression"])
+_duplicated_constraint["parameter_definitions"][0]["maximum"] = 12
+SEMANTIC_INVALID_CASES["map-expression-duplicated-constraint"] = ("map-expression", _duplicated_constraint)
 
 _invalid_portrayal = deepcopy(VALID_CASES["portrayal"])
 _invalid_portrayal["layers"][0]["map_expression_ref"]["version"] = "latest"
@@ -373,6 +431,46 @@ SEMANTIC_INVALID_CASES["template-analysis-suggestion-without-rationale"] = ("tem
 _invalid_prototype = deepcopy(VALID_CASES["prototype-description"])
 _invalid_prototype["renderer_execution"] = "succeeded"
 SEMANTIC_INVALID_CASES["prototype-description-false-render-claim"] = ("prototype-description", _invalid_prototype)
+
+_invalid_matching_policy = deepcopy(VALID_CASES["template-matching-policy"])
+_invalid_matching_policy["match_threshold"] = 1.5
+SEMANTIC_INVALID_CASES["template-matching-policy-threshold-range"] = ("template-matching-policy", _invalid_matching_policy)
+
+_invalid_match_request = deepcopy(VALID_CASES["template-match-request"])
+_invalid_match_request["kind"] = "map-scenario"
+SEMANTIC_INVALID_CASES["template-match-request-scenario-kind"] = ("template-match-request", _invalid_match_request)
+
+_invalid_match_result = deepcopy(VALID_CASES["template-match-result"])
+_invalid_match_result["candidates"][0]["score"] = 1.2
+SEMANTIC_INVALID_CASES["template-match-result-score-range"] = ("template-match-result", _invalid_match_result)
+
+_invalid_scenario_kind = deepcopy(REFERENCED_SCENARIO)
+_invalid_scenario_kind["segment_refs"]["layout"]["kind"] = "map-scenario"
+SEMANTIC_INVALID_CASES["scenario-segment-ref-kind-boundary"] = ("scenario", _invalid_scenario_kind)
+
+_invalid_scenario_coverage = deepcopy(REFERENCED_SCENARIO)
+_invalid_scenario_coverage["segment_refs"].pop("layout")
+SEMANTIC_INVALID_CASES["scenario-segment-source-missing"] = ("scenario", _invalid_scenario_coverage)
+
+_invalid_scenario_segment = deepcopy(REFERENCED_SCENARIO)
+_invalid_scenario_segment["segment_refs"]["portrayal"] = deepcopy(SEGMENT_REF_LAYOUT)
+SEMANTIC_INVALID_CASES["scenario-segment-ref-unknown-segment"] = ("scenario", _invalid_scenario_segment)
+
+_invalid_create_ref_kind = deepcopy(VALID_CASES["template-create-request"])
+_invalid_create_ref_kind["segment_refs"] = {"layout": {**deepcopy(SEGMENT_REF_LAYOUT), "kind": "map-scenario"}}
+SEMANTIC_INVALID_CASES["template-create-request-segment-ref-kind"] = ("template-create-request", _invalid_create_ref_kind)
+
+_invalid_create_ref_segment = deepcopy(VALID_CASES["template-create-request"])
+_invalid_create_ref_segment["segment_refs"] = {"portrayal": deepcopy(SEGMENT_REF_LAYOUT)}
+SEMANTIC_INVALID_CASES["template-create-request-segment-ref-unknown"] = ("template-create-request", _invalid_create_ref_segment)
+
+_invalid_redlines_enforcement = deepcopy(VALID_CASES["color-redlines-policy"])
+_invalid_redlines_enforcement["enforcement"]["cvd_safety"] = "sometimes"
+SEMANTIC_INVALID_CASES["color-redlines-policy-enforcement-enum"] = ("color-redlines-policy", _invalid_redlines_enforcement)
+
+_invalid_redlines_threshold = deepcopy(VALID_CASES["color-redlines-policy"])
+_invalid_redlines_threshold["adjacent_delta_e_min"] = 150.0
+SEMANTIC_INVALID_CASES["color-redlines-policy-threshold-range"] = ("color-redlines-policy", _invalid_redlines_threshold)
 
 _invalid_template_brief = deepcopy(VALID_CASES["template-brief"])
 _invalid_template_brief["kind"] = "map-style"

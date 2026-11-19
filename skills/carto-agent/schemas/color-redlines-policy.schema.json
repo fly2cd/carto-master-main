@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/color-redlines-policy.schema.json",
+  "description": "Cartographic colour redline parameters for the generate chain. Declares every numeric parameter and enforcement level used by compiler/color_checks.py; pending-business-review values are prototype calibrations, not accepted business thresholds. Distances are CIELAB CIE76 ΔE units; CVD simulation uses Machado et al. 2009 severity-1.0 matrices. This policy only tightens colour acceptance; it never admits capabilities or selects colours.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "policy_id",
+    "version",
+    "confirmation_status",
+    "enforcement",
+    "lightness_monotonic_tolerance",
+    "adjacent_delta_e_min",
+    "cvd_delta_e_min"
+  ],
+  "properties": {
+    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
+    "policy_id": {"const": "color-redlines"},
+    "version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"},
+    "confirmation_status": {"enum": ["pending-business-review", "confirmed"]},
+    "enforcement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ramp_semantics", "adjacent_distinguishability", "cvd_safety"],
+      "properties": {
+        "ramp_semantics": {"enum": ["blocker", "warning", "off"]},
+        "adjacent_distinguishability": {"enum": ["blocker", "warning", "off"]},
+        "cvd_safety": {"enum": ["blocker", "warning", "off"]}
+      }
+    },
+    "lightness_monotonic_tolerance": {"description": "L* slack for monotonicity noise, in CIELAB L* units.", "type": "number", "minimum": 0, "maximum": 5},
+    "adjacent_delta_e_min": {"description": "Minimum CIELAB CIE76 ΔE between adjacent classes.", "type": "number", "exclusiveMinimum": 0, "maximum": 100},
+    "cvd_delta_e_min": {"description": "Minimum CIELAB CIE76 ΔE between adjacent classes after dichromacy simulation.", "type": "number", "exclusiveMinimum": 0, "maximum": 100}
+  }
+}

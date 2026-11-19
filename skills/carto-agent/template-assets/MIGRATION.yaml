@@ -1,0 +1,109 @@
+schema_version: 1
+migration_id: 2026oct-segment-assets
+source_repository: 2026Oct/carto-master (external checkout, user-authorized 2026-11-17)
+# 2026-11-18: the map-brand asset (dingtalk-brand-identity) was deleted with the
+# whole brand segment (user-authorized); it had no rendering consumer.
+assets:
+- kind: map-style
+  id: guangdong-admin-area-style
+  version: 0.1.0
+  source_contract: skills/carto-agent/templates/map-style/guangdong-admin-area-style/0.1.0/contracts/cartography.yaml
+  source_digest: sha256:f9990e55cb117e67fcd530cf5e200219a24a719a69824edda4f61fe9339bd736
+  adaptations:
+  - schema_version 1->2 (main cartography v2)
+  - symbol_definitions removed from runtime contract; preserved in original.yaml
+  - typography added from main general-template baseline (source had none)
+- kind: map-style
+  id: kernel-density-sequential-style
+  version: 0.1.0
+  source_contract: skills/carto-agent/templates/map-style/kernel-density-sequential-style/0.1.0/contracts/cartography.yaml
+  source_digest: sha256:4e944ccd88c0bb2726acde93917825c0e488d14b91af8e26f6be8e360922fe4b
+  adaptations:
+  - schema_version 1->2 (main cartography v2)
+  - symbol_definitions removed from runtime contract; preserved in original.yaml
+  - typography added from main general-template baseline (source had none)
+- kind: map-style
+  id: pastel-admin-area-style
+  version: 0.1.0
+  source_contract: skills/carto-agent/templates/map-style/pastel-admin-area-style/0.1.0/contracts/cartography.yaml
+  source_digest: sha256:4d4aa9b5dc9e44b28cb1d73e9e0f5e15b57bdf5a227eb42cca849dbad30de85c
+  adaptations:
+  - schema_version 1->2 (main cartography v2)
+  - symbol_definitions removed from runtime contract; preserved in original.yaml
+  - typography added from main general-template baseline (source had none)
+- kind: map-style
+  id: putuo-cultural-tourism-style
+  version: 0.1.0
+  source_contract: skills/carto-agent/templates/map-style/putuo-cultural-tourism-style/0.1.0/contracts/cartography.yaml
+  source_digest: sha256:c1a96e04dc4c07005da81c83f49796dda42531637b24301a217d89593321d472
+  adaptations:
+  - schema_version 1->2 (main cartography v2)
+  - symbol_definitions removed from runtime contract; preserved in original.yaml
+  - typography added from main general-template baseline (source had none)
+- kind: map-style
+  id: yongchun-tea-tourism-style
+  version: 0.1.0
+  source_contract: skills/carto-agent/templates/map-style/yongchun-tea-tourism-style/0.1.0/contracts/cartography.yaml
+  source_digest: sha256:9a9503ca978feeb241b4bbfbd0b849fa5c72fcf7eb3a510a96e24e9a6782060c
+  adaptations:
+  - schema_version 1->2 (main cartography v2)
+  - symbol_definitions removed from runtime contract; preserved in original.yaml
+  - typography added from main general-template baseline (source had none)
+- kind: map-style
+  id: yunnan-dem-3d-style
+  version: 0.1.0
+  source_contract: skills/carto-agent/templates/map-style/yunnan-dem-3d-style/0.1.0/contracts/cartography.yaml
+  source_digest: sha256:145f69025968657406b9eb06959485eeea92d10a306cc8526cc01fce4c38fd26
+  adaptations:
+  - schema_version 1->2 (main cartography v2)
+  - symbol_definitions removed from runtime contract; preserved in original.yaml
+  - typography added from main general-template baseline (source had none)
+- kind: map-layout
+  id: a2-portrait-comparison
+  version: 0.1.0
+  source_contract: skills/carto-agent/templates/map-layout/a2-portrait-comparison/0.1.0/contracts/layout.yaml
+  source_digest: sha256:31cb6f9843cdfc568bb1a8f1302230d296395c2eb612c34777b9f20bd6996ca9
+  adaptations:
+  - content_id=frame id added per frame (main explicit-binding protocol)
+- kind: map-layout
+  id: a3-landscape-two-column
+  version: 0.1.0
+  source_contract: skills/carto-agent/templates/map-layout/a3-landscape-two-column/0.1.0/contracts/layout.yaml
+  source_digest: sha256:dcf0d27f066d33bb37ce0411e2b0b09557f7254005bc0c64a936ee836ee928ae
+  adaptations:
+  - content_id=frame id added per frame (main explicit-binding protocol)
+- kind: map-layout
+  id: a4-landscape-comparison
+  version: 0.1.0
+  source_contract: skills/carto-agent/templates/map-layout/a4-landscape-comparison/0.1.0/contracts/layout.yaml
+  source_digest: sha256:568f282d0317f1b5d3a6c72f9c7ac4ec37a06034d6aae00203cade93c05224f1
+  adaptations:
+  - content_id=frame id added per frame (main explicit-binding protocol)
+- kind: map-layout
+  id: a4-landscape-three-column-comparison
+  version: 0.1.0
+  source_contract: skills/carto-agent/templates/map-layout/a4-landscape-three-column-comparison/0.1.0/contracts/layout.yaml
+  source_digest: sha256:b63393e219f3693f41eba616e7fff7d87687f80e03167f73255b19f494af7ecd
+  adaptations:
+  - content_id=frame id added per frame (main explicit-binding protocol)
+- kind: map-layout
+  id: main-map-with-right-info-panel
+  version: 0.1.0
+  source_contract: skills/carto-agent/templates/map-layout/main-map-with-right-info-panel/0.1.0/contracts/layout.yaml
+  source_digest: sha256:012f3c0fc78d8e121b065787a40eec47839009256a957b1aa3bbf43fec76f757
+  adaptations:
+  - content_id=frame id added per frame (main explicit-binding protocol)
+- kind: map-layout
+  id: portrait-admin-with-legend
+  version: 0.1.0
+  source_contract: skills/carto-agent/templates/map-layout/portrait-admin-with-legend/0.1.0/contracts/layout.yaml
+  source_digest: sha256:1689c973933d93734adbfdbdb391fa88154bd3fead441aff8ad0d01d27a1f967
+  adaptations:
+  - content_id=frame id added per frame (main explicit-binding protocol)
+- kind: map-layout
+  id: yongchun-tea-tourism-layout
+  version: 0.1.0
+  source_contract: skills/carto-agent/templates/map-layout/yongchun-tea-tourism-layout/0.1.0/contracts/layout.yaml
+  source_digest: sha256:b44dd8156313b3c51bca1c805d54a3628886da118338c04ab8f7a0f64a6b8e69
+  adaptations:
+  - content_id=frame id added per frame (main explicit-binding protocol)

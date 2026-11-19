@@ -1,0 +1,89 @@
+schema_version: 1
+layout_id: a3-landscape-two-column
+version: 0.1.0
+category: general
+canvas:
+  width: 420
+  height: 297
+  unit: mm
+  orientation: landscape
+  safe_margin: 5
+frames:
+- id: main-map
+  type: map
+  bounds:
+  - 5
+  - 5
+  - 280
+  - 260
+  coordinate_space: page
+  overflow_policy: clip
+  content_id: main-map
+- id: map-title
+  type: title
+  bounds:
+  - 287
+  - 5
+  - 128
+  - 20
+  coordinate_space: page
+  overflow_policy: clip
+  content_id: map-title
+- id: map-legend
+  type: legend
+  bounds:
+  - 287
+  - 27
+  - 128
+  - 100
+  coordinate_space: page
+  overflow_policy: clip
+  content_id: map-legend
+- id: north-arrow
+  type: north-arrow
+  bounds:
+  - 287
+  - 129
+  - 30
+  - 30
+  coordinate_space: page
+  overflow_policy: shrink
+  content_id: north-arrow
+- id: scale-bar
+  type: scale-bar
+  bounds:
+  - 320
+  - 139
+  - 80
+  - 10
+  coordinate_space: page
+  overflow_policy: shrink
+  content_id: scale-bar
+- id: marginalia
+  type: marginalia
+  bounds:
+  - 5
+  - 267
+  - 405
+  - 20
+  coordinate_space: page
+  overflow_policy: shrink
+  content_id: marginalia
+placeholders:
+- '{{MAP_TITLE}}'
+- '{{LEGEND_TITLE}}'
+- '{{DATA_SOURCE}}'
+- '{{AUTHOR}}'
+- '{{DATE}}'
+- '{{SCALE}}'
+- '{{PROJECTION}}'
+capacity:
+  legend_items: 15
+  title_characters: 20
+rules:
+- id: synthetic-preview-only
+  strength: hard_rule
+  path: /application/excluded_uses
+  description: Draft package is limited to synthetic engineering previews and is not
+    a published product.
+  value: true

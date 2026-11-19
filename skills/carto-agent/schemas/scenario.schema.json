@@ -1,6 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schemas.carto-agent.local/v1/scenario.schema.json",
+  "description": "MapScenario composition contract. Each of cartography/layout must be sourced exactly once: either embedded inline or referenced via segment_refs to a published segment template (cartography->map-style, layout->map-layout). Referenced segments must be listed in replaceable_segments, pinned in manifest.dependencies and dependency-lock.dependencies with identical {kind,id,version,digest}, and their ownership transfers to the segment kind. Mutual exclusion, replaceability and lock consistency are semantic rules enforced by OwnershipResolver; validate/publish and generate resolve referenced segments from the published repository at the admission/load boundary (S2). The identity/map-brand segment was removed (2026-11-18, user-authorized): it had no rendering consumer.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -68,15 +69,7 @@
     "embedded": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "identity",
-        "cartography",
-        "layout"
-      ],
       "properties": {
-        "identity": {
-          "$ref": "https://schemas.carto-agent.local/v1/identity.schema.json"
-        },
         "cartography": {
           "$ref": "https://schemas.carto-agent.local/v2/cartography.schema.json"
         },
@@ -85,12 +78,29 @@
         }
       }
     },
+    "segment_refs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cartography": {
+          "allOf": [
+            {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/templateRef"},
+            {"properties": {"kind": {"const": "map-style"}}}
+          ]
+        },
+        "layout": {
+          "allOf": [
+            {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/templateRef"},
+            {"properties": {"kind": {"const": "map-layout"}}}
+          ]
+        }
+      }
+    },
     "replaceable_segments": {
       "type": "array",
       "uniqueItems": true,
       "items": {
         "enum": [
-          "identity",
           "cartography",
           "layout"
         ]
@@ -170,5 +180,19 @@
         "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/rule"
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "anyOf": [
+        {"properties": {"embedded": {"required": ["cartography"]}}, "required": ["embedded"]},
+        {"properties": {"segment_refs": {"required": ["cartography"]}}, "required": ["segment_refs"]}
+      ]
+    },
+    {
+      "anyOf": [
+        {"properties": {"embedded": {"required": ["layout"]}}, "required": ["embedded"]},
+        {"properties": {"segment_refs": {"required": ["layout"]}}, "required": ["segment_refs"]}
+      ]
+    }
+  ]
 }

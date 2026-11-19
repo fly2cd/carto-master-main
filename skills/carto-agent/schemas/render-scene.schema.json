@@ -501,7 +501,7 @@
         },
         "background": {
           "type": "string",
-          "pattern": "^#[0-9A-Fa-f]{6}$"
+          "pattern": "^#[0-9A-F]{6}$"
         }
       }
     },
@@ -940,7 +940,7 @@
         },
         "color": {
           "type": "string",
-          "pattern": "^#[0-9A-Fa-f]{6}$"
+          "pattern": "^#[0-9A-F]{6}$"
         },
         "symbol": {
           "enum": [

@@ -184,6 +184,8 @@ class TemplateCreationWorkflow:
         attestation_key: bytes,
         browser: str | Path | None = None,
         font_path: str | Path | None = None,
+        repository_root: str | Path | None = None,
+        repository_scope: str | None = None,
     ) -> dict[str, Any]:
         request, inputs, state = self._resume_request(request_path)
         self._require_step(state.step, "validate")
@@ -193,6 +195,15 @@ class TemplateCreationWorkflow:
         if state.attempt > 1:
             validation_relative /= f"attempt-{state.attempt}"
         validation_root = self.path_guard.resolve(self.work_root / validation_relative)
+        repository = None
+        if repository_root is not None or repository_scope is not None:
+            if repository_root is None or not repository_scope:
+                raise ProtocolError("TEMPLATE_REPOSITORY_REQUIRED", "repository root and scope must be supplied together")
+            repository = TemplateRepository(
+                path_guard=self.path_guard,
+                root=self._resolve_project_path(repository_root, must_exist=False),
+                repository_scope=repository_scope, registry=self.registry,
+            )
         validator = TemplatePackageValidator(
             path_guard=self.path_guard,
             package_root=package_root,
@@ -202,6 +213,7 @@ class TemplateCreationWorkflow:
             browser=browser,
             font_path=font_path,
             context=self._validation_context(request, state),
+            repository=repository,
         )
         evidence = validator.validate(expected, request["targets"])
         authored_digest = self._last_output_digest("staging-package")
@@ -255,17 +267,18 @@ class TemplateCreationWorkflow:
         if evidence.get("evidence_digest") != evidence_ref["digest"]:
             raise ProtocolError("JOB_PREREQUISITE_DRIFT", state.run_id)
         package_root = self.path_guard.resolve(self.work_root / "staging/package", must_exist=True)
-        validator = TemplatePackageValidator(
-            path_guard=self.path_guard, package_root=package_root,
-            evidence_root=evidence_path.parent, attestation_key=renderer_attestation_key,
-            registry=self.registry, context=self._validation_context(request, state),
-        )
-        snapshot = validator.verify_evidence(evidence, self._expected_validation(request), request["targets"])
         repository_path = self._resolve_project_path(repository_root, must_exist=False)
         repository = TemplateRepository(
             path_guard=self.path_guard, root=repository_path,
             repository_scope=repository_scope, registry=self.registry,
         )
+        validator = TemplatePackageValidator(
+            path_guard=self.path_guard, package_root=package_root,
+            evidence_root=evidence_path.parent, attestation_key=renderer_attestation_key,
+            registry=self.registry, context=self._validation_context(request, state),
+            repository=repository,
+        )
+        snapshot = validator.verify_evidence(evidence, self._expected_validation(request), request["targets"])
         coordinator = self._gate_coordinator(approval_key, request)
         publication_object = {
             "package_digest": snapshot["package_digest"],

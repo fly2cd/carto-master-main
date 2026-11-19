@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/template-match-result.schema.json",
+  "description": "Read-only advisory segment matching result (S0). Candidates are ranked by similarity score; matched only reports score >= policy match_threshold. This is advisory evidence for authoring review, not a template selection, admission decision, or approval.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "policy_version", "confirmation_status", "match_threshold", "candidates"],
+  "properties": {
+    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
+    "kind": {"enum": ["map-style", "map-layout"]},
+    "policy_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"},
+    "confirmation_status": {"enum": ["pending-business-review", "confirmed"]},
+    "match_threshold": {"type": "number", "minimum": 0, "maximum": 1},
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["template_ref", "score", "matched"],
+        "properties": {
+          "template_ref": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/templateRef"},
+          "score": {"type": "number", "minimum": 0, "maximum": 1},
+          "matched": {"type": "boolean"}
+        }
+      }
+    }
+  }
+}

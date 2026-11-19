@@ -36,6 +36,9 @@ def instantiate_grid(contract, parameters, registry=None):
         return result
     if any(f['type'] not in {'map','title','legend','marginalia'} for f in result['frames']):
         raise ProtocolError('GRID_BASE_INVALID', 'Grid does not support undeclared adornments')
+    # The grid regenerates every map frame, so a base containment declaration would dangle.
+    if any('inside_frame' in f for f in result['frames']):
+        raise ProtocolError('GRID_BASE_INVALID', 'Declared containment requires a single-map base; the grid regenerates map frames')
     shared = parameters['legend_mode']=='shared'
     area = grid['shared_panel_area'] if shared else grid['panel_area']
     x,y,w,h = area

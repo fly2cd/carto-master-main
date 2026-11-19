@@ -99,6 +99,32 @@ class RasterClassificationTests(PreparationFixture, unittest.TestCase):
         self.assertFalse(questions)
         self.assertTrue(rows[0]["color"].startswith("#"))
 
+    def test_hex_case_is_canonicalized_at_both_input_boundaries(self):
+        """CSV and clarification answers accept either case but freeze uppercase only.
+
+        Canonical form is what makes the frozen digest stable: the same color written
+        two ways must not produce two different prepared reports.
+        """
+        stats = {"classes": [{"value": 0, "count": 2}, {"value": 1, "count": 2}, {"value": 255, "count": 2}]}
+        # CSV boundary: lowercase in, uppercase out.
+        self.legend_path.write_bytes(b"value,label,color\n1,Category A,#ff0000\n")
+        self.sync_inputs()
+        definitions = parse_legend(self.legend_path.read_bytes(), self.request["legend"])
+        self.assertEqual("#FF0000", definitions[0]["color"])
+        # Answers boundary: same normalization, and identical rows/digest either way.
+        answers = self.answers(SimpleNamespace(digest="sha256:" + "0" * 64))
+        upper = deepcopy(answers)
+        lower = deepcopy(answers)
+        for entry in lower["entries"]:
+            if entry.get("color"):
+                entry["color"] = entry["color"].lower()
+        rows_upper, _ = resolve_classes(self.request, definitions, stats, upper)
+        rows_lower, _ = resolve_classes(self.request, definitions, stats, lower)
+        self.assertEqual(rows_upper, rows_lower)
+        self.assertEqual(sha256_digest(rows_upper), sha256_digest(rows_lower))
+        self.assertTrue(all(row["color"] is None or row["color"] == row["color"].upper()
+                            for row in rows_lower))
+
     def test_missing_name_and_color_prepare_as_questions(self):
         self.legend_path.write_bytes(b"value,label,color\n1,,\n")
         self.sync_inputs()

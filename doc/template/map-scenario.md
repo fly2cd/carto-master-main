@@ -1,6 +1,8 @@
 # MapScenario 完整说明
 
-> 2026-11-09 设计收敛：采用 Encoding / Appearance / Composition 三个设计维度及独立 Renderer 执行层；模板是组合载体，不与维度一一映射。统一定义见[模板体系设计](../carto-template-dsg.md)，本轮决定及修订范围见收敛记录 design-convergence-20261109.md（已移除，可从 git 历史取回）。新增模型、引用、参数与作用域调整属于目标设计，不改变当前 Schema、能力准入和审批。
+> **状态公告（2026-11-18）**：品牌段（map-brand/identity）已经用户授权整体移除——它在渲染链中无消费者，移除不改变成图外观。本文已同步清理品牌遗留描述；当前协议以 `skills/carto-agent/schemas/` 与 SKILL.md 为准。
+
+> 2026-11-09 设计收敛：采用 Encoding / Appearance / Composition 三个设计维度及独立 Renderer 执行层；模板是组合载体，不与维度一一映射。统一定义见[模板体系设计](../carto-template-dsg.md)。**所有权与词表的现行权威见[表达与符号设计结论 §11 单表](map-expression-and-symbol-design.md#11-所有权与权威源单表)与 §15 单源规范；`rules` 可执行性见其 §12；历次修订记录见该文档 §14**（原收敛记录文件已不存在，不再作为依据）。新增模型、引用、参数与作用域调整属于目标设计，不改变当前 Schema、能力准入和审批。
 
 
 ## 1. 文档定位
@@ -46,7 +48,7 @@ MapScenario 回答：
 
 ### 3.3 装配可替换组件
 
-提供完整的身份、表达和版式基线，并声明哪些段可以被独立 MapBrand、MapStyle、MapLayout 替换。业务内容可以保持稳定，同时采用符合条件的其他机构身份或版面。
+提供完整的表达和版式基线，并声明哪些段可以被独立 MapStyle、MapLayout 替换。业务内容可以保持稳定，同时采用符合条件的其他风格或版面。
 
 ### 3.4 在执行前暴露缺口
 
@@ -63,7 +65,6 @@ MapScenario 回答：
 | MapScenario | 业务任务、数据角色、语义绑定、空间条件、必需内容和成果要求 | 提供可复用业务合同，装配其他组件 |
 | MapStyle | 符号使用配置、色带、注记、图例外观和尺度行为 | 提供满足 Scenario 与表达定义约束的视觉配置 |
 | MapLayout | 画布、Frame、空间组织、容量和溢出策略 | 承载 Scenario 提供的内容角色 |
-| MapBrand | 机构身份、Logo、字体与品牌资源 | 提供身份资源及使用约束 |
 | 地图表达目录 / Map Expression Catalog | 输入语义、适用条件、参数、编码和检查要求 | 提供精确引用的表达定义，算法仍在受信代码中 |
 | 符号库 / Symbol Catalog | 通用符号资源、锚点、可调通道和使用限制 | 提供表达与 Style 使用的图形资源，不负责业务映射 |
 | 内置表达方法与图表核心 | 受信编码计算与可复用绘图 | 按经过验证的计划执行，不由目录名称直接产生能力 |
@@ -143,9 +144,9 @@ MapScenario 采用六份业务契约。它们是同一个方案的分段，不�
 
 ### 6.1 Scenario 契约与内嵌段
 
-当前 `scenario.yaml` 必须包含 `identity`、`cartography`、`layout` 三个内嵌段。它们提供可以独立理解的完整基线；如果允许外部替换，应在 `replaceable_segments` 中显式声明。
+当前 `scenario.yaml` 必须包含 `cartography`、`layout` 两个内嵌段（品牌段 identity 已于 2026-11-18 移除）。它们提供可以独立理解的完整基线；如果允许外部替换，应在 `replaceable_segments` 中显式声明。
 
-“六份契约”与“三个内嵌段”是不同计数维度。三个内嵌段位于场景契约内，不应据此再增加三份并行的 Scenario 业务契约。
+“六份契约”与“两个内嵌段”是不同计数维度。两个内嵌段位于场景契约内，不应据此再增加并行的 Scenario 业务契约。
 
 ### 6.2 数据契约
 
@@ -224,13 +225,12 @@ MapScenario 的目标定位是组合方案，不是三个设计维度之外的�
 
 | Scenario 内嵌段 | 可替换模板 | 替换单位 |
 |---|---|---|
-| `identity` | MapBrand | 完整 identity 段 |
 | `cartography` | MapStyle | 完整 cartography 段 |
 | `layout` | MapLayout | 完整 layout 段 |
 
 只有 Scenario 允许替换的段才可以替换。同类模板不得重复选择，不能把两个 Style 的字段或两个 Layout 的 Frame 任意拼接成一个未发布组合。
 
-替换后仍需满足 Scenario 的全部业务硬约束。外部 Brand 不能改变法定风险色语义，外部 Layout 不能删掉必需声明，外部 Style 不能把非负数量改成按半径正比表达。
+替换后仍需满足 Scenario 的全部业务硬约束。外部 Layout 不能删掉必需声明，外部 Style 不能把非负数量改成按半径正比表达。
 
 ### 8.2 与 MapStyle 对接
 
@@ -248,9 +248,9 @@ Scenario 提供内容角色、类型、数量、必需性和视图关系；Layou
 
 例如 `main-legend` 是内容角色，`right-panel` 是某个 Layout 的 Frame ID。二者通过实例绑定关联，不要求所有 Layout 使用同一组 Frame 名称。比例尺和指北针必须绑定具体地图视图，不能只证明页面上存在相应图形。
 
-### 8.4 与 MapBrand、标准和工具对接
+### 8.4 与标准和工具对接
 
-Brand 提供已解析资源及使用限制；标准提供适用约束；工具网关检查能力注册与当前授权。模板只能声明所需条件，不能凭声明扩展工具或数据访问范围。
+标准提供适用约束；工具网关检查能力注册与当前授权。模板只能声明所需条件，不能凭声明扩展工具或数据访问范围。
 
 所有权用于确定值由谁定义，强制约束需要共同满足。六种规则语义 `hard_rule`、`forbidden`、`mandatory`、`binding`、`default`、`reference` 不是可以按数值排序、相互覆盖的优先级阶梯。
 
@@ -308,7 +308,7 @@ owned_segments:
   - portrayal
   - delivery
   - quality-gates
-replaceable_segments: [identity, cartography, layout]
+replaceable_segments: [cartography, layout]
 data_role_refs: [risk-area, shelter-point]
 target_ids: [a3-svg, a3-pdf, a3-png]
 application:
@@ -343,20 +343,20 @@ license_policy: project-approved
 
 ```yaml
 requires:
-  style_profiles: [sequential-area, proportional-point]
+  symbol_roles: [thematic-area-fill, proportional-circle]
   brand_roles: [body-font, heading-font]
 
 portrayal_bindings:
   - layer_id: risk-layer
     data_role: risk-area
     value_role: risk-value
-    semantic_type: ordered-numeric
-    style_profile: sequential-area
+    measurement: normalized-index
+    style_role: thematic-area-fill
   - layer_id: shelter-layer
     data_role: shelter-point
     value_role: count-value
-    semantic_type: nonnegative-count
-    style_profile: proportional-point
+    measurement: count
+    style_role: proportional-circle
 
 views:
   - id: overview-view
@@ -475,7 +475,7 @@ T1 批准创建简报，TP 批准具体发布对象。二者都不能用作地�
     → render → check → DeliveryManifest → G3 → deliver
 ```
 
-未来引入 `ResolvedCartography` 和 `ResolvedLayout` 时，它们应作为候选的组成或引用结果，继续纳入同一摘要闭包，不再增加一个与 MapSpecLock 竞争的“Scenario 实例锁”。
+实例产物使用已有的 `resolved-appearance`、`resolved-portrayal` 与 `resolved-layout`（原提案名 `ResolvedCartography` / `ResolvedLayout` 已删除，见表达与符号设计结论 §15.2）；它们应作为候选的组成或引用结果，继续纳入同一摘要闭包，不再增加一个与 MapSpecLock 竞争的“Scenario 实例锁”。
 
 ### 14.2 规划、图面实现与渲染的分工
 
@@ -543,7 +543,7 @@ Manifest 管理身份、文件闭包和依赖入口；依赖锁固定表达、�
 | 跨契约引用 | 数据角色、图层、目标、内嵌段与检查器引用一致 |
 | 业务语义 | 指标口径、单位、等级含义、支持与禁止用途 |
 | 数据与空间 | 必需角色、空值、几何、CRS、关联键、范围和尺度 |
-| 组件组合 | 替换许可、Style 能力、Brand 资源、Layout 内容与容量 |
+| 组件组合 | 替换许可、Style 能力、Layout 内容与容量 |
 | 表达与预览 | 分类、比例符号、无数据、图例、文字与必需内容 |
 | 运行能力 | 注册工具、授权、渲染器能力、环境与预算 |
 | 冻结与成品 | 候选、预览、锁、attempt、文件及环境摘要绑定 |
@@ -569,7 +569,6 @@ Manifest 管理身份、文件闭包和依赖入口；依赖锁固定表达、�
 | 缺少必需数据或许可 | 输出缺口，补齐后继续 |
 | 缺少符号或表达 Profile | 选择兼容 Style，或独立创建完整新版本 |
 | 缺少页面规格或容量 | 选择兼容 Layout，重新检查空间与内容 |
-| 缺少机构身份资源 | 选择兼容 Brand 或补齐获准资源 |
 | 新增稳定业务角色、用途或任务 | 创建新 Scenario 或发布新版本 |
 | 请求违反方案用途限制 | 选择经验证的其他方案；不得删除限制绕过 |
 | 请求超出平台注册能力 | 返回能力缺口，创建模板不能补足实现 |
@@ -580,13 +579,15 @@ Manifest 管理身份、文件闭包和依赖入口；依赖锁固定表达、�
 
 ## 18. 当前仓库状态与演进建议
 
-截至 2026-11-09，唯一注册业务为 general_thematic_mapping，模板身份为 map-scenario/general-thematic-map@3.0.0，实现为 general-thematic-raster。接受用户已分类栅格，单图或有限 1×2/2×2 网格、独立/共享图例，A4 横向 300 dpi PDF+PNG，production_enabled=false；见[能力策略](../../skills/carto-agent/policies/scenario-capabilities.yaml)。不存在可作为当前基线引用的旧洪涝默认模板包。
+截至 2026-11-18 重新静态核对（上一版为 2026-11-09）。唯一注册业务为 `general_thematic_mapping`，能力档案为 `general-thematic-mapping@5.0.0`，implementation 为 `general-thematic`；其下两个 `geometry_variants`：raster→`map-scenario/general-thematic-map@3.0.0`（`rasterio-matplotlib-page`）、vector→`@4.0.0`（`matplotlib-vector-page`）。单图或有限 1×1/1×2/2×2 网格、独立/共享图例，`output_profile` 为 A4 横向 300 dpi PDF+PNG，`production_enabled: false`；见[能力策略:9-11,40-45,66-80](../../skills/carto-agent/policies/scenario-capabilities.yaml)。不存在可作为当前基线引用的旧洪涝默认模板包。**所有权与权威源以[表达与符号设计结论 §11 单表](map-expression-and-symbol-design.md#11-所有权与权威源单表)为准，`rules` 可执行性以其 §12 为准**。
 
-- v1 仍要求六个 owned segments 与 identity/cartography/layout 内嵌段；当前 general 的 replaceable_segments 为空。见 [scenario.schema.json](../../skills/carto-agent/schemas/scenario.schema.json)、[general_thematic.py](../../skills/carto-agent/scripts/carto_core/scenarios/general_thematic.py)。
+- v1 仍要求六个 owned segments；cartography/layout 可以内嵌，也可以经 `segment_refs` 逐段引用已发布段模板（两者互斥；品牌段 identity 已移除）。`replaceable_segments` 等于请求声明的引用段集合，**有引用时非空**。见 [scenario.schema.json](../../skills/carto-agent/schemas/scenario.schema.json)、[general_thematic.py:461-478](../../skills/carto-agent/scripts/carto_core/scenarios/general_thematic.py)。
+- 段引用协议（S2）已接入 validate/publish/generate 三个边界：引用段必须在 `replaceable_segments` 内、精确钉住 `{kind,id,version,digest}`、与 `manifest.dependencies`/`dependency-lock.dependencies` 逐条一致，所有权随段转移；包本体不改写，无仓库或引用漂移一律失败关闭。全内嵌旧路径零改动。见 [ownership.py:87-140](../../skills/carto-agent/scripts/carto_core/compiler/ownership.py)、[template_validation.py:416-422](../../skills/carto-agent/scripts/carto_core/workflow/template_validation.py)、[map_candidate.py:111-114](../../skills/carto-agent/scripts/carto_core/compiler/map_candidate.py)。
+- **规则指针所有权**：`/application/excluded_uses` 只存在于 scenario 契约（[general_thematic.py:481-482](../../skills/carto-agent/scripts/carto_core/scenarios/general_thematic.py)）。段契约（cartography/layout）的规则 `path` **必须指向段自身文档**，不得复制 scenario 级路径；详见表达与符号设计结论 §12.1。
 - 模板 validate 为一个模板声明的六种网格/图例参数组合逐一生成并冻结样张和回执，publish 重验完整覆盖后消费精确 TP。
 - 框架已有候选、G2、正式渲染、终检、G3 和交付事务，不等于真实用户数据、身份和本机依赖已经验收。
-- page-bindings、v3 页面/计划及 ResolvedLayout v2 已接入有限多图；每图显式源/范围/图层，完整类别定义兼容时可共享整页图例。通用组件引用、自动分面、任意共享组及矢量混合仍未开放。
+- page-bindings v2、**map-plan / page-request / page-output v4**、cartography v2 及 ResolvedLayout v2 已接入有限多图；每图显式源/范围/图层，完整类别定义兼容时可共享整页图例。通用组件引用、自动分面、任意共享组仍受限；矢量已作为同一档案下的几何变体登记为受限工程能力，不等于生产准入。
 
-S1 已统一编码、Appearance、Composition、空间与输出的来源并完成有限参数化多图闭环，见实施记录 20261109-s1cd-parameterized-grid-and-workflow.md（已移除，可从 git 历史取回）；后续按实际需求扩展矢量和后端能力。独立模板类型是复用分类，不必作为每个增量的前置条件；也不为每种布局×表达×后端的组合新增业务场景。
+S1 已统一编码、Appearance、Composition、空间与输出的来源并完成有限参数化多图闭环；可核对锚点：[grid_layout.py](../../skills/carto-agent/scripts/carto_core/compiler/grid_layout.py)、[test_s1cd_grid.py](../../skills/carto-agent/scripts/tests/test_s1cd_grid.py)、[test_general_thematic.py](../../skills/carto-agent/scripts/tests/test_general_thematic.py)。独立模板类型是复用分类，不必作为每个增量的前置条件；也不为每种布局×表达×后端的组合新增业务场景。
 
 所有目标均通过唯一 CLI、严格协议、版本化策略和既有审批实施；不修改旧包和旧锁，不新增旧格式兼容旁路。合同引用、声明参数和受限作用域调整只有在实现、注册与验收后才能执行。

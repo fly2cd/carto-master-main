@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/template-match-request.schema.json",
+  "description": "Read-only advisory segment matching request (S0). The segment document is additionally validated against the kind-specific contract schema (identity / cartography / layout) by the CLI. Matching never selects a template for generate-map and never writes repository state.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "segment"],
+  "properties": {
+    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
+    "kind": {"enum": ["map-style", "map-layout"]},
+    "segment": {"type": "object"}
+  }
+}

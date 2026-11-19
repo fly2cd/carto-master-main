@@ -58,7 +58,7 @@
                       "if": { "properties": { "display": { "const": "color" } } },
                       "then": {
                         "properties": {
-                          "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+                          "color": { "type": "string", "pattern": "^#[0-9A-F]{6}$" },
                           "label": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[^\\x00-\\x1f\\x7f]+$" }
                         }
                       }
@@ -136,7 +136,7 @@
           "semantic": { "enum": [null, "class", "background", "nodata"] },
           "display": { "enum": [null, "color", "hidden"] },
           "label": { "anyOf": [{ "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[^\\x00-\\x1f\\x7f]+$" }, { "type": "null" }] },
-          "color": { "anyOf": [{ "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" }, { "type": "null" }] },
+          "color": { "anyOf": [{ "type": "string", "pattern": "^#[0-9A-F]{6}$" }, { "type": "null" }] },
           "order": { "type": "integer", "minimum": 0, "maximum": 1023 },
           "include_in_legend": { "type": "boolean" }
         },

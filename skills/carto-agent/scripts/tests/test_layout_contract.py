@@ -26,7 +26,7 @@ from carto_core.schema_registry import SchemaRegistry
 from carto_core.security.paths import PathGuard
 from carto_core.workflow.map_final_check import FinalMapCheckService
 from carto_core.workflow.map_preview import MapPreviewService
-from tests.fixtures.schema_cases import VALID_CASES
+from tests.fixtures.schema_cases import LAYOUT_CONTAINMENT_VALID, VALID_CASES
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -276,6 +276,117 @@ class LayoutContractTests(unittest.TestCase):
             self.assertEqual([map_size, page_size], browser.sizes)
             self.assertEqual(2381, receipt["viewport"]["width_px"])
 
+
+
+class DeclaredContainmentTests(unittest.TestCase):
+    """Intentional overlap is admitted only as a declared, verified full containment.
+
+    map-layout design §8.3: an adornment inside the map frame is deliberate and must be
+    declared; accidental covering stays a failure. The declaration is semantic, the
+    enclosure check is mechanical, and nothing is silently exempted.
+    """
+
+    def setUp(self) -> None:
+        self.registry = SchemaRegistry()
+        self.resolver = LayoutResolver(self.registry)
+        self.contract = deepcopy(LAYOUT_CONTAINMENT_VALID)
+
+    @staticmethod
+    def _north(contract: dict) -> dict:
+        return next(frame for frame in contract["frames"] if frame["id"] == "north")
+
+    def _code(self, contract: dict, parameters=None) -> str:
+        with self.assertRaises(ProtocolError) as raised:
+            self.resolver.resolve(contract, 144, parameters=parameters)
+        return raised.exception.code
+
+    def test_declared_containment_resolves_and_travels_with_the_snapshot(self) -> None:
+        self.registry.validate("layout", self.contract)
+        resolved = self.resolver.resolve(self.contract, 144)
+        self.registry.validate("resolved-layout", resolved)
+        north = next(f for f in resolved["frames"] if f["id"] == "north")
+        self.assertEqual("main-map", north["inside_frame"])
+        self.assertNotIn("inside_frame", next(f for f in resolved["frames"] if f["id"] == "main-map"))
+        self.resolver.validate(resolved)
+        self.assertEqual(resolved, self.resolver.resolve(self.contract, 144))
+
+    def test_same_geometry_without_declaration_is_still_a_prohibition(self) -> None:
+        undeclared = deepcopy(self.contract)
+        self._north(undeclared).pop("inside_frame")
+        self.assertEqual("LAYOUT_FRAME_OVERLAP", self._code(undeclared))
+
+    def test_contracts_without_the_field_keep_the_exact_legacy_frame_shape(self) -> None:
+        legacy = deepcopy(LAYOUT_CONTAINMENT_VALID)
+        self._north(legacy).pop("inside_frame")
+        self._north(legacy)["bounds"] = [20, 270, 380, 10]
+        resolved = self.resolver.resolve(legacy, 144)
+        for frame in resolved["frames"]:
+            self.assertEqual({"id", "content_id", "type", "bounds_px", "overflow_policy"}, set(frame))
+        self.resolver.validate(resolved)
+
+    def test_partial_enclosure_is_rejected_even_when_declared(self) -> None:
+        partial = deepcopy(self.contract)
+        self._north(partial)["bounds"] = [380, 40, 30, 30]
+        self.assertEqual("LAYOUT_CONTAINMENT_NOT_ENCLOSED", self._code(partial))
+
+    def test_dangling_self_and_chained_references_are_rejected(self) -> None:
+        dangling = deepcopy(self.contract)
+        self._north(dangling)["inside_frame"] = "absent-frame"
+        self.assertEqual("LAYOUT_CONTAINMENT_REFERENCE", self._code(dangling))
+        selfish = deepcopy(self.contract)
+        self._north(selfish)["inside_frame"] = "north"
+        self.assertEqual("LAYOUT_CONTAINMENT_REFERENCE", self._code(selfish))
+        chained = deepcopy(self.contract)
+        chained["frames"].append({"id": "legend", "content_id": "legend", "type": "legend",
+                                  "coordinate_space": "page", "bounds": [40, 40, 60, 60],
+                                  "overflow_policy": "reject", "inside_frame": "main-map"})
+        self._north(chained)["inside_frame"] = "legend"
+        self.assertEqual("LAYOUT_CONTAINMENT_REFERENCE", self._code(chained))
+
+    def test_only_a_non_map_frame_may_be_contained_by_a_map(self) -> None:
+        wrong_container = deepcopy(self.contract)
+        wrong_container["frames"].append({"id": "title", "content_id": "title", "type": "title",
+                                          "coordinate_space": "page", "bounds": [20, 10, 380, 15],
+                                          "overflow_policy": "reject"})
+        self._north(wrong_container)["inside_frame"] = "title"
+        self.assertEqual("LAYOUT_CONTAINMENT_TYPE", self._code(wrong_container))
+        map_in_map = deepcopy(self.contract)
+        map_in_map["frames"].append({"id": "inset-map", "content_id": "inset-view", "type": "map",
+                                     "coordinate_space": "page", "bounds": [300, 200, 80, 50],
+                                     "overflow_policy": "clip", "inside_frame": "main-map"})
+        self.assertEqual("LAYOUT_CONTAINMENT_TYPE", self._code(map_in_map))
+
+    def test_two_contained_adornments_may_not_cover_each_other(self) -> None:
+        contract = deepcopy(self.contract)
+        contract["frames"].append({"id": "legend", "content_id": "legend", "type": "legend",
+                                   "coordinate_space": "page", "bounds": [365, 45, 30, 30],
+                                   "overflow_policy": "reject", "inside_frame": "main-map"})
+        self.assertEqual("LAYOUT_FRAME_OVERLAP", self._code(contract))
+
+    def test_touching_edges_need_no_declaration(self) -> None:
+        edge = deepcopy(self.contract)
+        self._north(edge).pop("inside_frame")
+        self._north(edge)["bounds"] = [400, 40, 10, 30]
+        self.assertEqual(2, len(self.resolver.resolve(edge, 144)["frames"]))
+
+    def test_containment_does_not_weaken_the_content_fit_gate(self) -> None:
+        tiny = deepcopy(self.contract)
+        self._north(tiny)["bounds"] = [360, 40, 5, 5]
+        resolved = self.resolver.resolve(tiny, 144)
+        with self.assertRaises(ProtocolError) as raised:
+            self.resolver.place_overlays(resolved, [{"id": "north", "type": "north-arrow"}])
+        self.assertEqual("LAYOUT_CONTENT_OVERFLOW", raised.exception.code)
+
+    def test_grid_rejects_a_containment_base_but_single_map_grid_keeps_it(self) -> None:
+        from carto_core.scenarios.general_thematic import layout_contract
+        base = layout_contract()
+        base["frames"][1]["inside_frame"] = "map"
+        self.assertEqual("GRID_BASE_INVALID",
+                         self._code(base, {"rows": 1, "columns": 2, "legend_mode": "shared"}))
+        base["frames"][1]["bounds"] = [20, 30, 100, 10]
+        resolved = self.resolver.resolve(base, 144, parameters={"rows": 1, "columns": 1, "legend_mode": "independent"})
+        self.registry.validate("resolved-layout", resolved)
+        self.resolver.validate(resolved)
 
 
 if __name__ == "__main__":

@@ -5,15 +5,18 @@ import os
 import shutil
 import tempfile
 import time
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
 
 from ..artifacts import atomic_yaml, file_digest, utc_now
 from ..canonical import sha256_digest
+from ..compiler.ownership import OwnershipResolver
 from ..errors import ProtocolError
 from ..schema_registry import SchemaRegistry, load_document
 from ..security.paths import PathGuard
+from .template_matching import SEGMENT_CONTRACTS
 
 REPOSITORY_VERSION = "1.0.0"
 VALIDATION_VERSION = "1.0.0"
@@ -188,6 +191,74 @@ class TemplateRepository:
         manifest = self.path_guard.resolve(self.root / entry["manifest_path"], must_exist=True)
         self._verify_package_tree(manifest.parent, entry["digest"], entry["manifest_digest"], published=True)
         return entry
+
+    def segment_candidates(self, *, kind: str) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+        """Read-only retrieval of published segment contracts for advisory matching (S0).
+
+        Every package tree is integrity-verified before its contract is read;
+        entries without the conventional contract file are skipped. This never
+        mutates repository state, selects a template, or bypasses any gate.
+        """
+        if kind not in SEGMENT_CONTRACTS:
+            raise ProtocolError("SEGMENT_KIND_UNSUPPORTED", kind)
+        relative, schema_name = SEGMENT_CONTRACTS[kind]
+        candidates: list[tuple[dict[str, Any], dict[str, Any]]] = []
+        for entry in self._load_index()["entries"]:
+            if entry["kind"] != kind:
+                continue
+            found = self.discover(namespace=entry["namespace"], kind=kind,
+                                  template_id=entry["id"], version=entry["version"])
+            package_dir = (self.root / found["manifest_path"]).parent
+            contract_path = self.path_guard.resolve(package_dir / relative)
+            if not contract_path.is_file():
+                continue
+            contract = load_document(contract_path)
+            self.registry.validate(schema_name, contract)
+            candidates.append((found, contract))
+        return candidates
+
+    def fetch_segment(self, reference: dict[str, Any], *, namespace: str) -> dict[str, Any]:
+        """Fetch one exactly pinned published segment contract (S2).
+
+        The package tree is integrity-verified by discover; the pinned digest
+        must equal the indexed package digest, and the conventional contract
+        file must exist and validate. Read-only: never mutates repository state.
+        """
+        kind = reference.get("kind")
+        if kind not in SEGMENT_CONTRACTS:
+            raise ProtocolError("SEGMENT_KIND_UNSUPPORTED", str(kind))
+        entry = self.discover(namespace=namespace, kind=kind,
+                              template_id=reference["id"], version=reference["version"])
+        if reference.get("digest") != entry["digest"]:
+            raise ProtocolError("SEGMENT_DIGEST_MISMATCH", f"{kind}:{reference['id']}")
+        relative, schema_name = SEGMENT_CONTRACTS[kind]
+        package_dir = (self.root / entry["manifest_path"]).parent
+        contract_path = self.path_guard.resolve(package_dir / relative)
+        if not contract_path.is_file():
+            raise ProtocolError("SEGMENT_CONTRACT_MISSING", f"{kind}:{reference['id']}")
+        contract = load_document(contract_path)
+        self.registry.validate(schema_name, contract)
+        return contract
+
+    def resolve_scenario_segments(self, scenario: dict[str, Any], *, namespace: str,
+                                  lock: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Materialize referenced segments into a resolved scenario view (S2).
+
+        Semantic rules and lock binding are checked on the source scenario first;
+        each reference is then fetched from this repository inside the package
+        namespace (the scenario contract itself carries no namespace field).
+        The returned copy keeps segment_refs for provenance and fills embedded;
+        the on-disk package is never rewritten. Fully embedded scenarios pass
+        through unchanged (deep copy), so legacy consumers see zero drift.
+        """
+        resolver = OwnershipResolver()
+        resolver.validate_segment_refs(scenario)
+        if lock is not None:
+            resolver.validate_segment_lock(scenario, lock)
+        resolved = deepcopy(scenario)
+        for segment, reference in sorted(scenario.get("segment_refs", {}).items()):
+            resolved["embedded"][segment] = self.fetch_segment(reference, namespace=namespace)
+        return resolved
 
     def _load_index(self) -> dict[str, Any]:
         if not self.index_path.exists():

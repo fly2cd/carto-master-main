@@ -228,7 +228,7 @@ class MapGenerationWorkflow:
         bundle_target = self.path_guard.resolve(self._design_path("data/prepared-data-bundle.yaml"))
         atomic_yaml(bundle_target, bundle)
         compiler = self._candidate_compiler(request)
-        contracts = compiler.load_contracts(installation)
+        contracts = compiler.load_contracts(installation, repository=self._repository_optional())
         # R6: merge revised_cartography from the request into contracts so
         #     design-revision cartography changes are applied at compile time.
         if request.get("revised_cartography"):
@@ -290,7 +290,7 @@ class MapGenerationWorkflow:
         bundle_target = self.path_guard.resolve(self._design_path("data/prepared-data-bundle.yaml"))
         atomic_yaml(bundle_target, bundle)
         compiler = self._candidate_compiler(request)
-        contracts = compiler.load_contracts(installation)
+        contracts = compiler.load_contracts(installation, repository=self._repository_optional())
         plan = MapPlanner(self.registry, project_root=self.project_root).build(
             request, intent, brief, bundle, installation, contracts)
         plan_target = self.path_guard.resolve(self._design_path("plan/map-plan.yaml"))
@@ -366,7 +366,8 @@ class MapGenerationWorkflow:
         preflight = self._load("candidates/preflight-report.yaml", "validation-report")
         installation = self._load("templates/installed-template.yaml")
         self._verify_installed_template(installation)
-        contracts = MapCandidateCompiler(self.path_guard, self.registry).load_contracts(installation)
+        contracts = MapCandidateCompiler(self.path_guard, self.registry).load_contracts(
+            installation, repository=self._repository_optional())
         self._verify_candidate_inputs(candidate, scene, contracts, preflight)
         service = MapPreviewService(path_guard=self.path_guard,
                                     output_root=self.path_guard.resolve(self._design_path("previews")),
@@ -407,7 +408,8 @@ class MapGenerationWorkflow:
         evidence = self._load("candidates/preview-evidence.yaml", "map-preview-evidence")
         installation = self._load("templates/installed-template.yaml")
         self._verify_installed_template(installation)
-        contracts = MapCandidateCompiler(self.path_guard, self.registry).load_contracts(installation)
+        contracts = MapCandidateCompiler(self.path_guard, self.registry).load_contracts(
+            installation, repository=self._repository_optional())
         self._verify_candidate_inputs(candidate, scene, contracts, preflight)
         service = MapPreviewService(path_guard=self.path_guard,
                                     output_root=self.path_guard.resolve(self._design_path("previews"), must_exist=True),
@@ -1310,7 +1312,8 @@ class MapGenerationWorkflow:
             if sha256_digest(preview_receipt) != lock["render_receipt_ref"]["digest"]:
                 raise ProtocolError("MAP_SPEC_LOCK_PREVIEW_RECEIPT_DRIFT", lock["lock_id"])
             self._verify_installed_template(installation)
-            contracts = MapCandidateCompiler(self.path_guard, self.registry).load_contracts(installation)
+            contracts = MapCandidateCompiler(self.path_guard, self.registry).load_contracts(
+                installation, repository=self._repository_optional())
             self._verify_candidate_inputs(candidate, scene, contracts, preflight)
             preview_service = MapPreviewService(
                 path_guard=self.path_guard,
@@ -1453,6 +1456,20 @@ class MapGenerationWorkflow:
             raise ProtocolError("TEMPLATE_REPOSITORY_REQUIRED", "repository root and scope are required")
         return TemplateRepository(path_guard=self.path_guard, root=self.repository_root,
                                   repository_scope=self.repository_scope, registry=self.registry)
+
+    def _repository_optional(self) -> TemplateRepository | None:
+        """Repository for contract loading only; fully embedded packages need none.
+
+        ``MapCandidateCompiler.load_contracts`` itself raises SEGMENT_REPOSITORY_REQUIRED
+        when the scenario actually references published segments. Evaluating the strict
+        ``_repository()`` as a call argument pre-empts that decision and breaks legacy
+        fully embedded packages, which never need a repository. Steps that genuinely
+        require discovery (brief without digest, template install) keep using the strict
+        form, so no verification is weakened when a repository is configured.
+        """
+        if self.repository_root is None or not self.repository_scope:
+            return None
+        return self._repository()
 
     def _verify_installed_template(self, installation: dict[str, Any]) -> None:
         template_ref = installation.get("template_ref", {})

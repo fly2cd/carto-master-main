@@ -1,5 +1,5 @@
 schema_version: 1
-version: 1.0.0
+version: 1.0.1
 # Declared not-implemented queue. Guards may raise admission_class=not_implemented
 # ONLY for features listed here with status planned/backlog. Safety rejects
 # (unknown backend, arbitrary code, symlink, unknown fields) stay forbidden and
@@ -36,7 +36,7 @@ items:
   - id: composition-freeform
     status: backlog
     target: 待定
-    note: 自由编排(声明层级/允许重叠/裁剪);目标设计,未实现。
+    note: 自由编排(声明层级/裁剪/任意覆盖区域);目标设计,未实现。其中"显式声明的完整包含重叠"已实现(layout.frames[].inside_frame,程序机械核验几何包含);未声明重叠与部分重叠仍为永久禁止,不属本队列。
   - id: composition-inset
     status: backlog
     target: 待定

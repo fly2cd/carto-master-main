@@ -55,7 +55,8 @@ class MapCandidateCompiler:
                 "the compiler layer does not import the execution layer")
         return port
 
-    def load_contracts(self, installation: dict[str, Any]) -> dict[str, Any]:
+    def load_contracts(self, installation: dict[str, Any], *,
+                       repository=None) -> dict[str, Any]:
         root = self.path_guard.resolve(installation["package_path"], must_exist=True)
         if not root.is_dir():
             raise ProtocolError("TEMPLATE_INSTALL_INCOMPLETE", str(root))
@@ -107,6 +108,16 @@ class MapCandidateCompiler:
         lock = load_document(root / manifest["dependency_lock"])
         self.registry.validate("dependency-lock", lock)
         self.dependencies.validate_lock(lock)
+        if contracts["scenario"].get("segment_refs"):
+            # S2: resolve referenced segments from the published repository at the
+            # load boundary; the installed package stays byte-identical to the
+            # published one. Legacy fully embedded packages never need a repository.
+            if repository is None:
+                raise ProtocolError("SEGMENT_REPOSITORY_REQUIRED",
+                                    "Referenced segments require the published template repository")
+            contracts["scenario"] = repository.resolve_scenario_segments(
+                contracts["scenario"], namespace=manifest["package"]["namespace"], lock=lock)
+            self.registry.validate("scenario", contracts["scenario"])
         self._validate_expression_bindings(contracts["portrayal"], lock)
         self._validate_rules(contracts)
         return {"root": root, "manifest": manifest, "lock": lock, **contracts}
