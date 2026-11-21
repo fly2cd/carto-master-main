@@ -85,6 +85,21 @@ class RevisionContract(Protocol):
 
 
 @runtime_checkable
+class DataRevisionContract(Protocol):
+    """Scenario data-revision semantics (Design B): leg-level data change vocabulary,
+    evidence location/validity hooks and the request-side declaration rebinding.
+    Ready-made instance. ``apply_changes`` receives the actual evidence document —
+    the scenario rebinds its own forward declarations to the bound-facts digest."""
+
+    def rules(self) -> dict[str, tuple[str, ...]]: ...
+    def apply_changes(self, request: dict[str, Any], changes: dict[str, Any],
+                      evidence: dict[str, Any]) -> dict[str, Any]: ...
+    def evidence_uri(self, request: dict[str, Any]) -> str: ...
+    def validate_evidence(self, evidence: dict[str, Any],
+                          changes: dict[str, Any]) -> None: ...
+
+
+@runtime_checkable
 class Author(Protocol):
     """Template authoring — produces a deterministic, closed draft package.
 
@@ -207,6 +222,7 @@ COMPONENT_PROTOCOLS: dict[str, Any] = {
     "source_contract": SourceContract,
     "request_contract": RequestContract,
     "revision_contract": RevisionContract,
+    "data_revision_contract": DataRevisionContract,
     "author": Author,
     "validation_data_checker": ValidationDataChecker,
     "validation_scene": ValidationScene,

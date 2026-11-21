@@ -467,6 +467,17 @@ VALID_CASES["design-revision-proposal"] = {
     "parent_revision": 1, "changes": {"goal": {"new_value": "Updated map title"}},
     "justification": "Reflect the updated scope",
 }
+# Design B: same-run data revision (leg re-planning). The outbound declaration
+# is protocol data (digest-covered by the G1 approval face via the proposal ref),
+# not conversational discipline.
+VALID_CASES["data-revision-proposal"] = {
+    "schema_version": 1, "proposal_id": "proposal-data-001", "run_id": "run-test-001",
+    "parent_revision": 1,
+    "changes": {"route_legs": [{"leg_id": "leg-1",
+                                "via_points": [{"lon": 120.01, "lat": 30.005}]}]},
+    "outbound_declaration": [{"name": "示例途经点", "city": "示例市"}],
+    "justification": "Synthetic data-revision acceptance",
+}
 VALID_CASES["budget-state"] = {
     "schema_version": 1, "saved_at": "2026-11-12T00:00:00Z",
     "max_tool_calls": 20, "max_model_calls": 10, "max_revisions": 2,

@@ -1,7 +1,14 @@
 # 领导调研图"修改路线"实施方案（数据层变更通道）
 
-- 状态：待用户确认（确认后按 Phase A 起步执行）
-- 日期：2026-11-21
+- 状态：**已完成（2026-11-21）**。Phase A/B/C 全部收口：leg-01 途经浙江大学紫金港校区，
+  run-20261121081928 交付 committed；T-C1 全量回归 **721 passed / 7 skipped / 0 失败**
+  （基线 684 + 在线底图批次 + 本次 3 个增量合并测试）；T-C2 旧运行不可变、T-C3 delta
+  报告均通过。
+- 日期：2026-11-21（同日按最新源码复验：在线底图批次改动与本通道零交集，
+  方案可行性不变；T-B4/T-C1 已按新事实修订）
+- 执行记录：`leadership-e2e-2/work-2/`（新运行产物）、`leadership-e2e-2/work/host/
+  route-revision/`（复用素材、delta-report.json、组装驱动脚本）；交付在
+  `leadership-e2e-2/delivery/`（旧运行交付包已整体搬迁至 `delivery-v0-run-0001/`）
 - 适用：用户在 preview 阶段提出"某条路线要经过某个点 / 走某条路 / 改行程"类请求
 - 性质：本文档是开发与执行计划（`doc/` 只放开发记录，不作为运行时智能体协议；可长期固化的 SOP 归属 `skills/carto-agent/workflows/generate-map/leadership-visit-data-prep.md`，落地需用户批准）
 - 前置事实：本方案**零内核代码改动**，唯一新增代码交付物是一组增量合并自动测试（§四）
@@ -62,20 +69,22 @@ run_id/request_id/idempotency_key 自动生成）、prepared bundle、G1、G2。
 
 | # | 步骤 | 要点 |
 |---|---|---|
-| A1 | （仅新增地点）`geocode({places:[X]})` | `needs_input` 多候选 → **候选摆给用户选，不默认第一项**；选定后带 confirmations 重调至 `complete`。X 为既有地点则跳过，坐标取上轮 confirmations |
-| A2 | 改 `data/itinerary-draft.json` | 按分诊结果：途经不动 stops/legs；停靠加 place+stop 并拆腿。`geometry`/`location` 留空（工具产出） |
+| A1 | 固化复用素材 + 定性记录 | 上轮 geocode confirmations 与 plan_route results 固化进项目 `work/host/route-revision/`（会话缓存非持久证据）；途经定性记录在 `goal` 字段与宿主日志。**geocode 不得在此阶段调用**——外部服务须 G1 授权（数据准备规则 2），新增地点的坐标获取移至 B3 首步 |
+| A2 | 改 `data/itinerary-draft.json`（按分诊结果） | 途经：stops/legs **不动**（`via_points` 是 plan_route 参数，不是 draft 合同字段，draft 摘要不变属预期）；停靠：加 place（`location` 留空）+ stop 并拆腿，`geometry` 留空（工具产出） |
 | A3 | `itinerary_check` 复检 | 按字段级错误报告修，复检至 `complete` |
 | A4 | `request_scaffold` 生成新请求 | 身份四项必填；`--template-repo-path` 指既有仓库；`goal` 写修订意图（如 `修订：第N腿经停X`） |
 
 **Phase A 测试：**
 
-- **T-A1（交互）**：geocode 歧义路径实测——出现候选时必须完成"用户确认 →
-  confirmations 重调 → complete"闭环；复用地点时核对该地点确在上轮结果 `resolved` 列表
-  且坐标一致（防张冠李戴）。
+- **T-A1（复用素材固化）**：确认固化文件可读、内容与上轮一致（5 腿结果 + 6 地点坐标），
+  并备份旧 `itinerary.json` / 旧请求（新运行 assemble/scaffold 覆写前留底）。
 - **T-A2（工具）**：`itinerary_check` 返回 `status: complete`，`draft_digest` 记录备查。
-- **T-A3（一致性）**：`request_scaffold` 的 `bound_digests.draft` 必须等于 T-A2 的
-  `draft_digest`（两者都是规范 JSON 摘要，逐字节一致，有内核等价金样锁定）；
-  `registration/basemap` 摘要与上轮相同（材料未动的机械证明）。
+- **T-A2（工具）**：`itinerary_check` 返回 `status: complete`，`draft_digest` 记录备查。
+- **T-A3（一致性）**：`request_scaffold` 的四个 `bound_digests` 必须与上一轮请求的
+  对应摘要**完全相同**（draft/registration/basemap/template——材料未动的机械证明，
+  2026-11-21 实测四值均与金样一致）。注意 `itinerary_check` 的 `draft_digest` 与
+  scaffold 的 draft 摘要是**不同语义**（原始字节 vs 规范 JSON），两者不等是预期，
+  不能作比对锚点。
 - **T-A4（基线）**：`carto schema check` 全过（当前基线 100 个）。
 - **T-A5（自动测试）**：跑 `services/itinerary-tools` 测试套件（§四新增用例必须全绿）。
 
@@ -101,8 +110,10 @@ run_id/request_id/idempotency_key 自动生成）、prepared bundle、G1、G2。
   `counts.travel_legs` 与上轮一致（停靠拆腿场景为 N+1，须与分诊预期一致）；
   `geometry_points` 相对基线 2768 的差值应只来自变更腿（量级合理性人工核对）。
 - **T-B4（数据级 delta 核对，替代整图字节比对）**：diff 新旧 `map-document.json`
-  ——变更腿的 feature 几何必须不同，**未变更腿与停靠的 feature 必须逐字节一致**；
-  这是"只有该变的变了"的机械证明。
+  ——变更腿的 feature 几何必须不同，**未变更腿的几何坐标必须逐字节一致**；停靠
+  feature 的几何（点坐标）须一致，但**属性允许出现 `formatted_address` 新增字段**
+  （2026-11-21 在线底图批次给 `data_preparer` 增加了该透传，两代运行的属性面因此
+  合法不同，不是数据漂移）。这是"只有该变的变了"的机械证明。
 - **T-B5（人工门）**：用户目检新预览并当次明确批准（G2 的存在意义）。
 - **T-B6（终检与交付）**：`check` 11 项全过；交付包五件套齐（map.pdf/map.png/README/
   delivery-manifest/checksums）；`checksums.sha256` 校验通过；`delivery-status` 返回
@@ -116,8 +127,10 @@ run_id/request_id/idempotency_key 自动生成）、prepared bundle、G1、G2。
 
 **Phase C 测试：**
 
-- **T-C1（全量回归）**：仓库全量 pytest（基线 684+ passed / 0 failed，含
-  `services/itinerary-tools` 套件）+ `carto schema check`——证明零内核改动的声明成立。
+- **T-C1（全量回归）**：仓库全量 pytest + `carto schema check`——证明零内核改动的
+  声明成立。基线数字以当前代码实测为准（2026-11-21 在线底图批次已改动
+  `test_request_scaffold.py` 并新增 `test_basemap_snapshot.py`，历史基线 684 passed /
+  schema 100 不再直接可比；执行时先跑一次全量取新基线，收尾时对照该基线）。
 - **T-C2（旧运行不可变性抽查）**：执行前后各记录一次旧运行 `previews/` 与 `delivery/`
   的文件摘要，逐一相同。
 - **T-C3（delta 报告核对）**：报告中的每个数字可回溯到 T-B3/T-B4 的实测输出。
@@ -171,7 +184,13 @@ duration/engine 字段齐全），模拟"plan_route 增量重跑 + 宿主按 leg
 3. 宿主 Read 无法显示预览图 → 用户本人目检（B5 人工门）；
 4. `--allowed-root` append 语义漏传模板仓库根 → intake 失败（e2e-2 实测）；
 5. `via_points` 不进协议合同 → 审计线索依赖 `goal` 字段 + 宿主日志双记录；
-6. 宿主手工改 itinerary.json → 禁止（assemble 是程序步骤，拒绝点名缺项不落盘）。
+6. 宿主手工改 itinerary.json → 禁止（assemble 是程序步骤，拒绝点名缺项不落盘）；
+7. **scaffold 路径基准错位**（2026-11-21 实测）：MCP 服务的 allowed_root 与内核
+   `--project-root` 不一致时（如服务根=IGSA_1118 父目录），scaffold 写入请求的
+   URI 是"服务根相对"，而内核 intake 按"项目根相对"解析——intake 前必须把
+   `basemap/registration/font` 的 URI 修正为项目根相对（intake 后指纹锁定，
+   不能再改）。`.mcp.json` 的 allowed-root 修改只对新会话生效，运行中的服务
+   实例持有启动时的根。
 
 ## 七、验收判据
 

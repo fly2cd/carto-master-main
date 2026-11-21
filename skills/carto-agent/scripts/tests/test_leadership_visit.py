@@ -2234,5 +2234,225 @@ class OnlineSnapshotExportTests(EndToEndWorkflowTests):
         self.assertEqual("render", frozen["state"]["step"])
 
 
+class DataRevisionTests(EndToEndWorkflowTests):
+    """Design B: same-run data revision (leg re-planning) through the rN channel.
+
+    G1 on the revised brief authorizes the plan and its outbound footprint
+    BEFORE the facts exist; the host then swaps the prepared evidence (the MCP
+    chain's product); data-revise freezes the actual facts into the staged
+    revision and compile RE-PREPARES — data evidence is never silently reused
+    across a data revision, and unapproved evidence drift after staging is
+    refused (DATA_EVIDENCE_DRIFT), never silently consumed.
+    """
+
+    VIA = {"lon": 120.01, "lat": 30.005}
+
+    def _replanned_itinerary(self) -> dict:
+        """The MCP chain's product: leg-1 re-planned with an explicit detour polyline."""
+        revised = json.loads(json.dumps(self.itinerary))
+        revised["legs"][0]["geometry"] = {
+            "type": "LineString",
+            "coordinates": [[120.0, 30.0], [self.VIA["lon"], self.VIA["lat"]], [120.02, 29.98]],
+        }
+        return revised
+
+    def _swap_evidence(self, document: dict) -> None:
+        original = self.itinerary_path.read_bytes()
+        self.addCleanup(self.itinerary_path.write_bytes, original)
+        atomic_json(self.itinerary_path, document, create_once=False)
+
+    def _proposal(self) -> dict:
+        return {
+            "schema_version": 1, "proposal_id": "proposal-data-001",
+            "run_id": "test-run", "parent_revision": 1,
+            "changes": {"route_legs": [{"leg_id": "leg-1", "via_points": [dict(self.VIA)]}]},
+            "outbound_declaration": [{"name": "示例途经点", "city": "示例市"}],
+            "justification": "Synthetic data-revision acceptance",
+        }
+
+    def _base_pipeline(self):
+        """intake → brief → [G1] → compile → preview → old G2 (pre-revision state)."""
+        from tests.test_general_thematic import APPROVAL_KEY, KEY
+        self.workflow.intake(self.request_path)
+        briefed = self.workflow.brief(self.request_path)
+        g1 = self._signed("g1-base", "approve-map-brief", "map-brief",
+                          briefed["approval_object_digest"])
+        compiled = self.workflow.compile(self.request_path, g1, approval_key=APPROVAL_KEY)
+        self.assertEqual("preview", compiled["state"]["step"])
+        preview = self.workflow.preview(self.request_path, attestation_key=KEY)
+        old_g2 = self._signed("g2-old", "approve-freeze", "resolved-map",
+                              preview["approval_object_digest"])
+        return g1, old_g2
+
+    def test_data_revision_reprepares_and_requires_new_g2(self):
+        from tests.test_general_thematic import APPROVAL_KEY, KEY
+        from unittest.mock import patch
+        from carto_core.workflow import map_data_preparation
+        g1, old_g2 = self._base_pipeline()
+        # -- the host runs the post-G1 data chain: leg-1 re-planned on disk --
+        replanned = self._replanned_itinerary()
+        self._swap_evidence(replanned)
+        proposal_path = self.root / "data-revision-proposal.yaml"
+        atomic_yaml(proposal_path, self._proposal(), create_once=False)
+        face = self.workflow.data_revision_brief(self.request_path, proposal_path)
+        # G1 approves the REVISED BRIEF (pending-mode semantics: forward
+        # declarations only), and the brief digest-binds the proposal.
+        self.assertEqual("approve-map-brief", face["action"])
+        self.assertEqual("map-brief", face["object_type"])
+        revised_brief = face["brief"]
+        self.assertEqual(2, revised_brief["revision"])
+        self.assertEqual(sha256_digest(load_document(proposal_path)),
+                         revised_brief["revision_proposal_ref"]["digest"])
+        new_g1 = self._signed("g1-data", "approve-map-brief", "map-brief",
+                              face["approval_object_digest"])
+        revised = self.workflow.data_revise(self.request_path, proposal_path, new_g1,
+                                            approval_key=APPROVAL_KEY)
+        self.assertEqual("compile", revised["state"]["step"])
+        self.assertEqual(["route_legs"], revised["changed_fields"])
+        revised_path = Path(revised["request_path"])
+        self.assertEqual("r2", revised_path.parent.parent.name)
+        design_root = revised_path.parent.parent
+        # staged evidence: frozen copy of the re-planned facts, digest-bound
+        staged_evidence = load_document(design_root / "evidence" / "itinerary.json")
+        self.assertEqual(replanned, staged_evidence)
+        self.assertEqual(sha256_digest(replanned), revised["evidence_digest"])
+        # dependency graph: data evidence NOT reusable — compile must re-prepare
+        graph = load_document(design_root / "dependency-graph.yaml")
+        self.assertFalse(graph["data_evidence_reusable"])
+        self.assertIn("data-evidence", graph["invalidated_nodes"])
+        self.assertEqual(sha256_digest(replanned), graph["evidence_digest"])
+        # the only request-side change: the pending forward declaration matures
+        # into a bound-facts declaration (the actual evidence digest) — this is
+        # what separates the revision's product addressing
+        revised_request = load_document(revised_path)
+        expected = json.loads(json.dumps(self.request))
+        expected["itinerary_structure"]["source_ref"]["digest"] = sha256_digest(replanned)
+        self.assertEqual(expected, revised_request)
+        # -- the revised compile MUST re-prepare (anti-reuse direction) --
+        calls = []
+        original = map_data_preparation.MapDataPreparer.prepare
+        def spy(*args, **kwargs):
+            calls.append(1)
+            return original(*args, **kwargs)
+        with patch.object(map_data_preparation.MapDataPreparer, "prepare",
+                          side_effect=spy, autospec=True):
+            recompiled = self.workflow.compile(revised_path, new_g1, approval_key=APPROVAL_KEY)
+        self.assertEqual(1, len(calls))
+        self.assertEqual("preview", recompiled["state"]["step"])
+        new_preview = self.workflow.preview(revised_path, attestation_key=KEY)
+        self.assertEqual("passed", new_preview["evidence"]["status"])
+        # -- the old G2 must NOT authorize the revised data; a new G2 does --
+        with self.assertRaises(SecurityError) as raised:
+            self.workflow.freeze(revised_path, old_g2, approval_key=APPROVAL_KEY,
+                                 attestation_key=KEY)
+        self.assertEqual("APPROVAL_OBJECT_MISMATCH", raised.exception.code)
+        new_g2 = self._signed("g2-new", "approve-freeze", "resolved-map",
+                              new_preview["approval_object_digest"])
+        frozen = self.workflow.freeze(revised_path, new_g2, approval_key=APPROVAL_KEY,
+                                      attestation_key=KEY)
+        self.assertEqual("render", frozen["state"]["step"])
+
+    def test_wrong_approval_action_is_refused(self):
+        from tests.test_general_thematic import APPROVAL_KEY
+        g1, _ = self._base_pipeline()
+        self._swap_evidence(self._replanned_itinerary())
+        proposal_path = self.root / "data-revision-proposal.yaml"
+        atomic_yaml(proposal_path, self._proposal(), create_once=False)
+        face = self.workflow.data_revision_brief(self.request_path, proposal_path)
+        # a proposal-style receipt (approve-product-review) is not a G1 on the
+        # revised brief — the gate refuses it.
+        bogus = self._signed("g1-bogus", "approve-product-review", "validation-report",
+                             face["approval_object_digest"])
+        with self.assertRaises(SecurityError):
+            self.workflow.data_revise(self.request_path, proposal_path, bogus,
+                                      approval_key=APPROVAL_KEY)
+
+    def test_evidence_drift_after_staging_is_refused(self):
+        from tests.test_general_thematic import APPROVAL_KEY, KEY
+        g1, _ = self._base_pipeline()
+        replanned = self._replanned_itinerary()
+        self._swap_evidence(replanned)
+        proposal_path = self.root / "data-revision-proposal.yaml"
+        atomic_yaml(proposal_path, self._proposal(), create_once=False)
+        face = self.workflow.data_revision_brief(self.request_path, proposal_path)
+        new_g1 = self._signed("g1-drift", "approve-map-brief", "map-brief",
+                              face["approval_object_digest"])
+        revised = self.workflow.data_revise(self.request_path, proposal_path, new_g1,
+                                            approval_key=APPROVAL_KEY)
+        revised_path = Path(revised["request_path"])
+        # unapproved post-staging evidence change: compile must refuse, never
+        # silently re-consume the drifted file
+        drifted = self._replanned_itinerary()
+        drifted["legs"][0]["geometry"]["coordinates"][-1] = [120.03, 29.97]
+        atomic_json(self.itinerary_path, drifted, create_once=False)
+        with self.assertRaises(ProtocolError) as raised:
+            self.workflow.compile(revised_path, new_g1, approval_key=APPROVAL_KEY)
+        self.assertEqual("DATA_EVIDENCE_DRIFT", raised.exception.code)
+        # restoring the approved evidence unblocks the compile
+        atomic_json(self.itinerary_path, replanned, create_once=False)
+        recompiled = self.workflow.compile(revised_path, new_g1, approval_key=APPROVAL_KEY)
+        self.assertEqual("preview", recompiled["state"]["step"])
+
+    def test_staging_conflict_on_evidence_swap(self):
+        from tests.test_general_thematic import APPROVAL_KEY
+        from unittest.mock import patch
+        g1, _ = self._base_pipeline()
+        self._swap_evidence(self._replanned_itinerary())
+        proposal_path = self.root / "data-revision-proposal.yaml"
+        atomic_yaml(proposal_path, self._proposal(), create_once=False)
+        face = self.workflow.data_revision_brief(self.request_path, proposal_path)
+        new_g1 = self._signed("g1-cas", "approve-map-brief", "map-brief",
+                              face["approval_object_digest"])
+        # interrupt the transition AFTER staging, BEFORE the state journal commit
+        with patch.object(self.workflow.state_store, "complete_step",
+                          side_effect=RuntimeError("interrupted")):
+            with self.assertRaises(RuntimeError):
+                self.workflow.data_revise(self.request_path, proposal_path, new_g1,
+                                          approval_key=APPROVAL_KEY)
+        # resume with DIFFERENT evidence: the staged snapshot must refuse the swap
+        swapped = self._replanned_itinerary()
+        swapped["legs"][0]["geometry"]["coordinates"][1] = [120.015, 30.01]
+        atomic_json(self.itinerary_path, swapped, create_once=False)
+        with self.assertRaises(ProtocolError) as raised:
+            self.workflow.data_revise(self.request_path, proposal_path, new_g1,
+                                      approval_key=APPROVAL_KEY)
+        self.assertEqual("REVISION_STAGING_CONFLICT", raised.exception.code)
+        # resuming with the SAME evidence still completes (CAS: no double budget)
+        atomic_json(self.itinerary_path, self._replanned_itinerary(), create_once=False)
+        revised = self.workflow.data_revise(self.request_path, proposal_path, new_g1,
+                                            approval_key=APPROVAL_KEY)
+        self.assertEqual("compile", revised["state"]["step"])
+        budget = load_document(self.work / "budget-state.yaml") \
+            if (self.work / "budget-state.yaml").is_file() else None
+        if budget is not None:
+            self.assertEqual(1, budget["revisions"])
+
+    def test_data_revision_requires_prepared_evidence(self):
+        from tests.test_general_thematic import APPROVAL_KEY
+        g1, _ = self._base_pipeline()
+        proposal_path = self.root / "data-revision-proposal.yaml"
+        atomic_yaml(proposal_path, self._proposal(), create_once=False)
+        # remove the evidence: the proposal cannot proceed without the data
+        # chain having produced the facts
+        gone = self.itinerary_path.read_bytes()
+        self.addCleanup(self.itinerary_path.write_bytes, gone)
+        self.itinerary_path.unlink()
+        with self.assertRaises(ProtocolError) as raised:
+            self.workflow.data_revision_brief(self.request_path, proposal_path)
+        self.assertEqual("DATA_EVIDENCE_NOT_PREPARED", raised.exception.code)
+
+    def test_unknown_leg_is_refused_against_evidence(self):
+        from tests.test_general_thematic import APPROVAL_KEY
+        g1, _ = self._base_pipeline()
+        self._swap_evidence(self._replanned_itinerary())
+        proposal = self._proposal()
+        proposal["changes"]["route_legs"][0]["leg_id"] = "leg-99"
+        proposal_path = self.root / "data-revision-proposal.yaml"
+        atomic_yaml(proposal_path, proposal, create_once=False)
+        with self.assertRaises(ProtocolError) as raised:
+            self.workflow.data_revision_brief(self.request_path, proposal_path)
+        self.assertEqual("LEADERSHIP_DATA_REVISION_LEG_UNKNOWN", raised.exception.code)
+
+
 if __name__ == "__main__":
     unittest.main()

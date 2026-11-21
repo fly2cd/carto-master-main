@@ -73,10 +73,37 @@ freeze → render → check → 成品 review → 冻结 DeliveryManifest → [G
 5. 受累计修订预算约束；同一暂存修订中断恢复不重复计费，冲突提案拒绝。旧 G2 不批准新预览。
 6. 冻结后不在原运行上修改设计。新建运行并重新形成候选、G2、锁和交付依据，不能用 retry 当设计修订。
 
+## 4a. 如何修改数据（leadership_visit：leg 级改线）
+
+设计修订通道不受理行程数据（行程三键在 bundle 输入守卫内）；`leadership_visit`
+另设同运行数据修订通道（v1 仅 `route_legs`：变更腿 + 途经点/路线偏好）：
+
+1. 宿主先在对话中出示修订意图与外发声明（提案的 `outbound_declaration`：
+   将外发的新地名），获得用户批准后执行增量数据链（geocode 新地名 →
+   `plan_route` 变更腿带 via_points → 组装新 `data/itinerary.json`）——外发授权
+   在对话层面先行；回执在事实就位后签署。
+2. **证据就位后**调用 `data-revision-brief`：输出修订版 MapBrief——其
+   `source_ref.digest` 已绑定**实际证据摘要**（前瞻声明升级为已绑定事实声明，
+   这是修订产物寻址分离的载体；goal/intent 不动故无意图漂移），并经
+   `revision_proposal_ref` 摘要绑定提案。顺序由摘要强制：若 brief 先于换证据
+   调用、随后证据再变，`data-revise` 处的 G1 校验会 `APPROVAL_OBJECT_MISMATCH`
+   拒绝。
+3. 对该 MapBrief 签新 G1（一张回执同时覆盖修订计划、外发足迹与事实声明），
+   调用 `data-revise`：冻结提案、证据快照（`revisions/rN/evidence/`）、请求、
+   依赖图（`data_evidence_reusable: false` + `evidence_digest`）写入 `revisions/rN/`。
+4. 后续 `compile` 在同一 G1 下**重准备** bundle（数据证据绝不跨数据修订复用），
+   运行时门复核活证据摘要与 `evidence_digest` 一致，不一致拒绝
+   （`DATA_EVIDENCE_DRIFT`，绝不静默消费未批准数据）；`preview` 后签新 G2
+   绑定实际渲染结果。后续设计修订经依赖图继承证据绑定。
+5. 与设计修订共享修订编号、预算与 CAS 中断恢复（暂存后证据被换 →
+   `REVISION_STAGING_CONFLICT`）。停靠增删（改 draft 与前瞻声明）为 v2 范围。
+6. 停靠/地点结构变更、其他场景的数据修订按组件缺失拒绝（
+   `DATA_REVISION_UNSUPPORTED`）。
+
 CLI 只有一个入口，公共参数以 `--help` 为准：
 
 ```text
-carto generate-map <intake|brief|compile|preview|revision-brief|revise|freeze|render|check|review|deliver|status|retry|receipts|delivery-status>
+carto generate-map <intake|brief|compile|preview|revision-brief|revise|data-revision-brief|data-revise|freeze|render|check|review|deliver|status|retry|receipts|delivery-status>
 ```
 
 ## 5. 布局、渲染和交付边界

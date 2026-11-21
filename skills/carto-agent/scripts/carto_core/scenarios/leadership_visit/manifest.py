@@ -15,6 +15,7 @@ from __future__ import annotations
 _SRC = ".scenarios.leadership_visit.source_contract"
 _REQ = ".scenarios.leadership_visit.request_contract"
 _REV = ".scenarios.leadership_visit.revision"
+_DREV = ".scenarios.leadership_visit.data_revision"
 _PREP = ".scenarios.leadership_visit.data_preparer"
 _PLAN = ".scenarios.leadership_visit.planner"
 _COMP = ".scenarios.leadership_visit.candidate_compiler"
@@ -30,6 +31,7 @@ COMPONENTS: dict[str, tuple[str, str]] = {
     "source_contract": (_SRC, "SOURCE_CONTRACT"),
     "request_contract": (_REQ, "REQUEST_CONTRACT"),
     "revision_contract": (_REV, "REVISION_CONTRACT"),
+    "data_revision_contract": (_DREV, "DATA_REVISION_CONTRACT"),
     "author": (_AUTH, "RouteAuthor"),
     "validation_data_checker": (_VAL, "route_validation_data_checker"),
     "validation_scene": (_VAL, "route_validation_scene"),
