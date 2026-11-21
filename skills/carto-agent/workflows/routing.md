@@ -2,8 +2,8 @@
 
 | 路由 | 请求目标 | 当前状态 |
 |---|---|---|
-| `create-template` | 创建可复用地图模板包 | 保留 `analyze → brief → author → validate → publish` 编排；仅准入已注册的 `general_thematic_mapping` 场景（`general-thematic-map` 模板）。静态检查通过后 `validate` 在受信验证上下文内渲染合成样张并冻结场景/回执/预览证据，`publish` 重新核验冻结证据并消费精确 TP；缺少栅格渲染依赖、可嵌入字体或投影展示 CRS 时失败关闭；其余默认拒绝 |
-| `generate-map` | 从业务意图和数据生成地图成果 | 保留 `intake → brief → compile → preview → freeze → render → check → review → deliver` 编排及状态查询；仅准入已注册的 `general_thematic_mapping` 场景（已分类栅格或受限点/面矢量，显式 design → 单图/1×2/2×2 → A4 横版 PDF+PNG；非生产准入），其余默认拒绝 |
+| `create-template` | 创建可复用地图模板包 | 保留 `analyze → brief → author → validate → publish` 编排；准入已注册的 `general_thematic_mapping` 与 `leadership_visit` 场景（`general-thematic-map` / `leadership-visit-map` 模板）。静态检查通过后 `validate` 在受信验证上下文内渲染合成样张并冻结场景/回执/预览证据，`publish` 重新核验冻结证据并消费精确 TP；缺少栅格渲染依赖、可嵌入字体或投影展示 CRS 时失败关闭；其余默认拒绝 |
+| `generate-map` | 从业务意图和数据生成地图成果 | 保留 `intake → brief → compile → preview → freeze → render → check → review → deliver` 编排及状态查询；准入已注册的 `general_thematic_mapping` 场景（已分类栅格或受限点/面矢量，显式 design → 单图/1×2/2×2 → A4 横版 PDF+PNG）与 `leadership_visit` 场景（图片底图 + 配准参数 + 行程数据，pending 数据准备模式 `mcp-itinerary-chain`，A3 横版 PDF+PNG；均非生产准入），其余默认拒绝 |
 | `edit-native-map` | 保留原生 GIS 工程并编辑 | 未开放，返回 `CAPABILITY_NOT_AVAILABLE` |
 | `curate-catalog` | 治理符号、标准和目录 | 未开放，返回 `CAPABILITY_NOT_AVAILABLE` |
 
@@ -17,7 +17,9 @@
 
 ## 能力声明
 
-当前策略为 `scenario-capabilities.yaml` v1.7.0；`general_thematic_mapping` / `general-thematic` 只登记**一个**能力档案 `general-thematic-mapping@5.0.0`，栅格与矢量是它的 `geometry_variants` 数据适配变体，业务语义、意图约束、输出与版式上限只声明一遍。几何由请求与变体元数据显式声明，不按模板版本推断；撤销某几何即删除对应变体。矢量包括一对一 CSV 属性连接、类别、等距/手工分级设色、面积比例符号。`production_enabled: false`，`formal_capability_boundary.production_tasks` 仍为空。
+当前策略为 `scenario-capabilities.yaml` v1.8.0；`general_thematic_mapping` / `general-thematic` 只登记**一个**能力档案 `general-thematic-mapping@5.0.0`，栅格与矢量是它的 `geometry_variants` 数据适配变体，业务语义、意图约束、输出与版式上限只声明一遍。几何由请求与变体元数据显式声明，不按模板版本推断；撤销某几何即删除对应变体。矢量包括一对一 CSV 属性连接、类别、等距/手工分级设色、面积比例符号。`production_enabled: false`，`formal_capability_boundary.production_tasks` 仍为空。
+
+第二个已注册场景 `leadership_visit`（`leadership-visit` 实现登记 `leadership-visit-mapping@1.0.0`，vector 变体 + `image-itinerary-page` 渲染后端）：generate 路由支持 pending 数据准备模式（`mcp-itinerary-chain`，G1 后宿主经 MCP geocode/plan_route 组装行程数据，地名歧义必须经用户确认）；create-template 路由以合成 fixture 渲染验证样张。行程 MCP 工具见仓库 `services/itinerary-tools`。同属非生产准入。
 
 意图缺项/歧义先返回澄清错误，未注册场景失败关闭。`intent resolve` 不授权执行。模板复用优先；项目设计、自动模板检索、海报、调研、OCR、真实 CRS 转换和外部发布不能由已存在的通用接口推定开放。详见 `generate-map.md`。
 

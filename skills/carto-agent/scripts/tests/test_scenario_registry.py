@@ -35,7 +35,9 @@ class ScenarioRegistryTests(unittest.TestCase):
     def test_packaged_registry_admits_only_the_registered_scenario(self):
         with patch("carto_core.scenario_registry.import_module") as importer:
             registry = ScenarioRegistry(self.schemas)
-            self.assertEqual({("map-scenario", "general-thematic-map", "3.0.0"), ("map-scenario", "general-thematic-map", "4.0.0")},
+            self.assertEqual({("map-scenario", "general-thematic-map", "3.0.0"),
+                              ("map-scenario", "general-thematic-map", "4.0.0"),
+                              ("map-scenario", "leadership-visit-map", "1.0.0")},
                              set(registry._templates))
             profile = registry.for_create(
                 deepcopy(VALID_CASES["general-template-create-request"]))
@@ -144,22 +146,35 @@ class GeometryVariantPolicyTests(unittest.TestCase):
             return ScenarioRegistry(self.schemas)
 
     def test_packaged_policy_declares_the_shared_segment_once(self):
-        text = self.POLICY_PATH.read_text(encoding="utf-8")
         policy = load_document(self.POLICY_PATH)
         self.schemas.validate("scenario-capabilities", policy)
-        self.assertEqual(1, len(policy["profiles"]))
+        # Two registered business purposes: general thematic + leadership visit.
+        self.assertEqual(["general-thematic-mapping", "leadership-visit-mapping"],
+                         [item["id"] for item in policy["profiles"]])
         profile = policy["profiles"][0]
         self.assertEqual(["raster", "vector"],
                          [variant["geometry"] for variant in profile["geometry_variants"]])
         # The convergence has to be textual, not only structural: a shared declaration
-        # copied per geometry is what let the two profiles drift apart before.
+        # copied per geometry is what let the two profiles drift apart before. Counted
+        # within one profile's own declaration — a second scenario is a legitimate
+        # second registration of a different purpose, not a drift of this one.
+        profile_text = json.dumps(profile, ensure_ascii=False)
         for fragment in ("administrative-division", "land-cover", "max_width_mm",
                          "allowed_shapes", "user-declared-source-license"):
-            self.assertEqual(1, text.count(fragment), fragment)
+            self.assertEqual(1, profile_text.count(fragment), fragment)
         # Per-geometry fields live only inside a variant.
         for field in ("template", "authoring_profile", "renderer_id",
                       "template_geometry", "allowed_geometries"):
             self.assertNotIn(field, profile, field)
+        # The leadership-visit profile registers its own purpose, implementation and
+        # single vector variant (P2 admission skeleton; renderer derives from the registry).
+        leadership = policy["profiles"][1]
+        self.assertEqual("leadership_visit",
+                         leadership["intent_constraints"]["business_scene"])
+        self.assertEqual("leadership-visit", leadership["implementation"])
+        self.assertEqual(["vector"],
+                         [variant["geometry"] for variant in leadership["geometry_variants"]])
+        self.assertFalse(leadership["production_enabled"])
 
     def test_variants_flatten_into_one_capability_per_geometry(self):
         policy = deepcopy(VARIANT_CAPABILITIES_POLICY)

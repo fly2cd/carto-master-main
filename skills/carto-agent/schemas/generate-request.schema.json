@@ -162,6 +162,7 @@
       }
     },
     "allowed_capabilities": {
+      "description": "User-declared capability grants. geo-to-image-pixels / image-display-bounds / annotation-layout are the image-basemap registration and callout layout capabilities required by scenarios that render onto a registered raster basemap; admitting them into the shared vocabulary is a data-type-level evolution, admission stays with scenario policy.",
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
@@ -172,7 +173,10 @@
           "join",
           "classify",
           "reproject",
-          "render-preview"
+          "render-preview",
+          "geo-to-image-pixels",
+          "image-display-bounds",
+          "annotation-layout"
         ]
       }
     },

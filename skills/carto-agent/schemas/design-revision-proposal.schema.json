@@ -85,6 +85,91 @@
             }
           }
         },
+        "annotation_layout": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "new_value"
+          ],
+          "properties": {
+            "new_value": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "seed",
+                "iterations",
+                "gap_px"
+              ],
+              "properties": {
+                "seed": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "iterations": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000000
+                },
+                "gap_px": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          }
+        },
+        "page_layout": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "new_value"
+          ],
+          "properties": {
+            "new_value": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "model"
+              ],
+              "properties": {
+                "model": {
+                  "enum": [
+                    "image-native",
+                    "fixed-page"
+                  ]
+                },
+                "width_mm": {
+                  "type": "number",
+                  "minimum": 100,
+                  "maximum": 1200
+                },
+                "height_mm": {
+                  "type": "number",
+                  "minimum": 100,
+                  "maximum": 1200
+                },
+                "dpi": {
+                  "type": "integer",
+                  "minimum": 72,
+                  "maximum": 600
+                }
+              }
+            }
+          }
+        },
+        "style_overrides": {
+          "description": "Design-layer style patch (leadership-visit): merged onto the template portrayal contract's image_itinerary section at recompile; data evidence stays reusable.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "new_value"
+          ],
+          "properties": {
+            "new_value": {
+              "$ref": "https://schemas.carto-agent.local/v1/image-itinerary-style-override.schema.json"
+            }
+          }
+        },
         "panel_designs": {
           "type": "object",
           "additionalProperties": false,

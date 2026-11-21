@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.itinerary-tools.local/v1/request-scaffold-response.schema.json",
+  "type": "object",
+  "required": [
+    "status"
+  ],
+  "properties": {
+    "status": {
+      "enum": [
+        "built",
+        "error"
+      ]
+    },
+    "request_path": {
+      "type": "string"
+    },
+    "bound_digests": {
+      "type": "object"
+    },
+    "identity": {
+      "type": "object"
+    },
+    "reminder": {
+      "type": "string"
+    },
+    "code": {
+      "type": "string"
+    },
+    "message": {
+      "type": "string"
+    }
+  }
+}

@@ -18,7 +18,8 @@ version: 0.8.0
 ## 当前阶段边界
 
 - 保留通用框架：Schema 与安全底座、状态与回执、审批协调、ToolGateway、知识服务、模板创建发布编排、候选编译与冻结、锁驱动渲染、成品检查和原子本地交付。
-- **当前只注册一个业务场景**：`general_thematic_mapping`。`scenario-capabilities.yaml` v1.7.0 为 `general-thematic` 实现登记**一个**能力档案 `general-thematic-mapping@5.0.0`；栅格与矢量是该档案下的 `geometry_variants` 数据适配变体，各自只声明几何、模板资产（`general-thematic-map@3.0.0` / `@4.0.0`）、作者 profile 与渲染后端，业务语义/意图约束/输出与版式上限只声明一遍。按显式 `geometry` 与变体 `template_geometry` 分派，撤销某几何即删除对应变体。支持已分类栅格、点/面矢量及显式一对一 CSV 属性连接；网格 1×1 / 1×2 / 2×2，独立/共享图例，A4 横版 PDF+PNG。均为 `production_enabled: false`，禁止敏感坐标和生产数据，强制 NOTICE 与源许可；其余能力仍默认拒绝。
+- **已注册两个业务场景**。`scenario-capabilities.yaml` v1.8.0：`general_thematic_mapping`（`general-thematic` 实现登记能力档案 `general-thematic-mapping@5.0.0`；栅格与矢量是该档案下的 `geometry_variants` 数据适配变体，各自只声明几何、模板资产（`general-thematic-map@3.0.0` / `@4.0.0`）、作者 profile 与渲染后端，业务语义/意图约束/输出与版式上限只声明一遍。按显式 `geometry` 与变体 `template_geometry` 分派，撤销某几何即删除对应变体。支持已分类栅格、点/面矢量及显式一对一 CSV 属性连接；网格 1×1 / 1×2 / 2×2，独立/共享图例，A4 横版 PDF+PNG）；以及 `leadership_visit`（见下条）。均为 `production_enabled: false`，禁止敏感坐标和生产数据，强制 NOTICE 与源许可；其余能力仍默认拒绝。
+- **`leadership_visit`（领导调研行程路线图）**：`leadership-visit` 实现登记能力档案 `leadership-visit-mapping@1.0.0`（vector 变体，`image-itinerary-page` 静态图片底图渲染后端，A3 PDF+PNG）。`generate-map` 支持 pending 数据准备模式（`preparation: "mcp-itinerary-chain"`：请求 intake 后指纹锁定，G1 前只需底图 + 配准参数 + 行程 DOCX；G1 后宿主经 MCP 行程准备工具链组装行程数据——`geocode`（地名歧义必须展示候选并等待用户真实确认，不得默认选择）/ `plan_route`（三级回退）/ `itinerary_assemble`（确定性合并落盘），G1 前另有 `itinerary_check`（草稿校验反馈）与 `request_scaffold`（请求骨架与摘要计算）——之后不得改动请求，否则 `JOB_INPUT_DRIFT`；实际数据绑定发生在 G2 的 prepared-data-bundle）。`create-template` 路由经 RouteAuthor 生成样式合同（沿用旧框架 1.2.0 实测样式值）并以合成 fixture 走真实渲染验证。设计层样式修订通道已开放：请求可带 `style_overrides`（样式补丁：分组配色、注记/线宽表达参数、`page_furniture` 标题/正文字号与图框边线——补丁合并进模板 `image_itinerary` 合同，两渲染器经共享推导函数消费冻结值）；G2 前的样式修订走 `revision-brief → revise`（`style_overrides` 为合法修订键，数据证据复用仅重编译重预览，须换签 G1 与 G2；路线/底图/行程数据属数据层，须新运行）。行程工具服务见仓库 `services/itinerary-tools`（MCP stdio，五工具，advisory 层——权威校验在内核）；审批回执签发工具见 `tools/host/approval-sign.py`（签名权威在内核外，复用内核加密实现）。真实领导行程属敏感数据，须独立敏感准入送审或脱敏后方可执行。
 - 该场景的分类栅格模板样张渲染分支已注册：`validate` 在静态检查全部通过后，于受信验证上下文内由包内图例样本派生确定性合成栅格，经授权 MCP 网关测量统计，并用 `rasterio-matplotlib-page` 后端渲染 PDF+PNG 样张、冻结渲染场景与带签名 RenderReceipt；`publish` 按冻结场景重新核验证据（不依赖作者宿主字体）并消费精确 TP。宿主缺少栅格渲染依赖、无可嵌入字体或展示 CRS 为地理坐标系时仍失败关闭，不得伪造渲染证据绕过。
 - 仓库不附带业务示例数据、示例模板包或默认测试项目。后续由用户提供真实数据和场景需求，完成对应实现、注册和验收后才能启用。
 - 模板发布仍必须验证闭合包、依赖锁、场景验证输入、检查器集合、RenderReceipt、冻结样张场景（`render_scene_ref`）和环境绑定，并消费精确 TP。验证数据是否适合进入模板包由场景安全检查明确判定，不能把原始敏感业务数据打包。
@@ -57,6 +58,7 @@ version: 0.8.0
 ## 基础 GIS 数据接入（第一批）
 
 - 先阅读 `workflows/geospatial-data.md`，再通过唯一 CLI 的 `data inspect-raster` 检查显式配置的 GeoTIFF 元数据/精确类别统计；这不是新业务路由，也不生成地图。
+- `data summarize` 是同一 CLI 下的只读子命令：经 `data-summary` ToolGateway 能力（deny-by-default，PathGuard 约束）把项目数据目录镜像为分类 Markdown 清单，输出只落项目内不可变证据 artifact，不设第二 CLI 入口。
 - 可选 MCP SDK 以 stdio 接入独立 `geospatial-mcp 0.3.0`。必须显式配置可信解释器、项目/租户、数据根、catalog 和限制；不自动安装，不接受业务请求指定的服务命令/URL。
 - `raster-input` 是 `generate-request.source_bindings` 的结构分支；正式共享链路见下文第三批 C。结构合法不等于业务场景或模板准入。
 - 重投影已实现为 ToolGateway 适配能力（仅 nearest、显式目标 CRS）；只读 CLI 必须拒绝变换。尚未接入获批场景，不得绕过业务门禁直接调用。
@@ -104,7 +106,7 @@ version: 0.8.0
 - 生成时先解析用户意图，再验证用户明确选择的模板是否兼容；模板能力的 `intent_constraints` 只能限制可接受的场景、主题和任务，不得替用户补写或改写意图。当前不实现自动模板检索/选择。
 - `MapScenario.scenario_id` 是模板方案身份，`RenderScene.scene_id` 是渲染实例身份，二者不是业务分类。Brief、Plan 与 execution 保留同一业务场景、主题标签和任务，并绑定原意图摘要。
 - 不接纳旧 `scene_hint`、单值 `theme` 或 `fields.theme`；不自动迁移旧输入、候选或锁。详见 `workflows/intent-contract.md`。
-- 识别词表不等于可执行能力：现有分类保留为目录词汇；业务能力注册表和代码实现白名单当前只登记 `general-thematic-mapping`（实现 `general-thematic`），其余场景与组件一律默认拒绝。
+- 识别词表不等于可执行能力：现有分类保留为目录词汇；业务能力注册表和代码实现白名单当前登记 `general-thematic-mapping`（实现 `general-thematic`）与 `leadership-visit-mapping`（实现 `leadership-visit`），其余场景与组件一律默认拒绝。
 
 ## 布局契约消费（第一阶段）
 

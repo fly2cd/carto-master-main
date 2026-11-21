@@ -70,10 +70,7 @@
           "request_schemas": {
             "type": "object",
             "additionalProperties": false,
-            "required": [
-              "create-template",
-              "generate-map"
-            ],
+            "minProperties": 1,
             "properties": {
               "create-template": {
                 "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
@@ -193,7 +190,9 @@
                 "items": {
                   "enum": [
                     "grid",
-                    "freeform"
+                    "freeform",
+                    "image-native",
+                    "fixed-page"
                   ]
                 }
               },
@@ -297,7 +296,76 @@
               }
             }
           }
-        }
+        },
+        "allOf": [
+          {
+            "description": "A profile that admits a route must register the request schema for it; a profile without routes admits both, so both schemas stay required.",
+            "if": {
+              "properties": {
+                "routes": {
+                  "contains": {
+                    "const": "create-template"
+                  }
+                }
+              },
+              "required": [
+                "routes"
+              ]
+            },
+            "then": {
+              "properties": {
+                "request_schemas": {
+                  "required": [
+                    "create-template"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "routes": {
+                  "contains": {
+                    "const": "generate-map"
+                  }
+                }
+              },
+              "required": [
+                "routes"
+              ]
+            },
+            "then": {
+              "properties": {
+                "request_schemas": {
+                  "required": [
+                    "generate-map"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "description": "Routes absent defaults to both routes in scenario_registry, so both request schemas must be present.",
+            "if": {
+              "not": {
+                "required": [
+                  "routes"
+                ]
+              }
+            },
+            "then": {
+              "properties": {
+                "request_schemas": {
+                  "required": [
+                    "create-template",
+                    "generate-map"
+                  ]
+                }
+              }
+            }
+          }
+        ]
       }
     }
   },
@@ -311,7 +379,8 @@
     "rendererId": {
       "enum": [
         "rasterio-matplotlib-page",
-        "matplotlib-vector-page"
+        "matplotlib-vector-page",
+        "image-itinerary-page"
       ]
     },
     "templateIdentity": {

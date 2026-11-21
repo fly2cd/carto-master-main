@@ -45,3 +45,4 @@ doc/impl-log/
 doc/.venv-pdf/
 doc/patent-search/*.pdf
 doc/patent-search/raw/
+.mcp.json

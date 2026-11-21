@@ -53,6 +53,8 @@
         "enum": [
           "point",
           "polygon",
+          "linestring",
+          "multilinestring",
           "raster",
           "vector"
         ]

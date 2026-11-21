@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.itinerary-tools.local/v1/itinerary-draft-contract.schema.json",
+  "description": "Host-authored itinerary draft (itinerary-structure contract shape, pre-geocode). Advisory contract for the itinerary_check / itinerary_assemble / request_scaffold tools; the kernel's compile-time data_preparer remains the authority.",
+  "type": "object",
+  "required": ["schema_version", "itinerary_id", "places", "stops", "legs"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "itinerary_id": {"type": "string", "minLength": 1},
+    "input_crs": {"type": "string"},
+    "date_label": {"type": "string"},
+    "places": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["place_id", "name", "geocoding_query"],
+        "properties": {
+          "place_id": {"type": "string", "pattern": "^place-[a-z0-9-]+$"},
+          "name": {"type": "string", "minLength": 1},
+          "source_refs": {"type": "array", "items": {"type": "string"}},
+          "geocoding_query": {
+            "type": "object",
+            "required": ["name", "city"],
+            "properties": {"name": {"type": "string"}, "city": {"type": "string"}}
+          },
+          "location": {
+            "type": "object",
+            "description": "Populated by geocode (user-confirmed) — do not hand-fill",
+            "properties": {"lon": {"type": "number"}, "lat": {"type": "number"}},
+            "required": ["lon", "lat"]
+          }
+        }
+      }
+    },
+    "stops": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["stop_id", "place_id", "activities"],
+        "properties": {
+          "stop_id": {"type": "string", "pattern": "^stop-[a-z0-9-]+$"},
+          "place_id": {"type": "string"},
+          "activities": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["activity_id", "type"],
+              "properties": {
+                "activity_id": {"type": "string"},
+                "type": {"enum": ["departure", "visit", "meeting", "meal", "rest", "meal_and_rest", "transfer", "end"]},
+                "period": {"enum": ["morning", "afternoon"]},
+                "duration_min": {"type": "number", "exclusiveMinimum": 0},
+                "start_time": {"type": "string"}
+              }
+            }
+          },
+          "arrival_time": {"type": "string"},
+          "departure_time": {"type": "string"}
+        }
+      }
+    },
+    "legs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["leg_id", "kind", "from_stop_id", "to_stop_id"],
+        "properties": {
+          "leg_id": {"type": "string", "pattern": "^leg-[a-z0-9-]+$"},
+          "kind": {"enum": ["travel", "stay"]},
+          "from_stop_id": {"type": "string"},
+          "to_stop_id": {"type": "string"},
+          "period": {"enum": ["morning", "afternoon"]},
+          "route_mode": {"enum": ["road_network", "provided_geometry", "schematic", "straight_line"]},
+          "metric_source": {"enum": ["document", "routing", "none"]},
+          "document_metrics": {
+            "type": "object",
+            "properties": {
+              "distance_km": {"type": "number"},
+              "duration_min": {"type": "number"}
+            }
+          },
+          "routing_metrics": {
+            "type": "object",
+            "description": "Populated by itinerary_assemble from plan_route results",
+            "properties": {
+              "distance_km": {"type": "number"},
+              "duration_min": {"type": "number"},
+              "engine": {"type": "string"}
+            }
+          },
+          "geometry": {
+            "type": "object",
+            "description": "Populated by itinerary_assemble from plan_route results",
+            "properties": {
+              "type": {"const": "LineString"},
+              "coordinates": {"type": "array", "minItems": 2, "items": {"type": "array"}}
+            }
+          },
+          "source_refs": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "source_blocks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "text"],
+        "properties": {"id": {"type": "string"}, "kind": {"type": "string"}, "text": {"type": "string"}}
+      }
+    }
+  }
+}

@@ -275,6 +275,8 @@
                   "enum": [
                     "point",
                     "multipoint",
+                    "linestring",
+                    "multilinestring",
                     "polygon",
                     "multipolygon"
                   ]

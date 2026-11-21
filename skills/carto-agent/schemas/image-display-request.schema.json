@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/image-display-request.schema.json",
+  "title": "image-display-request",
+  "description": "Typed input for the image-display-bounds capability: visible-content window detection over a registered basemap image. The digest is the byte-level file digest; the handler re-verifies before measuring.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "image_ref",
+    "white_threshold"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "image_ref": {
+      "allOf": [
+        {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+        },
+        {
+          "required": ["uri"]
+        }
+      ]
+    },
+    "white_threshold": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 255
+    }
+  }
+}

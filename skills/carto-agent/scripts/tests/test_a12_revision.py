@@ -176,6 +176,62 @@ class DesignRevisionProposalTests(unittest.TestCase):
         }
         registry.validate("design-revision-proposal", proposal)
 
+    def test_annotation_layout_change_is_accepted(self):
+        """Phase 0 backfill: the leadership-visit change key passes the shared
+        proposal schema (closed shape mirroring the request profile)."""
+        registry = SchemaRegistry()
+        proposal = self._valid_proposal()
+        proposal["changes"] = {
+            "annotation_layout": {"new_value": {"seed": 7, "iterations": 500, "gap_px": 4}},
+        }
+        registry.validate("design-revision-proposal", proposal)
+
+    def test_page_layout_change_is_accepted(self):
+        registry = SchemaRegistry()
+        proposal = self._valid_proposal()
+        proposal["changes"] = {
+            "page_layout": {"new_value": {"model": "fixed-page", "width_mm": 297,
+                                          "height_mm": 210, "dpi": 300}},
+        }
+        registry.validate("design-revision-proposal", proposal)
+
+    def test_annotation_layout_invalid_shape_is_rejected(self):
+        registry = SchemaRegistry()
+        proposal = self._valid_proposal()
+        proposal["changes"] = {
+            "annotation_layout": {"new_value": {"seed": 7, "iterations": 0, "gap_px": 4}},
+        }
+        with pytest.raises(ProtocolError):
+            registry.validate("design-revision-proposal", proposal)
+
+    def test_page_layout_invalid_shape_is_rejected(self):
+        registry = SchemaRegistry()
+        proposal = self._valid_proposal()
+        proposal["changes"] = {
+            "page_layout": {"new_value": {"model": "unknown-model"}},
+        }
+        with pytest.raises(ProtocolError):
+            registry.validate("design-revision-proposal", proposal)
+
+    def test_style_overrides_change_is_accepted(self):
+        """Phase 2: the leadership-visit style patch is expressible in the shared
+        proposal vocabulary (shape delegated to the override schema)."""
+        registry = SchemaRegistry()
+        proposal = self._valid_proposal()
+        proposal["changes"] = {
+            "style_overrides": {"new_value": {"groups": [{"id": "morning", "color": "#228833"}]}},
+        }
+        registry.validate("design-revision-proposal", proposal)
+
+    def test_style_overrides_invalid_patch_is_rejected(self):
+        registry = SchemaRegistry()
+        proposal = self._valid_proposal()
+        proposal["changes"] = {
+            "style_overrides": {"new_value": {"groups": [{"id": "morning", "color": "#2288GG"}]}},
+        }
+        with pytest.raises(ProtocolError):
+            registry.validate("design-revision-proposal", proposal)
+
     def test_unknown_change_key_is_rejected(self):
         registry = SchemaRegistry()
         with pytest.raises(ProtocolError):

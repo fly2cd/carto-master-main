@@ -376,7 +376,13 @@ class TemplateCreationWorkflow:
             subject_id=request["subject"]["requester_subject_id"],
             roles=frozenset({"template-validator"}),
             namespaces=frozenset({request["subject"]["project_id"]}),
-            authorized_capabilities=frozenset({"gis-raster-statistics"}),
+            # Trusted fixture-render scope: the data-type-level tool capabilities
+            # validation scenes may invoke through ToolGateway (raster statistics
+            # for the general route, image registration/display for image-basemap
+            # scenarios). Scenario admission stays with the registry/policy.
+            authorized_capabilities=frozenset({"gis-raster-statistics",
+                                                "geo-to-image-pixels",
+                                                "image-display-bounds"}),
             environment=request["subject"]["environment"],
         )
         context.require_project_scope()

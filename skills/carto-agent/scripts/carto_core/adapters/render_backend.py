@@ -6,7 +6,7 @@ from pathlib import Path
 from ..canonical import sha256_digest
 from ..compiler.layout import LayoutResolver
 from ..errors import ProtocolError
-from ..backend_registry import IMPL_BROWSER, MAPLIBRE_WEB, resolve
+from ..backend_registry import IMPL_BROWSER, IMPL_IMAGE_ITINERARY, MAPLIBRE_WEB, resolve
 from .controlled_renderer import (FRONTEND_BUILD, MAPLIBRE_VERSION, OVERLAY_ENGINE_VERSION,
     RENDERER_VERSION, BrowserLimits, ControlledBrowserRenderer, browser_version, discover_browser)
 from .webmap_renderer import (RendererCapabilityProfile, RendererCapabilityRegistry,
@@ -78,6 +78,11 @@ def create_render_backend(renderer_id, **kwargs):
     backend = resolve(renderer_id)
     if backend.impl == IMPL_BROWSER:
         return BrowserRenderBackend(**kwargs)
+    if backend.impl == IMPL_IMAGE_ITINERARY:
+        from .image_page_renderer import ImagePageRenderer  # lazy import — heavy deps (PIL, matplotlib)
+        kwargs.pop("browser", None)
+        kwargs.pop("limits", None)
+        return ImagePageRenderer(renderer_id=renderer_id, **kwargs)
     from .formal_renderer import FormalRenderer
     kwargs.pop("browser", None)
     kwargs.pop("limits", None)

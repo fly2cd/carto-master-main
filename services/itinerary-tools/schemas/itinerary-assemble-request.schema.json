@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.itinerary-tools.local/v1/itinerary-assemble-request.schema.json",
+  "type": "object",
+  "required": [
+    "draft_path",
+    "geocode_result",
+    "route_result"
+  ],
+  "properties": {
+    "draft_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "geocode_result": {
+      "type": "object"
+    },
+    "route_result": {
+      "type": "object"
+    },
+    "output_path": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

@@ -1,0 +1,274 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/image-itinerary-style-override.schema.json",
+  "title": "image-itinerary-style-override",
+  "description": "Patch subset of image-itinerary-style for request-level style overrides (leadership-visit style_overrides). All sections optional; groups patch by id (id required, present fields replace); scalar sections replace; object sections merge key-wise. The merged result is validated against the full image-itinerary-style contract at compile; group ids must reference the template contract's declared groups (enforced by the scenario request contract).",
+  "type": "object",
+  "additionalProperties": false,
+  "minProperties": 1,
+  "properties": {
+    "groups": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          },
+          "right_offset_px": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 200
+          }
+        }
+      }
+    },
+    "default_group": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "width_px": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 50
+        },
+        "halo_width_px": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 50
+        },
+        "right_offset_px": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 200
+        },
+        "arrows": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "size_px",
+            "spacing_px"
+          ],
+          "properties": {
+            "size_px": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "spacing_px": {
+              "type": "number",
+              "minimum": 10,
+              "maximum": 2000
+            }
+          }
+        }
+      }
+    },
+    "pin": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "radius_px": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "font_size_px": {
+          "type": "number",
+          "minimum": 4,
+          "maximum": 100
+        }
+      }
+    },
+    "callout": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "width_px": {
+          "type": "number",
+          "minimum": 20,
+          "maximum": 2000
+        },
+        "title_font_px": {
+          "type": "number",
+          "minimum": 4,
+          "maximum": 200
+        },
+        "body_font_px": {
+          "type": "number",
+          "minimum": 4,
+          "maximum": 200
+        },
+        "padding_px": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "line_gap_px": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 1
+        },
+        "leader_width_px": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 20
+        },
+        "offset_x_px": {
+          "type": "number"
+        },
+        "offset_y_px": {
+          "type": "number"
+        },
+        "font_weight": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 900
+        },
+        "title_wrap": {
+          "type": "boolean"
+        },
+        "show_arrival_time": {
+          "type": "boolean"
+        },
+        "fit_content": {
+          "type": "boolean"
+        },
+        "title_color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "body_color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        }
+      }
+    },
+    "support_label": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "text_color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "point_radius_px": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "font_size_px": {
+          "type": "number",
+          "minimum": 4,
+          "maximum": 100
+        },
+        "padding_px": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 1
+        },
+        "leader_width_px": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 20
+        },
+        "offset_x_px": {
+          "type": "number"
+        },
+        "offset_y_px": {
+          "type": "number"
+        },
+        "font_weight": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 900
+        }
+      }
+    },
+    "numbering": {
+      "enum": [
+        "global",
+        "per-date-group"
+      ]
+    },
+    "white_threshold": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 255
+    },
+    "page_furniture": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title_font_pt": {
+          "type": "number",
+          "minimum": 4,
+          "maximum": 72
+        },
+        "body_font_pt": {
+          "type": "number",
+          "minimum": 4,
+          "maximum": 72
+        },
+        "frame_border": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "color": {
+              "type": "string",
+              "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "inner_width_mm": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 5
+            },
+            "gap_mm": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10
+            },
+            "outer_width_mm": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 5
+            }
+          }
+        }
+      }
+    }
+  }
+}

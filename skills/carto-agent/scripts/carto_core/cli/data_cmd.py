@@ -32,6 +32,15 @@ def register(sub) -> None:
     inspect_raster.add_argument("--project-id", required=True)
     inspect_raster.add_argument("--subject-id", required=True)
 
+    summarize = data_sub.add_parser("summarize", help="Inventory a project data directory into a Markdown mirror through the data-summary capability; read-only, no map")
+    summarize.add_argument("request", help="data-summary-request document (data_dir within the project root)")
+    summarize.add_argument("--project-root", required=True)
+    summarize.add_argument("--allowed-root", action="append", required=True)
+    summarize.add_argument("--run-id", required=True)
+    summarize.add_argument("--tenant-id", required=True)
+    summarize.add_argument("--project-id", required=True)
+    summarize.add_argument("--subject-id", required=True)
+
     for command in ("analyze-classification", "clarify-classification"):
         classification = data_sub.add_parser(command, help="Prepare/clarify a frozen raster classification; no map or approval")
         classification.add_argument("request", help="Classification request, or prepared artifact-ref JSON for clarification")
@@ -72,6 +81,26 @@ def handle(args) -> dict:
         context = _operator_context(args, frozenset({capability}))
         receipt = adapter.make_gateway().invoke(capability, request, context)
         # Structured details are in the project-scoped evidence artifact, not ordinary stdout logs.
+        return {"tool_result": receipt.to_dict()}
+    if args.data_command == "summarize":
+        # The old standalone scripts/data_summary.py entry, folded into the single
+        # CLI as an authorized read-only capability: PathGuard-resolved data
+        # directory, typed I/O schemas, ToolResult evidence artifact.
+        from ..adapters.image_tools import DATA_SUMMARY_CAPABILITY, make_data_summary_gateway
+        from ..repository.immutable_store import ImmutableArtifactStore
+
+        guard = PathGuard(args.allowed_root)
+        project = guard.resolve(args.project_root, must_exist=True)
+        path = guard.resolve(args.request, base_root=project, must_exist=True)
+        request = load_document(path)
+        registry = SchemaRegistry()
+        registry.validate("data-summary-request", request)
+        store = ImmutableArtifactStore(project / ".carto" / "data" / "evidence",
+                                       path_guard=PathGuard([project]))
+        gateway = make_data_summary_gateway(store, registry, guard=guard, project_root=project)
+        context = _operator_context(args, frozenset({DATA_SUMMARY_CAPABILITY}))
+        receipt = gateway.invoke(DATA_SUMMARY_CAPABILITY, request, context)
+        # The Markdown mirror lives in the project-scoped evidence artifact.
         return {"tool_result": receipt.to_dict()}
     if args.data_command in {"analyze-classification", "clarify-classification"}:
         from ..workflow.raster_preparation import RasterPreparationService

@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "itinerary-tools"
+version = "1.0.0"
+description = "Lightweight MCP tools for geocoding and route planning (Amap + offline dual-graph)"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.27,<1",
+    "mcp>=1.26,<2",
+    "PyYAML>=6,<7",
+]
+
+[project.scripts]
+itinerary-tools = "server:main"
+
+[tool.setuptools]
+py-modules = ["server", "geocode", "plan_route", "itinerary_check",
+                  "itinerary_assemble", "request_scaffold", "_service_utils"]
+
+[tool.setuptools.packages.find]
+include = ["amap_client*", "routing*"]
+
+[tool.setuptools.package-data]
+"routing" = ["data/*.geojson"]

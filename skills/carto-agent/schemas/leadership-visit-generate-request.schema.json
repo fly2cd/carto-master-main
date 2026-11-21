@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/leadership-visit-generate-request.schema.json",
+  "title": "leadership-visit-generate-request",
+  "description": "Closed profile for leadership visit route map generation requests. allOf envelope (generate-request) + leadership body, unevaluatedProperties: false.",
+  "allOf": [
+    {
+      "$ref": "https://schemas.carto-agent.local/v1/generate-request.schema.json"
+    },
+    {
+      "type": "object",
+      "required": [
+        "geometry",
+        "itinerary_structure",
+        "basemap",
+        "source_bindings"
+      ],
+      "properties": {
+        "geometry": {
+          "const": "vector"
+        },
+        "itinerary_structure": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source_ref",
+            "normalized_ref"
+          ],
+          "properties": {
+            "source_ref": {
+              "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+            },
+            "normalized_ref": {
+              "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+            }
+          }
+        },
+        "basemap": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "image_ref",
+            "parameters_ref"
+          ],
+          "properties": {
+            "mode": {
+              "const": "registered-transform"
+            },
+            "image_ref": {
+              "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+            },
+            "parameters_ref": {
+              "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+            }
+          }
+        },
+        "page_layout": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["model"],
+          "properties": {
+            "model": {
+              "enum": ["image-native", "fixed-page"]
+            },
+            "width_mm": {
+              "type": "number",
+              "minimum": 100,
+              "maximum": 1200
+            },
+            "height_mm": {
+              "type": "number",
+              "minimum": 100,
+              "maximum": 1200
+            },
+            "dpi": {
+              "type": "integer",
+              "minimum": 72,
+              "maximum": 600
+            }
+          }
+        },
+        "annotation_layout": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["seed", "iterations", "gap_px"],
+          "properties": {
+            "seed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "iterations": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000
+            },
+            "gap_px": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "map_title": {
+          "description": "Optional run-level map title. Mirrors the general profile's shape so the design-revision vocabulary (map_title) stays expressible after apply_changes re-validates against this closed profile.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+        },
+        "style_overrides": {
+          "description": "Optional design-layer style patch applied onto the template portrayal contract's image_itinerary section at compile (groups patch by id, sections merge key-wise, scalars replace). Absent means the template contract is authoritative unchanged; the merged style is validated against image-itinerary-style at compile.",
+          "$ref": "https://schemas.carto-agent.local/v1/image-itinerary-style-override.schema.json"
+        },
+        "source_bindings": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["role", "source_ref", "path", "geometry_types", "field_bindings"],
+            "properties": {
+              "role": {
+                "enum": ["route-stops", "route-line"]
+              },
+              "source_ref": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "geometry_types": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "enum": ["point", "multipoint", "linestring", "multilinestring"]
+                }
+              },
+              "field_bindings": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["semantic_role", "source_field"],
+                  "properties": {
+                    "semantic_role": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "source_field": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256
+                    }
+                  }
+                }
+              },
+              "pending": {
+                "type": "boolean",
+                "description": "True when the itinerary file will be produced after G1 via the MCP tool chain (geocode + plan_route, then host assembles itinerary.json). The brief's source_plan declares the preparation plan without requiring the file to exist yet."
+              },
+              "preparation": {
+                "enum": ["mcp-itinerary-chain"],
+                "description": "How the data will be prepared after G1. mcp-itinerary-chain = the independent MCP itinerary service (services/itinerary-tools)."
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "unevaluatedProperties": false
+}

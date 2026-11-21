@@ -1,6 +1,6 @@
 schema_version: 1
 registry_id: carto-tool-bindings
-version: 1.1.0
+version: 1.3.0
 default: deny
 bindings:
   - capability_id: local-file-read
@@ -72,6 +72,41 @@ bindings:
     adapter: mcp
     effect: write-project
     authorization_policy: project-gis-reproject
+    path_guard_required: true
+    credential_mode: none
+    snapshot_policy: required
+  # Image-basemap itinerary capabilities (leadership-visit scenario, P4).
+  - capability_id: geo-to-image-pixels
+    version: 1.0.0
+    adapter: local
+    effect: transform
+    authorization_policy: image-basemap-approved
+    path_guard_required: true
+    credential_mode: none
+    snapshot_policy: required
+  - capability_id: image-display-bounds
+    version: 1.0.0
+    adapter: local
+    effect: read
+    authorization_policy: image-basemap-approved
+    path_guard_required: true
+    credential_mode: none
+    snapshot_policy: required
+  - capability_id: annotation-layout
+    version: 1.0.0
+    adapter: local
+    effect: transform
+    authorization_policy: annotation-approved
+    path_guard_required: true
+    credential_mode: none
+    snapshot_policy: required
+  # Read-only data-directory inventory for host agents (replaces the standalone
+  # scripts/data_summary.py second CLI entry; read effect, evidence artifact only).
+  - capability_id: data-summary
+    version: 1.0.0
+    adapter: local
+    effect: read
+    authorization_policy: project-data-summary
     path_guard_required: true
     credential_mode: none
     snapshot_policy: required

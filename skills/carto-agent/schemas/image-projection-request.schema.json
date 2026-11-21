@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/image-projection-request.schema.json",
+  "title": "image-projection-request",
+  "description": "Typed input for the geo-to-image-pixels capability: registered affine projection of ordered stops and route lines onto the original basemap image. All references are digest-bound; the handler resolves and re-verifies bytes before projecting.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "image_ref",
+    "parameters_ref",
+    "stops_ref"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "image_ref": {
+      "allOf": [
+        {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+        },
+        {
+          "required": ["uri"]
+        }
+      ],
+      "description": "Basemap image (8-bit PNG); digest is the byte-level file digest."
+    },
+    "parameters_ref": {
+      "allOf": [
+        {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+        },
+        {
+          "required": ["uri"]
+        }
+      ],
+      "description": "Registration parameters document; digest is the canonical JSON digest."
+    },
+    "stops_ref": {
+      "allOf": [
+        {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+        },
+        {
+          "required": ["uri"]
+        }
+      ],
+      "description": "Prepared route-stops FeatureCollection; digest is the canonical JSON digest."
+    },
+    "route_ref": {
+      "allOf": [
+        {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+        },
+        {
+          "required": ["uri"]
+        }
+      ],
+      "description": "Optional prepared route-line FeatureCollection; omitted means no route geometry."
+    }
+  }
+}

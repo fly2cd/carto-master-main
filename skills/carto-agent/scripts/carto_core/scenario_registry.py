@@ -19,6 +19,7 @@ from .schema_registry import SchemaRegistry, load_document
 # module statically; component() imports the manifest's target modules lazily.
 _IMPLEMENTATIONS: dict[str, str] = {
     "general-thematic": ".scenarios.general_thematic.manifest",
+    "leadership-visit": ".scenarios.leadership_visit.manifest",
 }
 
 
@@ -195,10 +196,13 @@ class ScenarioCapability:
         constraints = self.definition.get("output_constraints")
         if constraints is not None:
             # Range-based validation: scene must be within the allowed envelope.
+            # Pixel limits use the same half-up rounding as the layout resolver
+            # (compiler/layout.py raster_size), so a page that exactly matches the
+            # declared mm maximum is admitted instead of failing by one pixel.
             viewport = scene.get("viewport", {})
             dpi = scene.get("export", {}).get("dpi", 0)
-            max_width_px = int(constraints["max_width_mm"] * dpi / 25.4)
-            max_height_px = int(constraints["max_height_mm"] * dpi / 25.4)
+            max_width_px = int(constraints["max_width_mm"] * dpi / 25.4 + 0.5)
+            max_height_px = int(constraints["max_height_mm"] * dpi / 25.4 + 0.5)
             if (viewport.get("width_px", 0) > max_width_px
                     or viewport.get("height_px", 0) > max_height_px
                     or dpi < constraints.get("min_dpi", 1)

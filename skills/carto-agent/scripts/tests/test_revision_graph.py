@@ -50,6 +50,35 @@ class ComputeInvalidationTests(unittest.TestCase):
             compute_invalidation({}, RULES)
 
 
+class LeadershipInvalidationTests(unittest.TestCase):
+    """Phase 2: the leadership contract's style_overrides vocabulary invalidates
+    the compilation nodes only — the frozen data evidence stays reusable and the
+    bundle-input digest is untouched by a style patch."""
+
+    def test_style_overrides_invalidate_compilation_only(self) -> None:
+        from carto_core.scenarios.leadership_visit.revision import REVISION_CONTRACT as ROUTE
+        result = compute_invalidation({"style_overrides": {"new_value": {}}}, ROUTE.rules())
+        self.assertEqual(result["invalidated_nodes"],
+                         ["candidate", "preflight", "preview", "scene"])
+        self.assertTrue(result["data_evidence_reusable"])
+        self.assertEqual("compile", result["earliest_step"])
+
+    def test_style_patch_never_alters_bundle_inputs(self) -> None:
+        from carto_core.scenarios.leadership_visit.revision import REVISION_CONTRACT as ROUTE
+        keys = ROUTE.bundle_input_keys()
+        before = {"source_bindings": [{"role": "r"}],
+                  "style_overrides": {"pin": {"radius_px": 9}}}
+        after = {"source_bindings": [{"role": "r"}],
+                 "style_overrides": {"pin": {"radius_px": 20}}}
+        self.assertEqual(bundle_input_digest(before, keys),
+                         bundle_input_digest(after, keys))
+
+    def test_page_layout_still_invalidates_plan(self) -> None:
+        from carto_core.scenarios.leadership_visit.revision import REVISION_CONTRACT as ROUTE
+        result = compute_invalidation({"page_layout": {"new_value": {}}}, ROUTE.rules())
+        self.assertIn("plan", result["invalidated_nodes"])
+
+
 class BundleInputDigestTests(unittest.TestCase):
     """The digest gate separates data inputs from design-layer inputs."""
 

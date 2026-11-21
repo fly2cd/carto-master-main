@@ -1,0 +1,384 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/frontend-map-document.schema.json",
+  "title": "frontend-map-document",
+  "description": "Image Canvas v2 map document (the canvas payload itself, no transport envelope). All canvas dimensions, boxes, point/line coordinates, font sizes, strokes and symbol sizes are millimetres. Array order is paint order. Indices, opacity and lineHeight ratios are dimensionless; SVG viewBox values are image-local.",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "category",
+    "designWidth",
+    "designHeight",
+    "canvasData"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "category": {
+      "enum": [
+        "leadership_visit"
+      ]
+    },
+    "designWidth": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Physical canvas dimension in millimeters."
+    },
+    "designHeight": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Physical canvas dimension in millimeters."
+    },
+    "canvasData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "features"
+      ],
+      "properties": {
+        "type": {
+          "const": "Grid"
+        },
+        "mapData": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "layers"
+          ],
+          "properties": {
+            "layers": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 16,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "type",
+                  "rect_indices"
+                ],
+                "properties": {
+                  "id": {
+                    "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+                  },
+                  "type": {
+                    "enum": [
+                      "route",
+                      "stops",
+                      "callouts",
+                      "basemap",
+                      "furniture"
+                    ]
+                  },
+                  "rect_indices": {
+                    "type": "array",
+                    "minItems": 0,
+                    "items": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "fields": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "features": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100000,
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "Rect"
+                  },
+                  "RectIndex": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "x": {
+                    "type": "number",
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "y": {
+                    "type": "number",
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "w": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "h": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "fillColor": {
+                    "type": "string",
+                    "pattern": "^(#[0-9A-Fa-f]{6}|none)$"
+                  },
+                  "strokeColor": {
+                    "type": "string",
+                    "pattern": "^(#[0-9A-Fa-f]{6}|none)$"
+                  },
+                  "strokeWidth": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "borderRadius": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "opacity": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "required": [
+                  "type",
+                  "x",
+                  "y",
+                  "w",
+                  "h"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "Text"
+                  },
+                  "RectIndex": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "x": {
+                    "type": "number",
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "y": {
+                    "type": "number",
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "w": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "h": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "fontSize": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "lineHeight": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Dimensionless line-height multiplier."
+                  },
+                  "fontFamily": {
+                    "type": "string"
+                  },
+                  "color": {
+                    "type": "string",
+                    "pattern": "^(#[0-9A-Fa-f]{6}|none)$"
+                  },
+                  "textAlign": {
+                    "enum": [
+                      "left",
+                      "center",
+                      "right"
+                    ]
+                  },
+                  "bold": {
+                    "type": "boolean"
+                  },
+                  "italic": {
+                    "type": "boolean"
+                  },
+                  "underline": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "type",
+                  "x",
+                  "y",
+                  "w",
+                  "h",
+                  "text"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "Image"
+                  },
+                  "RectIndex": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "x": {
+                    "type": "number",
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "y": {
+                    "type": "number",
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "w": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "h": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "href": {
+                    "type": "string",
+                    "pattern": "^data:image/(png|svg\\+xml);base64,"
+                  }
+                },
+                "required": [
+                  "type",
+                  "x",
+                  "y",
+                  "w",
+                  "h",
+                  "href"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "MultiPoint"
+                  },
+                  "RectIndex": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "coordinates": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100000,
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      },
+                      "minItems": 2,
+                      "maxItems": 2
+                    },
+                    "description": "Global canvas [x, y] pairs in millimeters, not source-image pixels or geographic coordinates."
+                  },
+                  "icon": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "color": {
+                    "type": "string",
+                    "pattern": "^(#[0-9A-Fa-f]{6}|none)$"
+                  }
+                },
+                "required": [
+                  "type",
+                  "coordinates"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "MultiLineString"
+                  },
+                  "RectIndex": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "coordinates": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 1000000,
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      },
+                      "minItems": 2,
+                      "maxItems": 2
+                    },
+                    "description": "Global canvas [x, y] pairs in millimeters, not source-image pixels or geographic coordinates."
+                  },
+                  "color": {
+                    "type": "string",
+                    "pattern": "^(#[0-9A-Fa-f]{6}|none)$"
+                  },
+                  "strokeWidth": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "strokeDash": {
+                    "type": "string"
+                  },
+                  "closed": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "type",
+                  "coordinates"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

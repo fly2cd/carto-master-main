@@ -56,9 +56,10 @@ class StdioSession:
             for tool in result.tools:
                 if tool.name in found or len(found) >= 128:
                     raise ProtocolError("MCP_DISCOVERY_INVALID", "Duplicate or excessive discovered tools")
-                found[tool.name] = {"name": tool.name, "input": tool.input_schema,
-                                    "output": tool.output_schema}
-            cursor = result.next_cursor
+                found[tool.name] = {"name": tool.name,
+                                    "input": tool.inputSchema if hasattr(tool, "inputSchema") else tool.input_schema,
+                                    "output": tool.outputSchema if hasattr(tool, "outputSchema") else tool.output_schema}
+            cursor = result.nextCursor if hasattr(result, "nextCursor") else result.next_cursor
             if cursor is None:
                 break
             if cursor in cursors:

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.itinerary-tools.local/v1/itinerary-check-request.schema.json",
+  "type": "object",
+  "required": [
+    "draft_path"
+  ],
+  "properties": {
+    "draft_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "expected_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

@@ -1428,18 +1428,29 @@ class MapGenerationWorkflow:
     def _verify_page_inputs(self, execution, scene, request):
         from ..adapters.formal_renderer import environment_snapshot
         from ..adapters.page_renderer import PageRenderer
-        from ..backend_registry import resolve as resolve_backend
+        from ..backend_registry import IMPL_IMAGE_ITINERARY, resolve as resolve_backend
         from .preparation_bundle import BundlePreparer
         context = ExecutionContext.from_generate_request(request)
         verifier = ScenarioRegistry(self.registry).for_generate(request).component("candidate_compiler")(
             self.path_guard, self.registry, project_root=self.project_root, context=context)
-        if resolve_backend(scene["renderer_id"]).geometry == "vector":
+        if resolve_backend(scene["renderer_id"]).impl == IMPL_IMAGE_ITINERARY:
+            # Image itinerary pages carry no raster/vector scene compiler; the frozen
+            # scene, its page inputs and the renderer environment are re-verified here
+            # and the scenario component performs the request-aware re-verification.
+            from ..adapters.image_page_renderer import environment_snapshot as image_environment
+            from ..compiler.layout import LayoutResolver
+            LayoutResolver(self.registry).validate_execution(scene, execution)
+            if execution["environment"] != image_environment(scene["renderer_id"]):
+                raise ProtocolError("RENDER_ENVIRONMENT_DRIFT", "Image renderer environment differs from the frozen execution")
+            verifier.verify_request(request, scene, None)
+        elif resolve_backend(scene["renderer_id"]).geometry == "vector":
             from ..compiler.vector_scene import VectorSceneCompiler
             from .vector_preparation import VectorPreparationService
             service = VectorPreparationService(project_root=self.project_root,
                 allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
             inputs = VectorSceneCompiler(service, bundles=BundlePreparer, pages=PageRenderer,
                 environment=environment_snapshot).validate_execution(scene, execution, context)
+            verifier.verify_request(request, scene, inputs)
         else:
             from ..compiler.raster_scene import RasterSceneCompiler
             from .raster_preparation import RasterPreparationService
@@ -1447,7 +1458,7 @@ class MapGenerationWorkflow:
                 allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
             inputs = RasterSceneCompiler(preparation, bundles=BundlePreparer, pages=PageRenderer,
                 environment=environment_snapshot).validate_execution(scene, execution, context)
-        verifier.verify_request(request, scene, inputs)
+            verifier.verify_request(request, scene, inputs)
 
     def _resolve_project_path(self, value: str | Path, *, must_exist: bool = False) -> Path:
         return self.path_guard.resolve(value, base_root=self.project_root, must_exist=must_exist)
