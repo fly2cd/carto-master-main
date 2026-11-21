@@ -244,17 +244,22 @@ class ImagePageRenderer:
         Only when the frozen page contract declares one (``page.document``);
         the same neutral builder and the same frozen inputs the scenario
         compiler used, so this copy is byte-identical to the compile-time
-        original in the project's immutable store.
+        original in the project's immutable store. The frozen online-view
+        sections (``page.document.geo``, present when the request declared
+        online_basemap) are merged back so the copy carries the same
+        baseMap/mapData sections as the authoritative document.
         """
         meta = page.get("document")
         if not meta:
             return
         from .frontend_canvas import build_canvas_document
+        from .frontend_geo import attach_geo_sections
         from ..artifacts import atomic_json
         document = build_canvas_document(
             self.registry, scene, page,
             identifier=f"map-{scene['context']['run_id']}",
             name=meta.get("name", "map"), category=meta["category"])
+        attach_geo_sections(document, meta.get("geo"))
         atomic_json(self.path_guard.resolve(directory / "map-document.json"), document)
 
     def _paint(self, scene: dict[str, Any], inputs: dict[str, Any], directory: Path) -> dict[str, dict]:

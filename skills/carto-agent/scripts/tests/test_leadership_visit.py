@@ -1353,6 +1353,18 @@ class EndToEndWorkflowTests(LeadershipFixture, unittest.TestCase):
                    create_once=False)
         return path
 
+    def _revise(self, proposal, name, request_path=None):
+        from tests.test_general_thematic import APPROVAL_KEY
+        proposal_path = self.root / (name + ".yaml")
+        atomic_yaml(proposal_path, proposal, create_once=False)
+        revised_brief = self.workflow.revision_brief(request_path or self.request_path,
+                                                      proposal_path)
+        new_g1 = self._signed(name + "-g1", "approve-map-brief", "map-brief",
+                              revised_brief["approval_object_digest"])
+        revised = self.workflow.revise(request_path or self.request_path, proposal_path,
+                                       new_g1, approval_key=APPROVAL_KEY)
+        return Path(revised["request_path"]), new_g1
+
     def test_full_generation_workflow_delivers_pdf_png_and_map_document(self):
         from tests.test_general_thematic import APPROVAL_KEY, KEY
         intake = self.workflow.intake(self.request_path)
@@ -1845,6 +1857,381 @@ class TemplateLifecycleTests(LeadershipFixture, unittest.TestCase):
         preview = workflow.preview(request_path, attestation_key=KEY)
         self.assertEqual({"pdf", "png"},
                          {item["target"] for item in preview["receipt"]["output_artifacts"]})
+
+
+class OnlineBasemapDocumentTests(EndToEndWorkflowTests):
+    """Online basemap binding: the request declares online_basemap, the brief
+    carries the outbound entry on the G1 face, the compiled map-document gains
+    the baseMap/mapData geographic sections (window-consistent framing,
+    scale-free camera contract), and the renderer's preview copy stays
+    byte-identical to the authoritative immutable document."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.request["online_basemap"] = {"provider": "Tianditu", "layer": "vec_w"}
+        # Class-specific request path: the shared generate-request.yaml stays
+        # with the base shape (create_once), this file carries the online
+        # declaration for every test of the class (identical content).
+        self.request_path = self.root / "generate-request-online.yaml"
+        atomic_yaml(self.request_path, self.request)
+
+    def _document(self) -> tuple[Path, dict]:
+        path = self.root / ".carto" / "image" / "map-documents" / (
+            "map-test-run-" + sha256_digest(self.request)[7:23] + ".json")
+        return path, load_document(path)
+
+    def _compile_run(self):
+        from tests.test_general_thematic import APPROVAL_KEY
+        self.workflow.intake(self.request_path)
+        briefed = self.workflow.brief(self.request_path)
+        g1 = self._signed("g1", "approve-map-brief", "map-brief",
+                          briefed["approval_object_digest"])
+        compiled = self.workflow.compile(self.request_path, g1, approval_key=APPROVAL_KEY)
+        self.assertEqual("preview", compiled["state"]["step"])
+        return briefed
+
+    def test_document_carries_geo_sections_and_preview_copy_is_identical(self):
+        from tests.test_general_thematic import KEY
+        briefed = self._compile_run()
+        # G1 face: the brief's source plan carries the online-basemap outbound entry.
+        brief = load_document(self.work / "brief" / "map-brief.yaml")
+        roles = {entry["role"]: entry for entry in brief["source_plan"]}
+        self.assertIn("online-basemap", roles)
+        self.assertEqual("online-basemap", roles["online-basemap"]["source_ref"]["id"])
+        self.assertTrue(roles["online-basemap"]["source_ref"]["digest"].startswith("sha256:"))
+        path, document = self._document()
+        self.registry.validate("frontend-map-document", document)
+        self.assertEqual("Tianditu", document["baseMap"]["type"])
+        self.assertEqual("vec_w", document["baseMap"]["layer"])
+        map_data = document["mapData"]
+        self.assertEqual("Vector", map_data["type"])
+        self.assertEqual("WGS84", map_data["coordinateSystem"])
+        self.assertEqual("contain-replicate", map_data["zoomRule"])
+        self.assertEqual(0, map_data["bearing"])
+        for key in ("x", "y", "w", "h", "extent", "center", "referenceZoom", "features"):
+            self.assertIn(key, map_data)
+        # Stops facts: 3 points across the morning/default period features.
+        stop_features = [f for f in map_data["features"] if f["type"] == "stops"]
+        points = [p for f in stop_features for p in f["properties"]["points"]]
+        self.assertEqual(3, len(points))
+        labels = {p["label"] for p in points}
+        self.assertEqual({"出发点", "行程点 2", "返程点"}, labels)
+        # Route legs: from/to names resolve via stop ids; polyline is the raw
+        # WGS84 geometry of the prepared documents, point-for-point.
+        route_features = [f for f in map_data["features"] if f["type"] == "route"]
+        self.assertEqual(1, len(route_features))
+        legs = route_features[0]["properties"]["legs"]
+        self.assertEqual(("甲地", "乙地"), (legs[0]["fromName"], legs[0]["toName"]))
+        self.assertEqual(("乙地", "丙地"), (legs[1]["fromName"], legs[1]["toName"]))
+        self.assertEqual(self.route_fc["features"][0]["geometry"]["coordinates"],
+                         [[lon, lat] for lon, lat in legs[0]["polyline"]])
+        # RectIndex linkage: every point references an existing canvasData card.
+        rect_groups = {f["RectIndex"] for f in document["canvasData"]["features"]
+                       if f["type"] == "Rect"}
+        for point in points:
+            self.assertIn(point["RectIndex"], rect_groups)
+        # The renderer's preview copy is byte-identical to the immutable original.
+        preview = self.workflow.preview(self.request_path, attestation_key=KEY)
+        preview_document = self.work / "previews" / "map-preview-candidate-test-run" / "map-document.json"
+        self.assertTrue(preview_document.is_file(), str(preview_document))
+        self.assertEqual(load_document(path), load_document(preview_document))
+        # Deterministic rebuild from the frozen scene + page contract.
+        scene = load_document(self.work / "candidates" / "render-scene.yaml")
+        page = load_document(Path(scene["page_request_ref"]["uri"]))
+        rebuilt = FrontendDocumentBuilder(self.registry).build(
+            scene, page, identifier="map-test-run",
+            name=load_document(path)["name"])
+        self.assertEqual(load_document(path), rebuilt)
+
+    def test_extent_is_the_display_windows_geography(self):
+        from carto_core.adapters.frontend_geo import window_extent
+        self._compile_run()
+        _, document = self._document()
+        extent, center = window_extent(self.parameters, display_bounds(self.image_bytes))
+        for key in ("west", "south", "east", "north"):
+            self.assertAlmostEqual(extent[key], document["mapData"]["extent"][key], places=6)
+        self.assertAlmostEqual(center["lon"], document["mapData"]["center"]["lon"], places=6)
+        self.assertAlmostEqual(center["lat"], document["mapData"]["center"]["lat"], places=6)
+        # All stops lie inside the window-derived extent (completeness).
+        for feature in self.stops_fc["features"]:
+            lon, lat = feature["geometry"]["coordinates"]
+            self.assertTrue(extent["west"] <= lon <= extent["east"])
+            self.assertTrue(extent["south"] <= lat <= extent["north"])
+
+    def test_cross_view_geometry_is_consistent(self):
+        """The core switch-losslessness invariant: projecting each mapData point
+        back through the SAME registration + placement math lands on the baked
+        canvasData coordinates (< 0.01 mm)."""
+        self._compile_run()
+        _, document = self._document()
+        scene = load_document(self.work / "candidates" / "render-scene.yaml")
+        window = display_bounds(self.image_bytes)
+        frame = LayoutResolver.map_frame(scene["resolved_layout"])
+        frame_box = {key: value for key, value
+                     in zip(("x", "y", "width", "height"), frame["bounds_px"])}
+        placement = contain_layout({"width_px": window["width"], "height_px": window["height"]},
+                                   frame_box)
+        page = scene["resolved_layout"]["page"]
+        mm_x = page["width_mm"] / scene["viewport"]["width_px"]
+        mm_y = page["height_mm"] / scene["viewport"]["height_px"]
+        converter = PixelConverter(self.parameters)
+        canvas_points = [f["coordinates"][0] for f in document["canvasData"]["features"]
+                         if f["type"] == "MultiPoint"]
+        self.assertEqual(3, len(canvas_points))
+        for feature in document["mapData"]["features"]:
+            if feature["type"] != "stops":
+                continue
+            for point in feature["properties"]["points"]:
+                pixels, _ = converter.coordinates([[point["lon"], point["lat"]]])
+                x = (pixels[0][0] + 0.5) * placement["scale"] - window["x"] * placement["scale"] \
+                    + placement["x"]
+                y = (pixels[0][1] + 0.5) * placement["scale"] - window["y"] * placement["scale"] \
+                    + placement["y"]
+                expected = (round(x * mm_x, 6), round(y * mm_y, 6))
+                self.assertTrue(any(abs(expected[0] - cx) < 0.01 and abs(expected[1] - cy) < 0.01
+                                    for cx, cy in canvas_points),
+                                f"{point['id']} at {expected} not found in canvas points")
+
+    def test_camera_gates_fail_closed(self):
+        from carto_core.adapters.frontend_geo import window_extent
+        window = display_bounds(self.image_bytes)
+        projected = dict(self.parameters)
+        projected["work_crs"] = "EPSG:32650"
+        with self.assertRaises(ProtocolError) as raised:
+            window_extent(projected, window)
+        self.assertEqual("LEADERSHIP_ONLINE_BASEMAP_CRS_UNSUPPORTED", raised.exception.code)
+        anisotropic = dict(self.parameters)
+        anisotropic["local_km_y_down_to_pixel"] = [[100.0, 0.0, 1190.0], [0.0, 90.0, 842.0]]
+        with self.assertRaises(ProtocolError) as raised:
+            window_extent(anisotropic, window)
+        self.assertEqual("LEADERSHIP_ONLINE_BASEMAP_AFFINE_UNSUPPORTED", raised.exception.code)
+
+    def test_provider_gate_fails_closed(self):
+        from carto_core.scenarios.leadership_visit.request_contract import REQUEST_CONTRACT
+        request = json.loads(json.dumps(self.request))
+        request["online_basemap"] = {"provider": "Amap", "layer": "vec_w"}
+        with self.assertRaises(ProtocolError) as raised:
+            REQUEST_CONTRACT.validate_body(request)
+        self.assertEqual("LEADERSHIP_BASEMAP_PROVIDER_UNSUPPORTED", raised.exception.code)
+
+
+class BasemapRevisionLoopTests(EndToEndWorkflowTests):
+    """The basemap compile-resource revision loop: swap the registered image,
+    add/remove the online binding — bundle reused (zero MCP re-run), plan node
+    invalidated for basemap, old G2 rejected, new G2 freezes. Data keys stay
+    outside the vocabulary."""
+
+    def _run_to_preview(self):
+        from tests.test_general_thematic import APPROVAL_KEY, KEY
+        self.workflow.intake(self.request_path)
+        briefed = self.workflow.brief(self.request_path)
+        g1 = self._signed("g1", "approve-map-brief", "map-brief",
+                          briefed["approval_object_digest"])
+        self.workflow.compile(self.request_path, g1, approval_key=APPROVAL_KEY)
+        preview = self.workflow.preview(self.request_path, attestation_key=KEY)
+        return preview
+
+    def test_image_swap_revision_reuses_bundle_and_invalidates_plan(self):
+        from tests.test_general_thematic import APPROVAL_KEY, KEY
+        from unittest.mock import patch
+        from carto_core.workflow import map_data_preparation
+        preview = self._run_to_preview()
+        old_g2 = self._signed("g2-old", "approve-freeze", "resolved-map",
+                              preview["approval_object_digest"])
+        # A second synthetic basemap: same border geometry (same display window),
+        # different bytes (red border) => different digest.
+        image2 = Image.new("RGB", (2381, 1684), "white")
+        ImageDraw.Draw(image2).rectangle([60, 60, 2320, 1620], outline="red", width=6)
+        image2_path = self.root / "basemap2.png"
+        image2.save(image2_path, format="PNG")
+        digest2 = "sha256:" + __import__("hashlib").sha256(image2_path.read_bytes()).hexdigest()
+        proposal = {"schema_version": 1, "proposal_id": "proposal-swap-basemap",
+                    "run_id": "test-run", "parent_revision": 1,
+                    "changes": {"basemap": {"new_value": {
+                        "mode": "registered-transform",
+                        "image_ref": {"id": "basemap-image", "version": "1.0.0",
+                                      "digest": digest2, "uri": "basemap2.png"},
+                        "parameters_ref": deepcopy(self.request["basemap"]["parameters_ref"])}}},
+                    "justification": "Synthetic basemap swap acceptance"}
+        revised_path, new_g1 = self._revise(proposal, "swap")
+        design_root = revised_path.parent.parent
+        self.assertEqual("r2", design_root.name)
+        # The refreshed brief binds the NEW image digest on the approval face.
+        revised_brief = load_document(design_root / "brief" / "map-brief.yaml")
+        basemap_entry = next(e for e in revised_brief["source_plan"] if e["role"] == "basemap")
+        self.assertEqual(digest2, basemap_entry["source_ref"]["digest"])
+        # Dependency graph: plan invalidated (planner copies basemap_ref), evidence reusable.
+        graph = load_document(design_root / "dependency-graph.yaml")
+        self.assertTrue(graph["data_evidence_reusable"])
+        self.assertIn("plan", graph["invalidated_nodes"])
+        # The recompiled scene consumes the new basemap image.
+        calls = []
+        original = map_data_preparation.MapDataPreparer.prepare
+        def spy(preparer, request, ref):
+            calls.append(1)
+            return original(preparer, request, ref)
+        with patch.object(map_data_preparation.MapDataPreparer, "prepare", side_effect=spy):
+            recompiled = self.workflow.compile(revised_path, new_g1, approval_key=APPROVAL_KEY)
+        self.assertEqual(0, len(calls))
+        self.assertEqual("preview", recompiled["state"]["step"])
+        scene = load_document(design_root / "candidates" / "render-scene.yaml")
+        basemap_resource = next(r for r in scene["resources"] if r["id"] == "basemap-image")
+        self.assertEqual(digest2, basemap_resource["ref"]["digest"])
+        # Same registration => the itinerary elements do not move.
+        first = load_document(self.root / ".carto" / "image" / "map-documents" / (
+            "map-test-run-" + sha256_digest(self.request)[7:23] + ".json"))
+        revised_request = load_document(revised_path)
+        second = load_document(self.root / ".carto" / "image" / "map-documents" / (
+            "map-test-run-" + sha256_digest(revised_request)[7:23] + ".json"))
+        self.assertEqual([f for f in first["canvasData"]["features"] if f["type"] == "MultiPoint"],
+                         [f for f in second["canvasData"]["features"] if f["type"] == "MultiPoint"])
+        # Old G2 rejected, new G2 freezes.
+        new_preview = self.workflow.preview(revised_path, attestation_key=KEY)
+        with self.assertRaises(SecurityError) as raised:
+            self.workflow.freeze(revised_path, old_g2, approval_key=APPROVAL_KEY,
+                                 attestation_key=KEY)
+        self.assertEqual("APPROVAL_OBJECT_MISMATCH", raised.exception.code)
+        new_g2 = self._signed("g2-new", "approve-freeze", "resolved-map",
+                              new_preview["approval_object_digest"])
+        frozen = self.workflow.freeze(revised_path, new_g2, approval_key=APPROVAL_KEY,
+                                      attestation_key=KEY)
+        self.assertEqual("render", frozen["state"]["step"])
+
+    def test_online_binding_add_and_remove_revisions(self):
+        from tests.test_general_thematic import APPROVAL_KEY, KEY
+        self._run_to_preview()
+        first_path = self.root / ".carto" / "image" / "map-documents" / (
+            "map-test-run-" + sha256_digest(self.request)[7:23] + ".json")
+        first = load_document(first_path)
+        self.assertNotIn("baseMap", first)
+        # -- add the online binding --
+        proposal = {"schema_version": 1, "proposal_id": "proposal-add-online",
+                    "run_id": "test-run", "parent_revision": 1,
+                    "changes": {"online_basemap": {"new_value":
+                                 {"provider": "Tianditu", "layer": "vec_w"}}},
+                    "justification": "Synthetic online-binding add acceptance"}
+        revised_path, new_g1 = self._revise(proposal, "add-online")
+        self.workflow.compile(revised_path, new_g1, approval_key=APPROVAL_KEY)
+        revised_request = load_document(revised_path)
+        second_path = self.root / ".carto" / "image" / "map-documents" / (
+            "map-test-run-" + sha256_digest(revised_request)[7:23] + ".json")
+        second = load_document(second_path)
+        self.assertIn("baseMap", second)
+        self.assertIn("mapData", second)
+        # Display layer does not jump: canvasData sections are byte-equal.
+        self.assertEqual(first["canvasData"], second["canvasData"])
+        # -- remove the online binding --
+        proposal = {"schema_version": 1, "proposal_id": "proposal-remove-online",
+                    "run_id": "test-run", "parent_revision": 2,
+                    "changes": {"online_basemap": {"new_value": None}},
+                    "justification": "Synthetic online-binding remove acceptance"}
+        removed_path, g1 = self._revise(proposal, "remove-online", request_path=revised_path)
+        self.workflow.compile(removed_path, g1, approval_key=APPROVAL_KEY)
+        removed_request = load_document(removed_path)
+        third = load_document(self.root / ".carto" / "image" / "map-documents" / (
+            "map-test-run-" + sha256_digest(removed_request)[7:23] + ".json"))
+        self.assertNotIn("baseMap", third)
+        self.assertEqual(first["canvasData"], third["canvasData"])
+
+    def test_data_keys_are_outside_the_vocabulary(self):
+        self._run_to_preview()
+        proposal = {"schema_version": 1, "proposal_id": "proposal-data-change",
+                    "run_id": "test-run", "parent_revision": 1,
+                    "changes": {"source_bindings": {"new_value": []}},
+                    "justification": "Synthetic rejected proposal"}
+        proposal_path = self.root / "data-change.yaml"
+        atomic_yaml(proposal_path, proposal, create_once=False)
+        with self.assertRaises(ProtocolError) as raised:
+            self.workflow.revision_brief(self.request_path, proposal_path)
+        # The closed design-revision-proposal schema rejects unknown change keys
+        # before the scenario vocabulary gate would; either rejection proves
+        # data keys stay outside the revision channel.
+        self.assertIn(raised.exception.code,
+                      {"SCHEMA_VALIDATION_FAILED", "REVISION_CHANGES_UNKNOWN"})
+
+
+class OnlineSnapshotExportTests(EndToEndWorkflowTests):
+    """Snapshot solidification: derive a synthetic online snapshot (exact tool
+    math) from the frozen camera, revise the basemap to it, and the revised
+    previews under revisions/rN render with the snapshot as the basemap."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.request["online_basemap"] = {"provider": "Tianditu", "layer": "vec_w"}
+        # Class-specific request path: the shared generate-request.yaml stays
+        # with the base shape (create_once), this file carries the online
+        # declaration for every test of the class (identical content).
+        self.request_path = self.root / "generate-request-online.yaml"
+        atomic_yaml(self.request_path, self.request)
+
+    def test_snapshot_solidification_renders_online_style(self):
+        from tests.test_general_thematic import APPROVAL_KEY, KEY
+        self.workflow.intake(self.request_path)
+        briefed = self.workflow.brief(self.request_path)
+        g1 = self._signed("g1", "approve-map-brief", "map-brief",
+                          briefed["approval_object_digest"])
+        self.workflow.compile(self.request_path, g1, approval_key=APPROVAL_KEY)
+        self.workflow.preview(self.request_path, attestation_key=KEY)
+        document = load_document(self.root / ".carto" / "image" / "map-documents" / (
+            "map-test-run-" + sha256_digest(self.request)[7:23] + ".json"))
+        extent = document["mapData"]["extent"]
+        # -- derive the snapshot + registration with the tool's exact math --
+        from pyproj import Transformer
+        import hashlib
+        transformer = Transformer.from_crs("EPSG:4326", "EPSG:3857", always_xy=True)
+        west, south = transformer.transform(extent["west"], extent["south"])
+        east, north = transformer.transform(extent["east"], extent["north"])
+        merc_w, merc_h = east - west, north - south
+        width_px = 1600
+        height_px = max(1, round(merc_h / merc_w * width_px))
+        snapshot = Image.new("RGB", (width_px, height_px), (198, 219, 240))
+        snapshot_path = self.root / "basemap-snapshot.png"
+        snapshot.save(snapshot_path, format="PNG")
+        px_per_km = 1000.0 * width_px / merc_w
+        registration = {"work_crs": "EPSG:3857", "origin_m": [west, north],
+                        "local_km_y_down_to_pixel": [[px_per_km, 0.0, 0.0],
+                                                     [0.0, px_per_km, 0.0]],
+                        "source_size": [width_px, height_px]}
+        registration_path = self.root / "registration-snapshot.yaml"
+        atomic_yaml(registration_path, registration)
+        snapshot_digest = "sha256:" + hashlib.sha256(snapshot_path.read_bytes()).hexdigest()
+        # -- revise the basemap to the solidified snapshot --
+        proposal = {"schema_version": 1, "proposal_id": "proposal-snapshot",
+                    "run_id": "test-run", "parent_revision": 1,
+                    "changes": {"basemap": {"new_value": {
+                        "mode": "registered-transform",
+                        "image_ref": {"id": "basemap-image", "version": "1.0.0",
+                                      "digest": snapshot_digest, "uri": "basemap-snapshot.png"},
+                        "parameters_ref": {"id": "registration-parameters", "version": "1.0.0",
+                                           "digest": sha256_digest(registration),
+                                           "uri": "registration-snapshot.yaml"}}}},
+                    "justification": "Synthetic snapshot solidification acceptance"}
+        revised_path, new_g1 = self._revise(proposal, "snapshot")
+        design_root = revised_path.parent.parent
+        compiled = self.workflow.compile(revised_path, new_g1, approval_key=APPROVAL_KEY)
+        self.assertEqual("preview", compiled["state"]["step"])
+        scene = load_document(design_root / "candidates" / "render-scene.yaml")
+        basemap_resource = next(r for r in scene["resources"] if r["id"] == "basemap-image")
+        self.assertEqual(snapshot_digest, basemap_resource["ref"]["digest"])
+        # The revisions/rN/previews outputs render with the snapshot basemap.
+        new_preview = self.workflow.preview(revised_path, attestation_key=KEY)
+        self.assertEqual({"pdf", "png"},
+                         {item["target"] for item in new_preview["receipt"]["output_artifacts"]})
+        previews_root = design_root / "previews"
+        rendered = list(previews_root.rglob("map.png"))
+        self.assertTrue(rendered, str(previews_root))
+        # The revised document also keeps the geo sections (frozen camera rides the
+        # page contract of the revised design).
+        revised_request = load_document(revised_path)
+        revised_document = load_document(self.root / ".carto" / "image" / "map-documents" / (
+            "map-test-run-" + sha256_digest(revised_request)[7:23] + ".json"))
+        self.assertIn("mapData", revised_document)
+        # New G2 freezes the online-style design.
+        new_g2 = self._signed("g2-snapshot", "approve-freeze", "resolved-map",
+                              new_preview["approval_object_digest"])
+        frozen = self.workflow.freeze(revised_path, new_g2, approval_key=APPROVAL_KEY,
+                                      attestation_key=KEY)
+        self.assertEqual("render", frozen["state"]["step"])
 
 
 if __name__ == "__main__":

@@ -21,7 +21,7 @@ REFERENCE_WIDTH_PX = 2381   # A3 landscape at the 144-DPI reference design
 REFERENCE_HEIGHT_PX = 1684
 
 
-def _value(feature: dict, fields: dict, role: str):
+def itinerary_value(feature: dict, fields: dict, role: str):
     field = fields.get(role)
     return feature["properties"].get(field) if field else None
 
@@ -100,7 +100,7 @@ def apply_grouped_style(style: dict[str, Any], page_request: dict[str, Any],
         raise ProtocolError("ITINERARY_GROUP_CONFIG_INVALID", "unique groups and a declared default are required")
 
     def group(feature, role):
-        value = _value(feature, fields.get(role, {}), "itinerary-group")
+        value = itinerary_value(feature, fields.get(role, {}), "itinerary-group")
         key = style["default_group"] if value is None or value == "" else value
         if not isinstance(key, str) or key not in groups:
             raise ProtocolError("ITINERARY_GROUP_UNKNOWN", role)
@@ -139,7 +139,7 @@ def apply_grouped_style(style: dict[str, Any], page_request: dict[str, Any],
     def finish(graphic: dict, source: dict) -> None:
         explicit = False
         for role, key in (("callout-offset-x", "offset_x_px"), ("callout-offset-y", "offset_y_px")):
-            value = _value(source, metadata, role)
+            value = itinerary_value(source, metadata, role)
             if value is not None:
                 graphic[key] = _number(value, role) * scale
                 explicit = True
@@ -154,13 +154,13 @@ def apply_grouped_style(style: dict[str, Any], page_request: dict[str, Any],
         color = selected_group["color"]
         base = {"frame_id": MAIN_FRAME, "coordinate_space": "image-pixel", "position": stop["position"]}
         support = style.get("support_label")
-        kind = _value(source, metadata, "stop-type") if support else "visit"
+        kind = itinerary_value(source, metadata, "stop-type") if support else "visit"
         if kind is None or kind == "":
             kind = "visit"
         if not isinstance(kind, str) or kind not in {"departure", "visit", "transit"}:
             raise ProtocolError("ITINERARY_STOP_TYPE_UNKNOWN", "stop-type")
         if "map-role" in metadata:
-            map_role = _value(source, metadata, "map-role")
+            map_role = itinerary_value(source, metadata, "map-role")
             if not isinstance(map_role, str) or map_role not in {"origin", "visit", "waypoint", "destination"}:
                 raise ProtocolError("ITINERARY_MAP_ROLE_INVALID", "map-role")
             kind = "visit" if map_role == "visit" else "transit"
@@ -171,7 +171,7 @@ def apply_grouped_style(style: dict[str, Any], page_request: dict[str, Any],
             graphics.append({**base, "id": f"image-stop-{order}", "type": "point", "visit_order": order,
                              "shape": "pin", "show_number": False, "color": support["color"],
                              "group": "support", "radius_px": support["point_radius_px"] * scale})
-            offsets = [_value(source, metadata, role) for role in ("callout-offset-x", "callout-offset-y")]
+            offsets = [itinerary_value(source, metadata, role) for role in ("callout-offset-x", "callout-offset-y")]
             offsets = [None if v is None else _number(v, "callout-offset") for v in offsets]
             label_key = (title, stop["position"]["x"], stop["position"]["y"], *offsets)
             if label_key in support_seen:
@@ -195,20 +195,20 @@ def apply_grouped_style(style: dict[str, Any], page_request: dict[str, Any],
                          "shape": "pin", "color": color, "group": selected_group["id"],
                          "radius_px": style["pin"]["radius_px"] * scale,
                          "font_size_px": style["pin"]["font_size_px"] * scale, "show_number": True})
-        date = _text(_value(source, metadata, "visit-date"), "visit-date")
-        period = _text(_value(source, metadata, "visit-period"), "visit-period")
+        date = _text(itinerary_value(source, metadata, "visit-date"), "visit-date")
+        period = _text(itinerary_value(source, metadata, "visit-period"), "visit-period")
         key = (date, selected_group["id"])
         group_counts[key] = group_counts.get(key, 0) + 1
         display_order = group_counts[key] if style.get("numbering", "global") == "per-date-group" else order
         lines = [f"{date}{period}行程点{display_order}"]
         config = style["callout"]
         if config.get("show_arrival_time", True):
-            arrival = _text(_value(source, metadata, "arrival-time"), "arrival-time")
+            arrival = _text(itinerary_value(source, metadata, "arrival-time"), "arrival-time")
             if arrival:
                 lines.append("到达时间：" + arrival)
         travel = []
         for role, suffix in (("distance-km", "公里"), ("duration-min", "分钟")):
-            value = _value(source, metadata, role)
+            value = itinerary_value(source, metadata, role)
             if value is not None:
                 value = _number(value, role)
                 if value < 0 or value > 100000:

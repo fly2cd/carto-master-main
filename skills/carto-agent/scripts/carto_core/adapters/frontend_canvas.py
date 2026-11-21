@@ -28,6 +28,45 @@ from .route_display import display_points
 MAIN_FRAME = "main-map"
 
 
+def stop_card_index(graphics: list[dict[str, Any]]) -> dict[int, int]:
+    """Replay the builder's group allocation to get stop_order -> RectIndex.
+
+    Single source of truth for which canvasData card each itinerary stop
+    belongs to: replays the exact allocation order ``_CanvasBuilder.build``
+    performs (background = group 0, route-layer = 1, then per-graphic ids in
+    list order, page-furniture last). Callout registration overwrites the
+    point's own group because callouts rank after points — the final value is
+    the shared card group. Used both inside the builder and by the compile-time
+    geo-section builder (which needs the map before the full document exists).
+    """
+    groups: dict[str, int] = {}
+    next_group = 0
+
+    def group(key: str) -> int:
+        nonlocal next_group
+        if key not in groups:
+            next_group += 1
+            groups[key] = next_group
+        return groups[key]
+
+    group("route-layer")
+    stop_card: dict[int, int] = {}
+    for graphic in graphics:
+        kind = graphic.get("type")
+        if kind == "point":
+            allocated = group(graphic["id"])
+            if "visit_order" in graphic:
+                stop_card.setdefault(graphic["visit_order"], allocated)
+        elif kind == "callout":
+            allocated = group(graphic["id"])
+            for order in graphic.get("stop_orders", []):
+                groups[f"image-stop-{order}"] = allocated
+                stop_card[order] = allocated
+        elif kind == "label":
+            group(graphic["id"])
+    return stop_card
+
+
 def _pin_icon(radius_px: float, color: str, scale: float, mm_x: float) -> tuple[str, float]:
     """Inline SVG icon for a pin marker (mm-sized in the global canvas)."""
     r = radius_px * scale
@@ -52,6 +91,7 @@ class _CanvasBuilder:
         self.category = category
         self.features: list[dict[str, Any]] = []
         self.groups: dict[str, int] = {}
+        self.stop_card: dict[int, int] = {}
         self._next_group = 0
 
     def build(self) -> dict[str, Any]:
@@ -82,6 +122,10 @@ class _CanvasBuilder:
             return y * scale - window["y"] * scale + placement["y"]
 
         route_group = self._group("route-layer")
+        # stop -> card map from the single replay implementation (see
+        # stop_card_index); the graphics loop below performs the identical
+        # allocation as a by-product but the map is derived once, here.
+        self.stop_card = stop_card_index(scene.get("image_graphics", []))
         self._rect(0, 0, viewport["width_px"], viewport["height_px"], "#FFFFFF", group=0)
         for graphic in scene.get("image_graphics", []):
             if graphic["type"] == "line":

@@ -67,8 +67,10 @@ class RequestScaffoldTests(unittest.TestCase):
         self.assertEqual(result["bound_digests"]["basemap"], expected)
 
     def test_request_shape(self):
+        # idempotency_key must satisfy the 16-128 char validation ("idem-1"
+        # was an invalid fixture value the validation rightly rejects).
         result = self.scaffold(request_id="req-1", run_id="run-1",
-                               idempotency_key="idem-1")
+                               idempotency_key="idempotency-key-0001")
         request = json.loads((self.tmp / "generate-request.yaml").read_text(encoding="utf-8"))
         binding = request["source_bindings"][0]
         self.assertTrue(binding["pending"])
@@ -80,7 +82,7 @@ class RequestScaffoldTests(unittest.TestCase):
         self.assertEqual(request["scope"], "project:test-project")
         self.assertEqual(request["subject"]["approver_subject_id"], "test-approver")
         self.assertEqual(request["requested_at"], "2026-11-20T00:00:00Z")
-        self.assertEqual(request["idempotency_key"], "idem-1")
+        self.assertEqual(request["idempotency_key"], "idempotency-key-0001")
         # deterministic identity pinning
         self.assertEqual(request["request_id"], "req-1")
         self.assertEqual(request["run_id"], "run-1")

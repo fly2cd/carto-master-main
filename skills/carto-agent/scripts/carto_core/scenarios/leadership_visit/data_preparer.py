@@ -141,6 +141,7 @@ def _from_contract(raw: dict[str, Any]) -> dict[str, Any]:
         out_stops.append({
             "stop_id": group["ids"][0],
             "name": place.get("name", ""),
+            "formatted_address": place.get("formatted_address", "") or place.get("address", ""),
             "visit_order": index + 1,
             "location": dict(place["location"]),
             "stop_type": reference.get("type", "visit"),
@@ -320,6 +321,7 @@ class RouteDataPreparer:
                 stop["map_role"] = "visit" if has_visit else "waypoint"
             stop.setdefault("itinerary_group", "default")
             stop.setdefault("visit_period", "")
+            stop.setdefault("formatted_address", stop.get("address", ""))
             normalized_stops.append(stop)
         # Determine route_mode from legs if present
         route_mode = "straight_line"
@@ -356,6 +358,7 @@ class RouteDataPreparer:
                 "properties": {
                     "visit_order": stop.get("visit_order", 0),
                     "stop_name": stop.get("name", ""),
+                    "formatted_address": stop.get("formatted_address", ""),
                     "stop_type": stop.get("stop_type", "visit"),
                     "map_role": stop.get("map_role", "visit"),
                     "itinerary_group": stop.get("itinerary_group", "default"),

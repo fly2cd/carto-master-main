@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from ...artifacts import file_digest
+from ...canonical import sha256_digest
 from ...errors import ProtocolError
 
 _GEOMETRY = "vector"
@@ -125,6 +126,17 @@ class RouteRequestContract:
         if basemap.get("mode") != "registered-transform":
             raise ProtocolError("LEADERSHIP_BASEMAP_MODE_INVALID",
                                 "basemap.mode must be 'registered-transform'")
+        # online_basemap — optional online tile binding (display layer only)
+        online = request.get("online_basemap")
+        if online is not None:
+            if online.get("provider") != "Tianditu":
+                raise ProtocolError(
+                    "LEADERSHIP_BASEMAP_PROVIDER_UNSUPPORTED",
+                    "online_basemap.provider must be 'Tianditu' (CGCS2000 ~= WGS84); "
+                    "other providers are not admitted")
+            if online.get("layer") not in {"vec_w", "img_w", "cia_w"}:
+                raise ProtocolError("LEADERSHIP_BASEMAP_PROVIDER_UNSUPPORTED",
+                                    "online_basemap.layer must be a Tianditu raster layer")
         # source_bindings — route-stops must be present
         roles = {b["role"] for b in request.get("source_bindings", [])}
         if "route-stops" not in roles:
@@ -179,6 +191,22 @@ class RouteRequestContract:
             "path_digest": file_digest(image_path),
             "allowed_operations": ["read"],
         })
+        # online basemap declaration — an outbound face, not a local byte resource:
+        # the frontend fetches Tianditu tiles for the declared view, so the tile
+        # requests belong on the G1 approval face even when the PDF renders from
+        # the registered image. Encoded as a declaration ref (digest binds the
+        # declared provider/layer/zoom options); nothing resolves it as a path.
+        online = request.get("online_basemap")
+        if online is not None:
+            plan.append({
+                "role": "online-basemap",
+                "source_ref": {
+                    "id": "online-basemap",
+                    "version": "1.0.0",
+                    "digest": sha256_digest(online),
+                },
+                "allowed_operations": [],
+            })
         return plan
 
     # ------------------------------------------------------------------

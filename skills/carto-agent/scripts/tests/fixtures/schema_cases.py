@@ -904,3 +904,50 @@ VALID_CASES['revision-dependency-graph']={'schema_version':1,'revision':2,'run_i
     'bundle_input_digest':deepcopy(D),'earliest_step':'compile','created_at':'2026-11-13T00:00:00Z'}
 INVALID_CASES['revision-dependency-graph']={**deepcopy(VALID_CASES['revision-dependency-graph']),'unexpected':True}
 VALID_CASES['delivery-manifest']['review_ref']=deepcopy(A)
+
+# --- online basemap binding: legal + semantic illegal samples (2026-11-21) ---
+# Legal: the frontend document gains the online-view sections (frontend doc
+# sections 4/5) when the request declares online_basemap.
+_online_doc = deepcopy(VALID_CASES["frontend-map-document"])
+_online_doc["baseMap"] = {"type": "Tianditu", "layer": "vec_w", "opacity": 1.0,
+                          "minZoom": 3, "maxZoom": 18}
+_online_doc["mapData"] = {
+    "x": 20.0, "y": 30.0, "w": 380.0, "h": 230.0, "type": "Vector",
+    "extent": {"west": 119.97, "south": 29.97, "east": 120.03, "north": 30.03, "unit": "degree"},
+    "center": {"lon": 120.0, "lat": 30.0}, "bearing": 0,
+    "zoomRule": "contain-replicate", "referenceZoom": 9.5,
+    "coordinateSystem": "WGS84",
+    "features": [
+        {"type": "stops", "name": "上午行程点", "properties": {"period": "morning", "points": [
+            {"id": "stop-1", "name": "甲地", "formattedAddress": "合成地址", "lon": 120.0,
+             "lat": 30.0, "label": "出发点", "RectIndex": 2,
+             "style": {"icon": "star", "size": 4.0, "color": "#C41E3A"}}]}},
+        {"type": "route", "name": "路线", "properties": {"period": "default", "legs": [
+            {"fromName": "甲地", "toName": "乙地",
+             "polyline": [[120.0, 30.0], [120.02, 29.98]]}]},
+         "style": {"strokeColor": "#403B96", "strokeWidth": 0.8, "strokeDash": ""}},
+    ],
+}
+VALID_CASES["frontend-map-document"] = _online_doc
+
+_leadership_online = deepcopy(VALID_CASES["leadership-visit-generate-request"])
+_leadership_online["online_basemap"] = {"provider": "Tianditu", "layer": "vec_w"}
+SEMANTIC_INVALID_CASES["leadership-online-provider"] = (
+    "leadership-visit-generate-request",
+    {**deepcopy(_leadership_online), "online_basemap": {"provider": "Amap", "layer": "vec_w"}})
+SEMANTIC_INVALID_CASES["leadership-online-layer"] = (
+    "leadership-visit-generate-request",
+    {**deepcopy(_leadership_online), "online_basemap": {"provider": "Tianditu", "layer": "terrain"}})
+SEMANTIC_INVALID_CASES["leadership-online-zoom"] = (
+    "leadership-visit-generate-request",
+    {**deepcopy(_leadership_online),
+     "online_basemap": {"provider": "Tianditu", "layer": "vec_w", "minZoom": -1}})
+_lon_doc = deepcopy(VALID_CASES["frontend-map-document"])
+_lon_doc["mapData"]["features"][0]["properties"]["points"][0]["lon"] = 200.0
+SEMANTIC_INVALID_CASES["frontend-geo-lon-range"] = ("frontend-map-document", _lon_doc)
+_zoom_doc = deepcopy(VALID_CASES["frontend-map-document"])
+_zoom_doc["mapData"]["zoomRule"] = "fit"
+SEMANTIC_INVALID_CASES["frontend-geo-zoomrule"] = ("frontend-map-document", _zoom_doc)
+_revision_basemap = deepcopy(VALID_CASES["design-revision-proposal"])
+_revision_basemap["changes"] = {"basemap": {"new_value": {"mode": "registered-transform"}}}
+SEMANTIC_INVALID_CASES["revision-basemap-missing-refs"] = ("design-revision-proposal", _revision_basemap)

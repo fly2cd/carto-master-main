@@ -170,6 +170,84 @@
             }
           }
         },
+        "basemap": {
+          "description": "Leadership-visit compile-resource revision: replace the registered basemap image and registration parameters (e.g. swapping imagery, or an online-map snapshot solidified as a registered image). The prepared bundle is unaffected (basemap never enters the bundle); recompile re-projects and re-solves annotations against the new authority.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "new_value"
+          ],
+          "properties": {
+            "new_value": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "mode",
+                "image_ref",
+                "parameters_ref"
+              ],
+              "properties": {
+                "mode": {
+                  "const": "registered-transform"
+                },
+                "image_ref": {
+                  "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+                },
+                "parameters_ref": {
+                  "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+                }
+              }
+            }
+          }
+        },
+        "online_basemap": {
+          "description": "Leadership-visit online-basemap binding revision: add, replace or remove the online tile binding declaration (remove semantics via new_value: null). Compile-resource layer only; the registered image stays the geometric authority.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "new_value"
+          ],
+          "properties": {
+            "new_value": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "provider",
+                    "layer"
+                  ],
+                  "properties": {
+                    "provider": {
+                      "const": "Tianditu"
+                    },
+                    "layer": {
+                      "enum": ["vec_w", "img_w", "cia_w"]
+                    },
+                    "opacity": {
+                      "type": "number",
+                      "exclusiveMinimum": 0,
+                      "maximum": 1
+                    },
+                    "minZoom": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 18
+                    },
+                    "maxZoom": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 18
+                    }
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
         "panel_designs": {
           "type": "object",
           "additionalProperties": false,

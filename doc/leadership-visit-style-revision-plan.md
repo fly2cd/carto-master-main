@@ -348,6 +348,16 @@ subtests，0 失败**；leadership 套件 68 用例）：
 
 属 roadmap 级特性，`workflows/generate-map.md:92` 明示不开放；不在本计划范围内。
 
+> **2026-11-21 重判补注**（依据底图双绑定实施计划的源码核验，用户确认需求）：
+> 换底图分类由"数据层/新运行"重判为**compile 资源层/revise 修订回路**——内核零场景
+> 词汇（revision_graph.py：rules/keys 来自场景组件），bundle 复用由运行时
+> bundle_input_digest 比对守卫，而 basemap 从不进 prepared bundle（compile 直读请求
+> 引用）。`basemap` 已移出 bundle_input_keys 并进入修订词汇；行程数据三键
+> （source_bindings/sources/itinerary_structure）保留，"数据层不纳入修订通道"的结论
+> **对行程数据继续成立**。本节"在线底图"三处硬阻断的破法也已落地：请求加法声明
+> `online_basemap`（外发进 G1 面）、map-document 地理段（extent 显示窗口反推）、
+> 快照固化（瓦片 → 冻结 PNG + 相机反推配准）绕开瓦片流不可冻结问题。
+
 ## 七、已确认与待确认事项
 
 **已确认（讨论过程收敛）**：

@@ -55,6 +55,38 @@
             }
           }
         },
+        "online_basemap": {
+          "description": "Optional online tile basemap binding declared alongside the registered image. The registered image stays the geometric authority (display window, extent derivation); this binding only adds the frontend-displayable online view (map-document baseMap/mapData sections) and enters the G1 outbound face via the brief source plan. Provider is restricted to Tianditu (CGCS2000 ~= WGS84).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "provider",
+            "layer"
+          ],
+          "properties": {
+            "provider": {
+              "const": "Tianditu"
+            },
+            "layer": {
+              "enum": ["vec_w", "img_w", "cia_w"]
+            },
+            "opacity": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1
+            },
+            "minZoom": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 18
+            },
+            "maxZoom": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 18
+            }
+          }
+        },
         "page_layout": {
           "type": "object",
           "additionalProperties": false,

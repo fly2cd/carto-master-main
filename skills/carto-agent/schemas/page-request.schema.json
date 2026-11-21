@@ -823,6 +823,23 @@
                   "type": "string",
                   "minLength": 1,
                   "maxLength": 200
+                },
+                "geo": {
+                  "description": "Frozen online-view sections (frontend-map-document baseMap/mapData shapes) computed at compile when the request declares online_basemap. Carried on the page contract so BOTH renderers deterministically rebuild the same document from the same frozen inputs (the renderer's preview copy merges these sections back).",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "baseMap",
+                    "mapData"
+                  ],
+                  "properties": {
+                    "baseMap": {
+                      "$ref": "https://schemas.carto-agent.local/v1/frontend-map-document.schema.json#/$defs/baseMapSection"
+                    },
+                    "mapData": {
+                      "$ref": "https://schemas.carto-agent.local/v1/frontend-map-document.schema.json#/$defs/mapDataSection"
+                    }
+                  }
                 }
               }
             }

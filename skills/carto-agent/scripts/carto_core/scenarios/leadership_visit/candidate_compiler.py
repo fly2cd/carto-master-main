@@ -173,6 +173,20 @@ class RouteCandidateCompiler:
             graphics, annotation_receipt = self._solve_annotations(
                 gateway, graphics, window, annotation)
 
+        # --- Online-view geo sections (BEFORE the page request freezes) ------
+        # The sections ride the frozen page contract (document.geo) so both
+        # renderers rebuild the identical document from the same frozen inputs.
+        # A partial scene carries what the derivation needs (resolved_layout /
+        # viewport / graphics); the full scene is assembled after the freeze.
+        partial_scene = {"resolved_layout": resolved_layout,
+                         "viewport": {"width_px": page["width_px"], "height_px": page["height_px"],
+                                      "device_pixel_ratio": 1},
+                         "image_graphics": graphics}
+        draft_page = {"basemap": {"display_window": window}}
+        geo = FrontendDocumentBuilder(self.registry).geo_sections(
+            partial_scene, draft_page, request, parameters, fields,
+            stops_document, route_document, style)
+
         # --- Freeze the image page request ----------------------------------
         font_digest = file_digest(font_path)
         font_family = self._font_family(font_path)
@@ -189,6 +203,9 @@ class RouteCandidateCompiler:
         source_text = {"content_id": "source", "text": profile.notice}
         if "body_font_pt" in furniture_style:
             source_text["font_pt"] = furniture_style["body_font_pt"]
+        document_node = {"category": "leadership_visit", "name": title}
+        if geo is not None:
+            document_node["geo"] = geo
         page_request = {
             "schema_version": 4, "geometry": "image",
             "font": {"path": str(font_path), "digest": font_digest, "size_bytes": font_path.stat().st_size},
@@ -199,7 +216,7 @@ class RouteCandidateCompiler:
                          "items": [{"id": f"legend-item-{index + 1}", "label": item["label"],
                                     "color": item["color"], "shape": item["shape"]}
                                     for index, item in enumerate(styled["legend_items"])]}],
-            "document": {"category": "leadership_visit", "name": title},
+            "document": document_node,
             "basemap": {"image": {"path": str(image_path), "digest": image_ref["digest"],
                                   "size_bytes": len(image_bytes)},
                         "source_size": source_size, "display_window": window,
@@ -303,7 +320,7 @@ class RouteCandidateCompiler:
         document_path = self.project_root / ".carto" / "image" / "map-documents" / (
             f"map-{request['run_id']}-{sha256_digest(request)[7:23]}.json")
         atomic_json(self.guard.resolve(document_path), document)
-        frontend_ref = {"id": "frontend-map-document", "version": "1.0.0",
+        frontend_ref = {"id": "frontend-map-document", "version": "2.0.0",
                         "digest": sha256_digest(document), "uri": str(document_path)}
         return {"candidate": candidate, "scene": scene, "preflight": None,
                 "frontend_document": document, "frontend_document_ref": frontend_ref,

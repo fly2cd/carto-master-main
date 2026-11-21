@@ -89,6 +89,8 @@ carto generate-map <intake|brief|compile|preview|revision-brief|revise|freeze|re
 - 外部路径经 PathGuard。密钥、原始业务行、敏感位置不能进入普通日志、模板或交付包。
 - 最终包仅包含 `map.pdf`、`map.png`、`README.md`、`delivery-manifest.yaml`、`checksums.sha256`；内部审查记录由清单的精确引用绑定。
 - 隔离 staging、校验、同文件系统原子提交、不可变回执；冲突目的地和同幂等键换对象拒绝。提交结果未知先查询 delivery-status。
-- 不开放生产任务、在线底图/路线、真实 CRS 转换、海报/调研业务、任意字段表达式或外部发布。
+- 不开放生产任务、在线底图/路线、真实 CRS 转换、海报/调研业务、任意字段表达式或外部发布。唯一例外：`leadership_visit` 的
+  `online_basemap` 显示绑定（仅 Tianditu；前端显示层 + map-document 地理段 + revise 修订回路 + 快照固化导出，外发经 G1 审批面声明）；
+  正式渲染与交付产物仍为图片底图 PDF/PNG，maplibre-web 渲染后端仍按 roadmap 未开放。
 
 运行时只读取 Skill 协议、策略、索引及项目产物，不读取 doc 或测试代码。

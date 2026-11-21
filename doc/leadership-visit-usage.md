@@ -31,6 +31,7 @@ compile 前由宿主智能体执行 MCP 行程工具链产出 `data/itinerary.js
 | `basemap.png` | 已配准底图，8-bit PNG。**图片本身不做变形纠正** |
 | `registration.yaml` | 底图配准参数：`work_crs`/`origin_m`/`local_km_y_down_to_pixel`/`source_size` |
 | `fonts/*.ttf` | 可嵌入 TTF 字体（含 CJK） |
+| （无本地文件） | 可选 `online_basemap` 声明（仅 Tianditu，`vec_w`/`img_w`/`cia_w` 图层）：在线底图绑定，纯请求声明。前端拉取瓦片属外发，进 G1 审批面（brief source_plan 的 online-basemap 条目）；配准图像始终是几何权威 |
 
 请求的 `source_bindings` 设 `pending: true` + `preparation: "mcp-itinerary-chain"`，
 `path` 指向将产出的文件位置（G1 前不要求文件存在）。
@@ -67,7 +68,10 @@ compile 前由宿主智能体执行 MCP 行程工具链产出 `data/itinerary.js
 - 可选：`page_layout`（纸张/DPI，上限 420×297mm、144–300dpi）、
   `annotation_layout`（注记退火求解参数：`seed/iterations/gap_px`，固定 seed 保证可复现）、
   `style_overrides`（样式补丁：按 group id 改分组颜色、改注记/线宽等表达参数、
-  `page_furniture` 改标题/正文字号与图框边线——模板合同仍是缺省来源，补丁只覆盖提及的字段）
+  `page_furniture` 改标题/正文字号与图框边线——模板合同仍是缺省来源，补丁只覆盖提及的字段）、
+  `online_basemap`（在线底图绑定：`provider: Tianditu` + `layer: vec_w|img_w|cia_w`，
+  可选 opacity/minZoom/maxZoom；声明后 compile 的 map-document 携带 baseMap+mapData 地理段，
+  配准参数须为 EPSG:3857 各向同性仿射，否则在线段失败关闭）
 
 ## 三、进入制图（唯一入口，内核自动编排）
 
@@ -126,7 +130,30 @@ work/                   可审计链：意图/简报/计划/候选/场景/锁/�
 在发布时写入合同，不在请求中逐次传参。本次运行想改其中任何样式字段，用请求的
 `style_overrides`（首轮即生效）或 G2 前的设计修订通道（见"三"），不需要换模板。
 
-## 五、当前边界
+## 五、底图切换指引（智能体中介）
+
+用户说"换底图 / 换在线底图 / 换回图片底图"时，智能体按三层分诊：
+
+1. **显示层切换**（请求已声明 `online_basemap`，冻结文档含双绑定）→ 给前端发视图状态
+   指令即可，零内核动作：map-document 同时携带图片视图（canvasData 烘焙坐标）与
+   在线视图（顶层 baseMap + mapData），两者是同一地理（extent 由显示窗口反推）。
+2. **合同层变更**（换图片+配准、加/撤在线绑定）→ **revise 修订回路**：
+   组装新底图材料（digest 绑定）→ 修订提案（`basemap` 或 `online_basemap` 键，
+   后者 `new_value: null` 为撤除）→ `revision-brief` → 新 G1（brief source_plan 重绑
+   新 digest/外发声明）→ `revise` → 复用行程数据 bundle 重新 compile（零 MCP 重跑）
+   → 新 preview → 旧 G2 失效、新 G2。**冻结后（lock 已存在）不可修订**，须新运行。
+3. **在线地图样式导出** → `basemap_snapshot`（itinerary-tools 第 6 个工具）：抓取瓦片
+   拼接裁剪 → 反推配准参数产出 `*.registration.yaml` → 按 2 走 revise 换底图 →
+   预览/正式导出的底图即在线地图快照。需 `CARTO_TIANDITU_KEY`（**服务端类型** key，
+   浏览器端 key 会拒服务端直连）；快照是外发数据获取事件（须先有 online 声明）。
+   相机范围两种输入（互斥）：`extent`（标准闭环——compile 产出的 mapData.extent），
+   或 `derive_registration_path` + `derive_basemap_path`（**运行中途切换**——工具从配准
+   与底图自行推导显示窗口地理范围，镜像内核 `window_extent` 公式，金标测试锁对齐），
+   后者一次调用完成"读配准 → 算范围 → 抓快照 → 反推新配准"整链。
+4. **行程数据变化**（路线/点位）→ 新运行 + 宿主级复用（geocode confirmations /
+   按腿 route 复用，见样式修订计划 §六）；在线瓦片外发必须进新 G1 审批面。
+
+## 六、当前边界
 
 - `production_enabled: false`：合成验收状态，真实数据需完成敏感准入；
 - 样式修订通道已开放：颜色/字号/图框边线等设计层参数走 `revision-brief → revise`
@@ -136,3 +163,8 @@ work/                   可审计链：意图/简报/计划/候选/场景/锁/�
   `leadership-visit-map@1.0.0` 发布进项目模板仓库后，生成路由即可消费
   （样式合同由 RouteAuthor 内置的旧框架 1.2.0 实测样式值生成，不在请求中逐次传参）；
 - 前端 `map-document.json` 已落位 `work/previews/`，正式对外消费随 Part II 产品回路解禁。
+- 在线底图绑定仅限 Tianditu（CGCS2000≈WGS84）；在线视图取景 = 显示窗口反推（与图片
+  视图同一地理，切换不移动任何行程要素）；zoom 为运行时量（contain-replicate 重放规则），
+  不冻结为数字。配准参数需满足 `work_crs: EPSG:3857` 且仿射各向同性，否则在线段失败关闭。
+- 正式渲染与交付仍为图片底图 PDF/PNG（在线样式经快照固化路径进入）；maplibre-web
+  渲染后端与供应商切换重放按 roadmap 未开放；高德 GCJ02 不支持。

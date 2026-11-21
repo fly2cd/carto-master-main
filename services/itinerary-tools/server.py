@@ -20,6 +20,7 @@ from plan_route import plan_route
 from itinerary_check import itinerary_check
 from itinerary_assemble import itinerary_assemble
 from request_scaffold import request_scaffold
+from basemap_snapshot import basemap_snapshot
 from _service_utils import ServiceError, service_error_result
 
 # Tool descriptions for MCP discovery
@@ -59,6 +60,22 @@ TOOL_DESCRIPTIONS = {
         "Input: {draft_path, project_id, tenant_id, subject_id, approver_subject_id, "
         "request_id?, run_id?, idempotency_key?, basemap_path?, registration_path?, "
         "font_path?, font_family?, template_repo_path?, goal?, requested_at?}"
+    ),
+    "basemap_snapshot": (
+        "Freeze the online (Tianditu) view of a frozen camera extent as a registered "
+        "basemap: stitch raster tiles (zoom chosen so the ground resolution matches "
+        "extent_width / width_px, or an explicit zoom), crop exactly to the extent, "
+        "and derive the registration.yaml (EPSG:3857 affine) from extent + actual "
+        "pixel size. Two mutually exclusive extent inputs: 'extent' (the standard "
+        "loop — compile emitted it in mapData), or derive_registration_path + "
+        "derive_basemap_path (the mid-run switch loop — the tool derives the "
+        "display-window extent from the registration itself, mirroring the kernel's "
+        "window_extent math). Requires the request to have declared online_basemap "
+        "(the G1 outbound face) — tile fetches send the extent area to the provider. "
+        "The snapshot then enters the pipeline as ordinary registered-transform "
+        "material (revise the basemap to consume it). "
+        "Input: {extent? | derive_registration_path? + derive_basemap_path?, "
+        "output_path, registration_path?, layer?, width_px?, zoom?, fetched_at?}"
     ),
 }
 
@@ -178,6 +195,31 @@ _REQUEST_SCAFFOLD_SCHEMA = {
                  "subject_id", "approver_subject_id"],
 }
 
+_BASEMAP_SNAPSHOT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "extent": {
+            "type": "object",
+            "properties": {
+                "west": {"type": "number"},
+                "south": {"type": "number"},
+                "east": {"type": "number"},
+                "north": {"type": "number"},
+            },
+            "required": ["west", "south", "east", "north"],
+        },
+        "derive_registration_path": {"type": "string", "minLength": 1},
+        "derive_basemap_path": {"type": "string", "minLength": 1},
+        "output_path": {"type": "string", "minLength": 1},
+        "registration_path": {"type": "string", "minLength": 1},
+        "layer": {"type": "string", "enum": ["vec_w", "img_w", "cia_w"]},
+        "width_px": {"type": "integer", "minimum": 512, "maximum": 16384},
+        "zoom": {"type": "integer", "minimum": 0, "maximum": 18},
+        "fetched_at": {"type": "string", "minLength": 1},
+    },
+    "required": ["output_path"],
+}
+
 
 def _normalize_arguments(arguments):
     """Accept both native dict args and host clients that stringify them.
@@ -225,6 +267,7 @@ async def run(allowed_root: str, allow_online: bool = True, network_path: str | 
             Tool(name="itinerary_check", description=TOOL_DESCRIPTIONS["itinerary_check"], inputSchema=_ITINERARY_CHECK_SCHEMA),
             Tool(name="itinerary_assemble", description=TOOL_DESCRIPTIONS["itinerary_assemble"], inputSchema=_ITINERARY_ASSEMBLE_SCHEMA),
             Tool(name="request_scaffold", description=TOOL_DESCRIPTIONS["request_scaffold"], inputSchema=_REQUEST_SCAFFOLD_SCHEMA),
+            Tool(name="basemap_snapshot", description=TOOL_DESCRIPTIONS["basemap_snapshot"], inputSchema=_BASEMAP_SNAPSHOT_SCHEMA),
         ]
 
     @server.call_tool()
@@ -252,6 +295,8 @@ async def run(allowed_root: str, allow_online: bool = True, network_path: str | 
                 result = await asyncio.to_thread(itinerary_assemble, arguments, ctx)
             elif name == "request_scaffold":
                 result = await asyncio.to_thread(request_scaffold, arguments, ctx)
+            elif name == "basemap_snapshot":
+                result = await asyncio.to_thread(basemap_snapshot, arguments, ctx)
             else:
                 result = {"status": "error", "message": f"Unknown tool: {name}"}
         except ServiceError as exc:

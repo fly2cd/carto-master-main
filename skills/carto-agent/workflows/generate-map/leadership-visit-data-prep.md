@@ -174,9 +174,15 @@ draft / registration / basemap / 模板仓库位置非默认时显式传参。
 
 ## 六、数据变更重跑（宿主级复用，零代码）
 
-用户在 G2 前后提出**改路线 / 换底图 / 改行程数据**时，这些是数据层变更，**不走设计修订
-通道**（`revision-brief/revise` 只受理 `map_title/annotation_layout/page_layout/
-style_overrides` 四个设计层键），必须开新运行。新运行 ≠ 从零开始——按工具 I/O 契约复用
+> **2026-11-21 更新**：`revision-brief/revise` 的修订词汇已扩展——`map_title/
+> annotation_layout/page_layout/style_overrides` 四个设计层键之外，新增
+> `basemap`/`online_basemap` 两个 **compile 资源层键**（换底图、加/撤在线底图绑定
+> 走 revise，bundle 复用、零 MCP 重跑；冻结后 lock 已存在时不可修订，须新运行）。
+> 本节其余内容对**行程数据**（改路线/改点位）继续成立。
+
+用户在 G2 前后提出**改路线 / 改行程数据**时，这些是数据层变更，**不走设计修订
+通道**（修订词汇不含行程三键：`source_bindings/sources/itinerary_structure` 留在
+bundle_input_keys 守卫内），必须开新运行。新运行 ≠ 从零开始——按工具 I/O 契约复用
 上一轮结论，把成本压到"变更部分的真实计算 + 新 G1 + 新 G2"：
 
 1. **地理编码不重新盘问用户**：上一轮 `geocode` 的确认结论（`confirmations`）对未变更
