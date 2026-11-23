@@ -4,7 +4,7 @@ Takes the validated draft plus explicit request identity, computes every
 digest binding (draft / basemap / registration / template), and atomically
 writes the leadership-visit generate request in the shape twice verified by
 end-to-end runs (pending mode, mcp-itinerary-chain preparation, forward
-digest declaration, 7 field bindings, A3 fixed-page 200 dpi, 4 capabilities).
+digest declaration, 8 field bindings, A3 fixed-page 200 dpi, 4 capabilities).
 
 Advisory by design: the sole authority over request validity is the kernel's
 closed schema at intake (leadership-visit-generate-request.schema.json).
@@ -37,6 +37,10 @@ _FIELD_BINDINGS = [
     {"semantic_role": "distance-km", "source_field": "distance_km"},
     {"semantic_role": "duration-min", "source_field": "duration_min"},
     {"semantic_role": "itinerary-group", "source_field": "itinerary_group"},
+    # visit-period drives the 上午/下午行程点 callout label in the kernel style
+    # renderer (style.py reads the "visit-period" semantic role); omitting it
+    # makes both periods render as the generic "行程点".
+    {"semantic_role": "visit-period", "source_field": "visit_period"},
     {"semantic_role": "map-role", "source_field": "map_role"},
 ]
 _CAPABILITIES = ["read", "render-preview", "geo-to-image-pixels", "image-display-bounds"]

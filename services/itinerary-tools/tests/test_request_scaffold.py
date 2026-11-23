@@ -75,7 +75,13 @@ class RequestScaffoldTests(unittest.TestCase):
         binding = request["source_bindings"][0]
         self.assertTrue(binding["pending"])
         self.assertEqual(binding["preparation"], "mcp-itinerary-chain")
-        self.assertEqual(len(binding["field_bindings"]), 7)
+        self.assertEqual(len(binding["field_bindings"]), 8)
+        # visit-period must be bound: the kernel style renderer consumes the
+        # "visit-period" semantic role to label 上午/下午行程点; without this
+        # binding both periods render as the generic "行程点" (2026-11-22 fix).
+        roles = {b["semantic_role"]: b["source_field"] for b in binding["field_bindings"]}
+        self.assertEqual(roles.get("visit-period"), "visit_period")
+        self.assertEqual(roles.get("map-role"), "map_role")
         self.assertEqual(request["template"]["digest"], KNOWN_TEMPLATE_DIGEST)
         self.assertEqual(request["page_layout"],
                          {"model": "fixed-page", "width_mm": 420, "height_mm": 297, "dpi": 200})

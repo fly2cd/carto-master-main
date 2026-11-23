@@ -172,4 +172,13 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    # Pin stdout/stderr to UTF-8: hosts capture this script's output through
+    # pipes whose codepage (cp936 on Chinese Windows) would otherwise re-encode
+    # the Chinese receipt summary into invalid bytes.
+    for _stream in (sys.stdout, sys.stderr):
+        if _stream is not None:
+            try:
+                _stream.reconfigure(encoding="utf-8")
+            except (AttributeError, ValueError):
+                pass
     main()

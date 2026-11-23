@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.itinerary-tools.local/v1/plan-route-request.schema.json",
+  "description": "Host-facing input of the plan_route tool. legs carries only the legs that need (re-)routing; base_result_ref (a previous result_ref) enables the server-side incremental merge where unchanged legs are carried over verbatim from the persisted file.",
+  "type": "object",
+  "required": ["legs"],
+  "properties": {
+    "legs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["origin", "destination"],
+        "properties": {
+          "leg_id": {"type": "string", "minLength": 1},
+          "origin": {
+            "type": "object",
+            "properties": {
+              "lon": {"type": "number"},
+              "lat": {"type": "number"},
+              "name": {"type": "string"},
+              "city": {"type": "string"}
+            }
+          },
+          "destination": {
+            "type": "object",
+            "properties": {
+              "lon": {"type": "number"},
+              "lat": {"type": "number"},
+              "name": {"type": "string"},
+              "city": {"type": "string"}
+            }
+          },
+          "via_points": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "lon": {"type": "number"},
+                "lat": {"type": "number"},
+                "name": {"type": "string"},
+                "city": {"type": "string"}
+              }
+            }
+          },
+          "strategy": {"type": "string", "pattern": "^[0-6]$"}
+        }
+      }
+    },
+    "allow_straight_line": {"type": "boolean"},
+    "base_result_ref": {
+      "type": "object",
+      "required": ["uri", "digest"],
+      "properties": {
+        "uri": {"type": "string", "minLength": 1},
+        "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    }
+  }
+}

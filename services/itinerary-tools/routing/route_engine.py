@@ -15,6 +15,7 @@ from typing import Any
 import httpx
 
 from amap_client.geocoder_amap import AmapGeocoder
+from .router_amap import AmapRoutingError
 
 
 class RouteEngine:
@@ -116,6 +117,7 @@ class RouteEngine:
                 via_coords = [(float(p["lon"]), float(p["lat"])) for p in resolved_via_points]
 
             # ── 1. Plan A: Dual Graph (origin/destination must be coordinate format) ──
+            dual_failure = ""
             if self.enable_dual_graph and "lon" in origin and "lon" in destination:
                 origin_coord = (float(origin["lon"]), float(origin["lat"]))
                 dest_coord = (float(destination["lon"]), float(destination["lat"]))
@@ -124,10 +126,11 @@ class RouteEngine:
                 if engine:
                     try:
                         result = engine.route_leg(origin_coord, dest_coord, via_points=via_coords)
-                    except Exception:
+                    except Exception as exc:
                         logging.getLogger(__name__).debug(
                             "route_engine.reroute_leg.dual_graph_failed", exc_info=True
                         )
+                        dual_failure = f"dual_graph failed: {exc}"
                         result = None
                     if result and len(result.get("polyline", [])) >= 2:
                         logging.getLogger(__name__).debug("route_engine.reroute_leg.event")
@@ -140,25 +143,36 @@ class RouteEngine:
                             "viaPoints": resolved_via_points,
                             "engine": "dual_graph",
                         }
+                    if not dual_failure:
+                        dual_failure = "dual_graph returned no usable polyline"
                     logging.getLogger(__name__).debug("route_engine.reroute_leg.event")
 
             if not self.allow_online:
                 return {'fromName': origin.get('name', ''), 'toName': destination.get('name', ''),
                         'polyline': [[origin['lon'], origin['lat']], [destination['lon'], destination['lat']]],
-                        'distance': 0, 'duration': 0, 'engine': 'straight_line'}
+                        'distance': 0, 'duration': 0, 'engine': 'straight_line',
+                        'degraded': True}
 
             # ── 2. Plan B: Amap online ──
             plan_b = self._get_plan_b_router()
+            if plan_b is None:
+                raise RuntimeError("Plan B router unavailable (import failure)")
             geocoder = self._get_geocoder()
 
-            result = await plan_b.reroute_leg_with_resolve(
-                client=client,
-                origin=origin,
-                destination=destination,
-                via_points=via_points,
-                strategy=strategy,
-                geocoder=geocoder,
-            )
+            try:
+                result = await plan_b.reroute_leg_with_resolve(
+                    client=client,
+                    origin=origin,
+                    destination=destination,
+                    via_points=via_points,
+                    strategy=strategy,
+                    geocoder=geocoder,
+                )
+            except AmapRoutingError as exc:
+                # Surface the full fallback chain root cause: never swallow the
+                # Plan A failure context that led here.
+                detail = exc.message + (f"; {dual_failure}" if dual_failure else "")
+                raise AmapRoutingError(exc.code, detail) from exc
 
         logging.getLogger(__name__).debug("route_engine.reroute_leg.event")
         return result

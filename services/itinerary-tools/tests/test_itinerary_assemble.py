@@ -166,5 +166,73 @@ class IncrementalRerouteTests(unittest.TestCase):
         self.assertFalse((self.tmp / "data" / "itinerary.json").exists())
 
 
+class FallbackContractAssembleTests(unittest.TestCase):
+    """Degraded-route evidence gates (doc/itinerary-mcp-zero-script-plan.md CS-1).
+
+    A straight-line engine result may only enter evidence when the draft leg
+    explicitly declares route_mode=straight_line; a zero/absent distance from
+    a real engine is corrupted evidence. Nothing is written on refusal.
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmp = Path(self._tmp.name)
+        (self.tmp / "data").mkdir()
+        shutil.copy(FIXTURES / "draft.json", self.tmp / "data" / "itinerary-draft.json")
+        self.ctx = {"allowed_root": self.tmp}
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def assemble(self, **overrides):
+        args = {
+            "draft_path": "data/itinerary-draft.json",
+            "geocode_result": load("geocode-result.json"),
+            "route_result": load("route-result.json"),
+        }
+        args.update(overrides)
+        return itinerary_assemble(args, self.ctx)
+
+    def _degraded_route(self):
+        route = load("route-result.json")
+        for r in route["results"]:
+            if r["leg_id"] == "leg-01":
+                r["engine"] = "straight_line"
+                r["distance_km"] = 0
+                r["geometry"]["coordinates"] = [
+                    [119.748604, 30.256757], [119.748604, 30.256757]]
+        return route
+
+    def test_straight_line_engine_rejected_for_road_network_leg(self):
+        result = self.assemble(route_result=self._degraded_route())
+        self.assertEqual(result["status"], "error")
+        self.assertEqual(result["code"], "ROUTE_ENGINE_DEGRADED")
+        self.assertIn("leg-01", result["message"])
+        self.assertIn("CARTO_AMAP_KEY", result["message"])
+        self.assertFalse((self.tmp / "data" / "itinerary.json").exists())
+
+    def test_straight_line_accepted_when_draft_declares_it(self):
+        draft = json.loads((FIXTURES / "draft.json").read_text(encoding="utf-8"))
+        for leg in draft["legs"]:
+            if leg.get("leg_id") == "leg-01":
+                leg["route_mode"] = "straight_line"
+        (self.tmp / "data" / "itinerary-draft.json").write_text(
+            json.dumps(draft, ensure_ascii=False), encoding="utf-8")
+        result = self.assemble(route_result=self._degraded_route())
+        self.assertEqual(result["status"], "assembled", result)
+        self.assertTrue((self.tmp / "data" / "itinerary.json").exists())
+
+    def test_zero_distance_from_real_engine_rejected(self):
+        route = load("route-result.json")
+        for r in route["results"]:
+            if r["leg_id"] == "leg-01":
+                r["distance_km"] = 0
+        result = self.assemble(route_result=route)
+        self.assertEqual(result["status"], "error")
+        self.assertEqual(result["code"], "ROUTE_METRICS_INVALID")
+        self.assertIn("leg-01", result["message"])
+        self.assertFalse((self.tmp / "data" / "itinerary.json").exists())
+
+
 if __name__ == "__main__":
     unittest.main()

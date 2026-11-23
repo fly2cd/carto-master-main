@@ -43,7 +43,7 @@ class BudgetStoreTests(unittest.TestCase):
         assert budget.cost_units == 0.0
         assert budget.context_bytes == 0
         assert budget.max_tool_calls == 20
-        assert budget.max_revisions == 2
+        assert budget.max_revisions == 3
 
     def test_save_and_reload_preserves_counters(self):
         root = _temp_run_root()
@@ -66,7 +66,7 @@ class BudgetStoreTests(unittest.TestCase):
         assert restored.context_bytes == 5000
         # limits unchanged
         assert restored.max_tool_calls == 20
-        assert restored.max_revisions == 2
+        assert restored.max_revisions == 3
 
     def test_load_with_defaults_overrides_limits(self):
         root = _temp_run_root()
@@ -80,7 +80,7 @@ class BudgetStoreTests(unittest.TestCase):
         root = _temp_run_root()
         store = BudgetStore(root)
         budget = store.load()
-        budget.consume("revisions", 2)  # hits max_revisions=2
+        budget.consume("revisions", 3)  # hits max_revisions=3
         with pytest.raises(ProtocolError, match="EXECUTION_BUDGET_EXCEEDED"):
             budget.consume("revisions", 1)
 

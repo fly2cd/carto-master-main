@@ -480,8 +480,8 @@ VALID_CASES["data-revision-proposal"] = {
 }
 VALID_CASES["budget-state"] = {
     "schema_version": 1, "saved_at": "2026-11-12T00:00:00Z",
-    "max_tool_calls": 20, "max_model_calls": 10, "max_revisions": 2,
-    "max_elapsed_seconds": 600.0, "max_cost_units": 100.0, "max_context_bytes": 1000000,
+    "max_tool_calls": 20, "max_model_calls": 10, "max_revisions": 3,
+    "max_elapsed_seconds": 1200.0, "max_cost_units": 100.0, "max_context_bytes": 1000000,
     "tool_calls": 0, "model_calls": 0, "revisions": 0,
     "cost_units": 0.0, "context_bytes": 0, "started_at": 0.0,
 }

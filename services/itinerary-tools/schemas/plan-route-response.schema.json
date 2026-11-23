@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.itinerary-tools.local/v1/plan-route-response.schema.json",
+  "description": "Output of the plan_route tool. When the allowed-root context is present (the MCP server always supplies it) the complete result is persisted under route-results/ and returned as result_ref {uri, digest}; the inline results remain available for small responses. Straight-line results are only possible with allow_straight_line=true and carry degraded=true.",
+  "type": "object",
+  "required": ["status"],
+  "properties": {
+    "status": {"enum": ["complete", "partial", "error"]},
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["leg_id", "status"],
+        "properties": {
+          "leg_id": {"type": "string"},
+          "status": {"enum": ["complete", "failed", "error"]},
+          "geometry": {
+            "type": "object",
+            "properties": {
+              "type": {"const": "LineString"},
+              "coordinates": {
+                "type": "array",
+                "minItems": 2,
+                "items": {"type": "array"}
+              }
+            }
+          },
+          "distance_km": {"type": "number"},
+          "duration_min": {"type": "number"},
+          "engine": {"type": "string"},
+          "degraded": {"const": true},
+          "message": {"type": "string"}
+        }
+      }
+    },
+    "result_ref": {
+      "type": "object",
+      "required": ["uri", "digest"],
+      "properties": {
+        "uri": {"type": "string", "minLength": 1},
+        "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "code": {"type": "string"},
+    "message": {"type": "string"}
+  }
+}

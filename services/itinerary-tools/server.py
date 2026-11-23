@@ -36,8 +36,14 @@ TOOL_DESCRIPTIONS = {
         "Plan road routes between origin and destination. "
         "Three-tier fallback: Plan A (offline dual-graph, local road network) "
         "→ Plan B (Amap online routing) → Plan C (straight-line, if allowed). "
+        "The complete result is persisted server-side under route-results/ and "
+        "returned as result_ref {uri, digest} — pass that reference to "
+        "itinerary_assemble instead of re-typing the large inline result. "
+        "Incremental rerun: pass base_result_ref (a previous result_ref) plus "
+        "only the changed legs; unchanged legs are carried over verbatim. "
         "Input: {legs: [{leg_id, origin: {lon,lat}, destination: {lon,lat}, "
-        "via_points?: [...], strategy?: '0'-'6'}], allow_straight_line?: bool}"
+        "via_points?: [...], strategy?: '0'-'6'}], allow_straight_line?: bool, "
+        "base_result_ref?: {uri, digest}}"
     ),
     "itinerary_check": (
         "Validate the host's itinerary-draft.json against the itinerary contract "
@@ -49,8 +55,10 @@ TOOL_DESCRIPTIONS = {
         "Merge the user-confirmed geocode result and the plan_route result into the "
         "draft, validate completeness (every place geocoded, every travel leg routed), "
         "and atomically write data/itinerary.json. Run AFTER G1 approval, BEFORE "
-        "generate-map compile. Input: {draft_path, geocode_result, route_result, "
-        "output_path?}"
+        "generate-map compile. route_result may be passed inline OR as "
+        "route_result_ref {uri, digest} (byte-digest re-verified server-side; "
+        "mutually exclusive). Input: {draft_path, geocode_result, route_result | "
+        "route_result_ref, output_path?}"
     ),
     "request_scaffold": (
         "Build the pending generate-request.yaml mechanically: computes the digest "
@@ -141,13 +149,32 @@ _PLAN_ROUTE_SCHEMA = {
                         "properties": {"lon": {"type": "number"}, "lat": {"type": "number"}},
                         "required": ["lon", "lat"],
                     },
-                    "via_points": {"type": "array"},
+                    "via_points": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "lon": {"type": "number"},
+                                "lat": {"type": "number"},
+                                "name": {"type": "string"},
+                                "city": {"type": "string"},
+                            },
+                        },
+                    },
                     "strategy": {"type": "string"},
                 },
                 "required": ["origin", "destination"],
             },
         },
         "allow_straight_line": {"type": "boolean"},
+        "base_result_ref": {
+            "type": "object",
+            "properties": {
+                "uri": {"type": "string", "minLength": 1},
+                "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+            },
+            "required": ["uri", "digest"],
+        },
     },
     "required": ["legs"],
 }
@@ -167,9 +194,17 @@ _ITINERARY_ASSEMBLE_SCHEMA = {
         "draft_path": {"type": "string", "minLength": 1},
         "geocode_result": {"type": "object"},
         "route_result": {"type": "object"},
+        "route_result_ref": {
+            "type": "object",
+            "properties": {
+                "uri": {"type": "string", "minLength": 1},
+                "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+            },
+            "required": ["uri", "digest"],
+        },
         "output_path": {"type": "string", "minLength": 1},
     },
-    "required": ["draft_path", "geocode_result", "route_result"],
+    "required": ["draft_path", "geocode_result"],
 }
 
 _REQUEST_SCAFFOLD_SCHEMA = {
@@ -288,7 +323,7 @@ async def run(allowed_root: str, allow_online: bool = True, network_path: str | 
             if name == "geocode":
                 result = await asyncio.to_thread(geocode, arguments)
             elif name == "plan_route":
-                result = await asyncio.to_thread(plan_route, arguments)
+                result = await asyncio.to_thread(plan_route, arguments, ctx)
             elif name == "itinerary_check":
                 result = await asyncio.to_thread(itinerary_check, arguments, ctx)
             elif name == "itinerary_assemble":
@@ -314,8 +349,11 @@ async def run(allowed_root: str, allow_online: bool = True, network_path: str | 
 
 def main():
     parser = argparse.ArgumentParser(description="Itinerary tools MCP server (geocode + plan_route)")
-    parser.add_argument("--allowed-root", action="append", required=True,
-                        help="Existing absolute root granted by the operator")
+    parser.add_argument("--allowed-root", action="append", required=False, default=None,
+                        help="Absolute root granted by the operator: the file tools' "
+                             "path boundary and relative-path base. Optional — defaults "
+                             "to the process cwd when omitted (launch with cwd=project "
+                             "root, or pass this explicitly to pin the project).")
     parser.add_argument("--allow-online", action="store_true", default=True,
                         help="Enable Amap providers using CARTO_AMAP_KEY (default: true)")
     parser.add_argument("--offline", action="store_true",
@@ -335,7 +373,12 @@ def main():
     # lazily on first use, in the worker thread, which is safe — pure data).
     from routing import router_dual_graph  # noqa: F401
 
-    asyncio.run(run(args.allowed_root[0], allow_online, args.network))
+    # Optional boundary: when no --allowed-root is given, fall back to the
+    # process cwd (the host should launch with cwd=project root, or pass the
+    # flag explicitly). The path fence itself is unchanged — relative paths
+    # resolve against this root and out-of-root access is still refused.
+    roots = args.allowed_root or [str(Path.cwd())]
+    asyncio.run(run(roots[0], allow_online, args.network))
 
 
 if __name__ == "__main__":

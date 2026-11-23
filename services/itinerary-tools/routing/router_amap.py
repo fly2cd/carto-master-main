@@ -17,6 +17,19 @@ from amap_client.coord_converter import CoordConverter
 from amap_client.amap_rate_limit import wait_for_amap_slot
 
 
+class AmapRoutingError(RuntimeError):
+    """Named Plan-B failure (never silently degrades to a straight line).
+
+    ``code`` is a stable machine identifier (AMAP_KEY_MISSING /
+    AMAP_REQUEST_FAILED); ``message`` carries the diagnostic detail.
+    """
+
+    def __init__(self, code: str, message: str):
+        super().__init__(f"{code}: {message}")
+        self.code = code
+        self.message = message
+
+
 class AmapRouter:
     """高德驾车路径规划器（Plan B 兜底）"""
 
@@ -24,6 +37,14 @@ class AmapRouter:
 
     def __init__(self, amap_key: str = ""):
         self.amap_key = amap_key or os.environ.get("CARTO_AMAP_KEY", "")
+
+    def _require_key(self) -> None:
+        if not self.amap_key:
+            raise AmapRoutingError(
+                "AMAP_KEY_MISSING",
+                "CARTO_AMAP_KEY is not set; Plan B (Amap online routing) is "
+                "unavailable — fix the environment instead of degrading the route",
+            )
 
     # -----------------------------------------------------------------
     async def route_leg(
@@ -53,6 +74,7 @@ class AmapRouter:
             }
             or None if routing fails
         """
+        self._require_key()
         # WGS-84 → GCJ-02
         gcj_origin = CoordConverter.wgs84_to_gcj02(*origin)
         gcj_dest = CoordConverter.wgs84_to_gcj02(*destination)
@@ -144,6 +166,8 @@ class AmapRouter:
                 "viaPoints": [...]
             }
         """
+        self._require_key()
+
         async def _resolve_coord(item: Dict[str, Any]) -> Tuple[float, float, str]:
             name = item.get("name", "")
             if "lon" in item and "lat" in item:
@@ -189,18 +213,11 @@ class AmapRouter:
         data = resp.json()
 
         if data.get("status") != "1" or not data.get("route", {}).get("paths"):
-            logging.getLogger(__name__).debug("router_amap.reroute_leg_with_resolve.event")
-            start_pt = list(CoordConverter.gcj02_to_wgs84(orig_lon, orig_lat))
-            end_pt = list(CoordConverter.gcj02_to_wgs84(dest_lon, dest_lat))
-            return {
-                "fromName": orig_name,
-                "toName": dest_name,
-                "polyline": [start_pt, end_pt],
-                "engine": "straight_line",
-                "distance": 0,
-                "duration": 0,
-                "viaPoints": resolved_via_points,
-            }
+            raise AmapRoutingError(
+                "AMAP_REQUEST_FAILED",
+                f"amap driving API refused the request: status={data.get('status')} "
+                f"infocode={data.get('infocode')} info={data.get('info')}",
+            )
 
         path = data["route"]["paths"][0]
         leg_dist = int(path.get("distance", 0))
