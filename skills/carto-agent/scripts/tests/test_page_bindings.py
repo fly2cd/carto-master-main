@@ -78,7 +78,7 @@ class BindingContractTests(unittest.TestCase):
     def test_new_contract_versions_reject_old_documents(self):
         for name in ('style', 'map-plan', 'page-request'):
             value = deepcopy(VALID_CASES[name])
-            self.assertEqual({'style':2,'map-plan':4,'page-request':4}[name], value['schema_version'])
+            self.assertEqual({'style':2,'map-plan':4,'page-request':5}[name], value['schema_version'])
             value['schema_version'] = 1
             with self.subTest(name=name), self.assertRaises(ProtocolError):
                 self.registry.validate(name, value)
@@ -162,7 +162,7 @@ class SinglePageNormalizationTests(PreparationFixture, unittest.TestCase):
 
     def test_legacy_reference_is_not_migrated(self):
         ref = self.renderer.freeze_request(self.page,self.context).ref()
-        self.assertEqual('4.0.0', ref['version'])
+        self.assertEqual('5.0.0', ref['version'])
         ref['version'] = '1.0.0'
         with self.assertRaisesRegex(ProtocolError, 'RASTER_REFERENCE_INVALID'):
             self.service.document(ref,'page-request')

@@ -48,8 +48,8 @@ def resolve_legends(service, bindings, legends, layers, context, color_scheme=No
 
 
 def compile_page_request(service, request, cartography, context, bundles, color_scheme=None):
-    if request.get('schema_version')!=4:
-        raise ProtocolError('PAGE_CONTRACT_VERSION','An explicit v4 page design is required')
+    if request.get('schema_version')!=5:
+        raise ProtocolError('PAGE_CONTRACT_VERSION','An explicit v5 page design is required')
     if any(k in request for k in ('typography','appearance','bindings','portrayal_ref','legend')):
         raise ProtocolError('PAGE_DESIGN_ALREADY_RESOLVED','Do not supply legacy or already resolved inputs')
     if any('items' in item for item in request['legends']):
@@ -69,7 +69,9 @@ def compile_page_request(service, request, cartography, context, bundles, color_
     result['bindings']=build_page_bindings(layout,prototype,bundle,assignments,service.registry)
     result['appearance']=resolve_appearance(cartography,layout,result['portrayals'],service.registry)
     result['legends']=resolve_legends(service,result['bindings'],result['legends'],layers,context,color_scheme)
-    result['schema_version'] = 4; result['geometry'] = 'raster'
+    result['schema_version'] = 5; result['geometry'] = 'raster'; result['expression'] = 'portrayal'
+    # Frozen paint order: figure-ground is a declared contract, not renderer convention.
+    result['layer_stack'] = (['basemap'] if result.get('basemap') else []) + ['thematic', 'legends', 'charts', 'furniture']
     service.registry.validate('page-request', result)
     return result
 

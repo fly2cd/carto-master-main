@@ -17,7 +17,7 @@
   },
   "page_request_ref": {
     "id": "page-request",
-    "version": "4.0.0",
+    "version": "5.0.0",
     "digest": "sha256:78b0de8d080b96b75c8331aa13f7438be0eb550067f4ddb34fd8233a960386cb",
     "uri": ".carto/raster/page-request/78b0de8d080b96b75c8331aa13f7438be0eb550067f4ddb34fd8233a960386cb.json"
   },
@@ -313,7 +313,7 @@
       "digest_mode": "canonical-json",
       "ref": {
         "id": "page-request",
-        "version": "4.0.0",
+        "version": "5.0.0",
         "digest": "sha256:78b0de8d080b96b75c8331aa13f7438be0eb550067f4ddb34fd8233a960386cb",
         "uri": ".carto/raster/page-request/78b0de8d080b96b75c8331aa13f7438be0eb550067f4ddb34fd8233a960386cb.json"
       }

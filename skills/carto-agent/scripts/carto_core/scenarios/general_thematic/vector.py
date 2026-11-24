@@ -212,8 +212,9 @@ class GeneralVectorCandidateCompiler:
             image_bytes = service.read_bytes(image_path, 64 * 1024 * 1024)
             frozen_basemap = {'image': {'path': str(image_path), 'digest': service.digest_bytes(image_bytes),
                                         'size_bytes': len(image_bytes)},
-                              'crs': deepcopy(declared_basemap['crs']),
-                              'extent': list(declared_basemap['extent'])}
+                              'registration': {'kind': 'extent',
+                                               'crs': deepcopy(declared_basemap['crs']),
+                                               'extent': list(declared_basemap['extent'])}}
             if declared_basemap.get('style'):
                 frozen_basemap['style'] = deepcopy(declared_basemap['style'])
         page = compile_page(service, layout=layout, cartography=contracts['scenario']['embedded']['style'],

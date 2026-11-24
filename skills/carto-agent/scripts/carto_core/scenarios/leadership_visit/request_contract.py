@@ -218,9 +218,9 @@ class RouteRequestContract:
 
     def apply_overrides(self, overrides: dict[str, Any],
                         contracts: dict[str, Any]) -> dict[str, Any]:
-        if overrides.get("map_title"):
-            contracts.setdefault("scenario", {}).setdefault("embedded", {})
-            contracts["scenario"]["embedded"]["map_title"] = overrides["map_title"]
+        # map_title is consumed from the request by the compiler/planner; the
+        # scenario contract has no title field, so it stays byte-identical to the
+        # installed template.
         patch = overrides.get("style_overrides")
         if patch:
             contracts.setdefault("portrayal", {})

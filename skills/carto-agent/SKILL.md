@@ -33,7 +33,8 @@ version: 0.8.0
 ## S1：合同归一与有限参数化多图
 
 - 栅格/矢量模板分别使用一个参数化网格资产，不按每种布局复制模板。Layout 声明合法形状、区域与间距；请求的 `design`、`map_title`、`layout_parameters` 表示本次设计。自动模板检索/生成、任意网格仍未开放。
-- 模板升级须重新验证发布，旧页面/候选/锁不能自动迁移，也不能沿用旧审批。`map-plan`、`page-request/output` 为 v4；`cartography`、`page-bindings`、`resolved-appearance`、`resolved-layout`、`raster-map-body` 为 v2；准备报告与分类 portrayal 版本不变。
+- 模板升级须重新验证发布，旧页面/候选/锁不能自动迁移，也不能沿用旧审批。`map-plan` 为 v4，`page-request` 为 v5（`page-output` 仍 v4，它只由 raster/vector 静态渲染器产出）；`style`、`page-bindings`、`resolved-appearance`、`resolved-layout`、`raster-map-body` 为 v2；准备报告与分类 portrayal 版本不变。
+- **页面契约三轴（v5）**：`expression`（`portrayal` 图层机器 / `canvas-overlay` 配准画布叠绘）× `geometry`（专题数据形态 `raster`/`vector`，**永不取 `image`**）× `coordinate_mode`（`native-no-reprojection` / `image-pixel-registration`）。`layer_stack` 全模式必填，是冻结绘制序而非渲染器约定。`basemap` 抽为统一组件 Schema：同一 geo↔pixel 仿射的两种参数化（`registration.kind` = `extent` 轴对齐等向 / `affine` 显式配准文档），`source_size`/`display_window` 是测量事实。canvas 页以 `overlay.graphics_digest` 绑定 scene 图形，`document.category` 取业务场景 ID（不硬编码场景名）。无地理语义的图片素材（插画/海报背景）不属任何 geometry，走素材+frame 绑定，当前未开放（`capability-roadmap` 已登记）。
 - `source_id`、view、layer、panel、legend 显式关联。同源可复用，多源可同角色；每个视图保留对应数据范围。源 CRS 必须一致且匹配模板，不做隐式重投影或范围并集。
 - 独立图例使用对应面板的已确认类别；共享图例要求完整类别定义（编码、语义、显示、名称、颜色、顺序）及 legend_policy 一致。observed 使用已确认图例项并集；all 还要求逐类纳入标志一致。冲突拒绝，不改色、不重新分类、不降级。
 - 字号/行距唯一来自 cartography，内边距来自 Layout，类别颜色来自已确认 portrayal；最终 appearance、模板布局、参数与全部关系随页面冻结并重验。类别统计与模板图例容量分开。
@@ -107,7 +108,7 @@ version: 0.8.0
 - **品牌段（map-brand/identity）已整体移除**（2026-11-18 用户授权）：它在渲染链中无任何消费者（署名来自场景策略 notice、字体来自 generate 请求），移除不改变成图外观。identity Schema、品牌评分器、品牌资产与 map-brand.md 设计文档均已删除；旧包含 identity 的包不被新协议接纳，不自动迁移。若未来需要品牌影响成图，须以带真实消费者的新协议重建，不恢复旧形状。
 - `MapScenario.scenario_id` 是模板方案身份，`RenderScene.scene_id` 是渲染实例身份，二者不是业务分类。Brief、Plan 与 execution 保留同一业务场景、主题标签和任务，并绑定原意图摘要。
 - 段引用协议（S1 定义、S2 接入）：`scenario.segment_refs` 允许 cartography/layout 逐段以已发布段模板引用（cartography→map-style、layout→map-layout）替代内嵌，每段恰好一个来源（embedded 与 segment_refs 互斥），引用段必须在 `replaceable_segments` 内、精确钉住 `{kind,id,version,digest}` 并与 `manifest.dependencies`/`dependency-lock.dependencies` 逐条一致，所有权随段转移。create-template 请求可用可选 `segment_refs` 声明；validate/publish 与 generate 在准入/装载边界从已发布仓库按摘要拉取并复验完整性后物化为完整场景，包本体不改写；无仓库或引用漂移一律失败关闭。全内嵌旧路径零改动；段模板的自动检索/选择仍未开放（`template match` 仅只读评分）。
-- 迁移段资产（2026-11-17 用户授权）：`template-assets/` 存放从 2026Oct 项目迁入的 13 项段资产（6 风格/7 版式；原品牌资产已随品牌段移除删除），每项含逐字节原件与适配主仓 Schema 的契约，`MIGRATION.yaml` 记录源摘要与适配规则，守卫测试防漂移。它们是库参考资产：仅供只读匹配与段引用消费，未过 T1/TP 与验证渲染门禁，不是生产可用模板；入库走真实 publish 路径（开发种子脚本见 `template-assets/README.md`）。
+- 迁移段资产（2026-11-17 用户授权）：`template-assets/` 存放从 2026Oct 项目迁入的 13 项段资产（6 风格/7 版式；原品牌资产已随品牌段移除删除），每项含逐字节原件与适配主仓 Schema 的契约，`MIGRATION.yaml` 记录源摘要与适配规则，守卫测试防漂移。它们是库参考资产：仅供只读匹配与段引用消费，未过 TP 与验证渲染门禁，不是生产可用模板；入库走真实 publish 路径（开发种子脚本见 `template-assets/README.md`）。
 - 配色红线（map-style.md §8.2 目标设计的可校验部分）：generate 链在色值冻结前执行三条检查——顺序/分歧色带须与声明的感知结构一致（sequential 的 L* 单调、diverging 的亮心中点，CIE 15 CIELAB）、相邻类 ΔE76 可区分、二色觉模拟（Machado 2009）后仍可区分；离散类别色查后两条，不查单调性。参数与执行级别全部在 `policies/color-redlines-policy.yaml`（`pending-business-review`；R1/R2 阻断、色觉安全首期警告）；blocker 失败关闭，warning 不阻断。模板包不含实例颜色，故 template validate/publish 零改动；WCAG 对比度公式已就绪但未接线（契约尚未声明文字/背景色对）；不自动选色、不改写通过检查的色值。
 - 不接纳旧 `scene_hint`、单值 `theme` 或 `fields.theme`；不自动迁移旧输入、候选或锁。详见 `workflows/intent-contract.md`。
 - 识别词表不等于可执行能力：现有分类保留为目录词汇；业务能力注册表和代码实现白名单当前登记 `general-thematic-mapping`（实现 `general-thematic`）与 `leadership-visit-mapping`（实现 `leadership-visit`），其余场景与组件一律默认拒绝。

@@ -153,7 +153,7 @@ class FinalMapCheckService:
         if not isinstance(page, dict):
             raise ProtocolError("FINAL_CHECK_IMAGE_BINDING", str(ref["uri"]))
         self.registry.validate("page-request", page)
-        if (page.get("geometry") != "image" or sha256_digest(page) != ref.get("digest")
+        if (page.get("expression") != "canvas-overlay" or sha256_digest(page) != ref.get("digest")
                 or page["resolved_layout"] != scene["resolved_layout"]):
             raise ProtocolError("FINAL_CHECK_IMAGE_BINDING", "Page request differs from the frozen scene")
         LayoutResolver(self.registry).validate_execution(scene, lock["execution"])

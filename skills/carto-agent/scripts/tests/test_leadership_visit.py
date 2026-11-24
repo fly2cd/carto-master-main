@@ -715,8 +715,16 @@ class CompilerTests(LeadershipFixture, unittest.TestCase):
         self.registry.validate("resolved-map", candidate)
         self.assertEqual("image-itinerary-page", scene["renderer_id"])
         self.assertTrue(scene["image_graphics"])
-        self.assertEqual("image", load_document(
-            self.guard.resolve(scene["page_request_ref"]["uri"]))["geometry"])
+        frozen_page = load_document(self.guard.resolve(scene["page_request_ref"]["uri"]))
+        # The overlay is vector data drawn on a registered canvas: the page declares
+        # its data form truthfully and separates the expression/coordinate axes.
+        self.assertEqual("vector", frozen_page["geometry"])
+        self.assertEqual("canvas-overlay", frozen_page["expression"])
+        self.assertEqual("image-pixel-registration", frozen_page["coordinate_mode"])
+        self.assertEqual(["basemap", "thematic", "furniture", "legends"], frozen_page["layer_stack"])
+        self.assertEqual("affine", frozen_page["basemap"]["registration"]["kind"])
+        self.assertEqual(sha256_digest(scene["image_graphics"]),
+                         frozen_page["overlay"]["graphics_digest"])
         self.assertEqual(candidate["execution_digest"], sha256_digest(candidate["execution"]))
         self.assertEqual(candidate["execution"]["render_scene_ref"]["digest"], sha256_digest(scene))
         self.assertEqual(candidate["execution"]["business_scene"], "leadership_visit")
@@ -1780,9 +1788,7 @@ class TemplateLifecycleTests(LeadershipFixture, unittest.TestCase):
         self.assertEqual(["point"], summaries[0]["geometry_types"])
         briefed = self.workflow.brief(self.create_path)
         self.assertEqual(["route-stops"], [role["role_id"] for role in briefed["brief"]["data_roles"]])
-        t1 = self._sign("t1", "approve-template-brief", "template-brief",
-                        briefed["approval"]["object_digest"])
-        authored = self.workflow.author(self.create_path, t1, approval_key=APPROVAL_KEY)
+        authored = self.workflow.author(self.create_path)
         package_path = Path(authored["package"]["package_path"])
         portrayal = load_document(package_path / "contracts" / "portrayal.yaml")
         # The authored portrayal carries the tuned old-framework 1.2.0 style values.
@@ -1796,13 +1802,12 @@ class TemplateLifecycleTests(LeadershipFixture, unittest.TestCase):
         self.assertEqual("image-itinerary-page", evidence["renderer"]["renderer_id"])
         self.assertEqual({"pdf", "png"},
                          {item["target"] for item in evidence["preview_artifacts"]})
-        publication_digest = sha256_digest({
-            "package_digest": evidence["package_ref"]["digest"],
-            "evidence_digest": evidence["evidence_digest"],
-            "repository_scope": "local:templates",
-        })
+        prepared = self.workflow.prepare_publication(
+            self.create_path, repository_root=self.template_repo,
+            repository_scope="local:templates",
+            idempotency_key=f"publish-leadership-{self.suffix}")
         tp = self._sign("tp", "approve-template-publish", "template-publication",
-                        publication_digest)
+                        prepared["object_digest"])
         published = self.workflow.publish(self.create_path, tp,
                                           repository_root=self.template_repo,
                                           repository_scope="local:templates",

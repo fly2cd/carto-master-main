@@ -2,15 +2,15 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schemas.carto-agent.local/v1/page-request.schema.json",
   "title": "page-request",
-  "description": "Unified page contract. geometry selects the conditional body; identical layout/font/text/appearance/bindings fields are shared.",
+  "description": "Unified page contract. Three orthogonal axes: expression selects the map-body machinery (portrayal layers vs a registered canvas carrying overlay graphics), geometry names the thematic data form (raster/vector), coordinate_mode declares the drawing space. Layout/font/text/legend fields and the frozen component paint order (layer_stack) are shared by every expression.",
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "appearance",
-    "bindings",
+    "expression",
     "font",
     "geometry",
     "grid_north",
+    "layer_stack",
     "legends",
     "resolved_layout",
     "scale_bar",
@@ -34,7 +34,99 @@
       "type": "null"
     },
     "basemap": {
-      "type": "object"
+      "$ref": "https://schemas.carto-agent.local/v1/basemap.schema.json"
+    },
+    "expression": {
+      "enum": [
+        "portrayal",
+        "canvas-overlay"
+      ]
+    },
+    "overlay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "graphics_digest"
+      ],
+      "description": "Canvas map-body declaration: binds this page to the exact frozen overlay graphics the render scene carries (scene.image_graphics). Compiler and final check re-verify the digest so the page contract and the rendered content cannot drift apart.",
+      "properties": {
+        "graphics_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "category"
+      ],
+      "properties": {
+        "category": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/businessSceneId"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "geo": {
+          "description": "Frozen online-view sections (frontend-map-document baseMap/mapData shapes) computed at compile when the request declares online_basemap. Carried on the page contract so BOTH renderers deterministically rebuild the same document from the same frozen inputs.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "baseMap",
+            "mapData"
+          ],
+          "properties": {
+            "baseMap": {
+              "$ref": "https://schemas.carto-agent.local/v1/frontend-map-document.schema.json#/$defs/baseMapSection"
+            },
+            "mapData": {
+              "$ref": "https://schemas.carto-agent.local/v1/frontend-map-document.schema.json#/$defs/mapDataSection"
+            }
+          }
+        }
+      }
+    },
+    "furniture": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Frozen page furniture: the map frame border carried from the style contract's page_furniture section. Consumed identically by both renderers.",
+      "properties": {
+        "frame_border": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "color",
+            "inner_width_mm",
+            "gap_mm",
+            "outer_width_mm"
+          ],
+          "properties": {
+            "color": {
+              "type": "string",
+              "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "inner_width_mm": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 5
+            },
+            "gap_mm": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10
+            },
+            "outer_width_mm": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 5
+            }
+          }
+        }
+      }
     },
     "layer_stack": {
       "type": "array"
@@ -76,7 +168,10 @@
       "$ref": "https://schemas.carto-agent.local/v2/style.schema.json"
     },
     "coordinate_mode": {
-      "const": "native-no-reprojection"
+      "enum": [
+        "native-no-reprojection",
+        "image-pixel-registration"
+      ]
     },
         "panels": {
       "type": "array",
@@ -186,18 +281,41 @@
       ]
     },
     "schema_version": {
-      "const": 4
+      "const": 5
     }
   },
   "allOf": [
     {
       "if": {
         "properties": {
-          "geometry": {
-            "const": "raster"
+          "expression": {
+            "const": "portrayal"
           }
-        }
+        },
+        "required": [
+          "expression"
+        ]
       },
+      "then": {
+        "required": [
+          "appearance",
+          "bindings"
+        ],
+        "not": {
+          "anyOf": [
+            {"required": ["overlay"]},
+            {"required": ["document"]}
+          ]
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "geometry": {
+                  "const": "raster"
+                }
+              }
+            },
       "then": {
         "required": [
           "appearance",
@@ -212,10 +330,10 @@
           "texts"
         ],
         "not": {
-          "required": [
-            "style",
-            "coordinate_mode",
-            "panels"
+          "anyOf": [
+            {"required": ["style"]},
+            {"required": ["coordinate_mode"]},
+            {"required": ["panels"]}
           ]
         },
         "properties": {
@@ -286,81 +404,7 @@
             }
           },
           "basemap": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "image",
-              "crs",
-              "extent"
-            ],
-            "properties": {
-              "image": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "path",
-                  "digest",
-                  "size_bytes"
-                ],
-                "properties": {
-                  "path": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 1024
-                  },
-                  "digest": {
-                    "type": "string",
-                    "pattern": "^sha256:[0-9a-f]{64}$"
-                  },
-                  "size_bytes": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 268435456
-                  }
-                }
-              },
-              "crs": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "authority",
-                  "code"
-                ],
-                "properties": {
-                  "authority": {
-                    "const": "EPSG"
-                  },
-                  "code": {
-                    "type": "string",
-                    "pattern": "^[0-9]+$"
-                  }
-                }
-              },
-              "extent": {
-                "type": "array",
-                "minItems": 4,
-                "maxItems": 4,
-                "items": {
-                  "type": "number"
-                }
-              },
-              "style": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "desaturate": {
-                    "type": "number",
-                    "minimum": 0,
-                    "maximum": 1
-                  },
-                  "lighten": {
-                    "type": "number",
-                    "minimum": -1,
-                    "maximum": 1
-                  }
-                }
-              }
-            }
+            "$ref": "https://schemas.carto-agent.local/v1/basemap.schema.json"
           },
           "charts": {
             "type": "array",
@@ -510,6 +554,9 @@
           ]
         },
         "properties": {
+          "coordinate_mode": {
+            "const": "native-no-reprojection"
+          },
           "font": {
             "type": "object",
             "additionalProperties": false,
@@ -555,81 +602,7 @@
             }
           },
           "basemap": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "image",
-              "crs",
-              "extent"
-            ],
-            "properties": {
-              "image": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "path",
-                  "digest",
-                  "size_bytes"
-                ],
-                "properties": {
-                  "path": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 1024
-                  },
-                  "digest": {
-                    "type": "string",
-                    "pattern": "^sha256:[0-9a-f]{64}$"
-                  },
-                  "size_bytes": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 268435456
-                  }
-                }
-              },
-              "crs": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "authority",
-                  "code"
-                ],
-                "properties": {
-                  "authority": {
-                    "const": "EPSG"
-                  },
-                  "code": {
-                    "type": "string",
-                    "pattern": "^[0-9]+$"
-                  }
-                }
-              },
-              "extent": {
-                "type": "array",
-                "minItems": 4,
-                "maxItems": 4,
-                "items": {
-                  "type": "number"
-                }
-              },
-              "style": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "desaturate": {
-                    "type": "number",
-                    "minimum": 0,
-                    "maximum": 1
-                  },
-                  "lighten": {
-                    "type": "number",
-                    "minimum": -1,
-                    "maximum": 1
-                  }
-                }
-              }
-            }
+            "$ref": "https://schemas.carto-agent.local/v1/basemap.schema.json"
           },
           "charts": {
             "type": "array",
@@ -759,6 +732,179 @@
                   "minLength": 1,
                   "maxLength": 2048,
                   "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                }
+              }
+            }
+          }
+        }
+      }
+          }
+        ]
+      },
+      "else": {
+        "required": [
+          "basemap",
+          "coordinate_mode",
+          "overlay"
+        ],
+        "not": {
+          "anyOf": [
+            {"required": ["appearance"]},
+            {"required": ["bindings"]},
+            {"required": ["portrayals"]},
+            {"required": ["panels"]},
+            {"required": ["style"]},
+            {"required": ["charts"]}
+          ]
+        },
+        "properties": {
+          "geometry": {
+            "const": "vector"
+          },
+          "coordinate_mode": {
+            "const": "image-pixel-registration"
+          },
+          "basemap": {
+            "$ref": "https://schemas.carto-agent.local/v1/basemap.schema.json",
+            "required": [
+              "source_size",
+              "display_window"
+            ]
+          },
+          "grid_north": {
+            "type": "null"
+          },
+          "scale_bar": {
+            "type": "null"
+          },
+          "layer_stack": {
+            "type": "array",
+            "uniqueItems": true,
+            "minItems": 4,
+            "maxItems": 4,
+            "description": "Frozen paint order of the canvas page: basemap, overlay graphics (thematic), page furniture (texts and frame border), then legends — exactly the order the image renderer paints. Who covers whom is cartographic semantics, not convention.",
+            "items": {
+              "enum": [
+                "basemap",
+                "thematic",
+                "legends",
+                "furniture"
+              ]
+            }
+          },
+          "font": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "digest",
+              "size_bytes"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              },
+              "digest": {
+                "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+              },
+              "size_bytes": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 33554432
+              }
+            }
+          },
+          "texts": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 32,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "content_id",
+                "text"
+              ],
+              "properties": {
+                "content_id": {
+                  "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+                },
+                "text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2048,
+                  "pattern": "^[^\\x00-\\x09\\x0b-\\x1f\\x7f]+$"
+                },
+                "font_pt": {
+                  "type": "number",
+                  "minimum": 4,
+                  "maximum": 72,
+                  "description": "Frozen nominal furniture font (points) from the style contract's page_furniture; absent means the renderers' historical nominal applies."
+                }
+              }
+            }
+          },
+          "legends": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "content_id",
+                "title",
+                "items"
+              ],
+              "properties": {
+                "content_id": {
+                  "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                },
+                "items": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 64,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "label",
+                      "color",
+                      "shape"
+                    ],
+                    "properties": {
+                      "id": {
+                        "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+                      },
+                      "label": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256,
+                        "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                      },
+                      "color": {
+                        "type": "string",
+                        "pattern": "^#[0-9A-Fa-f]{6}$"
+                      },
+                      "shape": {
+                        "enum": [
+                          "line",
+                          "pin",
+                          "circle"
+                        ]
+                      }
+                    }
+                  }
                 }
               }
             }

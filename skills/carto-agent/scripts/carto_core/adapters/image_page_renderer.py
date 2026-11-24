@@ -165,8 +165,8 @@ class ImagePageRenderer:
             raise ProtocolError("PAGE_REQUEST_SIZE_LIMIT", str(page_path))
         page = load_document(page_path)
         self.registry.validate("page-request", page)
-        if page.get("geometry") != "image":
-            raise ProtocolError("PAGE_REQUEST_GEOMETRY_MISMATCH", "image page request required")
+        if page.get("expression") != "canvas-overlay":
+            raise ProtocolError("PAGE_REQUEST_EXPRESSION_MISMATCH", "canvas page request required")
         if sha256_digest(page) != ref.get("digest"):
             raise ProtocolError("PAGE_REQUEST_DRIFT", "page request differs from the frozen reference")
         if page["resolved_layout"] != scene["resolved_layout"]:
@@ -192,6 +192,17 @@ class ImagePageRenderer:
         from .image_layout import inspect_png
         if inspect_png(image_bytes) != basemap["source_size"]:
             raise ProtocolError("IMAGE_SOURCE_SIZE_MISMATCH", "basemap dimensions differ from the page request")
+        window = basemap["display_window"]
+        if (window["x"] + window["width"] > basemap["source_size"]["width_px"]
+                or window["y"] + window["height"] > basemap["source_size"]["height_px"]):
+            raise ProtocolError("BASEMAP_WINDOW_OUT_OF_BOUNDS",
+                                "Declared visible window exceeds the registered image")
+        # The frozen paint order must match what this renderer actually paints:
+        # backdrop -> overlay graphics -> texts/frame border -> legends.
+        if page["layer_stack"] != ["basemap", "thematic", "furniture", "legends"]:
+            raise ProtocolError("LAYER_STACK_DRIFT", "Declared layer stack differs from the renderer's paint order")
+        if page["overlay"]["graphics_digest"] != sha256_digest(scene.get("image_graphics", [])):
+            raise ProtocolError("PAGE_OVERLAY_DRIFT", "Page overlay declaration differs from the frozen scene graphics")
         frame = LayoutResolver.map_frame(scene["resolved_layout"])
         frame_box = {key: value for key, value in zip(("x", "y", "width", "height"), frame["bounds_px"])}
         placement = contain_layout({"width_px": basemap["display_window"]["width"],

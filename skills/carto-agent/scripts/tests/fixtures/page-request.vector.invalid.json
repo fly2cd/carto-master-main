@@ -1,5 +1,7 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
+  "expression": "portrayal",
+  "layer_stack": ["thematic", "legends", "charts", "furniture"],
   "resolved_layout": {
     "schema_version": 2,
     "resolver_version": "2.0.0",

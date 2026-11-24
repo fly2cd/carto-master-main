@@ -96,19 +96,6 @@ LAYOUT_CONTRACT: dict[str, Any] = {
 VALIDATION_TITLE = "领导调研行程路线图（模板验证样张）"
 VALIDATION_NOTICE = "领导调研路线图：行程路线为示意参考，不用于实际导航"
 
-IDENTITY: dict[str, Any] = {
-    "schema_version": 1, "identity_id": "leadership-blue", "version": "1.0.0",
-    "organization": "示例机构",
-    "colors": [{"role": "primary", "hex": "#1769D2",
-                "provenance": {"source_type": "user", "source_ref": "template-brief:leadership-visit",
-                               "version": "1", "retrieved_at": "2026-11-19T00:00:00Z",
-                               "classification": "internal"}}],
-    "typography": [{"role": "title", "family": "Noto Sans CJK SC", "weight": 700}],
-    "attribution": {"organization_format": "制图：{organization}",
-                    "data_source_format": "数据来源：{source}"},
-    "rules": [],
-}
-
 CARTOGRAPHY: dict[str, Any] = {
     "schema_version": 2, "style_id": "technical-map", "version": "2.0.0",
     "visual_language": "technical",
@@ -148,8 +135,8 @@ def template_documents(request: dict[str, Any] | None = None) -> dict[str, Any]:
         "business_scene": BUSINESS_SCENE, "tasks": ["visit-route-map"],
         "owned_segments": ["scenario", "data", "spatial-behavior", "portrayal",
                            "delivery", "quality-gates"],
-        "embedded": {"identity": IDENTITY, "cartography": CARTOGRAPHY, "layout": LAYOUT_CONTRACT},
-        "replaceable_segments": ["identity", "layout"],
+        "embedded": {"style": CARTOGRAPHY, "layout": LAYOUT_CONTRACT},
+        "replaceable_segments": ["layout"],
         "data_role_refs": ["route-stops", "route-line"],
         "target_ids": list(TARGET_IDS),
         "application": {"supported_uses": ["engineering-preview"],

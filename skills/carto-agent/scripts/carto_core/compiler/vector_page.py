@@ -82,7 +82,11 @@ def compile_page(service, *, layout, cartography, panels, font, texts, legend_ti
     # ground must cover every figure -- thematic bounds must fall inside the
     # declared basemap extent (dangling figures break figure-ground).
     if basemap is not None:
-        bx0, by0, bx1, by1 = basemap['extent']
+        registration = basemap['registration']
+        if registration['kind'] != 'extent':
+            raise ProtocolError('BASEMAP_REGISTRATION_UNSUPPORTED',
+                                'Thematic pages paint the backdrop in the display CRS; an affine pixel registration belongs to a canvas page')
+        bx0, by0, bx1, by1 = registration['extent']
         if bx0 >= bx1 or by0 >= by1:
             raise ProtocolError('BASEMAP_EXTENT_INVALID', 'Basemap extent must have positive area')
         for stack in layers.values():
@@ -98,7 +102,8 @@ def compile_page(service, *, layout, cartography, panels, font, texts, legend_ti
             colors.append({'view_id': panel['view_id'], 'ref': item['portrayal_ref']})
     # Layer stack: the frozen paint order (figure-ground is a declared contract).
     layer_stack = (['basemap'] if basemap is not None else []) + ['thematic', 'legends', 'charts', 'furniture']
-    page = {'schema_version': 4, 'geometry': 'vector', 'resolved_layout': deepcopy(layout), 'style': deepcopy(cartography),
+    page = {'schema_version': 5, 'geometry': 'vector', 'expression': 'portrayal',
+            'resolved_layout': deepcopy(layout), 'style': deepcopy(cartography),
             'panels': resolved_panels, 'font': deepcopy(font), 'texts': deepcopy(texts), 'legends': legends,
             'charts': deepcopy(resolved_charts), 'layer_stack': layer_stack,
             **({'basemap': deepcopy(basemap)} if basemap is not None else {}),

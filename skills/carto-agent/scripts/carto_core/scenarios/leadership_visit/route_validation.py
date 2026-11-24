@@ -142,7 +142,8 @@ def route_validation_scene(package_root: Path, snapshot: dict[str, Any], targets
                            context: Any = None, workspace: Path | None = None,
                            registry: SchemaRegistry | None = None,
                            layout_parameters: dict[str, Any] | None = None,
-                           validation_expression: str | None = None) -> dict[str, Any]:
+                           validation_expression: str | None = None,
+                           category_colors: Any = None) -> dict[str, Any]:
     """Freeze the deterministic synthetic image scene for template validation."""
     if context is None or workspace is None:
         raise SecurityError("IMAGE_VALIDATION_CONTEXT_REQUIRED",
@@ -243,7 +244,9 @@ def route_validation_scene(package_root: Path, snapshot: dict[str, Any], targets
         shutil.copy(font, font_copy)
     font_digest = "sha256:" + hashlib.sha256(font_copy.read_bytes()).hexdigest()
     page_request = {
-        "schema_version": 4, "geometry": "image",
+        "schema_version": 5, "geometry": "vector", "expression": "canvas-overlay",
+        "coordinate_mode": "image-pixel-registration",
+        "layer_stack": ["basemap", "thematic", "furniture", "legends"],
         "font": {"path": str(font_copy), "digest": font_digest,
                  "size_bytes": font_copy.stat().st_size},
         "grid_north": None, "scale_bar": None,
@@ -254,9 +257,14 @@ def route_validation_scene(package_root: Path, snapshot: dict[str, Any], targets
                      "items": [{"id": f"legend-item-{index + 1}", "label": item["label"],
                                 "color": item["color"], "shape": item["shape"]}
                                 for index, item in enumerate(styled["legend_items"])]}],
-        "document": {"category": "leadership_visit", "name": "领导调研行程路线图（模板验证样张）"},
+        "document": {"category": scenario["business_scene"], "name": "领导调研行程路线图（模板验证样张）"},
+        "overlay": {"graphics_digest": sha256_digest(styled["graphics"])},
         "basemap": {"image": {"path": str(basemap_path), "digest": image_digest,
                               "size_bytes": len(image_bytes)},
+                    "registration": {"kind": "affine",
+                                     "parameters_ref": {"id": "registration-parameters", "version": "1.0.0",
+                                                        "digest": sha256_digest(parameters),
+                                                        "uri": str(parameters_path)}},
                     "source_size": {"width_px": width, "height_px": height},
                     "display_window": window,
                     "white_threshold": style.get("white_threshold", DEFAULT_WHITE_THRESHOLD)},
@@ -282,7 +290,7 @@ def route_validation_scene(package_root: Path, snapshot: dict[str, Any], targets
                     "project_id": context.project_id, "subject_id": context.subject_id},
         "prepared_bundle_ref": {"id": "prepared-data-bundle", "version": "1.0.0",
                                 "digest": sha256_digest(bundle), "uri": str(bundle_path)},
-        "page_request_ref": {"id": "page-request", "version": "4.0.0",
+        "page_request_ref": {"id": "page-request", "version": "5.0.0",
                              "digest": sha256_digest(page_request), "uri": str(page_path)},
         "resources": [
             {"id": "basemap-image", "kind": "data", "digest_mode": "bytes",

@@ -7,7 +7,7 @@
   "renderer_code_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "request_ref": {
     "id": "page-request",
-    "version": "4.0.0",
+    "version": "5.0.0",
     "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "uri": "projects/synthetic/.carto/raster/page-request/example.json"
   },
@@ -66,7 +66,12 @@
     {
       "element_id": "title",
       "frame_id": "title",
-      "bounds_px": [140, 140, 1000, 65]
+      "bounds_px": [
+        140,
+        140,
+        1000,
+        65
+      ]
     }
   ],
   "checks": {

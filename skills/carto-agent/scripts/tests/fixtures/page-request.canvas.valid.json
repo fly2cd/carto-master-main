@@ -1,0 +1,320 @@
+{
+  "schema_version": 5,
+  "geometry": "vector",
+  "expression": "canvas-overlay",
+  "coordinate_mode": "image-pixel-registration",
+  "layer_stack": [
+    "basemap",
+    "thematic",
+    "furniture",
+    "legends"
+  ],
+  "resolved_layout": {
+    "schema_version": 2,
+    "resolver_version": "2.0.0",
+    "contract_ref": {
+      "id": "synthetic-a4-landscape",
+      "version": "1.0.0",
+      "digest": "sha256:36d9deb6e14453d86737707e821cffa19858cfdf61424612501a363c241175cb"
+    },
+    "contract": {
+      "schema_version": 1,
+      "layout_id": "synthetic-a4-landscape",
+      "version": "1.0.0",
+      "category": "report",
+      "canvas": {
+        "width": 297,
+        "height": 210,
+        "unit": "mm",
+        "orientation": "landscape",
+        "safe_margin": 10
+      },
+      "frames": [
+        {
+          "id": "map",
+          "content_id": "main-view",
+          "type": "map",
+          "bounds": [
+            10,
+            25,
+            215,
+            175
+          ],
+          "coordinate_space": "page",
+          "overflow_policy": "clip"
+        },
+        {
+          "id": "title",
+          "content_id": "title",
+          "type": "title",
+          "bounds": [
+            10,
+            10,
+            277,
+            10
+          ],
+          "coordinate_space": "page",
+          "overflow_policy": "reject"
+        },
+        {
+          "id": "legend",
+          "content_id": "legend",
+          "type": "legend",
+          "bounds": [
+            230,
+            40,
+            57,
+            130
+          ],
+          "coordinate_space": "page",
+          "overflow_policy": "reject"
+        },
+        {
+          "id": "source",
+          "content_id": "source",
+          "type": "marginalia",
+          "bounds": [
+            230,
+            180,
+            57,
+            15
+          ],
+          "coordinate_space": "page",
+          "overflow_policy": "reject"
+        }
+      ],
+      "placeholders": [
+        "{{MAP_TITLE}}",
+        "{{MAP_FRAME}}",
+        "{{LEGEND}}"
+      ],
+      "rules": [],
+      "capacity": {
+        "legend_items": 12,
+        "title_characters": 40
+      },
+      "content_padding_mm": 2
+    },
+    "page": {
+      "width_mm": 297,
+      "height_mm": 210,
+      "dpi": 300,
+      "width_px": 3508,
+      "height_px": 2480,
+      "device_pixel_ratio": 1,
+      "safe_margin_px": 118.110236
+    },
+    "frames": [
+      {
+        "id": "legend",
+        "content_id": "legend",
+        "type": "legend",
+        "bounds_px": [
+          2716.535433,
+          472.440945,
+          673.228346,
+          1535.433071
+        ],
+        "overflow_policy": "reject"
+      },
+      {
+        "id": "map",
+        "content_id": "main-view",
+        "type": "map",
+        "bounds_px": [
+          118.110236,
+          295.275591,
+          2539.370079,
+          2066.929134
+        ],
+        "overflow_policy": "clip"
+      },
+      {
+        "id": "source",
+        "content_id": "source",
+        "type": "marginalia",
+        "bounds_px": [
+          2716.535433,
+          2125.984252,
+          673.228346,
+          177.165354
+        ],
+        "overflow_policy": "reject"
+      },
+      {
+        "id": "title",
+        "content_id": "title",
+        "type": "title",
+        "bounds_px": [
+          118.110236,
+          118.110236,
+          3271.653543,
+          118.110236
+        ],
+        "overflow_policy": "reject"
+      }
+    ],
+    "map_frame_ids": [
+      "map"
+    ],
+    "template_contract": {
+      "schema_version": 1,
+      "layout_id": "synthetic-a4-landscape",
+      "version": "1.0.0",
+      "category": "report",
+      "canvas": {
+        "width": 297,
+        "height": 210,
+        "unit": "mm",
+        "orientation": "landscape",
+        "safe_margin": 10
+      },
+      "frames": [
+        {
+          "id": "map",
+          "content_id": "main-view",
+          "type": "map",
+          "bounds": [
+            10,
+            25,
+            215,
+            175
+          ],
+          "coordinate_space": "page",
+          "overflow_policy": "clip"
+        },
+        {
+          "id": "title",
+          "content_id": "title",
+          "type": "title",
+          "bounds": [
+            10,
+            10,
+            277,
+            10
+          ],
+          "coordinate_space": "page",
+          "overflow_policy": "reject"
+        },
+        {
+          "id": "legend",
+          "content_id": "legend",
+          "type": "legend",
+          "bounds": [
+            230,
+            40,
+            57,
+            130
+          ],
+          "coordinate_space": "page",
+          "overflow_policy": "reject"
+        },
+        {
+          "id": "source",
+          "content_id": "source",
+          "type": "marginalia",
+          "bounds": [
+            230,
+            180,
+            57,
+            15
+          ],
+          "coordinate_space": "page",
+          "overflow_policy": "reject"
+        }
+      ],
+      "placeholders": [
+        "{{MAP_TITLE}}",
+        "{{MAP_FRAME}}",
+        "{{LEGEND}}"
+      ],
+      "rules": [],
+      "capacity": {
+        "legend_items": 12,
+        "title_characters": 40
+      },
+      "content_padding_mm": 2
+    },
+    "parameters": null
+  },
+  "font": {
+    "path": "assets/NotoSansCJKsc-Regular.otf",
+    "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "size_bytes": 16777216
+  },
+  "grid_north": null,
+  "scale_bar": null,
+  "texts": [
+    {
+      "content_id": "title",
+      "text": "领导调研行程路线图",
+      "font_pt": 34.0
+    },
+    {
+      "content_id": "source",
+      "text": "领导调研路线图：行程路线为示意参考，不用于实际导航"
+    }
+  ],
+  "legends": [
+    {
+      "content_id": "legend",
+      "title": "图例",
+      "items": [
+        {
+          "id": "legend-item-1",
+          "label": "上午行程",
+          "color": "#1769D2",
+          "shape": "pin"
+        },
+        {
+          "id": "legend-item-2",
+          "label": "路线",
+          "color": "#403B96",
+          "shape": "line"
+        }
+      ]
+    }
+  ],
+  "basemap": {
+    "image": {
+      "path": "data/registered-basemap.png",
+      "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "size_bytes": 512000
+    },
+    "registration": {
+      "kind": "affine",
+      "parameters_ref": {
+        "id": "registration-params",
+        "version": "1.0.0",
+        "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "uri": "data/registration.yaml"
+      }
+    },
+    "source_size": {
+      "width_px": 1680,
+      "height_px": 1170
+    },
+    "display_window": {
+      "x": 24,
+      "y": 18,
+      "width": 1632,
+      "height": 1134
+    },
+    "white_threshold": 245
+  },
+  "overlay": {
+    "graphics_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "document": {
+    "category": "leadership_visit",
+    "name": "领导调研行程路线图"
+  },
+  "furniture": {
+    "frame_border": {
+      "color": "#000000",
+      "inner_width_mm": 0.25,
+      "gap_mm": 1.0,
+      "outer_width_mm": 0.5
+    }
+  }
+}

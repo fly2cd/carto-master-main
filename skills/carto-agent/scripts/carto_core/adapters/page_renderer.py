@@ -414,7 +414,11 @@ class PageRenderer(MeasuredPageRenderer):
         # The axes occupies the frame; the data window mirrors position()'s affine.
         axis = fig.add_axes([x / width, 1 - (y + fh) / height, fw / width, fh / height])
         axis.set_axis_off()
-        bx0, by0, bx1, by1 = basemap["extent"]
+        registration = basemap["registration"]
+        if registration["kind"] != "extent":
+            raise ProtocolError("BASEMAP_REGISTRATION_UNSUPPORTED",
+                                "The static thematic renderer paints the backdrop by declared extent")
+        bx0, by0, bx1, by1 = registration["extent"]
         axis.imshow(rgba, extent=(bx0, bx1, by0, by1), origin="upper",
                     interpolation="none", resample=False, aspect="auto", zorder=-5)
         axis.set_xlim(left + (x - ox) / scale, left + (x + fw - ox) / scale)

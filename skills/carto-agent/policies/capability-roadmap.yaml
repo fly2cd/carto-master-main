@@ -1,5 +1,5 @@
 schema_version: 1
-version: 1.0.3
+version: 1.0.4
 # Declared not-implemented queue. Guards may raise admission_class=not_implemented
 # ONLY for features listed here with status planned/backlog. Safety rejects
 # (unknown backend, arbitrary code, symlink, unknown fields) stay forbidden and
@@ -77,3 +77,7 @@ items:
     status: planned
     target: Part II
     note: maplibre-web 正式渲染后端(受控无头浏览器渲染瓦片流,RenderReceipt 改语义冻结+环境声明)。快照固化已覆盖"导出在线样式"需求;此项为终局形态,非本期依赖。
+  - id: image-material-frame-binding
+    status: backlog
+    target: 待定
+    note: 无地理语义的图片素材(插画/海报背景/装饰图)经冻结 image material 绑定 layout frame 接入版面。组件级接入模式与 chart 同构(独立 schema + content_id 绑 frame + layer_stack 绘制序),不是新的 geometry 数据形态,也不进数据准备流程(素材通道:字节冻结+处理证据;压缩等变换须留输入/参数/输出摘要)。当前 layout.frames[].type 无 image 类、content_id 只绑 view/overlay,故明确拒绝;开放须补协议三件套。

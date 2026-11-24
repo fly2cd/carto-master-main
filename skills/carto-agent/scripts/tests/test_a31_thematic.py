@@ -671,8 +671,9 @@ class ThematicWorkflowTests(unittest.TestCase):
         scene = load_document(workflow._design_path('candidates/render-scene.yaml'))
         page_request = load_document(Path(scene['page_request_ref']['uri']))
         frozen = page_request['basemap']
-        self.assertEqual({'authority': 'EPSG', 'code': '4326'}, frozen['crs'])
-        self.assertEqual([-1, -1, 5, 2], frozen['extent'])
+        self.assertEqual({'authority': 'EPSG', 'code': '4326'}, frozen['registration']['crs'])
+        self.assertEqual([-1, -1, 5, 2], frozen['registration']['extent'])
+        self.assertEqual('extent', frozen['registration']['kind'])
         self.assertEqual({'desaturate': 0.5, 'lighten': 0.2}, frozen['style'])
         self.assertEqual(basemap_file.stat().st_size, frozen['image']['size_bytes'])
         # The paint order is a frozen contract: ground first, figures above.

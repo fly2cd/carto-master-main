@@ -203,11 +203,15 @@ class RouteCandidateCompiler:
         source_text = {"content_id": "source", "text": profile.notice}
         if "body_font_pt" in furniture_style:
             source_text["font_pt"] = furniture_style["body_font_pt"]
-        document_node = {"category": "leadership_visit", "name": title}
+        document_node = {"category": intent["business_scene"], "name": title}
         if geo is not None:
             document_node["geo"] = geo
         page_request = {
-            "schema_version": 4, "geometry": "image",
+            "schema_version": 5, "geometry": "vector", "expression": "canvas-overlay",
+            "coordinate_mode": "image-pixel-registration",
+            # Frozen paint order of the canvas page: backdrop, overlay graphics,
+            # page furniture (texts and frame border), then legends.
+            "layer_stack": ["basemap", "thematic", "furniture", "legends"],
             "font": {"path": str(font_path), "digest": font_digest, "size_bytes": font_path.stat().st_size},
             "grid_north": None, "scale_bar": None,
             "resolved_layout": resolved_layout,
@@ -217,8 +221,11 @@ class RouteCandidateCompiler:
                                     "color": item["color"], "shape": item["shape"]}
                                     for index, item in enumerate(styled["legend_items"])]}],
             "document": document_node,
+            "overlay": {"graphics_digest": sha256_digest(graphics)},
             "basemap": {"image": {"path": str(image_path), "digest": image_ref["digest"],
                                   "size_bytes": len(image_bytes)},
+                        "registration": {"kind": "affine",
+                                         "parameters_ref": deepcopy(basemap_request["parameters_ref"])},
                         "source_size": source_size, "display_window": window,
                         "white_threshold": style.get("white_threshold", DEFAULT_WHITE_THRESHOLD)},
         }

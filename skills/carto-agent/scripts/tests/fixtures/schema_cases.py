@@ -953,6 +953,11 @@ for _name in ("page-request", "page-output"):
     VALID_CASES[_name] = json.loads((Path(__file__).parent / f"{_name}.valid.json").read_text(encoding="utf-8"))
     INVALID_CASES[_name] = json.loads((Path(__file__).parent / f"{_name}.invalid.json").read_text(encoding="utf-8"))
 
+# Registered raster backdrop component. The invalid fixture mixes both registration
+# parameterizations — one geo-to-pixel affine, declared exactly one way.
+VALID_CASES["basemap"] = json.loads((Path(__file__).parent / "basemap.valid.json").read_text(encoding="utf-8"))
+INVALID_CASES["basemap"] = json.loads((Path(__file__).parent / "basemap.invalid.json").read_text(encoding="utf-8"))
+
 # Shared categorical portrayal does not register a business scenario or renderer receipt.
 for _name in ("map-expression-catalog", "resolved-portrayal"):
     VALID_CASES[_name] = json.loads((Path(__file__).parent / f"{_name}.valid.json").read_text(encoding="utf-8"))
@@ -1025,9 +1030,13 @@ VARIANT_CASES["general-generate-request.vector"] = _vector_gr
 VARIANT_INVALID_CASES["general-generate-request.vector"] = {**deepcopy(_vector_gr), "unexpected": True}
 
 # Vector geometry variants of the unified page contracts (variant case, not a schema key).
-for _name in ("page-request.vector", "page-output.vector"):
+for _name in ("page-request.vector", "page-output.vector", "page-request.canvas"):
     VARIANT_CASES[_name] = json.loads((Path(__file__).parent / f"{_name}.valid.json").read_text(encoding="utf-8"))
     VARIANT_INVALID_CASES[_name] = json.loads((Path(__file__).parent / f"{_name}.invalid.json").read_text(encoding="utf-8"))
+
+# Affine registration variant of the backdrop component (explicit registration document).
+VARIANT_CASES["basemap.affine"] = json.loads((Path(__file__).parent / "basemap.affine.valid.json").read_text(encoding="utf-8"))
+VARIANT_INVALID_CASES["basemap.affine"] = json.loads((Path(__file__).parent / "basemap.affine.invalid.json").read_text(encoding="utf-8"))
 
 # A3.1 fixtures use explicit business designs; old request shapes are rejected.
 from tests.fixtures.thematic_cases import canonical_request, RASTER_DESIGN

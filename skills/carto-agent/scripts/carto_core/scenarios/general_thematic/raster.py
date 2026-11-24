@@ -187,7 +187,7 @@ class GeneralThematicCandidateCompiler:
         texts=[{'content_id':'title','text':request['map_title']},{'content_id':'source','text':profile.notice}]
         if len(panels)>1:
             for vid,panel in sorted(panels.items()):texts.append({'content_id':vid.replace('view-','caption-',1),'text':panel['title']})
-        raw={'schema_version':4,'portrayals':[{'view_id':vid,'ref':refs[panel['source_id']]} for vid,panel in sorted(panels.items())],
+        raw={'schema_version':5,'portrayals':[{'view_id':vid,'ref':refs[panel['source_id']]} for vid,panel in sorted(panels.items())],
              'resolved_layout':resolved,'font':{'path':str(font_path),'digest':preparation.digest_bytes(font_bytes),'size_bytes':len(font_bytes)},
              'texts':texts,'legends':[{'content_id':f['content_id'],'title':resolved['contract'].get('legend_title',LEGEND_TITLE)} for f in resolved['frames'] if f['type']=='legend'],
              'scale_bar':None,'grid_north':None}
@@ -975,7 +975,7 @@ def validation_scene(package_root: Path, snapshot: dict[str, Any], targets: list
                             "Layout differs from the enabled output profile")
     font_bytes = preparation.read_bytes(font, FONT_LIMIT)
     page_request = {
-        "schema_version": 4,
+        "schema_version": 5,
         "portrayals": [{"view_id":f["content_id"], "ref":deepcopy(portrayal_ref)} for f in resolved_layout["frames"] if f["type"]=="map"],
         "resolved_layout": deepcopy(resolved_layout),
         "font": {"path": str(font), "digest": preparation.digest_bytes(font_bytes),

@@ -70,6 +70,73 @@ class SchemaTests(unittest.TestCase):
                 with self.assertRaises(ProtocolError):
                     self.registry.validate(schema_name, instance)
 
+    def test_basemap_component_accepts_both_registrations_and_rejects_mixing(self) -> None:
+        from tests.fixtures.schema_cases import VARIANT_CASES, VARIANT_INVALID_CASES
+        self.registry.validate("basemap", VALID_CASES["basemap"])
+        self.registry.validate("basemap", VARIANT_CASES["basemap.affine"])
+        for name, instance in (("mixed-registration", INVALID_CASES["basemap"]),
+                               ("affine-without-uri", VARIANT_INVALID_CASES["basemap.affine"])):
+            with self.subTest(case=name):
+                with self.assertRaises(ProtocolError):
+                    self.registry.validate("basemap", instance)
+        mutations = [
+            lambda v: v.update(unexpected=True),
+            lambda v: v["image"].pop("digest"),
+            lambda v: v["registration"].update(kind="pixels"),
+            lambda v: v["image"].update(size_bytes=67108865),
+            lambda v: v.update(display_window={"x": 0, "y": 0, "width": 0, "height": 1}),
+        ]
+        for index, mutate in enumerate(mutations):
+            bad = deepcopy(VALID_CASES["basemap"])
+            mutate(bad)
+            with self.subTest(mutation=index):
+                with self.assertRaises(ProtocolError):
+                    self.registry.validate("basemap", bad)
+
+    def test_page_expression_axis_separates_portrayal_and_canvas_bodies(self) -> None:
+        from tests.fixtures.schema_cases import VARIANT_CASES, VARIANT_INVALID_CASES
+        canvas = VARIANT_CASES["page-request.canvas"]
+        self.registry.validate("page-request", canvas)
+        # A canvas page declares its thematic data form truthfully: the overlay is vector.
+        self.assertEqual("vector", canvas["geometry"])
+        self.assertEqual("image-pixel-registration", canvas["coordinate_mode"])
+        with self.assertRaises(ProtocolError):
+            self.registry.validate("page-request", VARIANT_INVALID_CASES["page-request.canvas"])
+        mutations = [
+            lambda v: v.update(geometry="image"),
+            lambda v: v.update(geometry="raster"),
+            lambda v: v.update(expression="portrayal"),
+            lambda v: v.update(coordinate_mode="native-no-reprojection"),
+            lambda v: v.pop("basemap"),
+            lambda v: v.pop("overlay"),
+            lambda v: v.pop("layer_stack"),
+            lambda v: v.update(bindings=deepcopy(VALID_CASES["page-bindings"])),
+            lambda v: v.update(charts=[]),
+            lambda v: v.update(unexpected=True),
+        ]
+        for index, mutate in enumerate(mutations):
+            bad = deepcopy(canvas)
+            mutate(bad)
+            with self.subTest(canvas_mutation=index):
+                with self.assertRaises(ProtocolError):
+                    self.registry.validate("page-request", bad)
+        # Portrayal pages must not carry canvas-only nodes, and raster pages must not
+        # carry any vector-only node (each rejection is independent, not conjunctive).
+        for key, value in (("overlay", {"graphics_digest": D}),
+                           ("document", {"category": "leadership_visit"})):
+            bad = deepcopy(VALID_CASES["page-request"])
+            bad[key] = value
+            with self.subTest(portrayal_forbidden=key):
+                with self.assertRaises(ProtocolError):
+                    self.registry.validate("page-request", bad)
+        for key, value in (("style", deepcopy(VALID_CASES["style"])),
+                           ("coordinate_mode", "native-no-reprojection")):
+            bad = deepcopy(VALID_CASES["page-request"])
+            bad[key] = value
+            with self.subTest(raster_forbidden=key):
+                with self.assertRaises(ProtocolError):
+                    self.registry.validate("page-request", bad)
+
     def test_validation_evidence_supports_browser_and_raster_renderer_bindings(self) -> None:
         browser = deepcopy(VALID_CASES["template-validation-evidence"])
         self.registry.validate("template-validation-evidence", browser)
