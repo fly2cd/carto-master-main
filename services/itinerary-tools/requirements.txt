@@ -1,0 +1,43 @@
+# carto-agent skill + itinerary-tools MCP 完整依赖（单文件）
+# Python >= 3.11
+#
+# 本清单由 AST 扫描一手源码推导（skills/carto-agent/scripts/carto_core 全部
+# 运行时模块 + services/itinerary-tools 服务/routing/amap_client），非抄现有
+# requirements/pyproject。import 名 → PyPI 名映射：PIL→Pillow、yaml→PyYAML、
+# fontTools→fonttools、docx→python-docx。已排除宿主自有模块（hermes_probe_worker
+# 的 `tools.skills_tool` 属 Hermes，非 PyPI 依赖）。
+# 版本范围以本机验证可用的 Anaconda 3.13.15 环境为锚。
+
+# ── 协议 / Schema / 内核 ─────────────────────────────────────
+jsonschema[format]>=4.23,<5   # Schema 校验（Draft 2020-12）
+referencing>=0.30,<1          # schema_registry 直接 import（Registry/Resource）
+PyYAML>=6.0.2,<7              # registration / request / 合同 YAML
+
+# ── 文档素材提取（file_parser：DOCX/PDF/XLSX）─────────────────
+python-docx>=1.1,<2           # DOCX 行程提取（leadership-visit 主路径）
+pdfplumber>=0.11,<1           # PDF 素材提取（本机未装；用 PDF 素材时必装）
+openpyxl>=3.1,<4              # XLSX 素材提取
+
+# ── MCP 服务 + 行程工具 ──────────────────────────────────────
+mcp>=1.26,<2                  # MCP stdio SDK（itinerary-tools 用 1.x）
+anyio>=4.0,<5                 # mcp_stdio 适配器直接 import
+httpx>=0.27,<1                # 高德在线 geocode / route
+networkx>=3.0,<4              # dual-graph 路网图
+tqdm>=4.60,<5                 # 路由构图进度
+
+# ── 几何 / 投影 / 矢量 ───────────────────────────────────────
+numpy>=1.26,<3                # 像素阵列摘要 / 几何计算
+shapely>=2.0,<3               # 路由几何裁剪 / 矢量
+pyproj>=3.6,<4                # geo-to-image-pixels 投影（CRS/Transformer）
+fiona>=1.10,<2                # 矢量 / shapefile 读取
+
+# ── 渲染（图片底图页 / 栅格页）────────────────────────────────
+matplotlib>=3.8,<4            # 整页渲染 / PDF 导出 / 字体测量
+Pillow>=10,<13                # 图像处理 / 快照
+rasterio>=1.4,<2              # 栅格读取与统计
+fonttools>=4.40,<5            # 字体嵌入校验（fsType）
+
+# ── 可选 ─────────────────────────────────────────────────────
+# osmnx>=2.0,<3               # 仅在线下载城市路网（Overpass）才需；本地 GeoJSON
+                              # 离线路由不需要，缺省自动降级触发高德回退；
+                              # 装它会顺带引入 geopandas 等地理栈。

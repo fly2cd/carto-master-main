@@ -189,7 +189,9 @@ class IntentSemanticsTests(unittest.TestCase):
             self.schemas.validate("map-brief", self.projection("map-brief", intent))
         # The temporary intent catalog never touches the packaged scenario policy:
         # it still admits only the registered general-thematic scenario.
-        self.assertEqual({("map-scenario", "general-thematic-map", "3.0.0"), ("map-scenario", "general-thematic-map", "4.0.0")},
+        self.assertEqual({("map-scenario", "general-thematic-map", "3.0.0"),
+                          ("map-scenario", "general-thematic-map", "4.0.0"),
+                          ("map-scenario", "leadership-visit-map", "1.0.0")},
                          set(ScenarioRegistry(self.schemas)._templates))
 
     def test_standalone_and_generate_share_the_same_intent(self):

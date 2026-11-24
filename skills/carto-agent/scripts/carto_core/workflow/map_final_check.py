@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from ..artifacts import atomic_yaml, file_digest
-from ..backend_registry import RASTER_PAGE, VECTOR_PAGE
+from ..backend_registry import IMAGE_ITINERARY_PAGE, RASTER_PAGE, VECTOR_PAGE
 from ..canonical import sha256_digest
 from ..compiler.layout import LayoutResolver, overlay_bounds
 from ..errors import ProtocolError, SecurityError
@@ -104,6 +104,8 @@ class FinalMapCheckService:
         elif scene.get("renderer_id") == VECTOR_PAGE.renderer_id:
             context["static_page"] = self._vector_context(scene, lock, receipt)
             context["vector"] = context["static_page"]
+        elif scene.get("renderer_id") == IMAGE_ITINERARY_PAGE.renderer_id:
+            context["image_page"] = self._image_context(scene, lock, receipt)
         results = [self.checkers.evaluate(item["id"], lock, context).to_dict()
                    for item in self.definitions]
         counts = {
@@ -137,6 +139,32 @@ class FinalMapCheckService:
         }
         self.registry.validate("validation-report", report)
         return report
+
+    def _image_context(self, scene, lock, receipt):
+        """Verified inputs for the image itinerary page: the frozen page request,
+        its layout agreement with the scene, the renderer environment and the
+        digest binding of every attested output."""
+        from ..adapters.image_page_renderer import environment_snapshot as image_environment
+        from ..compiler.layout import LayoutResolver
+        if self.execution_context is None:
+            raise SecurityError("IMAGE_EXECUTION_CONTEXT_REQUIRED", "Final checks require the trusted execution context")
+        ref = scene["page_request_ref"]
+        page = load_document(self.path_guard.resolve(ref["uri"], must_exist=True))
+        if not isinstance(page, dict):
+            raise ProtocolError("FINAL_CHECK_IMAGE_BINDING", str(ref["uri"]))
+        self.registry.validate("page-request", page)
+        if (page.get("geometry") != "image" or sha256_digest(page) != ref.get("digest")
+                or page["resolved_layout"] != scene["resolved_layout"]):
+            raise ProtocolError("FINAL_CHECK_IMAGE_BINDING", "Page request differs from the frozen scene")
+        LayoutResolver(self.registry).validate_execution(scene, lock["execution"])
+        if (receipt["renderer_id"] != scene["renderer_id"]
+                or lock["execution"]["environment"] != image_environment(scene["renderer_id"])):
+            raise ProtocolError("FINAL_CHECK_IMAGE_BINDING", "Scene, receipt and locked renderer environment differ")
+        for artifact in receipt["output_artifacts"]:
+            path = self.path_guard.resolve(artifact["artifact_ref"]["uri"], must_exist=True)
+            if file_digest(path) != artifact["artifact_ref"]["digest"]:
+                raise ProtocolError("FINAL_CHECK_IMAGE_BINDING", "Attested output differs on disk")
+        return {"page": page}
 
     def _raster_context(self, scene, lock, receipt):
         from ..adapters.formal_renderer import environment_snapshot
@@ -449,6 +477,15 @@ class FinalMapCheckService:
         path = self._artifact_path(pdf) if pdf else None
         payload = path.read_bytes() if path else b""
         pdf_font_evidence = any(marker in payload for marker in (b"/FontFile", b"/CIDFontType", b"/Type3"))
+        if "image_page" in context:
+            # The image renderer embeds the frozen font through matplotlib; the
+            # resource/lock digest chain plus embedded-font evidence is the policy.
+            return resource_ok and pdf_font_evidence, {
+                "font_resources": [item.get("font_family") for item in fonts],
+                "resource_binding_valid": resource_ok,
+                "pdf_font_evidence": pdf_font_evidence,
+                "policy": "embed-approved",
+            }, None
         if "static_page" in context:
             output = context["static_page"]["output"]
             font_ok = (output["font_snapshot"] == context["static_page"]["font"]
@@ -468,6 +505,24 @@ class FinalMapCheckService:
 
     def _layout_elements(self, context: dict[str, Any]) -> tuple[bool, dict[str, Any], None]:
         scene = context["scene"]
+        if "image_page" in context:
+            # Image pages: layout frames from the resolved contract, texts/legends
+            # bound one-to-one from the frozen page request.
+            page = context["image_page"]["page"]
+            try:
+                LayoutResolver(self.registry).validate_execution(scene, context["lock"]["execution"])
+            except (ProtocolError, SecurityError) as exc:
+                return False, {"layout_contract_valid": False,
+                               "error_code": exc.code, "message": exc.message}, None
+            frames = {f["content_id"]: f for f in scene["resolved_layout"]["frames"] if f["type"] != "map"}
+            bound = {item["content_id"] for item in page["texts"]}
+            bound.update(legend["content_id"] for legend in page.get("legends", []))
+            coverage_valid = set(frames) == bound
+            return coverage_valid, {
+                "layout_contract_valid": True, "frame_coverage_valid": coverage_valid,
+                "frames": sorted(frames), "bound_elements": sorted(bound),
+                "bounds_method": "frozen-contract-frames",
+            }, None
         if "static_page" in context:
             LayoutResolver(self.registry).validate_execution(scene, context["lock"]["execution"])
             frames = {f["id"]: f for f in scene["resolved_layout"]["frames"] if f["type"] != "map"}
@@ -511,7 +566,9 @@ class FinalMapCheckService:
 
     def _scenario_notice(self, context: dict[str, Any]) -> tuple[bool, dict[str, Any], None]:
         notice = context["scenario_profile"].notice
-        if "static_page" in context:
+        if "image_page" in context:
+            notices = [item for item in context["image_page"]["page"]["texts"] if item["text"] == notice]
+        elif "static_page" in context:
             notices = [item for item in context["static_page"]["page"]["texts"] if item["text"] == notice]
         else:
             notices = [item for item in context["scene"]["overlays"]
@@ -549,7 +606,23 @@ class FinalMapCheckService:
             hits = [marker.decode("utf-8") for marker in forbidden if marker in payload]
             if hits:
                 findings[item["target"]] = hits
-        if "static_page" in context:
+        if "image_page" in context:
+            # PDF streams may be compressed: also inspect the frozen source
+            # strings that produced these bytes (page texts, legend rows and
+            # itinerary callout content from the frozen scene).
+            page = context["image_page"]["page"]
+            strings = [item["text"] for item in page["texts"]]
+            strings += [legend["title"] for legend in page.get("legends", [])]
+            strings += [row["label"] for legend in page.get("legends", []) for row in legend["items"]]
+            for graphic in context["scene"].get("image_graphics", []):
+                if graphic["type"] == "callout":
+                    strings.append(graphic["title"])
+                    strings.extend(graphic.get("lines", []))
+            payload = "\n".join(strings).encode("utf-8")
+            hits = [marker.decode("utf-8") for marker in forbidden if marker in payload]
+            if hits:
+                findings["frozen-rendered-text"] = hits
+        elif "static_page" in context:
             # PDF streams may be compressed and SVG glyphs are paths: also inspect
             # the verified source strings actually used to produce these bytes.
             raster = context["static_page"]

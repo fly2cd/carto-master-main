@@ -16,9 +16,7 @@
     "data_bindings",
     "decisions",
     "open_issues",
-    "theme_tags",
-    "bindings",
-    "layout_parameters"
+    "theme_tags"
   ],
   "properties": {
     "schema_version": {
@@ -82,10 +80,7 @@
       "additionalProperties": false,
       "required": [
         "title",
-        "legend_source",
-        "renderer_id",
-        "legend_capacity",
-        "thematic_views"
+        "renderer_id"
       ],
       "properties": {
         "title": {
@@ -100,7 +95,8 @@
           "enum": [
             "maplibre-web",
             "rasterio-matplotlib-page",
-            "matplotlib-vector-page"
+            "matplotlib-vector-page",
+            "image-itinerary-page"
           ]
         },
         "legend_capacity": {
@@ -186,6 +182,72 @@
               }
             }
           }
+        },
+        "extent": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "number"
+          },
+          "description": "Image-itinerary plans: geographic bbox derived from the basemap registration."
+        },
+        "canvas": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "width_mm",
+            "height_mm",
+            "dpi"
+          ],
+          "properties": {
+            "width_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1200
+            },
+            "height_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1200
+            },
+            "dpi": {
+              "type": "integer",
+              "minimum": 72,
+              "maximum": 600
+            }
+          }
+        },
+        "basemap_ref": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+        },
+        "layout_model": {
+          "enum": [
+            "image-native",
+            "fixed-page"
+          ]
+        },
+        "annotation_layout": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "seed",
+            "iterations",
+            "gap_px"
+          ],
+          "properties": {
+            "seed": {
+              "type": "integer"
+            },
+            "iterations": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "gap_px": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
         }
       }
     },
@@ -204,5 +266,63 @@
     "layout_parameters": {
       "$ref": "https://schemas.carto-agent.local/v1/grid-parameters.schema.json"
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "decisions": {
+            "properties": {
+              "renderer_id": {
+                "const": "image-itinerary-page"
+              }
+            }
+          }
+        },
+        "required": [
+          "decisions"
+        ]
+      },
+      "then": {
+        "properties": {
+          "decisions": {
+            "required": [
+              "extent",
+              "canvas",
+              "basemap_ref"
+            ]
+          }
+        },
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "bindings"
+              ]
+            },
+            {
+              "required": [
+                "layout_parameters"
+              ]
+            }
+          ]
+        }
+      },
+      "else": {
+        "required": [
+          "bindings",
+          "layout_parameters"
+        ],
+        "properties": {
+          "decisions": {
+            "required": [
+              "legend_source",
+              "legend_capacity",
+              "thematic_views"
+            ]
+          }
+        }
+      }
+    }
+  ]
 }

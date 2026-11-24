@@ -1,0 +1,53 @@
+{
+  "status": "complete",
+  "resolved": [
+    {
+      "place_id": "place-spp",
+      "location": {
+        "lon": 120.150018,
+        "lat": 30.266874
+      },
+      "user_confirmed": true
+    },
+    {
+      "place_id": "place-linan",
+      "location": {
+        "lon": 119.748121,
+        "lat": 30.257323
+      },
+      "user_confirmed": true
+    },
+    {
+      "place_id": "place-chunan",
+      "location": {
+        "lon": 119.066668,
+        "lat": 29.608908
+      },
+      "user_confirmed": true
+    },
+    {
+      "place_id": "place-jiande",
+      "location": {
+        "lon": 119.324956,
+        "lat": 29.519091
+      },
+      "user_confirmed": true
+    },
+    {
+      "place_id": "place-tonglu",
+      "location": {
+        "lon": 119.689578,
+        "lat": 29.79341
+      },
+      "user_confirmed": true
+    },
+    {
+      "place_id": "place-szxz",
+      "location": {
+        "lon": 120.151352,
+        "lat": 30.265632
+      },
+      "user_confirmed": true
+    }
+  ]
+}

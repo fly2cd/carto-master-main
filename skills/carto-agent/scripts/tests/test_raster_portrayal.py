@@ -101,12 +101,13 @@ class MapExpressionCatalogTests(unittest.TestCase):
         policy = load_document(SKILL / "policies/scenario-capabilities.yaml")
         # One capability profile per business purpose; geometry is a data-adaptation
         # variant inside it, never a second registration of the same purpose.
-        self.assertEqual(["general-thematic-mapping"], [item["id"] for item in policy["profiles"]])
-        self.assertEqual(["general_thematic_mapping"],
+        self.assertEqual(["general-thematic-mapping", "leadership-visit-mapping"],
+                         [item["id"] for item in policy["profiles"]])
+        self.assertEqual(["general_thematic_mapping", "leadership_visit"],
                          [item["intent_constraints"]["business_scene"] for item in policy["profiles"]])
         self.assertEqual(["raster", "vector"],
                          [variant["geometry"] for variant in policy["profiles"][0]["geometry_variants"]])
-        self.assertEqual({"general-thematic"}, set(scenario_registry._COMPONENTS))
+        self.assertEqual({"general-thematic", "leadership-visit"}, set(scenario_registry._COMPONENTS))
         with self.assertRaisesRegex(CartoError, "CAPABILITY_NOT_AVAILABLE"):
             scenario_registry.ScenarioRegistry().for_template({"kind": "map-scenario", "id": "general-thematic-map", "version": "99.0.0"})
         for key in ("business_scene", "backend", "source_path", "lookup_table"):

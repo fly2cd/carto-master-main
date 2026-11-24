@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/data-summary-request.schema.json",
+  "title": "data-summary-request",
+  "description": "Typed input for the data-summary capability: a project-scoped data directory to parse into a Markdown mirror. The handler resolves the directory through PathGuard under the project root before reading.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "data_dir"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "data_dir": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    }
+  }
+}

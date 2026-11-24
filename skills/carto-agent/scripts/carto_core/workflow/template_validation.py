@@ -6,7 +6,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Callable
 
 
-from ..backend_registry import MAPLIBRE_WEB, VECTOR_PAGE, is_static
+from ..backend_registry import IMAGE_ITINERARY_PAGE, MAPLIBRE_WEB, VECTOR_PAGE, is_static
 from ..adapters.controlled_renderer import FRONTEND_BUILD, MAPLIBRE_VERSION, OVERLAY_ENGINE_VERSION, RENDERER_VERSION, BrowserLimits, ControlledBrowserRenderer, browser_version, discover_browser
 from ..adapters.webmap_renderer import (
     RendererCapabilityProfile, RendererCapabilityRegistry, WebMapRendererAdapter,
@@ -42,9 +42,14 @@ def _is_static_backend(renderer_id):
 def _validation_cases(snapshot):
     docs = snapshot["documents"]
     parameters = grid_cases(docs["scenario"]["embedded"]["layout"])
-    expressions = [mode for layer in docs["portrayal"]["layers"] for mode in layer.get("validation_expressions", [])]
+    layers = docs["portrayal"].get("layers", [])
+    expressions = [mode for layer in layers for mode in layer.get("validation_expressions", [])]
     if expressions:
         return [{"parameters": params, "expression": mode} for mode in expressions for params in parameters]
+    # Image-itinerary portrayals declare no layers and no layout parameters:
+    # a single default case renders the fixture scene once.
+    if not layers and not parameters:
+        return [{}]
     return [{"parameters": params} for params in parameters]
 
 
@@ -327,7 +332,7 @@ class TemplatePackageValidator:
                     or not _is_static_backend(scene["renderer_id"])):
                 raise ProtocolError("VALIDATION_RENDER_SCENE_DRIFT", "Grid scene changed")
             if (scene["resolved_layout"]["template_contract"] != layout
-                    or scene["resolved_layout"]["parameters"] != item["parameters"]):
+                    or scene["resolved_layout"].get("parameters") != item.get("parameters")):
                 raise ProtocolError("GRID_VALIDATION_CASE_MISMATCH",
                                     "Scene does not represent the declared grid case")
             if scene["renderer_id"] == VECTOR_PAGE.renderer_id:
@@ -339,9 +344,20 @@ class TemplatePackageValidator:
                 from ..compiler.portrayal_resolver import ir_to_kind
                 if any(ir_to_kind(VectorPortrayalCompiler(vector).load_verified(p["portrayal_ref"], self.context)[0]["encoding"]) != item["expression"] for p in page["panels"]):
                     raise ProtocolError("GRID_VALIDATION_CASE_MISMATCH", "Vector expression coverage differs")
+                actual_style = page["cartography"]
+            elif scene["renderer_id"] == IMAGE_ITINERARY_PAGE.renderer_id:
+                # Image pages carry no raster appearance document; the frozen scene
+                # already binds the template layout and the portrayal style digest.
+                page = load_document(self.path_guard.resolve(
+                    scene["page_request_ref"]["uri"], must_exist=True))
+                self.registry.validate("page-request", page)
+                if page["resolved_layout"]["template_contract"] != layout:
+                    raise ProtocolError("APPEARANCE_TEMPLATE_MISMATCH",
+                                        "Fixture layout differs from template")
+                actual_style = snapshot["documents"]["scenario"]["embedded"]["cartography"]
             else:
                 page = preparation.document(scene["page_request_ref"], "page-request")
-            actual_style = page["cartography"] if scene["renderer_id"] == VECTOR_PAGE.renderer_id else page["appearance"]["cartography"]
+                actual_style = page["appearance"]["cartography"]
             if actual_style != snapshot["documents"]["scenario"]["embedded"]["cartography"]:
                 raise ProtocolError("APPEARANCE_TEMPLATE_MISMATCH", "Fixture style differs from template")
             expected_session = f"template-validation-{snapshot['package_digest'][7:23]}-{sha256_digest(scene)[7:23]}"
@@ -495,10 +511,15 @@ class TemplatePackageValidator:
         from ..repository.map_expression_catalog import MapExpressionCatalog
         expr_catalog = MapExpressionCatalog(self.registry)
         expr_validator = ExpressionValidator(expr_catalog, self.registry)
-        for layer in docs["portrayal"]["layers"]:
-            findings = expr_validator.validate_layer(layer)
-            for finding in findings:
-                raise ProtocolError(finding["code"], finding["message"])
+        # Image-itinerary portrayals carry the image_itinerary style instead of
+        # thematic layers: layer-level checks are replaced by the prototype's
+        # reference to the portrayal's declared painted layer identities.
+        prototype = docs["prototype"]
+        if "layers" in docs["portrayal"]:
+            for layer in docs["portrayal"]["layers"]:
+                findings = expr_validator.validate_layer(layer)
+                for finding in findings:
+                    raise ProtocolError(finding["code"], finding["message"])
         profile.require_contract(docs["scenario"])
         expected_display_crs = expected.get("display_crs")
         if expected_display_crs is not None and docs["spatial_behavior"]["display_crs"] != expected_display_crs:
@@ -506,20 +527,28 @@ class TemplatePackageValidator:
         roles = {role["id"]: role for role in docs["data_schema"]["roles"]}
         if set(docs["scenario"]["data_role_refs"]) != set(roles):
             raise ProtocolError("SCENARIO_DATA_ROLE_MISMATCH", str(sorted(roles)))
-        layers = {layer["data_role"]: layer for layer in docs["portrayal"]["layers"]}
-        if set(layers) != set(roles):
-            raise ProtocolError("PORTRAYAL_DATA_ROLE_MISMATCH", str(sorted(layers)))
-        for role_id, layer in layers.items():
-            semantic_roles = {field["semantic_role"] for field in roles[role_id]["fields"]}
-            if layer.get("value_role") is not None and layer["value_role"] not in semantic_roles:
-                raise ProtocolError("PORTRAYAL_VALUE_ROLE_MISMATCH", role_id)
+        if "layers" in docs["portrayal"]:
+            layers = {layer["data_role"]: layer for layer in docs["portrayal"]["layers"]}
+            if set(layers) != set(roles):
+                raise ProtocolError("PORTRAYAL_DATA_ROLE_MISMATCH", str(sorted(layers)))
+            for role_id, layer in layers.items():
+                semantic_roles = {field["semantic_role"] for field in roles[role_id]["fields"]}
+                if layer.get("value_role") is not None and layer["value_role"] not in semantic_roles:
+                    raise ProtocolError("PORTRAYAL_VALUE_ROLE_MISMATCH", role_id)
+            if set(prototype["layer_ids"]) != {layer["id"] for layer in docs["portrayal"]["layers"]}:
+                raise ProtocolError("PROTOTYPE_REFERENCE_MISMATCH", prototype["prototype_id"])
+        else:
+            declared_layers = set(docs["portrayal"].get("layer_ids", []))
+            if not declared_layers:
+                raise ProtocolError("PORTRAYAL_LAYERS_UNDECLARED",
+                                    "image portrayals must declare their painted layer identities")
+            if set(prototype["layer_ids"]) != declared_layers:
+                raise ProtocolError("PROTOTYPE_REFERENCE_MISMATCH", prototype["prototype_id"])
         formats = {target["format"] for target in docs["delivery"]["targets"]}
         target_ids = {target["id"] for target in docs["delivery"]["targets"]}
         if formats != set(expected_targets) or set(docs["scenario"]["target_ids"]) != target_ids:
             raise ProtocolError("DELIVERY_TARGET_MISMATCH", str(sorted(formats)))
-        prototype = docs["prototype"]
-        if (set(prototype["target_ids"]) != target_ids
-                or set(prototype["layer_ids"]) != {layer["id"] for layer in docs["portrayal"]["layers"]}):
+        if set(prototype["target_ids"]) != target_ids:
             raise ProtocolError("PROTOTYPE_REFERENCE_MISMATCH", prototype["prototype_id"])
 
     @staticmethod

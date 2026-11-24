@@ -18,7 +18,8 @@ version: 0.8.0
 ## 当前阶段边界
 
 - 保留通用框架：Schema 与安全底座、状态与回执、审批协调、ToolGateway、知识服务、模板创建发布编排、候选编译与冻结、锁驱动渲染、成品检查和原子本地交付。
-- **当前只注册一个业务场景**：`general_thematic_mapping`。`scenario-capabilities.yaml` v1.7.0 为 `general-thematic` 实现登记**一个**能力档案 `general-thematic-mapping@5.0.0`；栅格与矢量是该档案下的 `geometry_variants` 数据适配变体，各自只声明几何、模板资产（`general-thematic-map@3.0.0` / `@4.0.0`）、作者 profile 与渲染后端，业务语义/意图约束/输出与版式上限只声明一遍。按显式 `geometry` 与变体 `template_geometry` 分派，撤销某几何即删除对应变体。支持已分类栅格、点/面矢量及显式一对一 CSV 属性连接；网格 1×1 / 1×2 / 2×2，独立/共享图例，A4 横版 PDF+PNG。均为 `production_enabled: false`，禁止敏感坐标和生产数据，强制 NOTICE 与源许可；其余能力仍默认拒绝。
+- **已注册两个业务场景**。`scenario-capabilities.yaml` v1.8.0：`general_thematic_mapping`（`general-thematic` 实现登记能力档案 `general-thematic-mapping@5.0.0`；栅格与矢量是该档案下的 `geometry_variants` 数据适配变体，各自只声明几何、模板资产（`general-thematic-map@3.0.0` / `@4.0.0`）、作者 profile 与渲染后端，业务语义/意图约束/输出与版式上限只声明一遍。按显式 `geometry` 与变体 `template_geometry` 分派，撤销某几何即删除对应变体。支持已分类栅格、点/面矢量及显式一对一 CSV 属性连接；网格 1×1 / 1×2 / 2×2，独立/共享图例，A4 横版 PDF+PNG）；以及 `leadership_visit`（见下条）。均为 `production_enabled: false`，禁止敏感坐标和生产数据，强制 NOTICE 与源许可；其余能力仍默认拒绝。
+- **`leadership_visit`（领导调研行程路线图）**：`leadership-visit` 实现登记能力档案 `leadership-visit-mapping@1.0.0`（vector 变体，`image-itinerary-page` 静态图片底图渲染后端，A3 PDF+PNG）。`generate-map` 支持 pending 数据准备模式（`preparation: "mcp-itinerary-chain"`：请求 intake 后指纹锁定，G1 前只需底图 + 配准参数 + 行程 DOCX；G1 后宿主经 MCP 行程准备工具链组装行程数据——`geocode`（地名歧义必须展示候选并等待用户真实确认，不得默认选择）/ `plan_route`（三级回退，直线须显式 `allow_straight_line=true`，结果经 `result_ref {uri,digest}` 引用传递并可 `base_result_ref` 服务端增量合并，大折线不经宿主内联重述）/ `itinerary_assemble`（确定性合并落盘，接受 `route_result_ref` 引用并字节复验摘要），G1 前另有 `itinerary_check`（草稿校验反馈）与 `request_scaffold`（请求骨架与摘要计算）——之后不得改动请求，否则 `JOB_INPUT_DRIFT`；实际数据绑定发生在 G2 的 prepared-data-bundle）。`create-template` 路由经 RouteAuthor 生成样式合同（沿用旧框架 1.2.0 实测样式值）并以合成 fixture 走真实渲染验证。设计层样式修订通道已开放：请求可带 `style_overrides`（样式补丁：分组配色、注记/线宽表达参数、`page_furniture` 标题/正文字号与图框边线——补丁合并进模板 `image_itinerary` 合同，两渲染器经共享推导函数消费冻结值）；G2 前的样式修订走 `revision-brief → revise`（`style_overrides` 为合法修订键，数据证据复用仅重编译重预览，须换签 G1 与 G2；底图/行程结构数据仍须新运行）。leg 级改线走同运行数据修订通道（2026-11-21 Design B）：`data-revision-brief`（修订版 brief 的 G1 审批对象，`outbound_declaration` 外发地名经提案摘要链绑定）→ G1 后宿主重跑增量 MCP 链 → `data-revise`（冻结证据快照进 `revisions/rN/evidence/`，`source_ref.digest` 升级为已绑定事实声明，依赖图 `data_evidence_reusable: false` + `evidence_digest`）→ 同一 G1 下 compile 重准备（运行时门复核活证据，漂移即 `DATA_EVIDENCE_DRIFT` 拒绝）→ 新 G2；v1 仅 `route_legs`（via_points/strategy），停靠增删与其他场景为 v2/未开放。行程工具服务见仓库 `services/itinerary-tools`（MCP stdio，六工具，advisory 层——权威校验在内核）；审批回执签发工具见 `tools/host/approval-sign.py`（签名权威在内核外，复用内核加密实现）。可选 `online_basemap`（仅 Tianditu）声明在线底图绑定：前端显示层经 map-document 的 baseMap/mapData 地理段（窗口一致取景、无标度相机合同），底图合同层变更走 revise 修订回路（`basemap`/`online_basemap` 为修订键，bundle 复用、数据证据门不松），在线地图样式经 `basemap_snapshot` 快照固化为配准底图后导出；正式渲染与交付仍为图片底图 PDF/PNG。真实领导行程属敏感数据，须独立敏感准入送审或脱敏后方可执行。
 - 该场景的分类栅格模板样张渲染分支已注册：`validate` 在静态检查全部通过后，于受信验证上下文内由包内图例样本派生确定性合成栅格，经授权 MCP 网关测量统计，并用 `rasterio-matplotlib-page` 后端渲染 PDF+PNG 样张、冻结渲染场景与带签名 RenderReceipt；`publish` 按冻结场景重新核验证据（不依赖作者宿主字体）并消费精确 TP。宿主缺少栅格渲染依赖、无可嵌入字体或展示 CRS 为地理坐标系时仍失败关闭，不得伪造渲染证据绕过。
 - 仓库不附带业务示例数据、示例模板包或默认测试项目。后续由用户提供真实数据和场景需求，完成对应实现、注册和验收后才能启用。
 - 模板发布仍必须验证闭合包、依赖锁、场景验证输入、检查器集合、RenderReceipt、冻结样张场景（`render_scene_ref`）和环境绑定，并消费精确 TP。验证数据是否适合进入模板包由场景安全检查明确判定，不能把原始敏感业务数据打包。
@@ -57,6 +58,7 @@ version: 0.8.0
 ## 基础 GIS 数据接入（第一批）
 
 - 先阅读 `workflows/geospatial-data.md`，再通过唯一 CLI 的 `data inspect-raster` 检查显式配置的 GeoTIFF 元数据/精确类别统计；这不是新业务路由，也不生成地图。
+- `data summarize` 是同一 CLI 下的只读子命令：经 `data-summary` ToolGateway 能力（deny-by-default，PathGuard 约束）把项目数据目录镜像为分类 Markdown 清单，输出只落项目内不可变证据 artifact，不设第二 CLI 入口。
 - 可选 MCP SDK 以 stdio 接入独立 `geospatial-mcp 0.3.0`。必须显式配置可信解释器、项目/租户、数据根、catalog 和限制；不自动安装，不接受业务请求指定的服务命令/URL。
 - `raster-input` 是 `generate-request.source_bindings` 的结构分支；正式共享链路见下文第三批 C。结构合法不等于业务场景或模板准入。
 - 重投影已实现为 ToolGateway 适配能力（仅 nearest、显式目标 CRS）；只读 CLI 必须拒绝变换。尚未接入获批场景，不得绕过业务门禁直接调用。
@@ -108,7 +110,7 @@ version: 0.8.0
 - 迁移段资产（2026-11-17 用户授权）：`template-assets/` 存放从 2026Oct 项目迁入的 13 项段资产（6 风格/7 版式；原品牌资产已随品牌段移除删除），每项含逐字节原件与适配主仓 Schema 的契约，`MIGRATION.yaml` 记录源摘要与适配规则，守卫测试防漂移。它们是库参考资产：仅供只读匹配与段引用消费，未过 T1/TP 与验证渲染门禁，不是生产可用模板；入库走真实 publish 路径（开发种子脚本见 `template-assets/README.md`）。
 - 配色红线（map-style.md §8.2 目标设计的可校验部分）：generate 链在色值冻结前执行三条检查——顺序/分歧色带须与声明的感知结构一致（sequential 的 L* 单调、diverging 的亮心中点，CIE 15 CIELAB）、相邻类 ΔE76 可区分、二色觉模拟（Machado 2009）后仍可区分；离散类别色查后两条，不查单调性。参数与执行级别全部在 `policies/color-redlines-policy.yaml`（`pending-business-review`；R1/R2 阻断、色觉安全首期警告）；blocker 失败关闭，warning 不阻断。模板包不含实例颜色，故 template validate/publish 零改动；WCAG 对比度公式已就绪但未接线（契约尚未声明文字/背景色对）；不自动选色、不改写通过检查的色值。
 - 不接纳旧 `scene_hint`、单值 `theme` 或 `fields.theme`；不自动迁移旧输入、候选或锁。详见 `workflows/intent-contract.md`。
-- 识别词表不等于可执行能力：现有分类保留为目录词汇；业务能力注册表和代码实现白名单当前只登记 `general-thematic-mapping`（实现 `general-thematic`），其余场景与组件一律默认拒绝。
+- 识别词表不等于可执行能力：现有分类保留为目录词汇；业务能力注册表和代码实现白名单当前登记 `general-thematic-mapping`（实现 `general-thematic`）与 `leadership-visit-mapping`（实现 `leadership-visit`），其余场景与组件一律默认拒绝。
 
 ## 布局契约消费（第一阶段）
 

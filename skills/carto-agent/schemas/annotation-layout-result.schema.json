@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/annotation-layout-result.schema.json",
+  "title": "annotation-layout-result",
+  "description": "Typed output of the annotation-layout capability: one placement assignment per callout item. Placed assignments carry the solved box and anchor offsets; the result is re-verified by check_layout without re-optimizing.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "algorithm",
+    "status",
+    "assignments",
+    "iterations",
+    "seed"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "algorithm": {
+      "const": "greedy-sa-v2"
+    },
+    "status": {
+      "enum": ["placed", "unplaceable"]
+    },
+    "assignments": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/assignment"
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "placed"
+                }
+              },
+              "required": ["status"]
+            },
+            "then": {
+              "required": ["x", "y", "w", "h", "dx", "dy"]
+            }
+          }
+        ]
+      }
+    },
+    "iterations": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "$defs": {
+    "assignment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "status": {
+          "enum": ["placed", "unplaced"]
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "w": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "h": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "dx": {
+          "type": "number"
+        },
+        "dy": {
+          "type": "number"
+        }
+      }
+    }
+  }
+}

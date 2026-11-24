@@ -34,11 +34,19 @@
       "maxItems": 8,
       "uniqueItems": true,
       "items": {
-        "enum": ["plan", "candidate", "scene", "preflight", "preview"]
+        "enum": ["plan", "candidate", "scene", "preflight", "preview", "data-evidence"]
       }
     },
     "data_evidence_reusable": {
       "type": "boolean"
+    },
+    "evidence_digest": {
+      "description": "Canonical digest of the actual prepared data evidence document (e.g. the assembled itinerary). Present only for revisions that carry/inherit a data-evidence binding: the runtime gate re-verifies the live evidence file against this digest at compile, so 'not reusable' claims and reuse decisions are both independently checked — never trusted from the static rules alone.",
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+    },
+    "evidence_ref": {
+      "description": "Reference to the revision-staged evidence snapshot (frozen copy of the data facts the revision was approved against).",
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
     },
     "bundle_input_digest": {
       "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"

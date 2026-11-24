@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.itinerary-tools.local/v1/itinerary-check-response.schema.json",
+  "type": "object",
+  "required": [
+    "status",
+    "report",
+    "draft_digest"
+  ],
+  "properties": {
+    "status": {
+      "enum": [
+        "complete",
+        "invalid",
+        "error"
+      ]
+    },
+    "report": {
+      "type": "object",
+      "properties": {
+        "errors": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "summary": {
+          "type": "object"
+        }
+      }
+    },
+    "draft_digest": {
+      "type": "string"
+    },
+    "code": {
+      "type": "string"
+    },
+    "message": {
+      "type": "string"
+    }
+  }
+}

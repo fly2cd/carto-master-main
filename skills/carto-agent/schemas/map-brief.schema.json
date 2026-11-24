@@ -76,6 +76,10 @@
           "path_digest": {
             "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
           },
+          "preparation": {
+            "enum": ["mcp-itinerary-chain"],
+            "description": "When present, the source file will be produced after G1 by the declared preparation chain; path_digest is omitted until the file exists."
+          },
           "field_bindings": {
             "type": "array",
             "items": {

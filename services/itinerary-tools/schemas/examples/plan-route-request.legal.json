@@ -1,0 +1,15 @@
+{
+  "legs": [
+    {
+      "leg_id": "leg-01",
+      "origin": {"lon": 120.150018, "lat": 30.266874},
+      "destination": {"lon": 119.748121, "lat": 30.257323},
+      "via_points": [{"lon": 120.077143, "lat": 30.305034}]
+    }
+  ],
+  "allow_straight_line": false,
+  "base_result_ref": {
+    "uri": "route-results/plan-20261122T093000000000Z-5legs.json",
+    "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  }
+}

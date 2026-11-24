@@ -1,0 +1,18 @@
+schema_version: 1
+index_id: local-template-index
+version: 1.0.0
+repository_scope: local:templates
+entries:
+- namespace: local
+  kind: map-scenario
+  id: leadership-visit-map
+  version: 1.0.0
+  digest: sha256:0561399063fbbdb86ee3e35a3de5802850f924cf043fbd9dd06d3e7e28d88962
+  manifest_path: packages/local/map-scenario/leadership-visit-map/1.0.0/manifest.yaml
+  manifest_digest: sha256:e9fb88f0fffe00599169bac52b99dc949fa00fe8b5499fb98550a6d0c229c910
+  evidence_digest: sha256:1c22e735c8edd97f52ea6a8793d2c268096d2415cbf62920026b5799de41dd56
+  publication_receipt_path: transactions/aaa1133c08cb91efa8f2819b72cff029de6188aa7012d4a3ae54b500e4a572d2.yaml
+  status: published
+  published_at: '2026-11-20T06:30:11.254Z'
+generated_at: '2026-11-20T06:30:11.254Z'
+digest: sha256:e468806fdfeb031536d6b504cdd46bf741490080acec98285eef71f3dcdf514c

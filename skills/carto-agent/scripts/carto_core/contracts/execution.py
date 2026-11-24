@@ -26,8 +26,12 @@ from ..errors import ProtocolError, SecurityError
 class ExecutionBudget:
     max_tool_calls: int = 20
     max_model_calls: int = 10
-    max_revisions: int = 2
-    max_elapsed_seconds: float = 600.0
+    # Interactive map runs include human approval gates (G1/G2/review/G3) and
+    # iterative design revisions; the elapsed cap counts wall-clock including
+    # gate waiting, so it must accommodate a human-paced session (2026-11-22:
+    # raised from 2 revisions / 600s after a real run hit both limits).
+    max_revisions: int = 3
+    max_elapsed_seconds: float = 1200.0
     max_cost_units: float = 100.0
     max_context_bytes: int = 2_000_000
     tool_calls: int = 0

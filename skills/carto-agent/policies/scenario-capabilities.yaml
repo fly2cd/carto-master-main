@@ -1,5 +1,5 @@
 schema_version: 1
-version: 1.7.0
+version: 1.8.0
 default: deny
 # ADR-001 §9.5 项④：一个业务能力只登记一次，几何降为数据适配属性。
 # 业务语义、意图约束、输出与版式上限在 profile 上声明一遍；每个 geometry_variants
@@ -78,3 +78,51 @@ profiles:
       version: 4.0.0
     authoring_profile: general-vector-authoring
     renderer_id: matplotlib-vector-page
+- id: leadership-visit-mapping
+  version: 1.0.0
+  implementation: leadership-visit
+  routes:
+  - create-template
+  - generate-map
+  request_schemas:
+    create-template: leadership-visit-template-create-request
+    generate-map: leadership-visit-generate-request
+  intent_constraints:
+    business_scene: leadership_visit
+    allowed_tasks:
+    - visit-route-map
+    allowed_theme_tags: []
+    required_theme_tags: []
+  data_nature: user-provided
+  production_enabled: false
+  notice: 领导调研路线图：行程路线为示意参考，不用于实际导航
+  licenses:
+  - user-declared-source-license
+  output_profile:
+    width_mm: 420
+    height_mm: 297
+    dpi: 300
+    width_px: 4961
+    height_px: 3508
+  output_constraints:
+    max_width_mm: 420
+    max_height_mm: 297
+    min_dpi: 144
+    max_dpi: 300
+    allowed_formats:
+    - pdf
+    - png
+    cmyk_supported: false
+  layout_constraints:
+    allowed_models:
+    - image-native
+    - fixed-page
+  internal_field_names: []
+  geometry_variants:
+  - geometry: vector
+    template:
+      kind: map-scenario
+      id: leadership-visit-map
+      version: 1.0.0
+    authoring_profile: leadership-visit-authoring
+    renderer_id: image-itinerary-page

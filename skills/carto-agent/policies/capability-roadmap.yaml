@@ -65,3 +65,11 @@ items:
     status: delivered
     target: U-P3.6
     note: 1×2/2×2 参数化网格 + 独立/整页共享图例已交付;保留作为 delivered 示例与防回退锚点。
+  - id: leadership-visit-online-basemap
+    status: delivered
+    target: leadership-visit Part II 前置
+    note: 在线底图三件套已交付(2026-11-21)——请求可选声明 online_basemap(仅 Tianditu,外发进 G1 审批面);compile 产出的 map-document 新增 baseMap+mapData 地理段(窗口一致取景/无标度相机合同);basemap/online_basemap 进入 revise 修订词汇(bundle 复用,数据证据门不松);快照固化经 services/itinerary-tools basemap_snapshot 工具导出在线地图样式。正式渲染与交付仍为图片底图 PDF/PNG。
+  - id: leadership-visit-maplibre-render
+    status: planned
+    target: Part II
+    note: maplibre-web 正式渲染后端(受控无头浏览器渲染瓦片流,RenderReceipt 改语义冻结+环境声明)。快照固化已覆盖"导出在线样式"需求;此项为终局形态,非本期依赖。

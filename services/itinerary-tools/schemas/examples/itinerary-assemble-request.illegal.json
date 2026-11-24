@@ -1,0 +1,9 @@
+{
+  "draft_path": "data/itinerary-draft.json",
+  "geocode_result": {"status": "complete", "resolved": []},
+  "route_result": {"status": "complete", "results": []},
+  "route_result_ref": {
+    "uri": "route-results/plan-20261122T093000000000Z-5legs.json",
+    "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  }
+}

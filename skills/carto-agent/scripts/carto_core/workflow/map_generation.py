@@ -18,7 +18,7 @@ from ..security.approval import ApprovalReceipt
 from ..security.nonce_store import NonceStore
 from ..security.paths import PathGuard
 from .approvals import ApprovalGateCoordinator
-from ..artifacts import artifact_ref, atomic_json, atomic_yaml, file_digest, utc_now
+from ..artifacts import artifact_ref, atomic_json, atomic_write_bytes, atomic_yaml, file_digest, utc_now
 from .budget_store import BudgetStore
 from .map_data_preparation import MapDataPreparer
 from .map_delivery import MapDeliveryService
@@ -1052,6 +1052,16 @@ class MapGenerationWorkflow:
                  "proposal_id": proposal["proposal_id"], **analysis,
                  "bundle_input_digest": bundle_input_digest(revised, revision_contract.bundle_input_keys()),
                  "created_at": utc_now()}
+        # Design revisions inherit the data-evidence binding of the lineage: a
+        # later design revision on top of a data revision keeps verifying the
+        # live evidence against the digest the data revision was approved for
+        # (otherwise an unapproved evidence change could hide under a design
+        # revision whose rules never mention the data node).
+        current_graph = self._load_design_graph()
+        if current_graph and current_graph.get("evidence_digest"):
+            graph["evidence_digest"] = current_graph["evidence_digest"]
+            if current_graph.get("evidence_ref"):
+                graph["evidence_ref"] = deepcopy(current_graph["evidence_ref"])
         previous_bundle_path = self.path_guard.resolve(self._design_path("data/prepared-data-bundle.yaml"))
         if previous_bundle_path.is_file():
             graph["reusable_bundle_ref"] = artifact_ref(
@@ -1080,6 +1090,192 @@ class MapGenerationWorkflow:
                 "request_path": str(request_target), "brief": revised_brief,
                 "proposal_id": proposal["proposal_id"], "changed_fields": sorted(proposal["changes"])}
 
+    # ------------------------------------------------------------------
+    # data revision (Design B: same-run, evidence-invalidating)
+    # ------------------------------------------------------------------
+
+    def _data_revision_contract(self, request: dict[str, Any]) -> Any:
+        capability = ScenarioRegistry(self.registry).for_generate(request)
+        try:
+            return capability.component("data_revision_contract")
+        except ProtocolError:
+            raise ProtocolError(
+                "DATA_REVISION_UNSUPPORTED",
+                "This scenario does not register a data_revision_contract") from None
+
+    def _load_design_graph(self) -> dict[str, Any] | None:
+        graph_path = self.path_guard.resolve(self._design_path("dependency-graph.yaml"))
+        if not graph_path.is_file():
+            return None
+        graph = load_document(graph_path)
+        self.registry.validate("revision-dependency-graph", graph)
+        return graph
+
+    def _verify_evidence_binding(self, request: dict[str, Any]) -> None:
+        """Runtime data-evidence gate for data-revision lineages.
+
+        When the active dependency graph carries an ``evidence_digest`` (staged
+        by a data revision and inherited by later design revisions), the live
+        evidence document must still match the digest the revision was approved
+        against. Unapproved evidence changes are REFUSED (DATA_EVIDENCE_DRIFT),
+        never silently re-consumed: the data direction is not trusted from the
+        static rules alone, mirroring the digest-gate doctrine of the reuse
+        direction. Design-only lineages carry no binding and skip the check.
+        """
+        graph = self._load_design_graph()
+        if graph is None or not graph.get("evidence_digest"):
+            return
+        contract = self._data_revision_contract(request)
+        evidence_path = self.path_guard.resolve(
+            contract.evidence_uri(request), base_root=self.project_root, must_exist=True)
+        if sha256_digest(load_document(evidence_path)) != graph["evidence_digest"]:
+            raise ProtocolError("DATA_EVIDENCE_DRIFT", str(evidence_path))
+
+    def _data_revision_documents(self, request_path: str | Path, proposal_path: str | Path):
+        """Construct the exact G1D object; the brief preview and the apply share this code."""
+        request = self._read_request(request_path)
+        state = self.state_store.load()
+        if sha256_digest(request) != state.input_fingerprint:
+            raise ProtocolError("JOB_INPUT_DRIFT", state.run_id)
+        if (state.step not in {"compile", "preview", "freeze"}
+                or (self.work_root / "locks" / f"lock-{state.run_id}" / "map-spec-lock.yaml").exists()):
+            raise ProtocolError("REVISION_NOT_ALLOWED", "Frozen designs require a new run and new approvals")
+        if self._load("request/generate-request.yaml", "generate-request") != request:
+            raise ProtocolError("JOB_INPUT_DRIFT", state.run_id)
+        proposal = load_document(self._resolve_project_path(proposal_path, must_exist=True))
+        self.registry.validate("data-revision-proposal", proposal)
+        brief = self._load("brief/map-brief.yaml", "map-brief")
+        if proposal["run_id"] != state.run_id or proposal["parent_revision"] != brief["revision"]:
+            raise ProtocolError("REVISION_PARENT_DRIFT", "Proposal must identify the current design")
+        data_contract = self._data_revision_contract(request)
+        # The new facts must already exist: the post-G1 data chain (scenario
+        # MCP preparation) runs BEFORE data-revise; the revision freezes what
+        # is actually on disk, and compile re-verifies it against this staging.
+        evidence_path = self.path_guard.resolve(
+            data_contract.evidence_uri(request), base_root=self.project_root, must_exist=False)
+        if not evidence_path.is_file():
+            raise ProtocolError(
+                "DATA_EVIDENCE_NOT_PREPARED",
+                "Data evidence is not prepared yet. Complete the post-G1D data "
+                "preparation chain, then re-enter data-revise. Do NOT edit "
+                "generate-request.yaml — the request is fingerprint-locked.")
+        evidence = load_document(evidence_path)
+        data_contract.validate_evidence(evidence, proposal["changes"])
+        revised = data_contract.apply_changes(request, proposal["changes"], evidence)
+        self.registry.validate("generate-request", revised)
+        self._validate_runtime_request(revised)
+        result = deepcopy(brief)
+        result.update(revision=brief["revision"] + 1,
+                      brief_id=f"brief-{request['run_id']}-r{brief['revision'] + 1}",
+                      request_ref=artifact_ref("generate-request", revised),
+                      revision_proposal_ref=artifact_ref("data-revision-proposal", proposal))
+        self.registry.validate("map-brief", result)
+        return request, state, proposal, brief, revised, evidence, evidence_path, result
+
+    @serialized_workflow_step
+    def data_revision_brief(self, request_path: str | Path, proposal_path: str | Path) -> dict[str, Any]:
+        """G1 approval object for a data revision: the REVISED BRIEF, not the proposal.
+
+        The revised brief is fully computable before the facts exist (it carries
+        only forward declarations, exactly like a pending first run), and it
+        digest-binds the proposal — including its outbound declaration — via
+        ``revision_proposal_ref``. One G1 receipt therefore authorizes the plan
+        AND the acquisition footprint; the actual facts are frozen by
+        ``data_revise`` and bound downstream at G2, mirroring pending-mode
+        semantics. (A separate G1D attestation was considered and dropped:
+        compile's G1 gate consumes the revised brief, so a proposal-only
+        receipt would force a second signature for no added guarantee.)
+        """
+        *_, revised_brief = self._data_revision_documents(request_path, proposal_path)
+        return {"brief": revised_brief,
+                "approval_object_digest": sha256_digest(revised_brief),
+                "action": "approve-map-brief",
+                "object_type": "map-brief"}
+
+    @serialized_workflow_step
+    def data_revise(self, request_path: str | Path, proposal_path: str | Path,
+                    approval_path: str | Path, *, approval_key: bytes) -> dict[str, Any]:
+        """Switch to an immutable data revision through the state transition journal.
+
+        G1 on the revised brief (see ``data_revision_brief``) authorizes the
+        revision plan and its outbound footprint BEFORE the facts exist; the
+        host then runs the scenario data chain, and this step freezes the
+        actual evidence into the staged revision. Facts bind downstream
+        exactly like pending first runs: compile re-prepares
+        (data_evidence_reusable: false) under the same G1, and G2 approves the
+        rendered result over the freshly prepared bundle.
+        """
+        (request, state, proposal, brief, revised, evidence, evidence_path,
+         revised_brief) = self._data_revision_documents(request_path, proposal_path)
+        data_contract = self._data_revision_contract(request)
+        revision = revised_brief["revision"]
+        root = self.path_guard.resolve(self.work_root / "revisions" / f"r{revision}")
+        proposal_target = root / "proposal.yaml"
+        if proposal_target.exists() and load_document(proposal_target) != proposal:
+            raise ProtocolError("REVISION_STAGING_CONFLICT", "Resume the already staged revision")
+        evidence_target = root / "evidence" / "itinerary.json"
+        if evidence_target.exists() and load_document(evidence_target) != evidence:
+            raise ProtocolError(
+                "REVISION_STAGING_CONFLICT",
+                "Staged evidence differs from the current data chain output — "
+                "re-run the data chain and re-approve before resuming")
+        budget = self._budget_store.load()
+        expected_used = revision - 1
+        if budget.revisions == expected_used - 1:
+            budget.consume("revisions")
+        elif budget.revisions != expected_used or not proposal_target.exists():
+            raise ProtocolError("REVISION_BUDGET_DRIFT", "Budget does not match revision history")
+        approval_value = load_document(self._resolve_project_path(approval_path, must_exist=True))
+        self.registry.validate("approval-receipt", approval_value)
+        self._gate_coordinator(approval_key, request).require(
+            "G1", ApprovalReceipt.from_dict(approval_value),
+            sha256_digest(revised_brief), run_id=state.run_id)
+        request_target = root / "request/generate-request.yaml"
+        brief_target = root / "brief/map-brief.yaml"
+        atomic_yaml(proposal_target, proposal, create_once=True)
+        atomic_yaml(request_target, revised, create_once=True)
+        atomic_yaml(brief_target, revised_brief, create_once=True)
+        # Freeze the actual facts byte-exact: replay/audit reads the snapshot,
+        # never the mutable data chain output. CAS-resume compares documents.
+        atomic_write_bytes(evidence_target, evidence_path.read_bytes())
+        from .revision_graph import bundle_input_digest, compute_invalidation
+        revision_contract = ScenarioRegistry(self.registry).for_generate(request).component("revision_contract")
+        analysis = compute_invalidation(proposal["changes"], data_contract.rules())
+        evidence_snapshot_ref = artifact_ref("data-evidence", evidence, evidence_target)
+        graph = {"schema_version": 1, "revision": revision, "run_id": request["run_id"],
+                 "proposal_id": proposal["proposal_id"], **analysis,
+                 "bundle_input_digest": bundle_input_digest(revised, revision_contract.bundle_input_keys()),
+                 "evidence_digest": sha256_digest(evidence),
+                 "evidence_ref": evidence_snapshot_ref,
+                 "created_at": utc_now()}
+        previous_bundle_path = self.path_guard.resolve(self._design_path("data/prepared-data-bundle.yaml"))
+        if previous_bundle_path.is_file():
+            graph["reusable_bundle_ref"] = artifact_ref(
+                "prepared-data-bundle", load_document(previous_bundle_path), previous_bundle_path)
+        graph_target = root / "dependency-graph.yaml"
+        if graph_target.exists():
+            previous_graph = load_document(graph_target)
+            graph["created_at"] = previous_graph["created_at"]
+            if previous_graph != graph:
+                raise ProtocolError("DEPENDENCY_GRAPH_CONFLICT", "Staged graph differs from the interrupted revision")
+        atomic_yaml(graph_target, graph, create_once=True)
+        self._budget_store.save(budget)
+        state, receipt = self.state_store.complete_step(
+            state, status="succeeded", receipt_step="data-revise",
+            prerequisites={"request": request, "brief": brief, "proposal": proposal,
+                           "approval": approval_value, "evidence": evidence,
+                           "dependency_graph": graph},
+            output_refs=[artifact_ref("generate-request", revised, request_target),
+                         artifact_ref("map-brief", revised_brief, brief_target),
+                         artifact_ref("data-revision-proposal", proposal, proposal_target),
+                         evidence_snapshot_ref,
+                         artifact_ref("revision-dependency-graph", graph, graph_target)],
+            tool_versions={"data-revision": TOOL_VERSION}, next_step="compile",
+            next_input_fingerprint=sha256_digest(revised))
+        return {"state": state.to_dict(), "receipt": receipt.to_dict(), "revision": revision,
+                "request_path": str(request_target), "evidence_digest": graph["evidence_digest"],
+                "proposal_id": proposal["proposal_id"], "changed_fields": sorted(proposal["changes"])}
+
     def _snapshot_approval(self, value: dict[str, Any]) -> Path:
         """Keep audit evidence independent of a caller's mutable approval file."""
         digest = sha256_digest(value)
@@ -1094,6 +1290,11 @@ class MapGenerationWorkflow:
         # digest => deterministic prepare => byte-equal bundle. The reused bundle
         # keeps referencing the previous revision's frozen data evidence, which is
         # exactly the "unchanged evidence stays referenced" semantics.
+        # Data-revision lineages additionally re-verify the live evidence document
+        # against the staged evidence digest here (both reuse and re-prepare
+        # paths pass through this call): an unapproved evidence change is
+        # refused, never silently consumed.
+        self._verify_evidence_binding(request)
         graph_path = self.path_guard.resolve(self._design_path("dependency-graph.yaml"))
         if not graph_path.is_file():
             return None
@@ -1445,18 +1646,29 @@ class MapGenerationWorkflow:
     def _verify_page_inputs(self, execution, scene, request):
         from ..adapters.formal_renderer import environment_snapshot
         from ..adapters.page_renderer import PageRenderer
-        from ..backend_registry import resolve as resolve_backend
+        from ..backend_registry import IMPL_IMAGE_ITINERARY, resolve as resolve_backend
         from .preparation_bundle import BundlePreparer
         context = ExecutionContext.from_generate_request(request)
         verifier = ScenarioRegistry(self.registry).for_generate(request).component("candidate_compiler")(
             self.path_guard, self.registry, project_root=self.project_root, context=context)
-        if resolve_backend(scene["renderer_id"]).geometry == "vector":
+        if resolve_backend(scene["renderer_id"]).impl == IMPL_IMAGE_ITINERARY:
+            # Image itinerary pages carry no raster/vector scene compiler; the frozen
+            # scene, its page inputs and the renderer environment are re-verified here
+            # and the scenario component performs the request-aware re-verification.
+            from ..adapters.image_page_renderer import environment_snapshot as image_environment
+            from ..compiler.layout import LayoutResolver
+            LayoutResolver(self.registry).validate_execution(scene, execution)
+            if execution["environment"] != image_environment(scene["renderer_id"]):
+                raise ProtocolError("RENDER_ENVIRONMENT_DRIFT", "Image renderer environment differs from the frozen execution")
+            verifier.verify_request(request, scene, None)
+        elif resolve_backend(scene["renderer_id"]).geometry == "vector":
             from ..compiler.vector_scene import VectorSceneCompiler
             from .vector_preparation import VectorPreparationService
             service = VectorPreparationService(project_root=self.project_root,
                 allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
             inputs = VectorSceneCompiler(service, bundles=BundlePreparer, pages=PageRenderer,
                 environment=environment_snapshot).validate_execution(scene, execution, context)
+            verifier.verify_request(request, scene, inputs)
         else:
             from ..compiler.raster_scene import RasterSceneCompiler
             from .raster_preparation import RasterPreparationService
@@ -1464,7 +1676,7 @@ class MapGenerationWorkflow:
                 allowed_roots=list(self.path_guard.allowed_roots), registry=self.registry)
             inputs = RasterSceneCompiler(preparation, bundles=BundlePreparer, pages=PageRenderer,
                 environment=environment_snapshot).validate_execution(scene, execution, context)
-        verifier.verify_request(request, scene, inputs)
+            verifier.verify_request(request, scene, inputs)
 
     def _resolve_project_path(self, value: str | Path, *, must_exist: bool = False) -> Path:
         return self.path_guard.resolve(value, base_root=self.project_root, must_exist=must_exist)

@@ -1,0 +1,322 @@
+{
+  "schema_version": 1,
+  "itinerary_id": "itinerary-hz-20261029",
+  "input_crs": "EPSG:4326",
+  "date_label": "10月29日（星期四）",
+  "places": [
+    {
+      "place_id": "place-spp",
+      "name": "省人民大会堂北门",
+      "source_refs": [
+        "src-docx"
+      ],
+      "geocoding_query": {
+        "name": "省人民大会堂北门",
+        "city": "杭州"
+      }
+    },
+    {
+      "place_id": "place-linan",
+      "name": "临安区行政中心",
+      "source_refs": [
+        "src-docx"
+      ],
+      "geocoding_query": {
+        "name": "临安区行政中心",
+        "city": "杭州"
+      }
+    },
+    {
+      "place_id": "place-chunan",
+      "name": "淳安县行政中心",
+      "source_refs": [
+        "src-docx"
+      ],
+      "geocoding_query": {
+        "name": "淳安县行政中心",
+        "city": "杭州"
+      }
+    },
+    {
+      "place_id": "place-jiande",
+      "name": "建德市行政中心",
+      "source_refs": [
+        "src-docx"
+      ],
+      "geocoding_query": {
+        "name": "建德市行政中心",
+        "city": "杭州"
+      }
+    },
+    {
+      "place_id": "place-tonglu",
+      "name": "桐庐县行政中心",
+      "source_refs": [
+        "src-docx"
+      ],
+      "geocoding_query": {
+        "name": "桐庐县行政中心",
+        "city": "杭州"
+      }
+    },
+    {
+      "place_id": "place-szxz",
+      "name": "省行政中心",
+      "source_refs": [
+        "src-docx"
+      ],
+      "geocoding_query": {
+        "name": "浙江省行政中心",
+        "city": "杭州"
+      }
+    }
+  ],
+  "stops": [
+    {
+      "stop_id": "stop-01",
+      "place_id": "place-spp",
+      "activities": [
+        {
+          "activity_id": "a01",
+          "type": "departure",
+          "period": "morning",
+          "start_time": "09:00",
+          "source_refs": [
+            "src-docx"
+          ]
+        }
+      ],
+      "departure_time": "09:00",
+      "source_refs": [
+        "src-docx"
+      ]
+    },
+    {
+      "stop_id": "stop-02",
+      "place_id": "place-linan",
+      "activities": [
+        {
+          "activity_id": "a02",
+          "type": "visit",
+          "period": "morning",
+          "duration_min": 60,
+          "source_refs": [
+            "src-docx"
+          ]
+        }
+      ],
+      "arrival_time": "09:45",
+      "source_refs": [
+        "src-docx"
+      ]
+    },
+    {
+      "stop_id": "stop-03-meal",
+      "place_id": "place-chunan",
+      "activities": [
+        {
+          "activity_id": "a03",
+          "type": "meal_and_rest",
+          "period": "morning",
+          "duration_min": 45,
+          "source_refs": [
+            "src-docx"
+          ]
+        }
+      ],
+      "arrival_time": "12:45",
+      "source_refs": [
+        "src-docx"
+      ]
+    },
+    {
+      "stop_id": "stop-03-visit",
+      "place_id": "place-chunan",
+      "activities": [
+        {
+          "activity_id": "a04",
+          "type": "visit",
+          "period": "afternoon",
+          "duration_min": 60,
+          "source_refs": [
+            "src-docx"
+          ]
+        }
+      ],
+      "source_refs": [
+        "src-docx"
+      ]
+    },
+    {
+      "stop_id": "stop-04",
+      "place_id": "place-jiande",
+      "activities": [
+        {
+          "activity_id": "a05",
+          "type": "visit",
+          "period": "afternoon",
+          "duration_min": 60,
+          "source_refs": [
+            "src-docx"
+          ]
+        }
+      ],
+      "arrival_time": "15:15",
+      "source_refs": [
+        "src-docx"
+      ]
+    },
+    {
+      "stop_id": "stop-05",
+      "place_id": "place-tonglu",
+      "activities": [
+        {
+          "activity_id": "a06",
+          "type": "visit",
+          "period": "afternoon",
+          "duration_min": 60,
+          "source_refs": [
+            "src-docx"
+          ]
+        }
+      ],
+      "arrival_time": "16:50",
+      "source_refs": [
+        "src-docx"
+      ]
+    },
+    {
+      "stop_id": "stop-06",
+      "place_id": "place-szxz",
+      "activities": [
+        {
+          "activity_id": "a07",
+          "type": "end",
+          "period": "afternoon",
+          "start_time": "19:05",
+          "source_refs": [
+            "src-docx"
+          ]
+        }
+      ],
+      "arrival_time": "19:05",
+      "source_refs": [
+        "src-docx"
+      ]
+    }
+  ],
+  "legs": [
+    {
+      "leg_id": "leg-01",
+      "kind": "travel",
+      "from_stop_id": "stop-01",
+      "to_stop_id": "stop-02",
+      "period": "morning",
+      "route_mode": "road_network",
+      "metric_source": "document",
+      "document_metrics": {
+        "distance_km": 43,
+        "duration_min": 45,
+        "source_refs": [
+          "src-docx"
+        ]
+      },
+      "source_refs": [
+        "src-docx"
+      ]
+    },
+    {
+      "leg_id": "leg-02",
+      "kind": "travel",
+      "from_stop_id": "stop-02",
+      "to_stop_id": "stop-03-meal",
+      "period": "morning",
+      "route_mode": "road_network",
+      "metric_source": "document",
+      "document_metrics": {
+        "distance_km": 113,
+        "duration_min": 120,
+        "source_refs": [
+          "src-docx"
+        ]
+      },
+      "source_refs": [
+        "src-docx"
+      ]
+    },
+    {
+      "leg_id": "leg-03",
+      "kind": "stay",
+      "from_stop_id": "stop-03-meal",
+      "to_stop_id": "stop-03-visit",
+      "metric_source": "none",
+      "source_refs": [
+        "src-docx"
+      ]
+    },
+    {
+      "leg_id": "leg-04",
+      "kind": "travel",
+      "from_stop_id": "stop-03-visit",
+      "to_stop_id": "stop-04",
+      "period": "afternoon",
+      "route_mode": "road_network",
+      "metric_source": "document",
+      "document_metrics": {
+        "distance_km": 41.5,
+        "duration_min": 45,
+        "source_refs": [
+          "src-docx"
+        ]
+      },
+      "source_refs": [
+        "src-docx"
+      ]
+    },
+    {
+      "leg_id": "leg-05",
+      "kind": "travel",
+      "from_stop_id": "stop-04",
+      "to_stop_id": "stop-05",
+      "period": "afternoon",
+      "route_mode": "road_network",
+      "metric_source": "document",
+      "document_metrics": {
+        "distance_km": 44,
+        "duration_min": 35,
+        "source_refs": [
+          "src-docx"
+        ]
+      },
+      "source_refs": [
+        "src-docx"
+      ]
+    },
+    {
+      "leg_id": "leg-06",
+      "kind": "travel",
+      "from_stop_id": "stop-05",
+      "to_stop_id": "stop-06",
+      "period": "afternoon",
+      "route_mode": "road_network",
+      "metric_source": "document",
+      "document_metrics": {
+        "distance_km": 87,
+        "duration_min": 75,
+        "source_refs": [
+          "src-docx"
+        ]
+      },
+      "source_refs": [
+        "src-docx"
+      ]
+    }
+  ],
+  "source_blocks": [
+    {
+      "id": "src-docx",
+      "kind": "document",
+      "text": "赴杭州有关区县调研行程安排"
+    }
+  ]
+}

@@ -27,6 +27,7 @@ BROWSER = "browser"
 # 后端实现标签，供 create_render_backend 分派到具体适配器类。
 IMPL_FORMAL = "formal"
 IMPL_BROWSER = "browser"
+IMPL_IMAGE_ITINERARY = "image-itinerary"
 
 
 @dataclass(frozen=True)
@@ -49,10 +50,13 @@ VECTOR_PAGE = BackendDescriptor(
 MAPLIBRE_WEB = BackendDescriptor(
     renderer_id="maplibre-web", family=BROWSER, geometry="vector",
     export_formats=frozenset({"svg", "png", "pdf"}), impl=IMPL_BROWSER)
+IMAGE_ITINERARY_PAGE = BackendDescriptor(
+    renderer_id="image-itinerary-page", family=STATIC_PAGE, geometry="vector",
+    export_formats=frozenset({"pdf", "png"}), impl=IMPL_IMAGE_ITINERARY)
 
 _BACKENDS: dict[str, BackendDescriptor] = {
     descriptor.renderer_id: descriptor
-    for descriptor in (RASTER_PAGE, VECTOR_PAGE, MAPLIBRE_WEB)
+    for descriptor in (RASTER_PAGE, VECTOR_PAGE, MAPLIBRE_WEB, IMAGE_ITINERARY_PAGE)
 }
 
 

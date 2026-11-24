@@ -838,6 +838,95 @@
                   "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
                 }
               }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "renderer_id",
+                "renderer_version",
+                "renderer_code_digest",
+                "runtime",
+                "fingerprint"
+              ],
+              "properties": {
+                "renderer_id": {
+                  "const": "image-itinerary-page"
+                },
+                "renderer_version": {
+                  "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"
+                },
+                "renderer_code_digest": {
+                  "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+                },
+                "runtime": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "python",
+                    "numpy",
+                    "matplotlib",
+                    "pillow",
+                    "pyproj",
+                    "freetype",
+                    "fonttools",
+                    "zlib"
+                  ],
+                  "properties": {
+                    "python": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                    },
+                    "numpy": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                    },
+                    "matplotlib": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                    },
+                    "pillow": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                    },
+                    "pyproj": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                    },
+                    "freetype": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                    },
+                    "fonttools": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                    },
+                    "zlib": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                    }
+                  }
+                },
+                "fingerprint": {
+                  "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+                }
+              }
             }
           ]
         },
@@ -998,10 +1087,63 @@
               }
             },
             "else": {
-              "not": {
+              "if": {
+                "properties": {
+                  "environment": {
+                    "properties": {
+                      "renderer_id": {
+                        "const": "image-itinerary-page"
+                      }
+                    }
+                  }
+                }
+              },
+              "then": {
                 "required": [
-                  "page_inputs"
-                ]
+                  "page_inputs",
+                  "prepared_data_refs",
+                  "resolved_assets",
+                  "render_scene_ref"
+                ],
+                "properties": {
+                  "page_inputs": {
+                    "properties": {
+                      "page_request_ref": {
+                        "properties": {
+                          "id": {
+                            "const": "page-request"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "camera"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "overlay_coordinate_policy"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "interaction_policy"
+                      ]
+                    }
+                  ]
+                }
+              },
+              "else": {
+                "not": {
+                  "required": [
+                    "page_inputs"
+                  ]
+                }
               }
             }
           }

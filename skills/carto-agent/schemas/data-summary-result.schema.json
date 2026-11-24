@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/data-summary-result.schema.json",
+  "title": "data-summary-result",
+  "description": "Typed output of the data-summary capability: the categorized file inventory and the Markdown mirror of the data directory contents. Format conversion only; no business semantics.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "data_dir",
+    "file_count",
+    "categories",
+    "summary_md"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "data_dir": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "file_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "categories": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["category", "count"],
+        "properties": {
+          "category": {
+            "enum": ["geographic-vector", "geographic-raster", "tabular", "document", "image", "unknown"]
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "summary_md": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

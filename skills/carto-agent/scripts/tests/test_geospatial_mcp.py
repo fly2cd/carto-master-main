@@ -514,13 +514,20 @@ class StdioContractTests(unittest.IsolatedAsyncioTestCase):
             from mcp.types import ListToolsResult, PaginatedRequestParams, Tool
         except ImportError:
             self.skipTest("Optional MCP SDK required")
-        tool = Tool(name="geo_raster_info", input_schema={})
-        self.sdk.list_tools.side_effect = [ListToolsResult(tools=[], next_cursor="next"), ListToolsResult(tools=[tool])]
+        tool = Tool(name="geo_raster_info", inputSchema={})
+        # MCP SDK >= 1.30 uses camelCase field names (nextCursor, inputSchema).
+        # Older versions used snake_case; support both by using the current SDK's
+        # field names and letting model_config extra="allow" handle the rest.
+        next_attr = "nextCursor" if hasattr(ListToolsResult(tools=[]), "nextCursor") else "next_cursor"
+        self.sdk.list_tools.side_effect = [
+            ListToolsResult(tools=[], **{next_attr: "next"}),
+            ListToolsResult(tools=[tool]),
+        ]
         await self.session.discover({"geo_raster_info"})
         params = self.sdk.list_tools.call_args.kwargs["params"]
         self.assertIsInstance(params, PaginatedRequestParams)
         self.assertEqual("next", params.cursor)
-        self.sdk.list_tools.side_effect = [ListToolsResult(tools=[], next_cursor="repeat")] * 2
+        self.sdk.list_tools.side_effect = [ListToolsResult(tools=[], **{next_attr: "repeat"})] * 2
         with self.assertRaises(ProtocolError) as raised:
             await self.session.discover({"geo_raster_info"})
         self.assertEqual("MCP_DISCOVERY_INVALID", raised.exception.code)

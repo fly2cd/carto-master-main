@@ -860,22 +860,22 @@ class ThematicWorkflowTests(unittest.TestCase):
         self.assertEqual(sha256_digest(self.generate),workflow.state_store.load().input_fingerprint)
         self.assertEqual(0,workflow._budget_store.load().revisions)
 
-    def test_two_revisions_are_cumulative_and_third_is_rejected(self):
+    def test_three_revisions_are_cumulative_and_fourth_is_rejected(self):
         from tests.test_general_thematic import APPROVAL_KEY
         workflow,path=self.workflow_at_compile()
-        for parent in (1,2,3):
+        for parent in (1,2,3,4):
             proposal={'schema_version':1,'proposal_id':'revision-'+str(parent),'run_id':self.context.run_id,
                       'parent_revision':parent,'changes':{'map_title':{'new_value':'Title '+str(parent)}},
                       'justification':'Synthetic budget acceptance'}
             prop=self.root/('proposal-'+str(parent)+'.yaml');atomic_yaml(prop,proposal)
             brief=workflow.revision_brief(path,prop)
             g1=self.signed_file('revision-'+str(parent),'approve-map-brief','map-brief',brief['approval_object_digest'])
-            if parent<3:
+            if parent<4:
                 revised=workflow.revise(path,prop,g1,approval_key=APPROVAL_KEY);path=Path(revised['request_path'])
             else:
                 with self.assertRaisesRegex(ProtocolError,'EXECUTION_BUDGET_EXCEEDED'):
                     workflow.revise(path,prop,g1,approval_key=APPROVAL_KEY)
-        self.assertEqual(2,workflow._budget_store.load().revisions)
+        self.assertEqual(3,workflow._budget_store.load().revisions)
 
 
 class ThematicApprovalTests(unittest.TestCase):

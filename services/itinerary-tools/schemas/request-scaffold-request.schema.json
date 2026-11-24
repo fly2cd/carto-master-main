@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.itinerary-tools.local/v1/request-scaffold-request.schema.json",
+  "type": "object",
+  "required": [
+    "draft_path",
+    "project_id",
+    "tenant_id",
+    "subject_id",
+    "approver_subject_id"
+  ],
+  "properties": {
+    "draft_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "subject_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "approver_subject_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "request_id": {
+      "type": "string"
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "idempotency_key": {
+      "type": "string"
+    },
+    "basemap_path": {
+      "type": "string"
+    },
+    "registration_path": {
+      "type": "string"
+    },
+    "font_path": {
+      "type": "string"
+    },
+    "font_family": {
+      "type": "string"
+    },
+    "template_repo_path": {
+      "type": "string"
+    },
+    "goal": {
+      "type": "string"
+    },
+    "requested_at": {
+      "type": "string"
+    }
+  }
+}

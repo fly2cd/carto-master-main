@@ -1,0 +1,24 @@
+{
+  "work_crs": "PROJCRS[\"unknown\",BASEGEOGCRS[\"unknown\",DATUM[\"World Geodetic System 1984\",ELLIPSOID[\"WGS 84\",6378137,298.257223563,LENGTHUNIT[\"metre\",1]],ID[\"EPSG\",6326]],PRIMEM[\"Greenwich\",0,ANGLEUNIT[\"degree\",0.0174532925199433],ID[\"EPSG\",8901]]],CONVERSION[\"unknown\",METHOD[\"Azimuthal Equidistant\",ID[\"EPSG\",1125]],PARAMETER[\"Latitude of natural origin\",29.87715805,ANGLEUNIT[\"degree\",0.0174532925199433],ID[\"EPSG\",8801]],PARAMETER[\"Longitude of natural origin\",119.8036239,ANGLEUNIT[\"degree\",0.0174532925199433],ID[\"EPSG\",8802]],PARAMETER[\"False easting\",0,LENGTHUNIT[\"metre\",1],ID[\"EPSG\",8806]],PARAMETER[\"False northing\",0,LENGTHUNIT[\"metre\",1],ID[\"EPSG\",8807]]],CS[Cartesian,2],AXIS[\"(E)\",east,ORDER[1],LENGTHUNIT[\"metre\",1,ID[\"EPSG\",9001]]],AXIS[\"(N)\",north,ORDER[2],LENGTHUNIT[\"metre\",1,ID[\"EPSG\",9001]]]]",
+  "origin_m": [
+    -31898.93127507516,
+    2260.085144662599
+  ],
+  "local_km_y_down_to_pixel": [
+    [
+      23.19214075365372,
+      -0.062099987098991755,
+      2934.1818077763687
+    ],
+    [
+      0.026251627690049097,
+      23.162690727313223,
+      2336.3350282709475
+    ]
+  ],
+  "source_size": [
+    6083,
+    4490
+  ],
+  "source_pixel_sha256": "ede3d1d007e1828d039af403b20bc7c1517f5e3de319292f55c30e0a9ec403f9"
+}

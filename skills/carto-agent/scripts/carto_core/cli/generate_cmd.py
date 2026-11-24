@@ -20,6 +20,8 @@ def register(sub) -> None:
         ("deliver", "Verify G3 and atomically commit the local delivery package"),
         ("revise", "Submit a design revision proposal and prepare for re-compile"),
         ("revision-brief", "Build the exact revised map brief for G1 approval"),
+        ("data-revise", "Submit a data revision proposal (leg re-planning) and prepare for re-prepare"),
+        ("data-revision-brief", "Build the G1D approval object for a data revision proposal"),
     ):
         item = generate_sub.add_parser(name, help=help_text)
         item.add_argument("request")
@@ -28,11 +30,11 @@ def register(sub) -> None:
         item.add_argument("--repository-root", required=True)
         item.add_argument("--repository-scope", required=True)
         item.add_argument("--allowed-root", action="append", required=True)
-        if name in {"compile", "freeze", "deliver", "revise", "review"}:
+        if name in {"compile", "freeze", "deliver", "revise", "review", "data-revise"}:
             item.add_argument("--approval", required=True)
             item.add_argument("--key-env", default="CARTO_APPROVAL_HMAC_KEY")
-        if name in {"revise", "revision-brief"}:
-            item.add_argument("--proposal", required=True, help="Path to the design revision proposal YAML")
+        if name in {"revise", "revision-brief", "data-revise", "data-revision-brief"}:
+            item.add_argument("--proposal", required=True, help="Path to the revision proposal YAML")
         if name in {"preview", "freeze", "render", "check", "review"}:
             item.add_argument("--attestation-key-env", default="CARTO_RENDER_ATTESTATION_KEY")
             item.add_argument("--browser")
@@ -106,6 +108,10 @@ def handle(args) -> dict:
         return workflow.revision_brief(args.request, args.proposal)
     if command == "revise":
         return workflow.revise(args.request, args.proposal, args.approval, approval_key=approval_key(args))
+    if command == "data-revision-brief":
+        return workflow.data_revision_brief(args.request, args.proposal)
+    if command == "data-revise":
+        return workflow.data_revise(args.request, args.proposal, args.approval, approval_key=approval_key(args))
     if command == "select-candidate":
         return workflow.select_candidate(args.request, args.candidate_id)
     if command == "delivery-status":

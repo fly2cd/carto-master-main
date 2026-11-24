@@ -42,6 +42,8 @@
                 "multipoint",
                 "line",
                 "multiline",
+                "linestring",
+                "multilinestring",
                 "polygon",
                 "multipolygon",
                 "raster"

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.itinerary-tools.local/v1/itinerary-assemble-request.schema.json",
+  "description": "Host-facing input of the itinerary_assemble tool. The route result may be passed inline (route_result) or by digest-bound reference to a persisted plan_route result (route_result_ref) — exactly one of the two; the reference is byte-digest re-verified server-side so large polylines never round-trip through the host LLM context.",
+  "type": "object",
+  "required": ["draft_path", "geocode_result"],
+  "oneOf": [
+    {"required": ["route_result"]},
+    {"required": ["route_result_ref"]}
+  ],
+  "properties": {
+    "draft_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "geocode_result": {
+      "type": "object"
+    },
+    "route_result": {
+      "type": "object"
+    },
+    "route_result_ref": {
+      "type": "object",
+      "required": ["uri", "digest"],
+      "properties": {
+        "uri": {
+          "type": "string",
+          "minLength": 1
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "output_path": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

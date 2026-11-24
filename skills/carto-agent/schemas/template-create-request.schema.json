@@ -175,7 +175,7 @@
       "maxProperties": 32,
       "propertyNames": {
         "type": "string",
-        "pattern": "^[a-z][a-z0-9_]*$"
+        "pattern": "^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$"
       },
       "additionalProperties": {
         "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"

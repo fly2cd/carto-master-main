@@ -1,0 +1,765 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/frontend-map-document.schema.json",
+  "title": "frontend-map-document",
+  "description": "Image Canvas v2 map document (the canvas payload itself, no transport envelope). All canvas dimensions, boxes, point/line coordinates, font sizes, strokes and symbol sizes are millimetres. Array order is paint order. Indices, opacity and lineHeight ratios are dimensionless; SVG viewBox values are image-local. Optional top-level baseMap + mapData carry the online-view binding (WGS84 degrees, frontend doc sections 4-5) when the request declares online_basemap.",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "category",
+    "designWidth",
+    "designHeight",
+    "canvasData"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "category": {
+      "enum": [
+        "leadership_visit"
+      ]
+    },
+    "designWidth": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Physical canvas dimension in millimeters."
+    },
+    "designHeight": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Physical canvas dimension in millimeters."
+    },
+    "canvasData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "features"
+      ],
+      "properties": {
+        "type": {
+          "const": "Grid"
+        },
+        "mapData": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "layers"
+          ],
+          "properties": {
+            "layers": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 16,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "type",
+                  "rect_indices"
+                ],
+                "properties": {
+                  "id": {
+                    "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+                  },
+                  "type": {
+                    "enum": [
+                      "route",
+                      "stops",
+                      "callouts",
+                      "basemap",
+                      "furniture"
+                    ]
+                  },
+                  "rect_indices": {
+                    "type": "array",
+                    "minItems": 0,
+                    "items": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "fields": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "features": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100000,
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "Rect"
+                  },
+                  "RectIndex": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "x": {
+                    "type": "number",
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "y": {
+                    "type": "number",
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "w": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "h": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "fillColor": {
+                    "type": "string",
+                    "pattern": "^(#[0-9A-Fa-f]{6}|none)$"
+                  },
+                  "strokeColor": {
+                    "type": "string",
+                    "pattern": "^(#[0-9A-Fa-f]{6}|none)$"
+                  },
+                  "strokeWidth": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "borderRadius": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "opacity": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "required": [
+                  "type",
+                  "x",
+                  "y",
+                  "w",
+                  "h"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "Text"
+                  },
+                  "RectIndex": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "x": {
+                    "type": "number",
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "y": {
+                    "type": "number",
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "w": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "h": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "fontSize": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "lineHeight": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Dimensionless line-height multiplier."
+                  },
+                  "fontFamily": {
+                    "type": "string"
+                  },
+                  "color": {
+                    "type": "string",
+                    "pattern": "^(#[0-9A-Fa-f]{6}|none)$"
+                  },
+                  "textAlign": {
+                    "enum": [
+                      "left",
+                      "center",
+                      "right"
+                    ]
+                  },
+                  "bold": {
+                    "type": "boolean"
+                  },
+                  "italic": {
+                    "type": "boolean"
+                  },
+                  "underline": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "type",
+                  "x",
+                  "y",
+                  "w",
+                  "h",
+                  "text"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "Image"
+                  },
+                  "RectIndex": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "x": {
+                    "type": "number",
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "y": {
+                    "type": "number",
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "w": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "h": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "href": {
+                    "type": "string",
+                    "pattern": "^data:image/(png|svg\\+xml);base64,"
+                  }
+                },
+                "required": [
+                  "type",
+                  "x",
+                  "y",
+                  "w",
+                  "h",
+                  "href"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "MultiPoint"
+                  },
+                  "RectIndex": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "coordinates": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100000,
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      },
+                      "minItems": 2,
+                      "maxItems": 2
+                    },
+                    "description": "Global canvas [x, y] pairs in millimeters, not source-image pixels or geographic coordinates."
+                  },
+                  "icon": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "color": {
+                    "type": "string",
+                    "pattern": "^(#[0-9A-Fa-f]{6}|none)$"
+                  }
+                },
+                "required": [
+                  "type",
+                  "coordinates"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "MultiLineString"
+                  },
+                  "RectIndex": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "coordinates": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 1000000,
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      },
+                      "minItems": 2,
+                      "maxItems": 2
+                    },
+                    "description": "Global canvas [x, y] pairs in millimeters, not source-image pixels or geographic coordinates."
+                  },
+                  "color": {
+                    "type": "string",
+                    "pattern": "^(#[0-9A-Fa-f]{6}|none)$"
+                  },
+                  "strokeWidth": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Length in millimeters in the global canvas."
+                  },
+                  "strokeDash": {
+                    "type": "string"
+                  },
+                  "closed": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "type",
+                  "coordinates"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "baseMap": {
+      "$ref": "#/$defs/baseMapSection"
+    },
+    "mapData": {
+      "$ref": "#/$defs/mapDataSection"
+    }
+  },
+  "$defs": {
+    "geoFeature": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Leadership-visit stops feature (frontend doc section 5.3). Feature type literal 'stops' mirrors the canvasData layer metadata; needs one confirmation pass with the frontend team.",
+          "required": [
+            "type",
+            "name",
+            "properties"
+          ],
+          "properties": {
+            "type": {
+              "const": "stops"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "period",
+                "points"
+              ],
+              "properties": {
+                "period": {
+                  "type": "string",
+                  "enum": [
+                    "morning",
+                    "afternoon",
+                    "default"
+                  ]
+                },
+                "points": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "name",
+                      "lon",
+                      "lat",
+                      "label",
+                      "RectIndex"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "formattedAddress": {
+                        "type": "string"
+                      },
+                      "lon": {
+                        "type": "number",
+                        "minimum": -180,
+                        "maximum": 180
+                      },
+                      "lat": {
+                        "type": "number",
+                        "minimum": -90,
+                        "maximum": 90
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "index": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "RectIndex": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "style": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "icon",
+                          "size",
+                          "color"
+                        ],
+                        "properties": {
+                          "icon": {
+                            "enum": [
+                              "star",
+                              "circle"
+                            ]
+                          },
+                          "size": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          },
+                          "color": {
+                            "type": "string",
+                            "pattern": "^#[0-9A-Fa-f]{6}$"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Leadership-visit route feature (frontend doc section 5.4). Feature-level style applies to all legs of the period.",
+          "required": [
+            "type",
+            "name",
+            "properties",
+            "style"
+          ],
+          "properties": {
+            "type": {
+              "const": "route"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "period",
+                "legs"
+              ],
+              "properties": {
+                "period": {
+                  "type": "string",
+                  "enum": [
+                    "morning",
+                    "afternoon",
+                    "default"
+                  ]
+                },
+                "legs": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "fromName",
+                      "toName",
+                      "polyline"
+                    ],
+                    "properties": {
+                      "fromName": {
+                        "type": "string"
+                      },
+                      "toName": {
+                        "type": "string"
+                      },
+                      "polyline": {
+                        "type": "array",
+                        "minItems": 2,
+                        "description": "WGS84 [lon, lat] pairs.",
+                        "items": {
+                          "type": "array",
+                          "prefixItems": [
+                            {
+                              "type": "number",
+                              "minimum": -180,
+                              "maximum": 180
+                            },
+                            {
+                              "type": "number",
+                              "minimum": -90,
+                              "maximum": 90
+                            }
+                          ],
+                          "items": false,
+                          "minItems": 2,
+                          "maxItems": 2
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "style": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "strokeColor",
+                "strokeWidth",
+                "strokeDash"
+              ],
+              "properties": {
+                "strokeColor": {
+                  "type": "string",
+                  "pattern": "^#[0-9A-Fa-f]{6}$"
+                },
+                "strokeWidth": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "strokeDash": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "baseMapSection": {
+      "description": "Optional online tile basemap binding (frontend doc section 4). The registered image stays the geometric authority; this binding only declares the frontend-displayable online view. Provider restricted to Tianditu (CGCS2000 ~= WGS84).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "layer"
+      ],
+      "properties": {
+        "type": {
+          "const": "Tianditu"
+        },
+        "layer": {
+          "enum": [
+            "vec_w",
+            "img_w",
+            "cia_w"
+          ]
+        },
+        "opacity": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "minZoom": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 18
+        },
+        "maxZoom": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 18
+        }
+      }
+    },
+    "mapDataSection": {
+      "description": "Optional geographic vector section (frontend doc section 5) emitted when the request declares online_basemap. WGS84 facts frozen at compile; extent/center are the display window translated to geography through the registration affine (inverse), so the online view shows the same geography as the canvas/PDF view. Camera contract is scale-free: zoom is a device-dependent runtime quantity derived from the zoomRule (contain-replicate), never a frozen number.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y",
+        "w",
+        "h",
+        "type",
+        "extent",
+        "center",
+        "bearing",
+        "zoomRule",
+        "coordinateSystem",
+        "features"
+      ],
+      "properties": {
+        "x": {
+          "type": "number",
+          "description": "Map viewport left edge in millimetres in the global canvas."
+        },
+        "y": {
+          "type": "number",
+          "description": "Map viewport top edge in millimetres in the global canvas."
+        },
+        "w": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Map viewport width in millimetres."
+        },
+        "h": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Map viewport height in millimetres."
+        },
+        "type": {
+          "const": "Vector"
+        },
+        "extent": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "west",
+            "south",
+            "east",
+            "north",
+            "unit"
+          ],
+          "properties": {
+            "west": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180
+            },
+            "south": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "east": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180
+            },
+            "north": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "unit": {
+              "const": "degree"
+            }
+          }
+        },
+        "center": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "lon",
+            "lat"
+          ],
+          "properties": {
+            "lon": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180
+            },
+            "lat": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            }
+          }
+        },
+        "bearing": {
+          "const": 0
+        },
+        "zoomRule": {
+          "const": "contain-replicate",
+          "description": "Replay rule: replicate the contain_layout placement (scale = min(viewportW/windowW, viewportH/windowH), centered) in Web Mercator via jumpTo, not fitBounds."
+        },
+        "referenceZoom": {
+          "type": "number",
+          "description": "Diagnostic zoom at the page DPI; not part of the binding contract (device-dependent at runtime)."
+        },
+        "coordinateSystem": {
+          "const": "WGS84"
+        },
+        "features": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/geoFeature"
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

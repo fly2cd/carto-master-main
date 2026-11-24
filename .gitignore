@@ -45,3 +45,5 @@ doc/impl-log/
 doc/.venv-pdf/
 doc/patent-search/*.pdf
 doc/patent-search/raw/
+.mcp.json
+services/itinerary-tools/routing/data/backbone_06d5f2e5fb8de5dc8ad9abd38e7275593f774fb255ee590b6cfdfda6d3171596.json

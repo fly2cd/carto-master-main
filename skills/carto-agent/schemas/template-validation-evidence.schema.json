@@ -53,6 +53,9 @@
         },
         {
           "$ref": "#/$defs/vectorRenderer"
+        },
+        {
+          "$ref": "#/$defs/imageRendererBinding"
         }
       ]
     },
@@ -298,7 +301,8 @@
               "renderer_id": {
                 "enum": [
                   "rasterio-matplotlib-page",
-                  "matplotlib-vector-page"
+                  "matplotlib-vector-page",
+                  "image-itinerary-page"
                 ]
               }
             },
@@ -538,6 +542,82 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 128
+            }
+          }
+        },
+        "environment_fingerprint": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+        }
+      }
+    },
+    "imageRendererBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "renderer_id",
+        "renderer_profile_digest",
+        "adapter_version",
+        "renderer_version",
+        "renderer_code_digest",
+        "runtime",
+        "environment_fingerprint"
+      ],
+      "properties": {
+        "renderer_id": {
+          "const": "image-itinerary-page"
+        },
+        "renderer_profile_digest": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+        },
+        "adapter_version": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"
+        },
+        "renderer_version": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"
+        },
+        "renderer_code_digest": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"
+        },
+        "runtime": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "python",
+            "numpy",
+            "matplotlib",
+            "pillow",
+            "pyproj",
+            "freetype",
+            "fonttools",
+            "zlib"
+          ],
+          "properties": {
+            "python": {
+              "$ref": "#/$defs/runtimeVersion"
+            },
+            "numpy": {
+              "$ref": "#/$defs/runtimeVersion"
+            },
+            "matplotlib": {
+              "$ref": "#/$defs/runtimeVersion"
+            },
+            "pillow": {
+              "$ref": "#/$defs/runtimeVersion"
+            },
+            "freetype": {
+              "$ref": "#/$defs/runtimeVersion"
+            },
+            "fonttools": {
+              "$ref": "#/$defs/runtimeVersion"
+            },
+            "zlib": {
+              "$ref": "#/$defs/runtimeVersion"
+            },
+            "pyproj": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[^\u0000-\u001f]+$"
             }
           }
         },

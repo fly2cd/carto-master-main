@@ -1,0 +1,337 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/image-itinerary-style.schema.json",
+  "title": "image-itinerary-style",
+  "description": "Image presentation parameters for the grouped itinerary portrayal: group colors, route widths and arrows, pin markers, callout boxes and support labels (graphics-level, authored in the 144-DPI reference design and rescaled at compile), plus page-domain furniture (title/body font points, map frame border) expressed in physical units (pt/mm) that do NOT participate in the graphics style scale. Backfilled from the old framework 1.2.0 scenario contract's layout.image_presentation section.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "groups",
+    "default_group",
+    "route",
+    "pin",
+    "callout"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "groups": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "label",
+          "color"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          },
+          "right_offset_px": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 200
+          }
+        }
+      }
+    },
+    "default_group": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "width_px",
+        "halo_width_px"
+      ],
+      "properties": {
+        "width_px": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 50
+        },
+        "halo_width_px": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 50
+        },
+        "right_offset_px": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 200
+        },
+        "arrows": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "size_px",
+            "spacing_px"
+          ],
+          "properties": {
+            "size_px": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "spacing_px": {
+              "type": "number",
+              "minimum": 10,
+              "maximum": 2000
+            }
+          }
+        }
+      }
+    },
+    "pin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "radius_px",
+        "font_size_px"
+      ],
+      "properties": {
+        "radius_px": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "font_size_px": {
+          "type": "number",
+          "minimum": 4,
+          "maximum": 100
+        }
+      }
+    },
+    "callout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "width_px",
+        "title_font_px",
+        "body_font_px",
+        "padding_px",
+        "line_gap_px",
+        "opacity",
+        "leader_width_px"
+      ],
+      "properties": {
+        "width_px": {
+          "type": "number",
+          "minimum": 20,
+          "maximum": 2000
+        },
+        "title_font_px": {
+          "type": "number",
+          "minimum": 4,
+          "maximum": 200
+        },
+        "body_font_px": {
+          "type": "number",
+          "minimum": 4,
+          "maximum": 200
+        },
+        "padding_px": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "line_gap_px": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 1
+        },
+        "leader_width_px": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 20
+        },
+        "offset_x_px": {
+          "type": "number"
+        },
+        "offset_y_px": {
+          "type": "number"
+        },
+        "font_weight": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 900
+        },
+        "title_wrap": {
+          "type": "boolean"
+        },
+        "show_arrival_time": {
+          "type": "boolean"
+        },
+        "fit_content": {
+          "type": "boolean"
+        },
+        "title_color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "body_color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        }
+      }
+    },
+    "support_label": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "color",
+        "text_color",
+        "point_radius_px",
+        "font_size_px",
+        "padding_px",
+        "opacity",
+        "leader_width_px",
+        "offset_x_px",
+        "offset_y_px"
+      ],
+      "properties": {
+        "color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "text_color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "point_radius_px": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "font_size_px": {
+          "type": "number",
+          "minimum": 4,
+          "maximum": 100
+        },
+        "padding_px": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 1
+        },
+        "leader_width_px": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 20
+        },
+        "offset_x_px": {
+          "type": "number"
+        },
+        "offset_y_px": {
+          "type": "number"
+        },
+        "font_weight": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 900
+        }
+      }
+    },
+    "numbering": {
+      "enum": [
+        "global",
+        "per-date-group"
+      ]
+    },
+    "white_threshold": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 255
+    },
+    "page_furniture": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Page-domain furniture parameters (physical units, not reference-design pixels): the nominal furniture font sizes and the map frame border. When present, values are frozen into the page request (texts[].font_pt + furniture.frame_border) and consumed identically by both renderers; when absent the renderers fall back to their historical derivations.",
+      "properties": {
+        "title_font_pt": {
+          "type": "number",
+          "minimum": 4,
+          "maximum": 72
+        },
+        "body_font_pt": {
+          "type": "number",
+          "minimum": 4,
+          "maximum": 72
+        },
+        "frame_border": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "color",
+            "inner_width_mm",
+            "gap_mm",
+            "outer_width_mm"
+          ],
+          "properties": {
+            "color": {
+              "type": "string",
+              "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "inner_width_mm": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 5
+            },
+            "gap_mm": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10
+            },
+            "outer_width_mm": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 5
+            }
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "groups"
+        ]
+      },
+      "then": {
+        "properties": {
+          "default_group": {
+            "description": "Must reference one of the declared group ids."
+          }
+        }
+      }
+    }
+  ]
+}

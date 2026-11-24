@@ -50,6 +50,35 @@ class ComputeInvalidationTests(unittest.TestCase):
             compute_invalidation({}, RULES)
 
 
+class LeadershipInvalidationTests(unittest.TestCase):
+    """Phase 2: the leadership contract's style_overrides vocabulary invalidates
+    the compilation nodes only — the frozen data evidence stays reusable and the
+    bundle-input digest is untouched by a style patch."""
+
+    def test_style_overrides_invalidate_compilation_only(self) -> None:
+        from carto_core.scenarios.leadership_visit.revision import REVISION_CONTRACT as ROUTE
+        result = compute_invalidation({"style_overrides": {"new_value": {}}}, ROUTE.rules())
+        self.assertEqual(result["invalidated_nodes"],
+                         ["candidate", "preflight", "preview", "scene"])
+        self.assertTrue(result["data_evidence_reusable"])
+        self.assertEqual("compile", result["earliest_step"])
+
+    def test_style_patch_never_alters_bundle_inputs(self) -> None:
+        from carto_core.scenarios.leadership_visit.revision import REVISION_CONTRACT as ROUTE
+        keys = ROUTE.bundle_input_keys()
+        before = {"source_bindings": [{"role": "r"}],
+                  "style_overrides": {"pin": {"radius_px": 9}}}
+        after = {"source_bindings": [{"role": "r"}],
+                 "style_overrides": {"pin": {"radius_px": 20}}}
+        self.assertEqual(bundle_input_digest(before, keys),
+                         bundle_input_digest(after, keys))
+
+    def test_page_layout_still_invalidates_plan(self) -> None:
+        from carto_core.scenarios.leadership_visit.revision import REVISION_CONTRACT as ROUTE
+        result = compute_invalidation({"page_layout": {"new_value": {}}}, ROUTE.rules())
+        self.assertIn("plan", result["invalidated_nodes"])
+
+
 class BundleInputDigestTests(unittest.TestCase):
     """The digest gate separates data inputs from design-layer inputs."""
 
@@ -72,6 +101,42 @@ class BundleInputDigestTests(unittest.TestCase):
         request["unrelated"] = "anything"
         self.assertEqual(bundle_input_digest(request, BUNDLE_INPUT_KEYS),
                          bundle_input_digest({key: None for key in BUNDLE_INPUT_KEYS}, BUNDLE_INPUT_KEYS))
+
+
+class DataRevisionInvalidationTests(unittest.TestCase):
+    """Design B: change keys mapped onto the data-evidence node mark the prepared
+    bundle non-reusable, so compile re-prepares; design-layer rules are unaffected
+    (regression lock — their analysis stays byte-identical)."""
+
+    def setUp(self) -> None:
+        from carto_core.scenarios.leadership_visit.data_revision import DATA_REVISION_CONTRACT
+        self.rules = DATA_REVISION_CONTRACT.rules()
+
+    def test_route_legs_invalidate_data_evidence(self) -> None:
+        result = compute_invalidation(
+            {"route_legs": [{"leg_id": "leg-1", "via_points": [{"lon": 1.0, "lat": 2.0}]}]},
+            self.rules)
+        self.assertIn("data-evidence", result["invalidated_nodes"])
+        self.assertFalse(result["data_evidence_reusable"])
+        self.assertEqual("compile", result["earliest_step"])
+
+    def test_data_rules_leave_compilation_nodes_intact(self) -> None:
+        result = compute_invalidation(
+            {"route_legs": [{"leg_id": "leg-1", "via_points": [{"lon": 0.0, "lat": 0.0}]}]},
+            self.rules)
+        for node in ("candidate", "preview", "preflight", "scene"):
+            self.assertIn(node, result["invalidated_nodes"])
+
+    def test_unknown_data_key_rejected(self) -> None:
+        with self.assertRaises(ProtocolError):
+            compute_invalidation({"stops": []}, self.rules)
+
+    def test_design_rules_stay_reusable_regression(self) -> None:
+        # The general scenario's design rules never mention the data node, so
+        # their reusability verdict must remain True after the generalization.
+        result = compute_invalidation({"cartography": {"new_value": {}}}, RULES)
+        self.assertTrue(result["data_evidence_reusable"])
+        self.assertNotIn("data-evidence", result["invalidated_nodes"])
 
 
 if __name__ == "__main__":

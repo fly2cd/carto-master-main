@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/leadership-visit-template-create-request.schema.json",
+  "description": "Closed profile for leadership visit route map template creation requests. Envelope (template-create-request) + leadership body.",
+  "allOf": [
+    {
+      "$ref": "https://schemas.carto-agent.local/v1/template-create-request.schema.json"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "map-scenario"
+        },
+        "namespace": {
+          "const": "local"
+        },
+        "template_id": {
+          "const": "leadership-visit-map"
+        },
+        "version": {
+          "const": "1.0.0"
+        },
+        "profile": {
+          "const": "leadership-visit-authoring"
+        },
+        "authoring_mode": {
+          "const": "standard"
+        },
+        "targets": {
+          "minItems": 2,
+          "maxItems": 2,
+          "allOf": [
+            {
+              "contains": {
+                "const": "pdf"
+              }
+            },
+            {
+              "contains": {
+                "const": "png"
+              }
+            }
+          ]
+        },
+        "data_nature": {
+          "const": "user-provided"
+        },
+        "contains_production_data": {
+          "const": false
+        },
+        "contains_sensitive_coordinates": {
+          "const": false
+        },
+        "geometry": {
+          "const": "vector"
+        },
+        "source_crs": {
+          "const": {
+            "authority": "EPSG",
+            "code": "4326"
+          }
+        },
+        "display_crs": {
+          "const": {
+            "authority": "EPSG",
+            "code": "4326"
+          }
+        },
+        "role_bindings": {
+          "propertyNames": {
+            "const": "route-stops"
+          }
+        }
+      }
+    }
+  ],
+  "properties": {
+    "geometry": {
+      "const": "vector"
+    }
+  },
+  "required": [
+    "geometry"
+  ]
+}

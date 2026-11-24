@@ -91,6 +91,10 @@ class MapExpressionCatalog:
 
     def validate_portrayal(self, portrayal: dict[str, Any]) -> None:
         self.registry.validate("portrayal", portrayal)
+        # Image-itinerary portrayals carry the image_itinerary style instead of
+        # thematic layers: no map expressions are referenced, so nothing to resolve.
+        if "layers" not in portrayal:
+            return
         identifiers = [layer["id"] for layer in portrayal["layers"]]
         if len(identifiers) != len(set(identifiers)):
             raise ProtocolError("PORTRAYAL_LAYER_DUPLICATE", "Layer IDs must be unambiguous")
@@ -107,6 +111,8 @@ class MapExpressionCatalog:
     def references(self, portrayal: dict[str, Any]) -> list[dict[str, str]]:
         """The exact union of base and selectable expressions, shared by both workflows."""
         self.validate_portrayal(portrayal)
+        if "layers" not in portrayal:
+            return []
         refs = {}
         for layer in portrayal["layers"]:
             for ref in [layer["map_expression_ref"], *layer.get("expression_options", [])]:

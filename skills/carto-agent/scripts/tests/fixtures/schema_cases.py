@@ -247,6 +247,188 @@ _general_generate["intent"].update({"business_scene": "general_thematic_mapping"
 _general_generate["source_bindings"][0]["data_nature"] = "user-provided"
 VALID_CASES["general-generate-request"] = _general_generate
 
+# The registered leadership-visit scenario narrows the shared request envelope for
+# itinerary route maps; synthetic values only, no bundled dataset.
+_leadership_generate = {
+    "schema_version": 1,
+    "request_id": "leadership-request-one",
+    "project_id": "test-project",
+    "goal": "编制领导调研行程路线图",
+    "geometry": "vector",
+    "sources": [deepcopy(A)],
+    "requested_outputs": ["pdf", "png"],
+    "subject": {"tenant_id": "test-tenant", "subject_id": "test-subject",
+                "approver_subject_id": "synthetic-reviewer", "namespace": "test-project"},
+    "idempotency_key": "leadership-req-0001",
+    "intent": {
+        "business_scene": "leadership_visit",
+        "theme_tags": [],
+        "tasks": ["visit-route-map"],
+        "fields": {"itinerary": "甲地至乙地", "visit-order": "1,2", "route-mode": "road",
+                   "geography": "unit-region", "confidentiality": "internal", "output": "pdf"},
+    },
+    "template": {"namespace": "local", "kind": "map-scenario",
+                 "id": "leadership-visit-map", "version": "1.0.0"},
+    "run_id": "test-run",
+    "audience": "synthetic test only",
+    "scope": "project:test-project",
+    "environment": "local",
+    "requested_at": "2026-11-18T00:00:00Z",
+    "allowed_capabilities": ["read", "render-preview", "geo-to-image-pixels",
+                             "image-display-bounds", "annotation-layout"],
+    "font": {"path": "fixture-project/selected-font.ttf", "family": "Noto Sans CJK SC", "version": "1.0.0"},
+    "itinerary_structure": {"source_ref": deepcopy(A), "normalized_ref": deepcopy(A)},
+    "basemap": {"mode": "registered-transform", "image_ref": deepcopy(A), "parameters_ref": deepcopy(A)},
+    "source_bindings": [{
+        "role": "route-stops",
+        "source_ref": deepcopy(A),
+        "path": "stops.geojson",
+        "geometry_types": ["point"],
+        "field_bindings": [{"semantic_role": "visit-order", "source_field": "visit_order"},
+                           {"semantic_role": "stop-label", "source_field": "stop_name"}],
+    }],
+    "page_layout": {"model": "image-native", "width_mm": 420, "height_mm": 297, "dpi": 300},
+    "annotation_layout": {"seed": 7, "iterations": 200, "gap_px": 8},
+}
+VALID_CASES["leadership-visit-generate-request"] = _leadership_generate
+
+# Image itinerary portrayal parameters (the template portrayal contract's
+# image_itinerary section); synthetic values only.
+VALID_CASES["image-itinerary-style"] = {
+    "schema_version": 1,
+    "groups": [
+        {"id": "morning", "label": "上午", "color": "#1769D2"},
+        {"id": "afternoon", "label": "下午", "color": "#E43D96"},
+        {"id": "default", "label": "行程", "color": "#403B96", "right_offset_px": 12},
+    ],
+    "default_group": "default",
+    "route": {"width_px": 6, "halo_width_px": 2, "right_offset_px": 12,
+              "arrows": {"size_px": 8, "spacing_px": 200}},
+    "pin": {"radius_px": 12, "font_size_px": 12},
+    "callout": {"width_px": 500, "title_font_px": 22, "body_font_px": 14, "padding_px": 8,
+                "line_gap_px": 4, "opacity": 0.88, "leader_width_px": 1.5,
+                "offset_x_px": 16, "offset_y_px": -16, "font_weight": 700,
+                "title_wrap": True, "show_arrival_time": True, "fit_content": False},
+    "support_label": {"color": "#E65C6C", "text_color": "#FFFFFF", "point_radius_px": 6,
+                      "font_size_px": 14, "padding_px": 4, "opacity": 0.88,
+                      "leader_width_px": 1, "offset_x_px": 12, "offset_y_px": -12},
+    "numbering": "per-date-group",
+    "white_threshold": 245,
+}
+
+# Request-level patch subset of image-itinerary-style (leadership-visit
+# style_overrides); synthetic values only, all sections optional.
+VALID_CASES["image-itinerary-style-override"] = {
+    "groups": [
+        {"id": "morning", "color": "#228833"},
+        {"id": "default", "label": "全部行程", "right_offset_px": 20},
+    ],
+    "route": {"width_px": 8, "arrows": {"size_px": 10, "spacing_px": 300}},
+    "pin": {"radius_px": 14},
+    "callout": {"title_font_px": 24, "body_font_px": 16, "opacity": 0.9,
+                "title_color": "#FFFFFF"},
+    "support_label": {"color": "#C41E3A", "font_size_px": 18},
+    "page_furniture": {"title_font_pt": 22, "body_font_pt": 10,
+                       "frame_border": {"color": "#1A3A5C", "inner_width_mm": 0.5,
+                                        "gap_mm": 1.0, "outer_width_mm": 1.0}},
+    "numbering": "global",
+    "white_threshold": 240,
+}
+
+# ToolGateway capability I/O for the migrated image algorithms (typed request/
+# result pairs; digest-bound references, synthetic values only).
+AU = {**A, "uri": "data/basemap.png"}
+_VALID_PROJECTION_STOPS = [{"feature_id": "stop-1", "visit_order": 1, "position": {"x": 1190.5, "y": 842.5}}]
+VALID_CASES["image-projection-request"] = {
+    "schema_version": 1,
+    "image_ref": AU,
+    "parameters_ref": {**A, "uri": "registration.yaml"},
+    "stops_ref": {**A, "uri": "data/prepared/route-stops.geojson"},
+    "route_ref": {**A, "uri": "data/prepared/route-line.geojson"},
+}
+VALID_CASES["image-projection-result"] = {
+    "schema_version": 1,
+    "method": "registered-affine",
+    "method_version": "1.0.0",
+    "pixel_convention": "image-edge; x-right; y-down; center-offset-applied-once",
+    "source_size": {"width_px": 2381, "height_px": 1684},
+    "stops": _VALID_PROJECTION_STOPS,
+    "routes": [{"feature_id": "leg-1", "parts": [[{"x": 1190.5, "y": 842.5}, {"x": 1290.5, "y": 842.5}]],
+                "original_parts": [[{"x": 1190.5, "y": 842.5}, {"x": 1290.5, "y": 842.5}]],
+                "outside_vertex_count": 0, "route_mode": "straight_line"}],
+}
+VALID_CASES["image-display-request"] = {
+    "schema_version": 1,
+    "image_ref": AU,
+    "white_threshold": 245,
+}
+VALID_CASES["image-display-result"] = {
+    "schema_version": 1,
+    "display_window": {"x": 60, "y": 60, "width": 2261, "height": 1561},
+    "source_size": {"width_px": 2381, "height_px": 1684},
+}
+VALID_CASES["annotation-layout-request"] = {
+    "schema_version": 1,
+    "items": [{"id": "callout-1", "anchor_x": 100, "anchor_y": 100, "w": 500, "h": 120},
+              {"id": "callout-2", "anchor_x": 300, "anchor_y": 300, "w": 500, "h": 120,
+               "fixed": {"x": 310, "y": 310}}],
+    "hard_lines": [{"points": [{"x": 0, "y": 0}, {"x": 200, "y": 200}], "width_px": 6}],
+    "hard_boxes": [{"x": 88, "y": 88, "w": 24, "h": 36}],
+    "canvas": {"width": 2260, "height": 1560},
+    "gap_px": 8,
+    "seed": 7,
+    "iterations": 200,
+}
+VALID_CASES["annotation-layout-result"] = {
+    "schema_version": 1,
+    "algorithm": "greedy-sa-v2",
+    "status": "placed",
+    "assignments": [{"id": "callout-1", "status": "placed", "x": 110, "y": 130,
+                     "w": 500, "h": 120, "dx": 10, "dy": 30},
+                    {"id": "callout-2", "status": "placed", "x": 310, "y": 310,
+                     "w": 500, "h": 120, "dx": 10, "dy": 10}],
+    "iterations": 200,
+    "seed": 7,
+}
+VALID_CASES["data-summary-request"] = {
+    "schema_version": 1,
+    "data_dir": "data",
+}
+VALID_CASES["data-summary-result"] = {
+    "schema_version": 1,
+    "data_dir": "data",
+    "file_count": 2,
+    "categories": [{"category": "document", "count": 1},
+                   {"category": "geographic-vector", "count": 1}],
+    "summary_md": "# 数据目录内容\n",
+}
+
+# Frontend Image Canvas v2 document (the canvas payload itself); synthetic
+# millimetre geometry only.
+VALID_CASES["frontend-map-document"] = {
+    "id": "map-scene-unit-001", "name": "领导调研行程路线图 unit", "category": "leadership_visit",
+        "designWidth": 420.0, "designHeight": 297.0,
+        "canvasData": {"type": "Grid", "features": [
+            {"type": "Rect", "RectIndex": 0, "x": 0.0, "y": 0.0, "w": 420.0, "h": 297.0,
+             "fillColor": "#FFFFFF"},
+            {"type": "MultiLineString", "RectIndex": 1,
+             "coordinates": [[10.0, 10.0], [200.0, 150.0], [400.0, 20.0]],
+             "color": "#1769D2", "strokeWidth": 1.5, "strokeDash": "", "closed": False},
+            {"type": "MultiPoint", "RectIndex": 2, "coordinates": [[200.0, 150.0]],
+             "size": 6.0, "color": "#C41E3A"},
+            {"type": "Text", "RectIndex": 3, "x": 100.0, "y": 10.0, "w": 220.0, "h": 12.0,
+             "text": "领导调研行程路线图", "fontSize": 10.0, "lineHeight": 1.2,
+             "color": "#1A3A5C", "textAlign": "center", "bold": True, "italic": False,
+             "underline": False},
+        ], "mapData": {"layers": [
+            {"id": "basemap", "type": "basemap", "rect_indices": [0]},
+            {"id": "route-layer", "type": "route", "rect_indices": [1],
+             "fields": ["route_mode", "itinerary_group"]},
+            {"id": "stops", "type": "stops", "rect_indices": [2]},
+            {"id": "furniture", "type": "furniture", "rect_indices": [3]},
+        ]}},
+}
+
 _general_create = deepcopy(TEMPLATE_CREATE_REQUEST)
 _general_create.update({
     "request_id": "general-template-request",
@@ -263,6 +445,19 @@ _general_create.update({
 })
 VALID_CASES["general-template-create-request"] = _general_create
 
+# Leadership visit template creation request (closed profile, synthetic values only).
+_leadership_create = json.loads(json.dumps(VALID_CASES["general-template-create-request"]))
+_leadership_create.update({
+    "request_id": "leadership-template-request",
+    "template_id": "leadership-visit-map",
+    "version": "1.0.0",
+    "profile": "leadership-visit-authoring",
+    "purpose": "领导调研行程路线图模板（合成验收）",
+    "geometry": "vector",
+    "role_bindings": {"route-stops": "visit-route-sample"},
+})
+VALID_CASES["leadership-visit-template-create-request"] = _leadership_create
+
 # A1.2 / A2 contracts: design revision, persistent budget, and material
 # extraction / adoption. INVALID_CASES are auto-derived below (unknown-field).
 VALID_CASES["design-revision-proposal"] = {
@@ -270,10 +465,21 @@ VALID_CASES["design-revision-proposal"] = {
     "parent_revision": 1, "changes": {"goal": {"new_value": "Updated map title"}},
     "justification": "Reflect the updated scope",
 }
+# Design B: same-run data revision (leg re-planning). The outbound declaration
+# is protocol data (digest-covered by the G1 approval face via the proposal ref),
+# not conversational discipline.
+VALID_CASES["data-revision-proposal"] = {
+    "schema_version": 1, "proposal_id": "proposal-data-001", "run_id": "run-test-001",
+    "parent_revision": 1,
+    "changes": {"route_legs": [{"leg_id": "leg-1",
+                                "via_points": [{"lon": 120.01, "lat": 30.005}]}]},
+    "outbound_declaration": [{"name": "示例途经点", "city": "示例市"}],
+    "justification": "Synthetic data-revision acceptance",
+}
 VALID_CASES["budget-state"] = {
     "schema_version": 1, "saved_at": "2026-11-12T00:00:00Z",
-    "max_tool_calls": 20, "max_model_calls": 10, "max_revisions": 2,
-    "max_elapsed_seconds": 600.0, "max_cost_units": 100.0, "max_context_bytes": 1000000,
+    "max_tool_calls": 20, "max_model_calls": 10, "max_revisions": 3,
+    "max_elapsed_seconds": 1200.0, "max_cost_units": 100.0, "max_context_bytes": 1000000,
     "tool_calls": 0, "model_calls": 0, "revisions": 0,
     "cost_units": 0.0, "context_bytes": 0, "started_at": 0.0,
 }
@@ -807,3 +1013,50 @@ VALID_CASES['revision-dependency-graph']={'schema_version':1,'revision':2,'run_i
     'bundle_input_digest':deepcopy(D),'earliest_step':'compile','created_at':'2026-11-13T00:00:00Z'}
 INVALID_CASES['revision-dependency-graph']={**deepcopy(VALID_CASES['revision-dependency-graph']),'unexpected':True}
 VALID_CASES['delivery-manifest']['review_ref']=deepcopy(A)
+
+# --- online basemap binding: legal + semantic illegal samples (2026-11-21) ---
+# Legal: the frontend document gains the online-view sections (frontend doc
+# sections 4/5) when the request declares online_basemap.
+_online_doc = deepcopy(VALID_CASES["frontend-map-document"])
+_online_doc["baseMap"] = {"type": "Tianditu", "layer": "vec_w", "opacity": 1.0,
+                          "minZoom": 3, "maxZoom": 18}
+_online_doc["mapData"] = {
+    "x": 20.0, "y": 30.0, "w": 380.0, "h": 230.0, "type": "Vector",
+    "extent": {"west": 119.97, "south": 29.97, "east": 120.03, "north": 30.03, "unit": "degree"},
+    "center": {"lon": 120.0, "lat": 30.0}, "bearing": 0,
+    "zoomRule": "contain-replicate", "referenceZoom": 9.5,
+    "coordinateSystem": "WGS84",
+    "features": [
+        {"type": "stops", "name": "上午行程点", "properties": {"period": "morning", "points": [
+            {"id": "stop-1", "name": "甲地", "formattedAddress": "合成地址", "lon": 120.0,
+             "lat": 30.0, "label": "出发点", "RectIndex": 2,
+             "style": {"icon": "star", "size": 4.0, "color": "#C41E3A"}}]}},
+        {"type": "route", "name": "路线", "properties": {"period": "default", "legs": [
+            {"fromName": "甲地", "toName": "乙地",
+             "polyline": [[120.0, 30.0], [120.02, 29.98]]}]},
+         "style": {"strokeColor": "#403B96", "strokeWidth": 0.8, "strokeDash": ""}},
+    ],
+}
+VALID_CASES["frontend-map-document"] = _online_doc
+
+_leadership_online = deepcopy(VALID_CASES["leadership-visit-generate-request"])
+_leadership_online["online_basemap"] = {"provider": "Tianditu", "layer": "vec_w"}
+SEMANTIC_INVALID_CASES["leadership-online-provider"] = (
+    "leadership-visit-generate-request",
+    {**deepcopy(_leadership_online), "online_basemap": {"provider": "Amap", "layer": "vec_w"}})
+SEMANTIC_INVALID_CASES["leadership-online-layer"] = (
+    "leadership-visit-generate-request",
+    {**deepcopy(_leadership_online), "online_basemap": {"provider": "Tianditu", "layer": "terrain"}})
+SEMANTIC_INVALID_CASES["leadership-online-zoom"] = (
+    "leadership-visit-generate-request",
+    {**deepcopy(_leadership_online),
+     "online_basemap": {"provider": "Tianditu", "layer": "vec_w", "minZoom": -1}})
+_lon_doc = deepcopy(VALID_CASES["frontend-map-document"])
+_lon_doc["mapData"]["features"][0]["properties"]["points"][0]["lon"] = 200.0
+SEMANTIC_INVALID_CASES["frontend-geo-lon-range"] = ("frontend-map-document", _lon_doc)
+_zoom_doc = deepcopy(VALID_CASES["frontend-map-document"])
+_zoom_doc["mapData"]["zoomRule"] = "fit"
+SEMANTIC_INVALID_CASES["frontend-geo-zoomrule"] = ("frontend-map-document", _zoom_doc)
+_revision_basemap = deepcopy(VALID_CASES["design-revision-proposal"])
+_revision_basemap["changes"] = {"basemap": {"new_value": {"mode": "registered-transform"}}}
+SEMANTIC_INVALID_CASES["revision-basemap-missing-refs"] = ("design-revision-proposal", _revision_basemap)
