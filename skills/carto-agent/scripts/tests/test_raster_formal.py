@@ -58,7 +58,7 @@ class SyntheticCapability:
 
     def require_contract(self, contract):
         assert contract["scenario_id"] == "synthetic-test"
-        assert contract["embedded"]["cartography"] == VALID_CASES["cartography"]
+        assert contract["embedded"]["style"] == VALID_CASES["style"]
 
     def require_scene(self, scene):
         assert scene["renderer_id"] == RASTER_RENDERER_ID
@@ -233,7 +233,7 @@ class RasterFormalTests(PreparationFixture, unittest.TestCase):
             profile_refs=[intent["evidence_refs"][0], intent["evidence_refs"][-1]])
         self.execution["shared_semantics"]["theme_tags"] = intent["theme_tags"]
         self.contracts = {"scenario": {"scenario_id": "synthetic-test",
-                          "embedded": {"cartography": deepcopy(self.page["appearance"]["cartography"]),
+                          "embedded": {"style": deepcopy(self.page["appearance"]["style"]),
                                        "layout":deepcopy(self.page["resolved_layout"]["template_contract"])}},
                           "quality_gates": deepcopy(VALID_CASES["quality-gates"])}
         self.contracts["portrayal"] = self.service.document(self.page["portrayals"][0]["ref"], "resolved-portrayal")["portrayal"]

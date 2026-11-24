@@ -109,6 +109,22 @@ def resolve_classes(request: dict[str, Any], legend: list[dict[str, Any]], stati
         overrides = {item["value"]: item for item in answers["entries"]}
         if len(overrides) != len(answers["entries"]) or not set(overrides) <= set(values):
             raise ProtocolError("CLASSIFICATION_ANSWERS_INVALID", "Answers contain duplicate or unrelated category codes")
+    category_colors = request.get("category_colors")
+    style_mode = category_colors is not None
+    color_authority: dict[int, str] = {}
+    if style_mode:
+        # Path A single color authority: explicit category colors resolved from a confirmed
+        # Style before preparation. CSV color column and the registered palette must not be
+        # a competing second authority; the CSV still supplies codes/labels/order.
+        if request.get("palette") is not None:
+            raise ProtocolError("CLASSIFICATION_COLOR_AUTHORITY_CONFLICT",
+                                "category_colors is the single color authority; palette must be null")
+        if request["legend"].get("color_column") is not None:
+            raise ProtocolError("CLASSIFICATION_COLOR_AUTHORITY_CONFLICT",
+                                "category_colors is the single color authority; legend.color_column must be null")
+        color_authority = {item["value"]: item["color"] for item in category_colors}
+        if len(color_authority) != len(category_colors):
+            raise ProtocolError("CLASSIFICATION_CATEGORY_COLORS_INVALID", "Duplicate category codes in category_colors")
     rows, questions = [], []
     missing_order = len(legend)
     for value in values:
@@ -119,14 +135,20 @@ def resolve_classes(request: dict[str, Any], legend: list[dict[str, Any]], stati
                    "color": None, "order": missing_order, "include_in_legend": False}
             missing_order += 1
         else:
-            color = definition["color"]
-            if color is None and request["palette"] == "carto-categorical-v1" and definition["order"] < len(PALETTE):
-                color = PALETTE[definition["order"]]
+            if style_mode:
+                color = color_authority.get(value)
+            else:
+                color = definition["color"]
+                if color is None and request["palette"] == "carto-categorical-v1" and definition["order"] < len(PALETTE):
+                    color = PALETTE[definition["order"]]
             row = {"value": value, "count": observed, "semantic": "class", "display": "color",
                    "label": definition["label"], "color": color, "order": definition["order"],
                    "include_in_legend": bool(observed or request["legend_policy"] == "all")}
         if value in overrides:
             override = deepcopy(overrides[value])
+            if style_mode and override.get("color") is not None:
+                raise ProtocolError("CLASSIFICATION_ANSWER_COLOR_OVERRIDE",
+                                    "Answers must not replace bound category colors in Style mode")
             # Canonical hex: parse_legend normalizes CSV colors, so answers must too.
             # Otherwise the same color written two ways yields two frozen digests.
             if override.get("color"):
@@ -149,6 +171,14 @@ def resolve_classes(request: dict[str, Any], legend: list[dict[str, Any]], stati
             questions.append({"question_id": "class-" + sha256_digest({"request": request, "value": value, "kind": kind})[7:31],
                               "kind": kind, "value": value, "observed_count": observed, "message": messages[kind]})
         rows.append(row)
+    if style_mode:
+        # Path A gate timing: enforce the colour redlines when preparation forms the final
+        # colours (portrayal compile keeps its own re-verification). Only Style mode runs
+        # here, so the legacy CSV/palette path is unchanged.
+        from .color_checks import ColorRedlinesPolicy, check_color_sequence, enforce
+        ordered_colors = [row["color"] for row in sorted(rows, key=lambda r: r["order"])
+                          if row["display"] == "color" and row["color"] is not None]
+        enforce(check_color_sequence(ordered_colors, ColorRedlinesPolicy.load()))
     orders = [row["order"] for row in rows]
     if len(orders) != len(set(orders)):
         raise ProtocolError("CLASSIFICATION_ORDER_DUPLICATE", "Display order must be unambiguous")

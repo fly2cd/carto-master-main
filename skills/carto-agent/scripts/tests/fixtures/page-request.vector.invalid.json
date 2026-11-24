@@ -228,7 +228,7 @@
     },
     "parameters": null
   },
-  "cartography": {
+  "style": {
     "schema_version": 2,
     "style_id": "synthetic-style",
     "version": "2.0.0",
@@ -315,7 +315,7 @@
   ],
   "appearance": {
     "schema_version": 2,
-    "cartography": {
+    "style": {
       "schema_version": 2,
       "style_id": "synthetic-style",
       "version": "2.0.0",
@@ -346,7 +346,7 @@
       "rules": []
     },
     "style_ref": {
-      "id": "cartography",
+      "id": "style",
       "version": "2.0.0",
       "digest": "sha256:553d952156749cbbd82a92f4dc4d666061d9ff52c9a39675fa1455105e0456d3"
     },

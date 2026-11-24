@@ -1,3 +1,4 @@
+"""Core protocols: state, tools, intent, approvals, render receipts and SVG composition."""
 from __future__ import annotations
 
 import json
@@ -77,15 +78,6 @@ class StateAndRepositoryTests(unittest.TestCase):
                 store.resume({"request": "changed"}, {"policy": {"version": 1}})
             self.assertEqual(raised.exception.code, "JOB_INPUT_DRIFT")
 
-    def test_immutable_store_is_content_addressed(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            store = ImmutableArtifactStore(Path(temp))
-            first = store.put("artifact-one", "1.0.0", {"value": 1})
-            second = store.put("artifact-one", "1.0.0", {"value": 1})
-            self.assertEqual(first.path, second.path)
-            self.assertEqual(store.get(first), {"value": 1})
-
-
 class ToolAndKnowledgeTests(unittest.TestCase):
     def test_gateway_rejects_unknown_and_unauthorized_capabilities(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -143,7 +135,7 @@ class IntentAndRuntimeTests(unittest.TestCase):
             return {"geography": "示例市", "source": "应急数据", "output": "A3 PDF"}
         return {"itinerary": "甲地至乙地", "visit-order": "1,2", "route-mode": "road", "geography": "示例市", "confidentiality": "internal", "output": "A3 PDF"}
 
-    def test_two_business_scenes_resolve_and_dispatch(self) -> None:
+    def test_catalog_business_scenes_resolve_and_dispatch(self) -> None:
         texts = {"government_thematic": "制作经济发展政务专题图", "general_thematic_mapping": "制作洪涝应急专题图", "leadership_visit": "制作领导调研行程路线图"}
         for scene, text in texts.items():
             with self.subTest(scene=scene):

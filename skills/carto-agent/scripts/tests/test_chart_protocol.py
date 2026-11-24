@@ -245,7 +245,7 @@ class ChartCompilePageTests(unittest.TestCase):
                  for fr in layout["contract"]["frames"] if fr["type"] not in {"map", "legend", "chart"}]
         legend_titles = {fr["content_id"]: "L" for fr in layout["contract"]["frames"] if fr["type"] == "legend"}
         font = {"path": str(f), "digest": file_digest(f), "size_bytes": f.stat().st_size}
-        cartography = deepcopy(VALID_CASES["cartography"])
+        cartography = deepcopy(VALID_CASES["style"])
         return compile_page(service, layout=layout, cartography=cartography, panels=panels,
                             font=font, texts=texts, legend_titles=legend_titles, context=context,
                             charts=[chart])
@@ -269,7 +269,8 @@ class ChartCompilePageTests(unittest.TestCase):
 
 
 
-@unittest.skipUnless(_HAS_FIONA, "vector integration requires Fiona (geo313 environment)")
+@unittest.skipUnless(_HAS_FIONA, "vector integration requires Fiona (geo313 environment)")
+
 class StackedLayerPanelTests(unittest.TestCase):
     """Integration: an ordered two-layer panel (choropleth base + points on top)."""
 
@@ -345,7 +346,7 @@ class StackedLayerPanelTests(unittest.TestCase):
                  for fr in layout["contract"]["frames"] if fr["type"] not in {"map", "legend", "chart"}]
         legend_titles = {fr["content_id"]: "L" for fr in layout["contract"]["frames"] if fr["type"] == "legend"}
         font = {"path": str(f1), "digest": file_digest(f1), "size_bytes": f1.stat().st_size}
-        page = compile_page(service, layout=layout, cartography=deepcopy(VALID_CASES["cartography"]),
+        page = compile_page(service, layout=layout, cartography=deepcopy(VALID_CASES["style"]),
                             panels=[panel], font=font, texts=texts, legend_titles=legend_titles,
                             context=context)
         return service, page, context

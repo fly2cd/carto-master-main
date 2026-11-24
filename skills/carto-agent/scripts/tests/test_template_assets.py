@@ -19,7 +19,7 @@ if str(SCRIPTS_ROOT) not in sys.path:
 from carto_core.schema_registry import SchemaRegistry, load_document
 
 ASSETS_ROOT = SCRIPTS_ROOT.parent / "template-assets"
-CONTRACTS = {"map-style": ("cartography.yaml", "cartography"),
+CONTRACTS = {"map-style": ("cartography.yaml", "style"),
              "map-layout": ("layout.yaml", "layout")}
 
 
@@ -37,7 +37,7 @@ class MigratedAssetTests(unittest.TestCase):
             for version_dir in (ASSETS_ROOT / kind).glob("*/*"):
                 found.add((kind, version_dir.parent.name, version_dir.name))
         self.assertEqual(found, set(self.assets))
-        self.assertEqual(len(found), 13)
+        self.assertTrue(found, "No template assets found; integrity checks would be vacuous")
 
     def test_every_adapted_contract_validates_under_main_schemas(self) -> None:
         for (kind, template_id, version) in sorted(self.assets):

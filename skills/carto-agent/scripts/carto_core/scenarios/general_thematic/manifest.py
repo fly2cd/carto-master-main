@@ -28,6 +28,7 @@ COMPONENTS: dict[str, tuple[str, str]] = {
     "author": (_DISPATCH, "GeneralAuthor"),
     "validation_data_checker": (_DISPATCH, "validation_data_checker"),
     "validation_scene": (_DISPATCH, "validation_scene"),
+    "segment_validation_host": (_DISPATCH, "segment_validation_host"),
 }
 
 # Other registered implementations whose components this package inherits (own overrides).

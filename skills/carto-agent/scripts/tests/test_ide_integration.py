@@ -9,6 +9,9 @@ import unittest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
+SCRIPTS_ROOT = REPO_ROOT / "skills/carto-agent/scripts"
+if str(SCRIPTS_ROOT) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_ROOT))
 CLI = "${workspaceFolder}/skills/carto-agent/scripts/carto.py"
 TESTS = "${workspaceFolder}/skills/carto-agent/scripts/tests"
 RUNNER = "${workspaceFolder}/skills/carto-agent/scripts/tests/run_tests.py"
@@ -59,6 +62,17 @@ class IdeIntegrationTests(unittest.TestCase):
                 self.assertIsInstance(task["args"], list)
                 for key in ("runOptions", "dependsOn", "windows", "linux", "osx"):
                     self.assertNotIn(key, task)
+
+    def test_regression_discovery_is_importable_and_unique(self) -> None:
+        from collections import Counter
+        from tests.run_tests import discover, iter_cases
+
+        cases = list(iter_cases(discover()))
+        ids = [case.id() for case in cases]
+        self.assertTrue(ids, "Regression discovery must not be empty")
+        self.assertEqual([], [test_id for test_id in ids if "_FailedTest." in test_id])
+        self.assertEqual({}, {test_id: count for test_id, count in Counter(ids).items() if count > 1},
+                         "Import fixture modules rather than TestCase classes to avoid duplicate runs")
 
     def test_task_commands_are_generic_and_only_use_existing_entrypoints(self) -> None:
         expected = {

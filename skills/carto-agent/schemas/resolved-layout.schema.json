@@ -102,6 +102,7 @@
               "legend",
               "scale-bar",
               "north-arrow",
+              "inset",
               "marginalia",
               "chart"
             ]
@@ -114,6 +115,25 @@
               "clip",
               "reject"
             ]
+          },
+          "view_extent": {
+            "description": "Inset-only: verified independent view extent carried from the contract.",
+            "type": "array", "minItems": 4, "maxItems": 4, "items": {"type": "number"}
+          },
+          "main_map_ref": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier",
+            "description": "Inset-only: associated main map view."
+          },
+          "highlight_id": {
+            "description": "Inset-only: optional highlighted object id.",
+            "anyOf": [
+              {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+              {"type": "null"}
+            ]
+          },
+          "content_role": {
+            "description": "Page content role carried from the contract for deterministic fact-view counting.",
+            "enum": ["main-map", "inset-map", "legend-group", "title", "text", "chart", "decoration"]
           }
         }
       }

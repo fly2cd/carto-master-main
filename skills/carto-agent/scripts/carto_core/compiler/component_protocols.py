@@ -128,7 +128,20 @@ class ValidationScene(Protocol):
                  context: Any = None, workspace: Path | None = None,
                  registry: Any = None,
                  layout_parameters: dict[str, Any] | None = None,
-                 validation_expression: str | None = None) -> dict[str, Any]: ...
+                 validation_expression: str | None = None,
+                 category_colors: Any = None) -> dict[str, Any]: ...
+
+
+@runtime_checkable
+class SegmentValidationHost(Protocol):
+    """Build the platform validation-host shell for independent segment validation.
+
+    Returns (host_root, snapshot, descriptor); the kernel injects the segment-under-test
+    and reuses validation_scene + the generic renderer. Ready-made function component.
+    """
+
+    def __call__(self, kind: str, design: dict[str, Any], *, host_root: Path,
+                 registry: Any) -> tuple[Path, dict[str, Any], dict[str, Any], Any]: ...
 
 
 @runtime_checkable
@@ -226,6 +239,7 @@ COMPONENT_PROTOCOLS: dict[str, Any] = {
     "author": Author,
     "validation_data_checker": ValidationDataChecker,
     "validation_scene": ValidationScene,
+    "segment_validation_host": SegmentValidationHost,
 }
 
 #: Components the framework *constructs*, mapped to their construction contract.

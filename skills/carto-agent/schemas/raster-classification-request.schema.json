@@ -90,6 +90,32 @@
             "observed",
             "all"
           ]
+        },
+        "category_colors": {
+          "description": "Path A explicit category-color authority (value -> uppercase hex), resolved from a confirmed Style before preparation. When present it is the SINGLE color authority: palette and legend.color_column must be null (enforced at resolution); the CSV still supplies category codes/labels/order. Absent keeps the legacy CSV-color/palette behavior unchanged.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "value",
+              "color"
+            ],
+            "properties": {
+              "value": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 4294967295
+              },
+              "color": {
+                "type": "string",
+                "pattern": "^#[0-9A-F]{6}$"
+              }
+            }
+          }
         }
       }
     },

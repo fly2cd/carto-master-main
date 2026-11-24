@@ -378,7 +378,7 @@ class DeclaredContainmentTests(unittest.TestCase):
         self.assertEqual("LAYOUT_CONTENT_OVERFLOW", raised.exception.code)
 
     def test_grid_rejects_a_containment_base_but_single_map_grid_keeps_it(self) -> None:
-        from carto_core.scenarios.general_thematic import layout_contract
+        from carto_core.scenarios.general_thematic.raster import layout_contract
         base = layout_contract()
         base["frames"][1]["inside_frame"] = "map"
         self.assertEqual("GRID_BASE_INVALID",

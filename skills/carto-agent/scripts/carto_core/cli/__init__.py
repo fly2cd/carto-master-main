@@ -18,14 +18,14 @@ import sys
 
 from ..errors import CartoError
 from . import (
-    schema_cmd, security_cmd, intent_cmd, environment_cmd, data_cmd, template_cmd, generate_cmd,
+    schema_cmd, security_cmd, intent_cmd, environment_cmd, data_cmd, match_cmd, template_cmd, generate_cmd,
 )
 from ._shared import success
 
 # Registration order preserves the original --help output order. security_cmd registers
 # both the ``security`` and ``approval`` top-level commands.
 _REGISTER_ORDER = (
-    schema_cmd, security_cmd, intent_cmd, environment_cmd, data_cmd, template_cmd, generate_cmd,
+    schema_cmd, security_cmd, intent_cmd, environment_cmd, data_cmd, match_cmd, template_cmd, generate_cmd,
 )
 
 # Command name -> handling module. ``approval`` shares security_cmd.
@@ -36,6 +36,7 @@ _DISPATCH = {
     "intent": intent_cmd,
     "environment": environment_cmd,
     "data": data_cmd,
+    "template": match_cmd,
     "create-template": template_cmd,
     "generate-map": generate_cmd,
 }

@@ -136,6 +136,10 @@ class GeneralAuthor:
 # raster implementation stays the single shared component (identity preserved for tests).
 validation_data_checker = raster.validation_data_checker
 
+# Platform validation-host shell for independent segment validation (kernel reaches it via
+# the registered component hook; the kernel never imports this scenario module statically).
+segment_validation_host = raster.segment_validation_host
+
 
 def validation_scene(package_root: Path, snapshot: dict[str, Any], targets: list[str],
                      font: Path, validator_version: str, *,
@@ -143,14 +147,16 @@ def validation_scene(package_root: Path, snapshot: dict[str, Any], targets: list
                      workspace: Path | None = None,
                      registry: SchemaRegistry | None = None,
                      layout_parameters: dict[str, Any] | None = None,
-                     validation_expression: str | None = None) -> dict[str, Any]:
+                     validation_expression: str | None = None,
+                     category_colors: Any = None) -> dict[str, Any]:
     kwargs = {"context": context, "workspace": workspace, "registry": registry,
               "layout_parameters": layout_parameters}
     if geometry_of_snapshot(snapshot) == "vector":
         if validation_expression is not None:
             kwargs["validation_expression"] = validation_expression
         return vector.validation_scene(package_root, snapshot, targets, font, validator_version, **kwargs)
-    return raster.validation_scene(package_root, snapshot, targets, font, validator_version, **kwargs)
+    return raster.validation_scene(package_root, snapshot, targets, font, validator_version,
+                                   category_colors=category_colors, **kwargs)
 
 
 def legend_checker(context: dict[str, Any]) -> tuple[bool, dict[str, Any], None]:

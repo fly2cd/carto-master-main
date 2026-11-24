@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/reference-intake.schema.json",
+  "description": "Frozen intake record for an uploaded reference image (plan phase 2). The image is read through PathGuard with byte/pixel/format limits; source digest, dimensions, DPI, color mode and declared license are frozen as evidence. The original image stays in a controlled evidence directory and is never auto-published into a template package. A local file existing does not imply redistribution permission.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "intake_id",
+    "source_image",
+    "width_px",
+    "height_px",
+    "format",
+    "color_mode",
+    "license",
+    "byte_size"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "intake_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "source_image": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"},
+    "width_px": {"type": "integer", "minimum": 1},
+    "height_px": {"type": "integer", "minimum": 1},
+    "format": {"enum": ["PNG", "JPEG"]},
+    "color_mode": {"type": "string", "minLength": 1},
+    "license": {"type": "string", "minLength": 1},
+    "byte_size": {"type": "integer", "minimum": 1},
+    "dpi": {
+      "anyOf": [
+        {"type": "number", "exclusiveMinimum": 0},
+        {"type": "null"}
+      ]
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "k": {"type": "integer", "minimum": 1, "maximum": 256},
+        "max_pixels": {"type": "integer", "minimum": 1}
+      }
+    }
+  }
+}

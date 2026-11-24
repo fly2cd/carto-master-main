@@ -229,7 +229,7 @@
             "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
           },
           "revised_cartography": {
-            "$ref": "https://schemas.carto-agent.local/v2/cartography.schema.json"
+            "$ref": "https://schemas.carto-agent.local/v2/style.schema.json"
           },
           "output_profile": {
             "type": "object",

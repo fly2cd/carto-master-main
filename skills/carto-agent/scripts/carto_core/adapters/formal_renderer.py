@@ -46,7 +46,7 @@ def _formal_renderer_digest_raster(page_digest: str) -> str:
     ]
     paths += [root / "schemas" / (name + ".schema.json") for name in
               ("render-scene", "render-receipt", "prepared-data-bundle", "common",
-               "page-bindings", "resolved-appearance", "cartography", "layout", "category-counts",
+               "page-bindings", "resolved-appearance", "style", "layout", "category-counts",
                "bundle-inputs")]
     return sha256_digest({"page_renderer": page_digest,
                           "files": {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}})
@@ -73,7 +73,7 @@ def _formal_renderer_digest_vector(page_digest: str) -> str:
     paths += [root / "schemas" / (name + ".schema.json") for name in
               ("render-scene", "render-receipt", "common", "prepared-data-bundle", "bundle-inputs",
                "page-bindings", "vector-input", "encoding-ir", "vector-prepared-data",
-               "resolved-portrayal", "resolved-layout", "layout", "cartography", "resolved-appearance")]
+               "resolved-portrayal", "resolved-layout", "layout", "style", "resolved-appearance")]
     return sha256_digest({"page_renderer": page_digest,
                           "files": {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}})
 

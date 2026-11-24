@@ -26,6 +26,9 @@ TOOL_VERSION = "0.2.4"
 class TemplateCreationWorkflow:
     """U-P2 analyze -> brief -> author -> validate -> publish workflow."""
 
+    # Evidence schema validated by _load_evidence; segment subclasses override it.
+    _evidence_schema = "template-validation-evidence"
+
     def __init__(
         self,
         *,
@@ -96,7 +99,7 @@ class TemplateCreationWorkflow:
         atomic_yaml(brief_path, brief)
         state, receipt = self.state_store.complete_step(
             state,
-            status="waiting_approval",
+            status="succeeded",
             prerequisites={"analysis": analysis},
             output_refs=[artifact_ref("template-brief", brief, "template_brief.yaml")],
             tool_versions={"template-brief-builder": TOOL_VERSION},
@@ -106,25 +109,13 @@ class TemplateCreationWorkflow:
             "state": state.to_dict(),
             "receipt": receipt.to_dict(),
             "brief": brief,
-            "approval": {
-                "gate_id": "T1",
-                "action": "approve-template-brief",
-                "object_type": "template-brief",
-                "object_digest": sha256_digest(brief),
-                "scope": request["scope"],
-            },
         }
 
     @serialized_workflow_step
     def author(
         self,
         request_path: str | Path,
-        approval_path: str | Path | None,
-        *,
-        approval_key: bytes,
     ) -> dict[str, Any]:
-        if approval_path is None:
-            raise ProtocolError("BRIEF_NOT_CONFIRMED", "A T1 template-brief approval is required")
         package_root = self.path_guard.resolve(self.work_root / "staging/package")
         package_exists = package_root.exists()
         if package_exists and self.state_store.load().step != "author":
@@ -141,15 +132,6 @@ class TemplateCreationWorkflow:
         brief = self._load_yaml("template_brief.yaml", "template-brief")
         self._verify_last_output("template-brief", brief)
 
-        approval_resolved = self._resolve_project_path(approval_path, must_exist=True)
-        approval_value = load_document(approval_resolved)
-        if not isinstance(approval_value, dict):
-            raise ProtocolError("BRIEF_NOT_CONFIRMED", "Approval receipt must be an object")
-        self.registry.validate("approval-receipt", approval_value)
-        receipt = ApprovalReceipt.from_dict(approval_value)
-        coordinator = self._gate_coordinator(approval_key, request)
-        coordinator.require("T1", receipt, sha256_digest(brief),
-                            run_id=state.run_id)
         author = MapScenarioAuthor(self.path_guard, self.work_root, self.registry)
         package = (
             author.verify_existing(request, brief)
@@ -165,7 +147,7 @@ class TemplateCreationWorkflow:
         state, step_receipt = self.state_store.complete_step(
             state,
             status="succeeded",
-            prerequisites={"analysis": analysis, "brief": brief, "approval": approval_value},
+            prerequisites={"analysis": analysis, "brief": brief},
             output_refs=[package_ref],
             tool_versions={"map-scenario-author": TOOL_VERSION},
             next_step="validate",
@@ -232,10 +214,92 @@ class TemplateCreationWorkflow:
             prerequisites={"package_ref": evidence["package_ref"]},
             output_refs=[evidence_ref],
             tool_versions={"template-validator": "1.0.0", "fixture-renderer": "1.0.0"},
-            next_step="publish" if passed else None,
+            next_step="prepare-publish" if passed else None,
             error=None if passed else {"code": "TEMPLATE_VALIDATION_FAILED", "message": "blocker/error checks failed"},
         )
         return {"state": state.to_dict(), "receipt": step_receipt.to_dict(), "evidence": evidence}
+
+    def _load_evidence(self, state) -> tuple[dict[str, Any], dict[str, str], Path]:
+        evidence_ref = self.state_store.find_output_ref("template-validation-evidence")
+        evidence_uri = evidence_ref.get("uri")
+        if not evidence_uri or Path(evidence_uri).is_absolute():
+            raise ProtocolError("WORKFLOW_ARTIFACT_REF_INVALID", str(evidence_uri))
+        evidence_path = self.path_guard.resolve(self.work_root / evidence_uri, must_exist=True)
+        try:
+            evidence_path.relative_to(self.work_root)
+        except ValueError as exc:
+            raise ProtocolError("WORKFLOW_ARTIFACT_REF_INVALID", evidence_uri) from exc
+        evidence = load_document(evidence_path)
+        if not isinstance(evidence, dict):
+            raise ProtocolError("WORKFLOW_ARTIFACT_INVALID", evidence_uri)
+        self.registry.validate(self._evidence_schema, evidence)
+        if evidence.get("evidence_digest") != evidence_ref["digest"]:
+            raise ProtocolError("JOB_PREREQUISITE_DRIFT", state.run_id)
+        return evidence, evidence_ref, evidence_path
+
+    @serialized_workflow_step
+    def prepare_publication(
+        self,
+        request_path: str | Path,
+        *,
+        repository_root: str | Path,
+        repository_scope: str,
+        idempotency_key: str,
+    ) -> dict[str, Any]:
+        """Machine preparation of the frozen, operator-approved publication object.
+
+        Not an approval gate: consumes no nonce, signs nothing, publishes nothing.
+        Repeating the same preparation reuses the same object and digest.
+        """
+        request, inputs, state = self._resume_request(request_path)
+        if state.step == "publish" and state.status == "waiting_approval":
+            ref = self.state_store.find_output_ref("template-publication")
+            obj = self._load_yaml(ref["uri"], "template-publication")
+            if sha256_digest(obj) != ref["digest"]:
+                raise ProtocolError("PUBLICATION_OBJECT_DRIFT", state.run_id)
+            return {"state": state.to_dict(), "publication_object": obj,
+                    "object_digest": ref["digest"], "idempotent_prepare": True}
+        self._require_step(state.step, "prepare-publish")
+        evidence, evidence_ref, _ = self._load_evidence(state)
+        if evidence["status"] != "passed":
+            raise ProtocolError("TEMPLATE_VALIDATION_FAILED", "Only passed validation may be prepared")
+        if evidence["package_ref"]["digest"] != self._last_output_digest("staging-package"):
+            raise ProtocolError("JOB_PREREQUISITE_DRIFT", state.run_id)
+        root = self._resolve_project_path(repository_root, must_exist=False)
+        package = evidence["package_ref"]
+        obj = {
+            "schema_version": 1,
+            "run_id": state.run_id,
+            "request_digest": sha256_digest(inputs),
+            "package_ref": {key: package[key] for key in ("kind", "id", "version", "digest")},
+            "evidence_ref": evidence_ref,
+            "repository_scope": repository_scope,
+            "repository_root": root.as_posix(),
+            "idempotency_key": idempotency_key,
+        }
+        self.registry.validate("template-publication", obj)
+        obj_path = self.path_guard.resolve(self.work_root / "publication/template-publication.yaml")
+        if obj_path.exists():
+            if load_document(obj_path) != obj:
+                raise ProtocolError("PUBLICATION_OBJECT_DRIFT", str(obj_path))
+        else:
+            atomic_yaml(obj_path, obj)
+        obj_ref = {"id": "template-publication", "version": "1.0.0",
+                   "digest": sha256_digest(obj), "uri": "publication/template-publication.yaml"}
+        state, receipt = self.state_store.complete_step(
+            state,
+            status="waiting_approval",
+            prerequisites={"evidence": evidence},
+            output_refs=[obj_ref],
+            tool_versions={"template-publication-preparer": TOOL_VERSION},
+            next_step="publish",
+        )
+        return {"state": state.to_dict(), "receipt": receipt.to_dict(),
+                "publication_object": obj, "object_digest": obj_ref["digest"],
+                "previews": evidence.get("preview_artifacts", []),
+                "approval": {"gate_id": "TP", "action": "approve-template-publish",
+                             "object_type": "template-publication", "object_digest": obj_ref["digest"],
+                             "scope": request["scope"]}}
 
     @serialized_workflow_step
     def publish(
@@ -251,47 +315,38 @@ class TemplateCreationWorkflow:
     ) -> dict[str, Any]:
         request, inputs, state = self._resume_request(request_path)
         self._require_step(state.step, "publish")
-        evidence_ref = self.state_store.find_output_ref("template-validation-evidence")
-        evidence_uri = evidence_ref.get("uri")
-        if not evidence_uri or Path(evidence_uri).is_absolute():
-            raise ProtocolError("WORKFLOW_ARTIFACT_REF_INVALID", str(evidence_uri))
-        evidence_path = self.path_guard.resolve(self.work_root / evidence_uri, must_exist=True)
-        try:
-            evidence_path.relative_to(self.work_root)
-        except ValueError as exc:
-            raise ProtocolError("WORKFLOW_ARTIFACT_REF_INVALID", evidence_uri) from exc
-        evidence = load_document(evidence_path)
-        if not isinstance(evidence, dict):
-            raise ProtocolError("WORKFLOW_ARTIFACT_INVALID", evidence_uri)
-        self.registry.validate("template-validation-evidence", evidence)
-        if evidence.get("evidence_digest") != evidence_ref["digest"]:
-            raise ProtocolError("JOB_PREREQUISITE_DRIFT", state.run_id)
+        obj_ref = self.state_store.find_output_ref("template-publication")
+        obj = self._load_yaml(obj_ref["uri"], "template-publication")
+        if sha256_digest(obj) != obj_ref["digest"]:
+            raise ProtocolError("PUBLICATION_OBJECT_DRIFT", state.run_id)
+        if obj["run_id"] != state.run_id or obj["request_digest"] != sha256_digest(inputs):
+            raise ProtocolError("PUBLICATION_OBJECT_DRIFT", state.run_id)
+        root = self._resolve_project_path(repository_root, must_exist=False)
+        if (root.as_posix() != obj["repository_root"] or repository_scope != obj["repository_scope"]
+                or idempotency_key != obj["idempotency_key"]):
+            raise ProtocolError("PUBLICATION_TARGET_MISMATCH", state.run_id)
+        evidence, evidence_ref, evidence_path = self._load_evidence(state)
+        if evidence["evidence_digest"] != obj["evidence_ref"]["digest"]:
+            raise ProtocolError("PUBLICATION_OBJECT_DRIFT", state.run_id)
         package_root = self.path_guard.resolve(self.work_root / "staging/package", must_exist=True)
-        repository_path = self._resolve_project_path(repository_root, must_exist=False)
         repository = TemplateRepository(
-            path_guard=self.path_guard, root=repository_path,
-            repository_scope=repository_scope, registry=self.registry,
+            path_guard=self.path_guard, root=root,
+            repository_scope=obj["repository_scope"], registry=self.registry,
         )
-        validator = TemplatePackageValidator(
-            path_guard=self.path_guard, package_root=package_root,
-            evidence_root=evidence_path.parent, attestation_key=renderer_attestation_key,
-            registry=self.registry, context=self._validation_context(request, state),
-            repository=repository,
-        )
-        snapshot = validator.verify_evidence(evidence, self._expected_validation(request), request["targets"])
+        snapshot = self._verify_for_publish(
+            evidence, request, state, package_root, evidence_path, renderer_attestation_key, repository)
+        if snapshot["package_digest"] != obj["package_ref"]["digest"]:
+            raise ProtocolError("PUBLICATION_OBJECT_DRIFT", state.run_id)
+        publication_digest = sha256_digest(obj)
         coordinator = self._gate_coordinator(approval_key, request)
-        publication_object = {
-            "package_digest": snapshot["package_digest"],
-            "evidence_digest": evidence["evidence_digest"],
-            "repository_scope": repository_scope,
-        }
-        publication_digest = sha256_digest(publication_object)
         prior = repository.lookup_idempotency(
-            idempotency_key, package_digest=snapshot["package_digest"],
-            evidence_digest=evidence["evidence_digest"],
+            obj["idempotency_key"], package_digest=snapshot["package_digest"],
+            evidence_digest=evidence["evidence_digest"], publication_digest=publication_digest,
         )
         if prior is not None:
             approval_value = repository.load_publication_approval(prior)
+            if sha256_digest(repository.load_publication_object(prior)) != publication_digest:
+                raise ProtocolError("PUBLICATION_OBJECT_DRIFT", state.run_id)
             if state.status == "succeeded":
                 if self.state_store.find_output_digest("publication-receipt") != sha256_digest(prior):
                     raise ProtocolError("JOB_PREREQUISITE_DRIFT", state.run_id)
@@ -328,7 +383,8 @@ class TemplateCreationWorkflow:
         )
         publication = repository.publish(
             package_root=package_root, snapshot=snapshot, evidence=evidence,
-            approval=approval_value, idempotency_key=idempotency_key,
+            approval=approval_value, idempotency_key=obj["idempotency_key"],
+            publication_object=obj,
         )
         publication_ref = {
             "id": "publication-receipt", "version": "1.0.0",
@@ -405,6 +461,17 @@ class TemplateCreationWorkflow:
     def _expected_validation(cls, request: dict[str, Any]) -> dict[str, Any]:
         return {**cls._expected_identity(request), "source_crs": request["source_crs"],
                 "display_crs": request["display_crs"]}
+
+    def _verify_for_publish(self, evidence, request, state, package_root, evidence_path,
+                            attestation_key, repository):
+        """Publish-time re-verification hook; segment subclasses swap the validator."""
+        validator = TemplatePackageValidator(
+            path_guard=self.path_guard, package_root=package_root,
+            evidence_root=evidence_path.parent, attestation_key=attestation_key,
+            registry=self.registry, context=self._validation_context(request, state),
+            repository=repository,
+        )
+        return validator.verify_evidence(evidence, self._expected_validation(request), request["targets"])
 
     def _resolve_project_path(self, value: str | Path, *, must_exist: bool) -> Path:
         candidate = Path(value)

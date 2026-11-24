@@ -61,7 +61,7 @@ _COMPONENTS: dict[str, dict[str, tuple[str, str]]] = _load_components()
 REQUIRED_COMPONENTS = {
     # Always required — data admission and safety are universal.
     "admission": ("source_contract",),
-    # create-template route (T1 → author → validate → TP).
+    # create-template route (author → validate → prepare-publish → TP).
     "create-template": ("author", "validation_data_checker", "validation_scene"),
     # generate-map route (G1 → data-prep → plan → compile → G2 → render → check → G3).
     # request_contract supplies request-body understanding (source plan, validation, overrides).
@@ -284,6 +284,21 @@ class ScenarioRegistry:
             return self._templates[key]
         except (KeyError, TypeError) as exc:
             raise ProtocolError("CAPABILITY_NOT_AVAILABLE", "Template has no enabled scenario capability") from exc
+
+    def for_segment_validation_host(self) -> ScenarioCapability:
+        """The registered raster scenario used as the platform segment-validation host.
+
+        Segment validation renders a synthetic sample through an admitted scenario's
+        machinery; the kernel resolves that host here (registration authority) and reaches
+        its behavior via component hooks, never by importing a concrete scenario module.
+        """
+        hosts = [cap for cap in self._templates.values()
+                 if cap.definition["template"]["kind"] == "map-scenario"
+                 and cap.definition.get("template_geometry") == "raster"]
+        if len(hosts) != 1:
+            raise ProtocolError("SEGMENT_VALIDATION_HOST_AMBIGUOUS",
+                                "Exactly one raster scenario host must be registered for segment validation")
+        return hosts[0]
 
     def for_create(self, request: dict[str, Any]) -> ScenarioCapability:
         self.registry.validate("template-create-request", request)

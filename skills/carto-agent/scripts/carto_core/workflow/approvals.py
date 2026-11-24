@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from ..errors import ProtocolError
 from ..security.approval import ApprovalReceipt, verify_receipt
 
 if TYPE_CHECKING:
@@ -20,7 +21,6 @@ GATES = {
     "G1": GateDefinition("G1", "approve-map-brief", "map-brief"),
     "G2": GateDefinition("G2", "approve-freeze", "resolved-map"),
     "G3": GateDefinition("G3", "approve-delivery", "delivery-manifest"),
-    "T1": GateDefinition("T1", "approve-template-brief", "template-brief"),
     "TP": GateDefinition("TP", "approve-template-publish", "template-publication"),
 }
 
@@ -54,7 +54,9 @@ class ApprovalGateCoordinator:
         scope: str | None = None,
         run_id: str | None = None,
     ) -> None:
-        gate = GATES[gate_id]
+        gate = GATES.get(gate_id)
+        if gate is None:
+            raise ProtocolError("APPROVAL_GATE_UNKNOWN", f"Unknown approval gate: {gate_id}")
 
         self.require_attestation(gate.action, gate.object_type, receipt, object_digest,
                                  subject_id=subject_id, tenant_id=tenant_id, scope=scope, run_id=run_id)

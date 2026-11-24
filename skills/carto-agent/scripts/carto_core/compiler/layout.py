@@ -10,6 +10,7 @@ from ..canonical import sha256_digest
 from ..errors import ProtocolError
 from ..schema_registry import SchemaRegistry
 from ..roadmap import not_implemented
+from .inset import validate_inset_declaration
 
 RESOLVER_VERSION = "2.0.0"
 # These are conservative envelopes for the existing fixed-size SVG primitives,
@@ -19,7 +20,7 @@ INSET_PX = 4
 _FRAME_OVERLAYS = {
     "title": {"text"}, "legend": {"legend"}, "scale-bar": {"scale-bar"},
     "north-arrow": {"north-arrow"}, "marginalia": {"text", "attribution"},
-    "chart": {"chart"},
+    "chart": {"chart"}, "inset": {"inset"},
 }
 
 
@@ -154,6 +155,9 @@ class LayoutResolver:
         for frame in contract["frames"]:
             container_id = frame.get("inside_frame")
             if container_id is None:
+                if frame["type"] == "inset":
+                    raise ProtocolError("INSET_CONTAINMENT_REFERENCE",
+                                        f"{frame['id']}: an inset must declare inside_frame naming its map frame")
                 continue
             container = by_id.get(container_id)
             if container is None or container_id == frame["id"] or "inside_frame" in container:
@@ -181,7 +185,7 @@ class LayoutResolver:
             if kind != "map" and kind not in _FRAME_OVERLAYS:
                 not_implemented("layout-frame-types", "LAYOUT_FRAME_UNSUPPORTED",
                     f"Frame type {kind} is on the roadmap; current layout admits map and controlled overlays")
-            expected_overflow = "clip" if kind == "map" else "reject"
+            expected_overflow = "clip" if kind in ("map", "inset") else "reject"
             if frame["overflow_policy"] != expected_overflow:
                 not_implemented("layout-overflow-strategies", "LAYOUT_OVERFLOW_UNSUPPORTED",
                     f"Overflow policy {frame['overflow_policy']} is on the roadmap; current layout admits clip for map and reject elsewhere")
@@ -201,6 +205,15 @@ class LayoutResolver:
                               "overflow_policy": frame["overflow_policy"]}
             if "inside_frame" in frame:
                 resolved_frame["inside_frame"] = frame["inside_frame"]
+            if kind == "inset":
+                # An inset is a real secondary map view: verify independent extent, main-map
+                # association and full enclosure; carry the verified metadata into the snapshot.
+                meta = validate_inset_declaration(frame, by_id[frame["inside_frame"]])
+                resolved_frame["view_extent"] = meta["view_extent"]
+                resolved_frame["main_map_ref"] = meta["main_map_ref"]
+                resolved_frame["highlight_id"] = meta["highlight_id"]
+            if "content_role" in frame:
+                resolved_frame["content_role"] = frame["content_role"]
             frames.append(resolved_frame)
             if kind == "map":
                 maps.append(frame["id"])
@@ -238,12 +251,12 @@ class LayoutResolver:
         if self.map_frame(resolved)["content_id"] != map_view_id:
             raise ProtocolError("LAYOUT_MAP_BINDING_MISMATCH", map_view_id)
         by_id = {item["id"]: item for item in overlays}
-        expected = {frame["content_id"] for frame in resolved["frames"] if frame["type"] != "map"}
+        expected = {frame["content_id"] for frame in resolved["frames"] if frame["type"] not in ("map", "inset")}
         if len(by_id) != len(overlays) or set(by_id) != expected:
             raise ProtocolError("LAYOUT_CONTENT_BINDING_MISMATCH", "Every overlay must bind exactly one frame, with no unused frame")
         result = []
         for frame in resolved["frames"]:
-            if frame["type"] == "map":
+            if frame["type"] in ("map", "inset"):
                 continue
             item = deepcopy(by_id[frame["content_id"]])
             if item["type"] not in _FRAME_OVERLAYS[frame["type"]]:

@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/template-proposal.schema.json",
+  "description": "A NON-authoritative proposal produced by reference-image inverse extraction or controlled derivation. It is never auto-ingested: it must pass validate + round-trip perceptual comparison + human TP before publication. recovered holds proposed field values that are assembled into a full closed contract only at author time; unrecoverable fields MUST be supplied by the user.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "proposal_id", "kind", "recovered", "unrecoverable", "confidence", "provenance", "selected_segments"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "proposal_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "kind": {"enum": ["extract", "derive"]},
+    "source_image": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"},
+    "license": {"type": "string", "minLength": 1, "description": "Declared license of the uploaded reference image; required for extract."},
+    "base_ref": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/templateRef"},
+    "change_set": {"type": "object", "description": "Restricted derivation edits; only allowed keys applied."},
+    "recovered": {"type": "object", "description": "Proposed style/layout field values (partial); assembled+validated into full contract at author time."},
+    "unrecoverable": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["field", "reason", "requires_user"],
+        "properties": {
+          "field": {"type": "string"},
+          "reason": {"type": "string"},
+          "requires_user": {"const": true}
+        }
+      }
+    },
+    "confidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["palette", "layout", "typography"],
+      "properties": {
+        "palette": {"type": "number", "minimum": 0, "maximum": 1},
+        "layout": {"type": "number", "minimum": 0, "maximum": 1},
+        "typography": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    },
+    "field_sources": {
+      "description": "P2-2: per-field provenance distinguishing a user responsibility transfer (user) from an algorithmic measurement (backend/extracted). confidence reflects measurement only; a user-supplied field has source=user and does not inflate confidence.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "palette": {"enum": ["extracted"]},
+        "layout": {"enum": ["user", "backend", "absent"]},
+        "typography": {"enum": ["user", "backend", "absent"]}
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_type", "source_ref", "method"],
+      "properties": {
+        "source_type": {"enum": ["extracted", "derived", "user"]},
+        "source_ref": {"type": "string", "minLength": 1},
+        "method": {"type": "string", "minLength": 1},
+        "base_ref": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/templateRef"}
+      }
+    },
+    "selected_segments": {
+      "type": "array", "uniqueItems": true,
+      "items": {"enum": ["style", "layout"]},
+      "description": "User's single/multi selection of which segments enter the library; written into the approval object."
+    },
+    "round_trip": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "delta_e2000_max": {"type": "number", "minimum": 0},
+        "frame_iou_min": {"type": "number", "minimum": 0, "maximum": 1},
+        "ocr_match": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    }
+  },
+  "allOf": [
+    {"if": {"properties": {"kind": {"const": "extract"}}}, "then": {"required": ["source_image", "license"]}},
+    {"if": {"properties": {"kind": {"const": "derive"}}}, "then": {"required": ["base_ref", "change_set"]}}
+  ]
+}

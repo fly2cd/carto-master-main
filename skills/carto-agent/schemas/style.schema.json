@@ -1,0 +1,302 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v2/style.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "style_id",
+    "version",
+    "visual_language",
+    "symbolization",
+    "labeling",
+    "generalization",
+    "defaults",
+    "rules",
+    "typography"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 2
+    },
+    "style_id": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+    },
+    "version": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"
+    },
+    "visual_language": {
+      "description": "DEPRECATED (map-style.md §8.1): retained for v2 consumers/migrated assets; removal is a separate migration. Do not use in new designs.",
+      "enum": [
+        "editorial",
+        "technical",
+        "minimal",
+        "statistical",
+        "narrative"
+      ]
+    },
+    "symbolization": {
+      "description": "DEPRECATED (map-style.md §8.2/8.3): superseded by ramps + symbol_roles; retained for v2 consumers/migrated assets.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "color_system",
+        "symbol_catalogs"
+      ],
+      "properties": {
+        "color_system": {
+          "enum": [
+            "sequential",
+            "diverging",
+            "qualitative",
+            "mixed"
+          ]
+        },
+        "symbol_catalogs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*/[a-z][a-z0-9-]*@[0-9]+\\.[0-9]+\\.[0-9]+$"
+          }
+        },
+        "default_opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "labeling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "density",
+        "collision_policy",
+        "font_role"
+      ],
+      "properties": {
+        "density": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "collision_policy": {
+          "enum": [
+            "avoid",
+            "prioritize",
+            "allow-explicit"
+          ]
+        },
+        "font_role": {
+          "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
+        },
+        "hierarchy": {
+          "description": "Target (map-style.md §8.5): declared label roles with priority/overlap; supersedes density/collision_policy once consumed.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["role", "priority"],
+            "properties": {
+              "role": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+              "priority": {"type": "integer", "minimum": 0},
+              "allow_overlap": {"type": "boolean"},
+              "font_role_ref": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"}
+            }
+          }
+        },
+        "halo": {
+          "description": "Optional label halo stroke drawn behind feature labels.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "color",
+            "width_mm"
+          ],
+          "properties": {
+            "color": {
+              "type": "string",
+              "pattern": "^#[0-9A-F]{6}$"
+            },
+            "width_mm": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 2
+            }
+          }
+        }
+      }
+    },
+    "generalization": {
+      "description": "DEPRECATED: ownership unresolved in map-style.md §8; retained for v2 consumers. Generalization belongs to spatial-behavior, not style.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scale_dependent",
+        "strategy"
+      ],
+      "properties": {
+        "scale_dependent": {
+          "type": "boolean"
+        },
+        "strategy": {
+          "enum": [
+            "simplify",
+            "aggregate",
+            "select",
+            "none"
+          ]
+        }
+      }
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "line_width_mm": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 10
+        },
+        "point_size_mm": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 50
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/rule"
+      }
+    },
+    "typography": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title_pt",
+        "body_pt",
+        "legend_pt",
+        "legend_heading_pt",
+        "line_spacing"
+      ],
+      "properties": {
+        "title_pt": {
+          "type": "number",
+          "minimum": 10,
+          "maximum": 40
+        },
+        "body_pt": {
+          "type": "number",
+          "minimum": 8,
+          "maximum": 18
+        },
+        "legend_pt": {
+          "type": "number",
+          "minimum": 8,
+          "maximum": 18
+        },
+        "legend_heading_pt": {
+          "type": "number",
+          "minimum": 8,
+          "maximum": 20
+        },
+        "line_spacing": {
+          "type": "number",
+          "minimum": 1.1,
+          "maximum": 2
+        }
+      }
+    },
+    "ramps": {
+      "description": "Target (map-style.md §8.2): inline ordered hex ramps with scheme/reversal/provenance. Optional until the color-authority migration lands.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ramp_id", "colors", "provenance"],
+        "properties": {
+          "ramp_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+          "scheme": {"enum": ["sequential", "diverging"]},
+          "reversible": {"type": "boolean"},
+          "colors": {"type": "array", "minItems": 2, "items": {"$ref": "https://schemas.carto-agent.local/v1/encoding-ir.schema.json#/$defs/hexColor"}},
+          "provenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["source_type", "source_ref"],
+            "properties": {
+              "source_type": {"enum": ["user", "official", "internal", "external-authoritative", "extracted"]},
+              "source_ref": {"type": "string", "minLength": 1},
+              "license": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "symbol_roles": {
+      "description": "Target (map-style.md §8.3): per geometry/encoding symbol appearance; vocab single-sourced from encoding-ir.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role_id", "geometry_role"],
+        "properties": {
+          "role_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+          "geometry_role": {"$ref": "https://schemas.carto-agent.local/v1/encoding-ir.schema.json#/properties/geometry_role"},
+          "key_mode": {"$ref": "https://schemas.carto-agent.local/v1/encoding-ir.schema.json#/properties/key_mode"},
+          "size_semantics": {"enum": ["radius", "area", "width"]},
+          "symbol": {"$ref": "https://schemas.carto-agent.local/v1/encoding-ir.schema.json#/$defs/symbol"}
+        }
+      }
+    },
+    "accepts": {
+      "description": "Target (map-style.md §8.4): measurement x geometry_role x key_mode applicability; replaces Profile matching.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["measurement", "geometry_role", "key_mode"],
+        "properties": {
+          "measurement": {"$ref": "https://schemas.carto-agent.local/v1/encoding-ir.schema.json#/$defs/domain/properties/measurement"},
+          "geometry_role": {"$ref": "https://schemas.carto-agent.local/v1/encoding-ir.schema.json#/properties/geometry_role"},
+          "key_mode": {"$ref": "https://schemas.carto-agent.local/v1/encoding-ir.schema.json#/properties/key_mode"}
+        }
+      }
+    },
+    "compatibility": {
+      "description": "Target (map-style.md §8.7): capability requirements on Layout/Renderer.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "required_capabilities": {"type": "array", "items": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"}}
+      }
+    },
+    "extension_policy": {
+      "description": "Target (map-style.md §8.7): override/derivation governance.",
+      "enum": ["closed", "registered-override"]
+    },
+    "standard_refs": {
+      "description": "Target (map-style.md §8.7): cited cartographic standards (reference only, not copied thresholds).",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["standard", "clause"],
+        "properties": {
+          "standard": {"type": "string", "minLength": 1},
+          "clause": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}

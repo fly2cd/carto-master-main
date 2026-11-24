@@ -608,7 +608,7 @@
     },
     "revised_cartography": {
       "description": "Design revision cartography overrides applied during re-compile (R6). Only present on revised requests.",
-      "$ref": "https://schemas.carto-agent.local/v2/cartography.schema.json"
+      "$ref": "https://schemas.carto-agent.local/v2/style.schema.json"
     },
     "output_profile": {
       "description": "Optional page size override. When absent, the template's declared A4 landscape (297×210 mm) is used. Width/height must be within the scenario's output_constraints envelope (max 420×297 mm).",

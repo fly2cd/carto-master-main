@@ -26,7 +26,7 @@ from carto_core.compiler.ownership import OwnershipResolver
 from carto_core.errors import CartoError, ProtocolError
 from carto_core.repository.template_installer import ProjectTemplateInstaller
 from carto_core.repository.template_repository import TemplateRepository
-from carto_core.scenarios.general_thematic import GeneralThematicAuthor, layout_contract
+from carto_core.scenarios.general_thematic.raster import GeneralThematicAuthor, layout_contract
 from carto_core.schema_registry import SchemaRegistry, load_document
 from carto_core.security.paths import PathGuard
 from carto_core.workflow.template_workflow import TemplateCreationWorkflow
@@ -90,7 +90,15 @@ class SegmentPackageFixture(unittest.TestCase):
                     "dependency_lock_digest": file_digest(staging / "dependencies.lock.yaml")}
         publication = self.repository.publish(
             package_root=staging, snapshot=snapshot, evidence={"evidence_digest": D},
-            approval={"synthetic": "s2-segment-test"}, idempotency_key="s2-segment-layout-0001")
+            approval={"synthetic": "s2-segment-test"}, idempotency_key="s2-segment-layout-0001",
+            publication_object={"schema_version": 1, "run_id": "s2-segment-run", "request_digest": D,
+                                "package_ref": {"kind": "map-layout", "id": SEGMENT_ID, "version": "1.0.0",
+                                                "digest": snapshot["package_digest"]},
+                                "evidence_ref": {"id": "template-validation-evidence", "version": "1.0.0",
+                                                 "digest": D, "uri": "evidence.yaml"},
+                                "repository_scope": "local:templates",
+                                "repository_root": self.repo_root.as_posix(),
+                                "idempotency_key": "s2-segment-layout-0001"})
         return {"kind": "map-layout", "id": SEGMENT_ID, "version": "1.0.0",
                 "digest": publication["package_ref"]["digest"]}
 
@@ -128,7 +136,7 @@ class SegmentResolutionTests(SegmentPackageFixture):
         resolved = self.repository.resolve_scenario_segments(scenario, namespace="local", lock=lock)
         self.assertEqual(resolved["embedded"]["layout"], layout_contract())
         self.assertEqual(resolved["segment_refs"], {"layout": ref})
-        self.assertEqual(resolved["embedded"]["cartography"], scenario["embedded"]["cartography"])
+        self.assertEqual(resolved["embedded"]["style"], scenario["embedded"]["style"])
         # The source scenario is never mutated.
         self.assertNotIn("layout", scenario["embedded"])
 
@@ -177,7 +185,7 @@ class ReferencedAuthoringTests(SegmentPackageFixture):
         scenario = load_document(root / "contracts/scenario.yaml")
         self.assertNotIn("segment_refs", scenario)
         self.assertEqual(scenario["replaceable_segments"], [])
-        self.assertEqual(set(scenario["embedded"]), {"cartography", "layout"})
+        self.assertEqual(set(scenario["embedded"]), {"style", "layout"})
         manifest = load_document(root / "manifest.yaml")
         self.assertEqual(manifest["dependencies"], [])
 
@@ -260,12 +268,8 @@ class ReferencedPublishLineTests(SegmentPackageFixture):
 
     def run_to_validated(self, **repo_kwargs) -> dict:
         self.workflow.analyze(self.request_path)
-        briefed = self.workflow.brief(self.request_path)
-        atomic_yaml(self.root / "t1.yaml", asdict(sign(
-            "T1", "approve-template-brief", "template-brief", sha256_digest(briefed["brief"]),
-            subject_id=self.request["subject"]["approver_subject_id"],
-            scope=self.request["scope"], tenant_id=self.request["subject"]["tenant_id"])))
-        self.workflow.author(self.request_path, self.root / "t1.yaml", approval_key=APPROVAL_KEY)
+        self.workflow.brief(self.request_path)
+        self.workflow.author(self.request_path)
         return self.workflow.validate(self.request_path, attestation_key=KEY,
                                       font_path=self.font_path, **repo_kwargs)
 
@@ -293,6 +297,9 @@ class ReferencedPublishLineTests(SegmentPackageFixture):
         # The resolved fixture scene must bind the referenced layout contract exactly.
         scene = load_document(Path(evidence["render_scene_ref"]["uri"]))
         self.assertEqual(scene["resolved_layout"]["template_contract"], layout_contract())
+        prepared = self.workflow.prepare_publication(
+            self.request_path, repository_root=self.root / "repo",
+            repository_scope="local:templates", idempotency_key="publish-s2-referenced-0001")
 
         # Tampering with the published segment after validation fails closed at
         # publish re-verification (the evidence itself stays untouched).
@@ -306,11 +313,7 @@ class ReferencedPublishLineTests(SegmentPackageFixture):
         finally:
             contract_path.write_bytes(original)
 
-        publication_digest = sha256_digest({
-            "package_digest": evidence["package_ref"]["digest"],
-            "evidence_digest": evidence["evidence_digest"],
-            "repository_scope": "local:templates",
-        })
+        publication_digest = prepared["object_digest"]
         atomic_yaml(self.root / "tp.yaml", asdict(sign(
             "TP", "approve-template-publish", "template-publication", publication_digest,
             subject_id=self.request["subject"]["approver_subject_id"], scope=self.request["scope"],

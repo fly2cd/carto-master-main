@@ -1,3 +1,4 @@
+"""Controlled web-map rendering, resources, environment binding and execution limits."""
 from __future__ import annotations
 
 import json

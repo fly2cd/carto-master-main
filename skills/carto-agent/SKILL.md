@@ -23,7 +23,7 @@ version: 0.8.0
 - 该场景的分类栅格模板样张渲染分支已注册：`validate` 在静态检查全部通过后，于受信验证上下文内由包内图例样本派生确定性合成栅格，经授权 MCP 网关测量统计，并用 `rasterio-matplotlib-page` 后端渲染 PDF+PNG 样张、冻结渲染场景与带签名 RenderReceipt；`publish` 按冻结场景重新核验证据（不依赖作者宿主字体）并消费精确 TP。宿主缺少栅格渲染依赖、无可嵌入字体或展示 CRS 为地理坐标系时仍失败关闭，不得伪造渲染证据绕过。
 - 仓库不附带业务示例数据、示例模板包或默认测试项目。后续由用户提供真实数据和场景需求，完成对应实现、注册和验收后才能启用。
 - 模板发布仍必须验证闭合包、依赖锁、场景验证输入、检查器集合、RenderReceipt、冻结样张场景（`render_scene_ref`）和环境绑定，并消费精确 TP。验证数据是否适合进入模板包由场景安全检查明确判定，不能把原始敏感业务数据打包。
-- 工作流严格保留 T1 / TP / G1 / G2 / G3、运行级单写锁、revision/CAS、不可变步骤回执、受限重试及恢复证明；不得伪造审批或放松门禁以继续。
+- 工作流严格保留 TP / G1 / G2 / G3、运行级单写锁、revision/CAS、不可变步骤回执、受限重试及恢复证明；不得伪造审批或放松门禁以继续。
 - `render` 只消费锁与摘要绑定输入；`check` 验证冻结输出；`review` 签署独立成品审查并冻结含 `review_ref` 的交付清单；`deliver` 重新验证全部绑定后，按精确 G3 进行同文件系统原子提交。
 - 交付包白名单为 `map.pdf`、`map.png`、`README.md`、`delivery-manifest.yaml`、`checksums.sha256`；不包含原始数据、内部锁、审批密钥或内部回执。
 - 不声明生产制图、地图工作流中的真实 CRS 转换、任意输入格式、三场景覆盖、共享服务或公网发布；`production_tasks` 为空。`map-brand`、`map-style`、`map-layout` 的业务创建路由仍未开放。
@@ -87,7 +87,7 @@ version: 0.8.0
 - RenderScene / RenderReceipt / execution 环境按后端严格区分。预览、G2 冻结、锁驱动正式渲染与重放只按冻结 ID 分派；保留 `maplibre-web`，未知后端拒绝，栅格不探测 Chromium、不伪造浏览器版本。
 - 正式栅格 RenderReceipt 由 `FormalRenderer`（几何分派）签发，包含 HMAC、代码/依赖环境、精确会话、资源集、页面报告和输出摘要；内部 `page-output` 仍不是回执。当前是受项目路径约束的进程内后端，**不提供 OS/网络沙箱**，HMAC 不等于远程或硬件环境证明。
 - 复用既有 MapSpecLock、RenderAttempt、FormalRenderEvidence、11 项成品检查、精确 G3 和原子本地交付。图例共性检查不替代业务检查；篡改产物不生成 Manifest。
-- 已有从测试候选边界开始的临时合成数据 G2/G3 链路与恢复测试，以及合成数据/合成审批的模板 T1 → validate（合成样张渲染）→ TP → 发布闭环测试。均**不表示真实用户数据、真实审批身份或用户地图已验收**；注册策略和实现白名单当前仅登记 `general-thematic-mapping`（实现 `general-thematic`，栅格变体 `template_geometry: raster`，含模板样张渲染组件），不新增审批旁路 CLI。
+- 已有从测试候选边界开始的临时合成数据 G2/G3 链路与恢复测试，以及合成数据/合成审批的模板 author → validate（合成样张渲染）→ prepare-publish → TP → 发布闭环测试。均**不表示真实用户数据、真实审批身份或用户地图已验收**；注册策略和实现白名单当前仅登记 `general-thematic-mapping`（实现 `general-thematic`，栅格变体 `template_geometry: raster`，含模板样张渲染组件），不新增审批旁路 CLI。
 
 ## 通用内核与场景扩展
 
@@ -130,7 +130,7 @@ Codex / Claude Code 在 VS Code 中以“读取仓库指令 + 宿主终端调用
 2. 需要渲染时，再显式执行 `python skills/carto-agent/scripts/carto.py environment probe-renderer`。它会进行本机工具/字体和无头浏览器探测；退出码为 0 只表示报告生成成功，还要核对 `environment.status` 与能力项。此结果不证明 IDE 会话的 GIS 工具可用或生产能力已开放。
 3. 按 `workflows/routing.md` 选择唯一路由，读取对应工作流和 CLI 子命令帮助。只使用用户明确授权的输入、项目目录和允许根；缺少路径、语义或权限时先询问，不把测试 Fixture 当作用户数据，不自动选择业务场景，也不自动跑 `tools/host/` 的 bootstrap。
 4. 使用参数化终端调用现有 CLI；各步骤继续核对退出码和实际 JSON 结果，失败即停，按既有恢复协议查询状态。遇到不支持的场景、TIFF/CRS 等能力，明确报告未开放，不通过改策略、改锁或直接调用其他工具绕过主链。
-5. 宿主的命令确认和聊天中的“同意”不能替代有效业务审批回执；到 T1 / TP / G1 / G2 / G3 必须继续由现有程序验证精确授权。测试中的模拟审批不能用于真实执行。
+5. 宿主的命令确认和聊天中的“同意”不能替代有效业务审批回执；到 TP / G1 / G2 / G3 必须继续由现有程序验证精确授权。测试中的模拟审批不能用于真实执行。
 
 仓库 `.vscode/tasks.json` 仅提供帮助、Schema 自检、显式渲染探测及开发测试；不提供自动生成或自动交付任务。VS Code Python 选择与 Agent 终端解释器须分别确认。此阶段不宣称原生 Skill 选择器注册、宿主工具结果可信回传或 IDE 会话端到端验收已完成。
 

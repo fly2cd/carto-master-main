@@ -70,8 +70,8 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "cartography": {
-          "$ref": "https://schemas.carto-agent.local/v2/cartography.schema.json"
+        "style": {
+          "$ref": "https://schemas.carto-agent.local/v2/style.schema.json"
         },
         "layout": {
           "$ref": "https://schemas.carto-agent.local/v1/layout.schema.json"
@@ -82,7 +82,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "cartography": {
+        "style": {
           "allOf": [
             {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/templateRef"},
             {"properties": {"kind": {"const": "map-style"}}}
@@ -101,7 +101,7 @@
       "uniqueItems": true,
       "items": {
         "enum": [
-          "cartography",
+          "style",
           "layout"
         ]
       }
@@ -184,8 +184,8 @@
   "allOf": [
     {
       "anyOf": [
-        {"properties": {"embedded": {"required": ["cartography"]}}, "required": ["embedded"]},
-        {"properties": {"segment_refs": {"required": ["cartography"]}}, "required": ["segment_refs"]}
+        {"properties": {"embedded": {"required": ["style"]}}, "required": ["embedded"]},
+        {"properties": {"segment_refs": {"required": ["style"]}}, "required": ["segment_refs"]}
       ]
     },
     {

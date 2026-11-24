@@ -218,6 +218,17 @@
                       "type": "string",
                       "pattern": "^\\d+[×x]\\d+$"
                     }
+                  },
+                  "legend_placements": {
+                    "type": "array",
+                    "minItems": 1,
+                    "uniqueItems": true,
+                    "items": {
+                      "enum": [
+                        "outside",
+                        "inside"
+                      ]
+                    }
                   }
                 }
               },

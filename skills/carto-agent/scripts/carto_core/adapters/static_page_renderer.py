@@ -169,7 +169,7 @@ class MeasuredPageRenderer:
 
             # W2: expose annotation config (labeling+typography) and the font path for
             # feature-label drawing; set once per draw, consumed by the vector branch.
-            self._annotation = {key: deepcopy(request.get("cartography", {}).get(key))
+            self._annotation = {key: deepcopy(request.get("style", {}).get(key))
                                 for key in ("labeling", "typography")}
             self._font_path = font_path
             self._draw_map_bodies(fig, bodies, width, height, dpi)

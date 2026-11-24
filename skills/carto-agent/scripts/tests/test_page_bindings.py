@@ -1,4 +1,4 @@
-"""S1-A/B uses synthetic inputs only; no scenario admission or approval bypass."""
+"""Page bindings and single-page normalization; synthetic inputs, no approval bypass."""
 from __future__ import annotations
 from copy import deepcopy
 from pathlib import Path
@@ -76,9 +76,9 @@ class BindingContractTests(unittest.TestCase):
         self.assertNotIn('legend_capacity', counts)
 
     def test_new_contract_versions_reject_old_documents(self):
-        for name in ('cartography', 'map-plan', 'page-request'):
+        for name in ('style', 'map-plan', 'page-request'):
             value = deepcopy(VALID_CASES[name])
-            self.assertEqual({'cartography':2,'map-plan':4,'page-request':4}[name], value['schema_version'])
+            self.assertEqual({'style':2,'map-plan':4,'page-request':4}[name], value['schema_version'])
             value['schema_version'] = 1
             with self.subTest(name=name), self.assertRaises(ProtocolError):
                 self.registry.validate(name, value)
@@ -100,7 +100,7 @@ class BindingContractTests(unittest.TestCase):
 
     def test_style_and_layout_have_separate_sources(self):
         page = deepcopy(VALID_CASES['page-request'])
-        style = page['appearance']['cartography']
+        style = page['appearance']['style']
         layout = page['resolved_layout']['contract']
         style['typography']['title_pt'] = 22
         layout['content_padding_mm'] = 3
@@ -108,7 +108,7 @@ class BindingContractTests(unittest.TestCase):
         self.assertEqual(22, result['typography']['title_pt'])
         self.assertEqual(3, result['typography']['padding_mm'])
         self.assertNotIn('padding_mm', style['typography'])
-        self.assertEqual(artifact_ref('cartography', style), result['style_ref'])
+        self.assertEqual(artifact_ref('style', style), result['style_ref'])
         self.assertEqual('2.0.0', result['style_ref']['version'])
         require_appearance(result, layout, page['portrayals'], self.registry)
         result['typography']['title_pt'] = 21
@@ -154,7 +154,7 @@ class SinglePageNormalizationTests(PreparationFixture, unittest.TestCase):
         for change in ('font-size','source-style','data','view'):
             value = deepcopy(self.page)
             if change == 'font-size': value['appearance']['typography']['title_pt'] += 1
-            elif change == 'source-style': value['appearance']['cartography']['typography']['title_pt'] += 1
+            elif change == 'source-style': value['appearance']['style']['typography']['title_pt'] += 1
             elif change == 'data': value['bindings']['data_bindings'][0]['prepared_ref']['digest'] = 'sha256:'+'b'*64
             else: value['bindings']['panels'][0]['view_id'] = 'different-view'
             with self.subTest(change=change), self.assertRaises(ProtocolError):
@@ -171,7 +171,7 @@ class SinglePageNormalizationTests(PreparationFixture, unittest.TestCase):
         first = self.renderer.render(self.page,self.context)
         one = self.service.document(first.ref(),'page-output')
         updated = deepcopy(self.page)
-        updated['appearance']['cartography']['typography']['title_pt'] = 14
+        updated['appearance']['style']['typography']['title_pt'] = 14
         updated = rebind_page(self.service,updated,self.context)
         second = self.renderer.render(updated,self.context)
         two = self.service.document(second.ref(),'page-output')
@@ -183,11 +183,11 @@ class SinglePageNormalizationTests(PreparationFixture, unittest.TestCase):
         raw = {k: deepcopy(v) for k, v in self.page.items() if k not in {"appearance", "bindings"}}
         raw["schema_version"] = 1
         with self.assertRaisesRegex(ProtocolError, "PAGE_CONTRACT_VERSION"):
-            compile_page_request(self.service, raw, self.page["appearance"]["cartography"], self.context, BundlePreparer)
+            compile_page_request(self.service, raw, self.page["appearance"]["style"], self.context, BundlePreparer)
 
     def test_compiler_is_not_an_implicit_legacy_upgrade(self):
         with self.assertRaisesRegex(ProtocolError, 'PAGE_DESIGN_ALREADY_RESOLVED'):
-            compile_page_request(self.service,self.page,self.page['appearance']['cartography'],self.context,BundlePreparer)
+            compile_page_request(self.service,self.page,self.page['appearance']['style'],self.context,BundlePreparer)
 
 
 if __name__ == '__main__':

@@ -1,10 +1,14 @@
 schema_version: 1
-version: 1.0.1
+version: 1.0.3
 # Declared not-implemented queue. Guards may raise admission_class=not_implemented
 # ONLY for features listed here with status planned/backlog. Safety rejects
 # (unknown backend, arbitrary code, symlink, unknown fields) stay forbidden and
 # must NOT appear here.
 items:
+  - id: segment-validation-host
+    status: delivered
+    target: U-P4
+    note: 独立段模板(map-style/map-layout)验证宿主与段 validate/publish 全链已落地(参考图计划阶段一裁决2);经注册组件钩子复用场景 validation_scene 与通用渲染器,空库 style 验证+发布测试通过。样式驱动类别颜色验收待 Path A 颜色权威接通。
   - id: raster-multi-layer-overlay
     status: planned
     target: U-P4

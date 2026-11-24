@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/segment-validation-evidence.schema.json",
+  "description": "Validation evidence for an independent segment template (map-style/map-layout). Unlike template-validation-evidence (scenario), it binds the segment design digest and a platform validation-host binding instead of scenario fixture_set/grid_cases. The render receipt/scene/preview fields reuse the generic raster re-verification path so publish can re-render without the authoring host font.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_id",
+    "namespace",
+    "package_ref",
+    "manifest_digest",
+    "dependency_lock_digest",
+    "design_digest",
+    "host_ref",
+    "checker_set_digest",
+    "status",
+    "counts",
+    "results",
+    "created_at",
+    "evidence_digest"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "evidence_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "namespace": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "package_ref": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/templateRef"},
+    "manifest_digest": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"},
+    "dependency_lock_digest": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"},
+    "design_digest": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"},
+    "host_ref": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"},
+    "checker_set_digest": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"},
+    "status": {"enum": ["passed", "failed"]},
+    "counts": {
+      "type": "object", "additionalProperties": false,
+      "required": ["blocker", "error", "warning", "info"],
+      "properties": {
+        "blocker": {"type": "integer", "minimum": 0},
+        "error": {"type": "integer", "minimum": 0},
+        "warning": {"type": "integer", "minimum": 0},
+        "info": {"type": "integer", "minimum": 0}
+      }
+    },
+    "results": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["check_id", "version", "status", "severity", "details"],
+        "properties": {
+          "check_id": {"type": "string", "minLength": 1},
+          "version": {"type": "string", "minLength": 1},
+          "status": {"enum": ["passed", "failed"]},
+          "severity": {"enum": ["blocker", "error", "warning", "info"]},
+          "details": {"type": "object"}
+        }
+      }
+    },
+    "renderer": {"type": "object"},
+    "render_receipt_ref": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"},
+    "render_scene_ref": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"},
+    "preview_artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["target", "artifact_ref"],
+        "properties": {
+          "target": {"enum": ["svg", "pdf", "png"]},
+          "artifact_ref": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"}
+        }
+      }
+    },
+    "created_at": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/timestamp"},
+    "evidence_digest": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "passed"}}, "required": ["status"]},
+      "then": {"required": ["renderer", "render_receipt_ref", "render_scene_ref", "preview_artifacts"]}
+    }
+  ]
+}

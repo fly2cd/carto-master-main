@@ -37,7 +37,7 @@ from ..schema_registry import SchemaRegistry, load_document
 # Non-map-scenario manifests forbid business_contracts (manifest.schema.json),
 # so segment packages use this fixed convention inherited from the prototype.
 SEGMENT_CONTRACTS: dict[str, tuple[str, str]] = {
-    "map-style": ("contracts/cartography.yaml", "cartography"),
+    "map-style": ("contracts/cartography.yaml", "style"),
     "map-layout": ("contracts/layout.yaml", "layout"),
 }
 

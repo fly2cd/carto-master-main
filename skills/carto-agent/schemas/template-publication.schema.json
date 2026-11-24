@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/template-publication.schema.json",
+  "description": "The frozen, operator-approved publication object. TP signs exactly this object; publish must execute against it, never re-derive targets. Preview/dependency/font facts are bound through evidence_ref's digest closure, not duplicated here.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "request_digest",
+    "package_ref",
+    "evidence_ref",
+    "repository_scope",
+    "repository_root",
+    "idempotency_key"
+  ],
+  "properties": {
+    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
+    "run_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "request_digest": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"},
+    "package_ref": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/templateRef"},
+    "evidence_ref": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"},
+    "repository_scope": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*:[a-z][a-z0-9-]*$",
+      "maxLength": 160
+    },
+    "repository_root": {
+      "description": "PathGuard-normalized target repository root (.as_posix()). Binding the root, not only the scope, prevents reusing one TP approval across different filesystem locations that share a scope name.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "idempotency_key": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$"
+    }
+  }
+}

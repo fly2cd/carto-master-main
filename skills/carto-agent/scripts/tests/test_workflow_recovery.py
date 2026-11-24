@@ -1,3 +1,4 @@
+"""Workflow recovery, immutable receipts, single-writer locking and route isolation."""
 from __future__ import annotations
 
 import json

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/design-resolution-result.schema.json",
+  "description": "Read-only resolution decision for a design requirement (plan phase 1, design §7/§12). Records the branch (reuse/instantiate/derive/create/clarify/unsupported/search-incomplete) and per-candidate assessments with structural satisfaction, parameter domain, execution admission and validation coverage kept separate. This is advisory evidence for authoring review: it never creates, publishes, or grants approval; a structurally satisfied but not-implemented candidate is unsupported, never auto-downgraded. Phase 2 adds OPTIONAL execution-outcome fields (action/published_ref/draft_ref) produced by the creation orchestrator; the read-only resolve result omits them. A draft_ref is a project-scoped draft (design §7.1/§12.1), never a published library object.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "requirement_id",
+    "revision",
+    "branch",
+    "assessments"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "requirement_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "revision": {"type": "integer", "minimum": 1},
+    "branch": {"enum": ["reuse", "instantiate", "derive", "create", "clarify", "unsupported", "search-incomplete"]},
+    "action": {"enum": ["return-published-ref", "draft", "stop"]},
+    "published_ref": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/templateRef"},
+    "draft_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "draft_id", "revision", "id", "version", "content_digest"],
+      "properties": {
+        "kind": {"enum": ["map-style", "map-layout"]},
+        "draft_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+        "revision": {"type": "integer", "minimum": 1},
+        "id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+        "version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"},
+        "content_digest": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"},
+        "base_ref": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/templateRef"},
+        "base_contract_digest": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"},
+        "change_set": {"type": "object", "minProperties": 1}
+      }
+    },
+    "assessments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["candidate_ref", "usable", "structural_aggregate", "parameter_domain", "execution_admission", "validation_coverage"],
+        "properties": {
+          "candidate_ref": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/templateRef"},
+          "usable": {"type": "boolean"},
+          "structural_aggregate": {"enum": ["satisfied", "violated", "unknown", "browse"]},
+          "parameter_domain": {"enum": ["satisfied", "violated", "unknown", "not-applicable"]},
+          "execution_admission": {"enum": ["allowed", "not-implemented", "forbidden", "unknown"]},
+          "validation_coverage": {"enum": ["covered", "needs-validation", "unknown"]}
+        }
+      }
+    }
+  }
+}

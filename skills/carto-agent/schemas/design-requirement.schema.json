@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/design-requirement.schema.json",
+  "description": "Partial design requirement (plan phase 1, design §6.5). Expresses hard/soft conditions over a verified fact view WITHOUT requiring a complete Style/Layout contract first. The predicate vocabulary is a closed minimal set (measure/enum/count/relation); no arbitrary path, expression, regex, script or JSONPath. Conditions are AND-aggregated for hard requirements; soft conditions only rank. Unknown is never silently treated as satisfied. This is a requirement, not an approval or a publication object.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "requirement_id",
+    "revision",
+    "object_scope",
+    "conditions"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "requirement_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "revision": {"type": "integer", "minimum": 1},
+    "object_scope": {"enum": ["layout", "style", "scenario", "layout+style"]},
+    "conditions": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "strength", "predicate", "source_ref"],
+        "properties": {
+          "id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+          "strength": {"enum": ["hard", "soft"]},
+          "source_ref": {"type": "string", "minLength": 1, "maxLength": 512},
+          "predicate": {
+            "oneOf": [
+              {
+                "type": "object", "additionalProperties": false,
+                "required": ["kind", "path", "op", "value", "unit"],
+                "properties": {
+                  "kind": {"const": "measure"},
+                  "path": {"enum": ["/canvas/width", "/canvas/height"]},
+                  "op": {"enum": ["eq", "gte", "lte"]},
+                  "value": {"type": "number", "exclusiveMinimum": 0},
+                  "unit": {"const": "mm"}
+                }
+              },
+              {
+                "type": "object", "additionalProperties": false,
+                "required": ["kind", "path", "op", "value"],
+                "properties": {
+                  "kind": {"const": "enum"},
+                  "path": {"const": "/canvas/orientation"},
+                  "op": {"const": "eq"},
+                  "value": {"enum": ["landscape", "portrait"]}
+                }
+              },
+              {
+                "type": "object", "additionalProperties": false,
+                "required": ["kind", "role", "op", "value"],
+                "properties": {
+                  "kind": {"const": "count"},
+                  "role": {"enum": ["main-map", "inset-map", "legend-group"]},
+                  "op": {"enum": ["eq", "gte", "lte"]},
+                  "value": {"type": "integer", "minimum": 0, "maximum": 256}
+                }
+              },
+              {
+                "type": "object", "additionalProperties": false,
+                "required": ["kind", "relation", "scope", "mode"],
+                "properties": {
+                  "kind": {"const": "relation"},
+                  "relation": {"const": "contained-legend"},
+                  "scope": {"const": "each-main-map"},
+                  "mode": {"const": "independent"}
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "open_questions": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "question", "blocks"],
+        "properties": {
+          "id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+          "question": {"type": "string", "minLength": 1, "maxLength": 500},
+          "blocks": {"enum": ["retrieval", "creation", "execution", "publication", "selection"]}
+        }
+      }
+    }
+  }
+}

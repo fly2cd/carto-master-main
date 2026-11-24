@@ -5,7 +5,7 @@
   "additionalProperties": false,
   "required": [
     "schema_version",
-    "cartography",
+    "style",
     "style_ref",
     "typography",
     "color_sources"
@@ -14,8 +14,8 @@
     "schema_version": {
       "const": 2
     },
-    "cartography": {
-      "$ref": "https://schemas.carto-agent.local/v2/cartography.schema.json"
+    "style": {
+      "$ref": "https://schemas.carto-agent.local/v2/style.schema.json"
     },
     "style_ref": {
       "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"

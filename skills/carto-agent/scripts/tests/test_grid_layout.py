@@ -1,4 +1,4 @@
-"""S1-C/D finite grids, real multi-source TIFFs and all-panel provenance.
+"""Finite grids, synthetic multi-source TIFFs and all-panel provenance.
 
 Only synthetic data in TemporaryDirectory; no user approvals or business data.
 """
@@ -133,13 +133,21 @@ class GridPageTests(PreparationFixture, unittest.TestCase):
             self.portrayals.append(compile_portrayal(self.service, prepared, self.context).ref())
         self.renderer = PageRenderer(self.service)
 
-    def page(self, rows=1, columns=2, mode='shared', dpi=72):
+    def page(self, rows=1, columns=2, mode='shared', dpi=72, placement='outside'):
         base = page_request(self.service, self.prepared[0], self.context, dpi=dpi)
         base.pop('appearance')
         base.pop('bindings')
+        contract = layout_contract()
+        if placement == 'inside':
+            contract['grid'].pop('allowed_shapes', None)
+            contract['grid'].pop('legend_modes', None)
+            contract['grid']['allowed_cases'] = [
+                {'rows': rows, 'columns': columns, 'legend_mode': mode, 'legend_placement': 'inside'}]
+            contract['grid']['inside_legend'] = {
+                'anchor': 'bottom-right', 'offset_mm': 2, 'width_mm': 30, 'height_mm': 40, 'padding_mm': 2}
         base['resolved_layout'] = LayoutResolver().resolve(
-            layout_contract(), dpi,
-            parameters={'rows': rows, 'columns': columns, 'legend_mode': mode})
+            contract, dpi,
+            parameters={'rows': rows, 'columns': columns, 'legend_mode': mode, 'legend_placement': placement})
         frames = base['resolved_layout']['contract']['frames']
         maps = [f for f in frames if f['type'] == 'map']
         base['portrayals'] = [{'view_id': f['content_id'], 'ref': self.portrayals[i % 2]}
@@ -150,7 +158,7 @@ class GridPageTests(PreparationFixture, unittest.TestCase):
                          for f in frames if f['type'] not in {'map', 'legend'}]
         base['scale_bar'] = None
         base['grid_north'] = None
-        return compile_page_request(self.service, base, VALID_CASES['cartography'], self.context, BundlePreparer)
+        return compile_page_request(self.service, base, VALID_CASES['style'], self.context, BundlePreparer)
 
     def test_multi_source_bundle_preserves_source_specific_extents_and_counts(self):
         bundle = BundlePreparer(self.service, "raster").build_many([p.ref() for p in self.prepared], self.context)
@@ -284,6 +292,27 @@ class GridPageTests(PreparationFixture, unittest.TestCase):
         next(item for item in page['texts'] if item['content_id'] == 'caption-r0-c0')['text'] = 'synthetic long caption ' * 10
         with self.assertRaisesRegex(CartoError, 'RASTER_PAGE_CONTENT_OVERFLOW'):
             self.renderer.render(page, self.context)
+
+    def test_real_inside_legend_renders_within_each_map(self):
+        # Phase 3 §6.2/§6.4: the inside-legend mechanism must flow through the REAL render chain
+        # (compile_page_request + PageRenderer.render), not just geometry. Each independent legend
+        # is drawn fully inside its own main-map frame.
+        page = self.page(rows=1, columns=2, mode='independent', placement='inside')
+        frames = {f['id']: f for f in page['resolved_layout']['contract']['frames']}
+        resolved = {f['id']: f for f in page['resolved_layout']['frames']}
+        for key in ('r0-c0', 'r0-c1'):
+            legend = frames['legend-' + key]
+            self.assertEqual('map-' + key, legend['inside_frame'])
+            lx, ly, lw, lh = resolved['legend-' + key]['bounds_px']
+            mx, my, mw, mh = resolved['map-' + key]['bounds_px']
+            self.assertTrue(lx >= mx and ly >= my and lx + lw <= mx + mw and ly + lh <= my + mh)
+        artifact = self.renderer.render(page, self.context)
+        output = self.renderer.load_verified(artifact.ref(), self.context)
+        self.assertEqual(2, len(output['body_refs']))
+        with self.Image.open(output['outputs']['png']['artifact_ref']['uri']) as image:
+            self.assertEqual((842, 595), image.size)
+            colors = set(map(tuple, self.np.unique(self.np.asarray(image.convert('RGB')).reshape(-1, 3), axis=0)))
+            self.assertTrue({(255, 0, 0), (0, 255, 0), (0, 0, 255)} <= colors)
 
 
 if __name__ == '__main__':

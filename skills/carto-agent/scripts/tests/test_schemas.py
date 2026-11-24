@@ -320,7 +320,7 @@ class SchemaTests(unittest.TestCase):
         scenario = VALID_CASES["scenario"]
         replacement = {
             "kind": "map-style",
-            "segment": "cartography",
+            "segment": "style",
             "value": {"style_id": "replacement-only"},
             "compatibility": {
                 "scenario_ids": ["test-scenario"],
@@ -330,15 +330,15 @@ class SchemaTests(unittest.TestCase):
             },
         }
         result = resolver.compose_scenario(scenario, [replacement])
-        self.assertEqual(result["segments"]["cartography"], {"style_id": "replacement-only"})
-        self.assertNotIn("symbolization", result["segments"]["cartography"])
-        self.assertEqual(result["ownership"]["cartography"], "map-style")
+        self.assertEqual(result["segments"]["style"], {"style_id": "replacement-only"})
+        self.assertNotIn("symbolization", result["segments"]["style"])
+        self.assertEqual(result["ownership"]["style"], "map-style")
         self.assertEqual(result["ownership"]["layout"], "map-scenario")
 
     def test_scenario_ownership_rejects_duplicate_kind_and_boundary_violation(self) -> None:
         resolver = OwnershipResolver()
         scenario = VALID_CASES["scenario"]
-        replacement = {"kind": "map-style", "segment": "cartography", "value": {"style_id": "one"}}
+        replacement = {"kind": "map-style", "segment": "style", "value": {"style_id": "one"}}
         with self.assertRaises(ProtocolError) as raised:
             resolver.compose_scenario(scenario, [replacement, deepcopy(replacement)])
         self.assertEqual(raised.exception.code, "TEMPLATE_KIND_DUPLICATE")
@@ -359,7 +359,7 @@ class SchemaTests(unittest.TestCase):
 
         incompatible = {
             "kind": "map-style",
-            "segment": "cartography",
+            "segment": "style",
             "value": {"style_id": "external"},
             "compatibility": {"data_roles": ["population-density"]},
         }
@@ -400,7 +400,7 @@ class SegmentReferenceProtocolTests(unittest.TestCase):
 
     def test_semantic_rules_derive_ownership_for_embedded_and_referenced(self) -> None:
         ownership = self.resolver.validate_segment_refs(REFERENCED_SCENARIO)
-        self.assertEqual(ownership, {"cartography": "map-scenario", "layout": "map-layout"})
+        self.assertEqual(ownership, {"style": "map-scenario", "layout": "map-layout"})
         legacy = self.resolver.validate_segment_refs(VALID_CASES["scenario"])
         self.assertEqual(set(legacy.values()), {"map-scenario"})
 

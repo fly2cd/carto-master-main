@@ -15,6 +15,7 @@
     "index_digest_after",
     "repository_scope",
     "approval_ref",
+    "publication_object_ref",
     "published_at",
     "idempotency_key"
   ],
@@ -50,6 +51,17 @@
     },
     "approval_ref": {
       "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+    },
+    "publication_object_ref": {
+      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"
+    },
+    "selected_segments": {
+      "description": "User's single/multi selection of which segments enter the library (create-template entry ①/②); written into the approval object. Optional for legacy whole-package publishes.",
+      "type": "array", "uniqueItems": true, "items": {"enum": ["style", "layout"]}
+    },
+    "source_license": {
+      "description": "Declared license of an uploaded reference image (extract entry); audit trail. Optional.",
+      "type": "string", "minLength": 1
     },
     "published_at": {
       "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/timestamp"
