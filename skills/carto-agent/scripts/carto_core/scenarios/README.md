@@ -38,7 +38,7 @@
 - 共享布局支持毫米页面、单地图、DPR=1、无重叠框、地图 clip 与 overlay reject；浏览器/SVG 使用保守包络，静态栅格整页已采用实际字体测量。均不包含复合布局求解。
 - 场景声明使用 `scenario_notice` / `final.scenario-notice`；输出必须与冻结场景策略、锁和证据相符。旧字段和缺失布局/策略绑定的旧产物不自动迁移。
 - `production_enabled` / `production_ready` 的保守限制及空 `production_tasks` 是尚未完成生产认证的边界，不是可删除的临时开关。
-- 场景注册与能力验收不替代 T1 / TP / G1 / G2 / G3。
+- 场景注册与能力验收不替代 TP / G1 / G2 / G3。
 
 ## 数据类型、表达与后端不作为业务场景注册
 

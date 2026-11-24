@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/publication-request.schema.json",
+  "description": "Trusted user action record requesting publication of a validated segment draft (plan phase 2, design §10.3). NOT a TP and NOT a model/NLP field: it authorizes starting the publication flow only; the precise TP still approves the concrete publication object. intent-only records the wish to publish later; ready binds the target identity and lets validate advance to prepare-publish. Without a ready publication-request, validate ends at validated-draft and never writes the library index.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "publication_request_id",
+    "request_id",
+    "kind",
+    "intent_state"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "publication_request_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "request_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "kind": {"enum": ["map-style", "map-layout"]},
+    "intent_state": {"enum": ["intent-only", "ready"]},
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository_scope", "namespace", "template_id", "version"],
+      "properties": {
+        "repository_scope": {"type": "string", "minLength": 1, "maxLength": 128},
+        "namespace": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+        "template_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+        "version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"intent_state": {"const": "ready"}}, "required": ["intent_state"]},
+      "then": {"required": ["target"]}
+    }
+  ]
+}

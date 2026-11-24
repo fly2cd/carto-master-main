@@ -59,7 +59,7 @@ class StagingPackageWriter:
                 for relative, payload in payloads.items()
                 if relative != "checksums.sha256"
             }
-            self._verify_closed_package(temporary, manifest, all_checksums)
+            self.verify_closed_package(temporary, manifest, all_checksums)
             os.replace(temporary, package_root)
             return {**snapshot, "package_path": package_root.as_posix()}
         finally:
@@ -104,7 +104,7 @@ class StagingPackageWriter:
             for relative, payload in payloads.items()
             if relative != "checksums.sha256"
         }
-        self._verify_closed_package(package_root, manifest, all_checksums)
+        self.verify_closed_package(package_root, manifest, all_checksums)
         return {**snapshot, "package_path": package_root.as_posix()}
 
     def _expected_payloads(
@@ -155,7 +155,7 @@ class StagingPackageWriter:
             if raw in reserved or path.is_absolute() or ".." in path.parts or "\\" in raw:
                 raise ProtocolError("PACKAGE_PATH_INVALID", raw)
 
-    def _verify_closed_package(
+    def verify_closed_package(
         self,
         root: Path,
         manifest: dict[str, Any],
@@ -175,20 +175,35 @@ class StagingPackageWriter:
         lock = yaml.safe_load((root / manifest["dependency_lock"]).read_text(encoding="utf-8"))
         self.registry.validate("dependency-lock", lock)
         self.resolver.validate_lock(lock)
-        contract_schemas = {
-            "scenario": "scenario",
-            "data_schema": "data-role",
-            "spatial_behavior": "spatial-behavior",
-            "portrayal": "portrayal",
-            "delivery": "delivery",
-            "quality_gates": "quality-gates",
-        }
-        for key, schema_name in contract_schemas.items():
-            contract = yaml.safe_load((root / manifest["business_contracts"][key]).read_text(encoding="utf-8"))
+        if "business_contracts" in manifest:
+            contract_schemas = {
+                "scenario": "scenario",
+                "data_schema": "data-role",
+                "spatial_behavior": "spatial-behavior",
+                "portrayal": "portrayal",
+                "delivery": "delivery",
+                "quality_gates": "quality-gates",
+            }
+            for key, schema_name in contract_schemas.items():
+                contract = yaml.safe_load((root / manifest["business_contracts"][key]).read_text(encoding="utf-8"))
+                self.registry.validate(schema_name, contract)
+            prototypes = sorted(path for path in manifest["files"]
+                                if path.startswith("prototypes/") and path.endswith((".yaml", ".yml")))
+            if len(prototypes) != 1:
+                raise ProtocolError("PROTOTYPE_SET_INVALID", str(prototypes))
+            prototype = yaml.safe_load((root / prototypes[0]).read_text(encoding="utf-8"))
+            self.registry.validate("prototype-description", prototype)
+        else:
+            # Segment packages (map-style/map-layout) carry exactly one contract and no
+            # business_contracts/prototype (manifest.schema forbids business_contracts for
+            # non-scenario kinds). The path/schema convention is single-sourced from
+            # SEGMENT_CONTRACTS; the scenario path above is unchanged (zero regression).
+            from .template_matching import SEGMENT_CONTRACTS
+            kind = manifest["package"]["kind"]
+            if kind not in SEGMENT_CONTRACTS:
+                raise ProtocolError("PACKAGE_KIND_UNSUPPORTED", kind)
+            contract_path, schema_name = SEGMENT_CONTRACTS[kind]
+            if contract_path not in manifest["files"]:
+                raise ProtocolError("SEGMENT_CONTRACT_MISSING", contract_path)
+            contract = yaml.safe_load((root / contract_path).read_text(encoding="utf-8"))
             self.registry.validate(schema_name, contract)
-        prototypes = sorted(path for path in manifest["files"]
-                            if path.startswith("prototypes/") and path.endswith((".yaml", ".yml")))
-        if len(prototypes) != 1:
-            raise ProtocolError("PROTOTYPE_SET_INVALID", str(prototypes))
-        prototype = yaml.safe_load((root / prototypes[0]).read_text(encoding="utf-8"))
-        self.registry.validate("prototype-description", prototype)

@@ -824,9 +824,21 @@ MapLayout 的 Frame 与内容角色关系见 [MapLayout 完整说明](map-layout
 
 **schema 同步收紧**：`map-expression.schema.json` 的 `parameter_definitions` 删除这三个属性；因 `additionalProperties: false`，**今后再写入副本会直接被拒**。同步更新两个 catalog fixture 与 `schema_cases.MAP_EXPRESSION`，并新增非法样例 `map-expression-duplicated-constraint`。
 
-**并发变更提醒**：本轮发现 `identity.schema.json` 已被外部重构**删除**（git 状态 `D`），`common`/`manifest`/`template-index`/`dependency-lock` 等也被修改。因此：① 本文早先引用的 `identity.schema.json:16` 已失效；② 基于它的 hex 非法样例已移除（不得恢复别人有意删除的文件）；③ hex 收敛原则本身**未被破坏**，反而被推广到更多 schema。（2026-11-18 更新：该删除已经用户授权确认为品牌段整体移除的一部分，非外部意外变更。）
+**并发变更提醒**：本轮发现 `identity.schema.json` 已被外部重构**删除**（git 状态 `D`），`common`/`manifest`/`template-index`/`dependency-lock` 等也被修改。因此：① 本文早先引用的 `identity.schema.json:16` 已失效；② 基于它的 hex 非法样例已移除（不得恢复别人有意删除的文件）；③ hex 收敛原则本身**未被破坏**，反而被推广到更多 schema。
 
-### 14.11 Style/Layout 设计讨论归档（2026-11-19）
+### 14.11 创建链路单 TP 化实施（2026-11-19）
+
+按已评估的第一批计划实施：取消 T1、保留单次 TP、固化待确认发布对象、准确绑定发布目标、保留自动复验与受限恢复。**不含**发起者自批、暂存包编辑、草稿应用。
+
+- 协议：新增 `template-publication.schema.json`（绑定 run/请求摘要/包/证据/scope/规范化 root/幂等键）；`template-create-request` 本地 `schema_version` 升 2（不动 common）；`publication-receipt` 增 `publication_object_ref`。
+- 工作流：brief 改 `succeeded`；author 去审批参数；新增 `prepare_publication`（不消费 nonce）；publish 从固化对象读目标、args 仅作一致性断言、主/重放两分支均核验对象。
+- 仓库：publish 持久化对象；lookup 幂等加对象摘要；新增 `load_publication_object` 与受限索引恢复（仅当对象/审批/包树核验且重建摘要==index_digest_after）。
+- 审批门：GATES 删 T1；未知 gate 抛 `APPROVAL_GATE_UNKNOWN`（不再裸 KeyError）。
+- 测试：改写 general/segment/a31 发布线为 prepare+对象签名；新增 `test_template_single_approval.py`（8 项，含同 scope 不同 root 拒绝、对象篡改拒绝、旧 T1 不作 TP、prepare 幂等且不消费 nonce）。
+- 顺带修复外部拆包遗留的两处测试导入（`general_thematic` → `.raster`）与两处直接 `repository.publish` 调用补对象。
+- 文档：SKILL/workflows/create-template/map-scenario/routing 等同步为单 TP。**注意**：`design-principles.md` 的 “T1” 指 LLM 注册表达（另一未开放能力），与被删的简报审批门不同，未改动。（2026-11-18 更新：该删除已经用户授权确认为品牌段整体移除的一部分，非外部意外变更。）
+
+### 14.12 Style/Layout 设计讨论归档（2026-11-19）
 
 - 明确页面基础 Style、内容角色、Layout/Frame 的关系；同页多图与共享图例不自动推出相同编码/地图比例尺。
 - 明确固定几何合法，复用受适用范围约束，执行作用须有触发条件；设计说明和机器合同分责。
@@ -834,6 +846,45 @@ MapLayout 的 Frame 与内容角色关系见 [MapLayout 完整说明](map-layout
 - 在 MapStyle 收敛最小字段和联合密度图例子，删除相冲突的现行示例用法（品牌角色、Profile、token 追溯、Style 分类数覆盖和手写容量）；保持历史删除登记。
 - 在 MapLayout 增加“同一种 Frame 的父子组合”目标、内容组件拆分边界、局部坐标与测量传播、图文/图表结构例子；明确它不是当前 inside_frame，亦不注册新字段或能力。
 - 本次只编辑设计文档并检查文本一致性/引用；不运行制图、生成业务数据、修改 Schema/代码/策略或声称已通过新能力验收。新协议实施时仍须合法/非法样例与自动测试。
+
+### 14.13 段名统一：cartography → style（2026-11-20，用户批准协议级改名）
+
+**动机**：`cartography`（制图学）比“视觉表达/style”宽，易与 layout/generalization 混淆。经用户批准做协议级改名，使段名与模板 kind（map-style）、文档（map-style.md）对齐。
+
+**改名范围**（39+8 文件）：段键 `embedded/segment_refs/replaceable_segments/owned_segments` 的 `cartography`→`style`；`cartography.schema.json`→`style.schema.json`（$id 同步，schema_version 不变，字段集不变）；注册名/`registry.validate`/`KIND_TO_SEGMENT`/`style_contract`/appearance 消费点/fixtures/测试同步。
+
+**刻意保留**：① 不可变迁移资产的磁盘路径 `contracts/cartography.yaml`（`SEGMENT_CONTRACTS` 相对路径不变，仅 schema_name 改 style），遵守已发布包不可变纪律；② 形容词 `cartographic`（如配色红线 prose）；③ 已注册检查器 id `cartography.legend-consistency`（稳定标识，另案迁移）。
+
+**命名权威**：自此“style”为概念与协议段名；`cartography` 仅作为不可变资产文件名/检查器 id 的历史残留存在，不得再用于新协议字段。本文及 map-style/map-layout/map-scenario 中凡指视觉表达段者统一读作 style。
+
+### 14.14 Schema 向目标设计的加法演进（2026-11-20）
+
+**合理性评估**：把 schema 一次性改成 §8/§5.4 目标最小集（删除 visual_language/symbolization/labeling 三件套/generalization/defaults/capacity 手写等）**不合理**：这些字段仍被活消费点（template_matching.score_style、appearance、page_renderer、确定性作者）与**不可变迁移资产**（template-assets/map-style/*/cartography.yaml）消费/携带，删除即破坏零回归与已发布包不可变纪律。故采用 **Strangler-Fig 加法演进**。
+
+**本次实施（加法、可选、不破坏）**：
+- style.schema.json 新增可选目标字段：`ramps`（内联 hex+scheme+reversible+provenance）、`symbol_roles`、`accepts`、`labeling.hierarchy`、`compatibility`、`extension_policy`、`standard_refs`；词表**单源引用** encoding-ir（hexColor/symbol/geometry_role/key_mode/measurement），不复制枚举。
+- layout.schema.json 新增可选 `content_slots`；`category/placeholders/capacity` 标 DEPRECATED 但保留 required（v1 渲染容量检查仍消费）。
+- 旧字段 visual_language/symbolization/generalization 标 DEPRECATED，保留供 v2 消费点/迁移资产。
+- 修正 map-style §5.1 与 §8.1 的内部矛盾（visual_language/layer_order/collision/scale_behavior 表述对齐删除清单）。
+
+**验证**：test_schemas 27 项全绿；新字段正例合法、反例（小写 hex/非法 measurement/非法 slot 类型）拒绝；现有 fixture 不受影响。
+
+**删除阶段（独立迁移，未做）横切面**：作者 style_contract/layout_contract、appearance/page_renderer/static_page_renderer、template_matching.score_style/score_layout、迁移资产适配契约+MIGRATION 摘要、schema_cases/fixtures、相关测试；须升 schema_version 并跑全量回归。在此之前旧字段不得删。
+
+### 14.15 create-template 双入口原语（2026-11-20，提取/派生核心已实施+测试）
+
+**入口①参考图逆渲染**：[reference_extraction.py](../../skills/carto-agent/scripts/carto_core/compiler/reference_extraction.py) 实现调色板 Lab k-means（最远点初始化、确定性）+ ΔE2000 round-trip；产 `template-proposal`（kind=extract）带 provenance+置信度+不可恢复清单+许可。**不自动入库**。
+**入口②受控派生**：[template_derivation.py](../../skills/carto-agent/scripts/carto_core/compiler/template_derivation.py) `derive(base, change_set, allowed_keys)`→新版本+base_ref，重跑闭合校验；越权键抛 DERIVATION_KEY_FORBIDDEN。检索复用 advisory [template_matching](../../skills/carto-agent/scripts/carto_core/repository/template_matching.py)（阈值取 versioned policy），与 generate 精确 ref 消费分离。
+**逆问题边界**（环境实测：numpy/PIL 有，cv2/sklearn/OCR 无）：调色板✅可恢复；layout 几何/字号⚠️需 cv2/OCR→用户补充；数据绑定/断点/CRS/语义❌不可恢复→用户补充。
+**选择性入库**：proposal.selected_segments + publication-receipt 增可选 selected_segments/source_license（写入审批对象+许可审计）。
+**验收**：Sharma 2005 五对校验 ΔE2000；合成参考图 round-trip ΔE2000<2；同输入同 digest；提案/派生正/反例；test_schemas 覆盖。
+**未接线（协议就绪，独立迁移）**：NL→hint 前端、workflow propose 步、publish 读取 selected_segments 的活流程。本轮仅纯模块+schema，不动活工作流，零回归。
+
+### 14.16 提取模块独立化（MCP-ready，2026-11-23）
+
+按用户要求保证提取模块独立性（后期封装进 MCP）：[reference_extraction.py](../../skills/carto-agent/scripts/carto_core/compiler/reference_extraction.py) 重构为**纯函数单元**，仅依赖 numpy/PIL/纯色度数学 color_science，**不导入** workflow/repository/schema_registry/CLI；schema 校验改为边界注入（调用方可选）。公开 API：`extract_palette`/`round_trip_palette`/`extract_proposal`。
+**②layout/字号双通道**：解析序=用户补充 > 可插拔后端(cv2/OCR) > 不可恢复。环境无 cv2/OCR 时默认用户补充（`user_layout`/`user_typography`），补充后 confidence=1.0 且移出不可恢复清单；后端在时 confidence=0.6。实测：纯提取 ΔE2000=0；用户补充后 recovered={layout,ramps,typography}、不可恢复仅剩语义四项。
+**测试**：test_template_proposal 10 项（含独立性、用户补充、可插拔后端、边界校验、许可必填）。
 
 ## 15. 词表与概念单源规范（规范性附录）
 

@@ -1,4 +1,4 @@
-"""A2: Material extraction, data adoption, and provenance tests.
+"""Material extraction, data adoption, and provenance tests.
 
 Tests cover:
 - Plain text extraction with line-level provenance

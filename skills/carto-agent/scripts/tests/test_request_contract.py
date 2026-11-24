@@ -39,7 +39,8 @@ class GeometryAndFieldsTests(unittest.TestCase):
                          REQUEST_CONTRACT.required_fields())
 
     def test_override_keys(self):
-        self.assertEqual(("revised_cartography", "output_profile"), REQUEST_CONTRACT.override_keys())
+        self.assertEqual(("revised_cartography", "output_profile", "revised_color_scheme"),
+                         REQUEST_CONTRACT.override_keys())
 
 
 class CapabilityMatrixTests(unittest.TestCase):
@@ -98,7 +99,7 @@ class ValidateBodyTests(unittest.TestCase):
 
 class ApplyOverridesTests(unittest.TestCase):
     def test_no_overrides_is_identity(self):
-        contracts = {"scenario": {"embedded": {"cartography": {"title_pt": 18}}}}
+        contracts = {"scenario": {"embedded": {"style": {"title_pt": 18}}}}
         before = deepcopy(contracts)
         result = REQUEST_CONTRACT.apply_overrides({}, contracts)
         self.assertIs(result, contracts)
@@ -108,10 +109,10 @@ class ApplyOverridesTests(unittest.TestCase):
         contracts = {"scenario": {"embedded": {}}}
         cart = {"title_pt": 22}
         REQUEST_CONTRACT.apply_overrides({"revised_cartography": cart}, contracts)
-        self.assertEqual(cart, contracts["scenario"]["embedded"]["cartography"])
+        self.assertEqual(cart, contracts["scenario"]["embedded"]["style"])
         # deepcopy: mutating the source must not leak into contracts
         cart["title_pt"] = 99
-        self.assertEqual(22, contracts["scenario"]["embedded"]["cartography"]["title_pt"])
+        self.assertEqual(22, contracts["scenario"]["embedded"]["style"]["title_pt"])
 
     def test_output_profile_applied_to_canvas(self):
         contracts = {"scenario": {"embedded": {"layout": {"canvas": {"width": 297, "height": 210}}}}}

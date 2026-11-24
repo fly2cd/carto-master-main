@@ -7,7 +7,7 @@
 | `edit-native-map` | 保留原生 GIS 工程并编辑 | 未开放，返回 `CAPABILITY_NOT_AVAILABLE` |
 | `curate-catalog` | 治理符号、标准和目录 | 未开放，返回 `CAPABILITY_NOT_AVAILABLE` |
 
-路由不得互相降级。创建模板审批不等于地图生成审批；两条已实现编排的路由只共享 Schema、安全组件和受信资源目录。模板 T1/TP 与地图 G1/G2/G3 均按动作、对象、摘要、身份、tenant、scope、environment、时效和 nonce 独立绑定，不能跨 gate、跨对象或跨运行复用。
+路由不得互相降级。创建模板审批不等于地图生成审批；两条已实现编排的路由只共享 Schema、安全组件和受信资源目录。模板 TP 与地图 G1/G2/G3 均按动作、对象、摘要、身份、tenant、scope、environment、时效和 nonce 独立绑定，不能跨 gate、跨对象或跨运行复用。
 
 ## 运行闭环
 

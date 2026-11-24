@@ -11,14 +11,14 @@
 
 1. `analyze`：验证请求、来源摘要、摘要值、角色与 CRS，生成 `template-analysis` 和来源清单快照。
 2. `brief`：区分来源事实、用户决定、系统建议和推导值，生成严格的 `template-brief`。
-3. `author`：验证绑定审批人、动作、对象摘要、作用域、时效和 nonce 的 T1 回执，生成不可覆盖的暂存模板包。
+3. `author`：不再要求 T1 或审批密钥；按请求与简报确定性生成不可覆盖的暂存模板包（草稿）。
 4. `validate`：先执行静态校验，再由场景注册的样张渲染分支受控渲染（`general_thematic_mapping` 使用 `rasterio-matplotlib-page` 渲染由包内图例样本派生的合成栅格样张，输出 PDF/PNG、冻结渲染场景、RenderReceipt 和 `template-validation-evidence`）；存在 blocker 或 error 时不得进入发布步骤。
-5. `publish`：重新验证证据与全部绑定（栅格样张按冻结场景复现并比对输出摘要），验证 TP 发布审批，将精确版本写入不可变模板仓库并原子更新权威 `template-index.yaml`。
+5. `prepare-publish`：机器准备动作，核对验证通过与作者输出一致后固化 `template-publication` 对象（绑定 run/请求摘要/包/证据/目标 scope 与规范化 root/幂等键），进入 `waiting_approval/publish`；不消费 nonce、不签署、不发布。
+6. `publish`：从固化对象读目标与幂等键，重新验证证据与全部绑定（栅格样张按冻结场景复现并比对输出摘要），验证 TP 签署的正是该对象，将精确版本写入不可变模板仓库并原子更新权威 `template-index.yaml`。
 
 ## 审批消费中断恢复
 
-- T1 在消费 nonce 前保存已完成 claims 校验的工作流本地审批意图；中断后只允许按请求和简报确定性重建并精确核对暂存包。
-- TP 只允许从不可变发布事务及其中保留的已认证审批恢复。
+- `prepare-publish` 不消费 nonce；中断后重复准备复用同一固化对象。TP 只允许从不可变发布事务及其中保留的已认证审批与发布对象恢复；索引中断仅在对象/审批/包树全部核验且重建索引摘要等于 `index_digest_after` 时受限恢复。
 - 恢复必须证明原 nonce 已消费且动作、对象摘要、作用域、身份、环境和时效仍完全匹配；普通重放和漂移内容均被拒绝。
 
 ## 模板包与发布边界

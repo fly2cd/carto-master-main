@@ -2,10 +2,9 @@
 
 Why this exists
 ---------------
-The full regression measures ~974s (16.2 min) for 470 cases, but the cost is
-extremely concentrated: 32 cases that perform real A4@300dpi rendering account
-for ~89.8% of the wall time, while the other 438 cases finish in ~100s. Paying
-16 minutes for every inner-loop edit is what makes changes feel expensive.
+The regression includes both quick protocol checks and expensive real-rendering
+workflows. Their cost varies with the host and optional dependencies; use --list
+to inspect the recorded split rather than relying on a historical case count.
 
 Tiers are therefore derived from a MEASURED baseline (``regression-baseline.json``)
 rather than a hand-maintained list, so the split cannot silently drift away from
@@ -13,8 +12,8 @@ reality. Re-measure with ``--measure`` whenever the suite changes shape.
 
 Tiers
 -----
-fast  per-case measured time <= threshold (default 5s). Protocol, schema, unit and
-      component level. No real page rendering.
+fast  per-case measured time <= threshold (default 5s). Usually protocol, schema,
+      unit and component tests; unknown cases can include real rendering.
 slow  per-case measured time >  threshold. End-to-end workflows that render for
       real (template validate/publish across the six parameter combinations,
       preview -> G2 -> render -> check -> G3 -> deliver).

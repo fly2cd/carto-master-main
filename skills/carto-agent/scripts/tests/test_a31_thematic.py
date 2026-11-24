@@ -199,7 +199,7 @@ class TemplateContractMergeTests(unittest.TestCase):
         scenario=load_document(root/'contracts/scenario.yaml')
         self.assertEqual('4.0.0',scenario['version'])
         self.assertEqual(['thematic-features'],scenario['data_role_refs'])
-        for name in ('cartography','layout'):
+        for name in ('style','layout'):
             self.assertEqual('4.0.0',scenario['embedded'][name]['version'],name)
         # The embedded segments name the template version actually being authored;
         # before 项② the vector package carried a stale "@3.0.0" reference because the
@@ -414,7 +414,7 @@ class ThematicWorkflowTests(unittest.TestCase):
     def test_multi_candidate_select_and_preview(self):
         from tests.test_general_thematic import APPROVAL_KEY, KEY
         from carto_core.schema_registry import load_document
-        base=deepcopy(self.contracts['scenario']['embedded']['cartography'])
+        base=deepcopy(self.contracts['scenario']['embedded']['style'])
         style_a=deepcopy(base);style_a['typography']['title_pt']=16
         style_b=deepcopy(base);style_b['typography']['title_pt']=18
         self.generate['design_variants']=[
@@ -454,10 +454,10 @@ class ThematicWorkflowTests(unittest.TestCase):
         workflow.compile(path,self.root/'workflow-g1.yaml',approval_key=APPROVAL_KEY)
         preview=workflow.preview(path,attestation_key=KEY)
         first_bundle=load_document(workflow._design_path('data/prepared-data-bundle.yaml'))
-        style=deepcopy(self.contracts['scenario']['embedded']['cartography'])
+        style=deepcopy(self.contracts['scenario']['embedded']['style'])
         style['typography']['title_pt']=17
         proposal={'schema_version':1,'proposal_id':'reuse-title','run_id':self.context.run_id,
-                  'parent_revision':1,'changes':{'cartography':{'new_value':style}},
+                  'parent_revision':1,'changes':{'style':{'new_value':style}},
                   'justification':'Synthetic bundle-reuse acceptance'}
         proposal_path=self.root/'reuse-proposal.yaml';atomic_yaml(proposal_path,proposal)
         brief=workflow.revision_brief(path,proposal_path)
@@ -733,14 +733,14 @@ class ThematicWorkflowTests(unittest.TestCase):
         old_g2=self.signed_file('old-g2','approve-freeze','resolved-map',preview['approval_object_digest'])
         old_files={ref['uri']:file_digest(Path(ref['uri']))
             for receipt in workflow.state_store.receipts() for ref in receipt['receipt']['output_refs'] if ref.get('uri')}
-        style=deepcopy(self.contracts['scenario']['embedded']['cartography'])
+        style=deepcopy(self.contracts['scenario']['embedded']['style'])
         style['typography']['title_pt']=17
         design=density_design()
         design.update(normalization=None,measurement='normalized-index',unit='index',
                       classification={'method':'manual','edges':[0,25,50],'labels':['Low','High']})
         proposal={'schema_version':1,'proposal_id':'change-title','run_id':self.context.run_id,
                   'parent_revision':1,'changes':{'map_title':{'new_value':'Revised population density'},
-                      'cartography':{'new_value':style},'panel_designs':{'new_value':{'main-view':design}}},
+                      'style':{'new_value':style},'panel_designs':{'new_value':{'main-view':design}}},
                   'justification':'Synthetic revision acceptance'}
         proposal_path=self.root/'proposal.yaml';atomic_yaml(proposal_path,proposal)
         brief=workflow.revision_brief(path,proposal_path)
@@ -902,16 +902,22 @@ class ThematicApprovalTests(unittest.TestCase):
 
 
     def test_template_approvals_bind_declared_approver_not_receipt_claims(self):
-        from tests.test_general_thematic import CreateLineTests, APPROVAL_KEY
+        from tests.test_general_thematic import PublishLineTests, APPROVAL_KEY, sign
         from carto_core.security.approval import sign_receipt
-        CreateLineTests.setUp(self)
-        _,brief=CreateLineTests.run_to_brief(self)
-        approval=CreateLineTests.t1(self,sha256_digest(brief['brief']))
+        PublishLineTests.setUp(self)
+        PublishLineTests.run_to_validated(self)
+        prepared=self.workflow.prepare_publication(self.request_path,
+            repository_root=self.publish_kwargs['repository_root'],
+            repository_scope=self.publish_kwargs['repository_scope'],
+            idempotency_key=self.publish_kwargs['idempotency_key'])
+        good=sign('TP','approve-template-publish','template-publication',prepared['object_digest'],
+            subject_id=self.request['subject']['approver_subject_id'],scope=self.request['scope'],
+            tenant_id=self.request['subject']['tenant_id'])
         for field in ('subject_id','tenant_id','scope','environment'):
-            wrong=sign_receipt(replace(approval,**{field:'wrong-value'}),APPROVAL_KEY)
+            wrong=sign_receipt(replace(good,**{field:'wrong-value'}),APPROVAL_KEY)
             path=self.root/('bad-'+field+'.yaml');atomic_yaml(path,asdict(wrong))
             with self.subTest(field=field),self.assertRaises(SecurityError):
-                self.workflow.author(self.request_path,path,approval_key=APPROVAL_KEY)
+                self.workflow.publish(self.request_path,path,**self.publish_kwargs)
         self.assertEqual('waiting_approval',self.workflow.state_store.load().status)
 
 
@@ -923,7 +929,6 @@ class ThematicTemplateTests(unittest.TestCase):
         self.request.update(geometry='vector',version='4.0.0',profile='general-vector-authoring',
                             role_bindings={'thematic_features':'legend-sample'})
         self.request_path.write_text(json.dumps(self.request,ensure_ascii=False),encoding='utf8')
-        self.t1=lambda digest:PublishLineTests.t1(self, digest)
         result=PublishLineTests.run_to_validated(self)
         self.assertEqual('passed',result['evidence']['status'], result['evidence']['check_results'] if 'check_results' in result['evidence'] else result['evidence'])
         # A3.1 uses active expression catalog options, not deprecated vector/explicit.
@@ -932,10 +937,12 @@ class ThematicTemplateTests(unittest.TestCase):
             {r['id'] for r in portrayal['layers'][0]['expression_options']})
         evidence=result['evidence']
         self.assertEqual(23,len(evidence['grid_cases']))
-        publication={'package_digest':evidence['package_ref']['digest'],
-                     'evidence_digest':evidence['evidence_digest'], 'repository_scope':'local:templates'}
+        prepared=self.workflow.prepare_publication(self.request_path,
+            repository_root=self.publish_kwargs['repository_root'],
+            repository_scope=self.publish_kwargs['repository_scope'],
+            idempotency_key=self.publish_kwargs['idempotency_key'])
         approval=self.root/'tp.yaml'
-        atomic_yaml(approval,asdict(sign('TP','approve-template-publish','template-publication',sha256_digest(publication),
+        atomic_yaml(approval,asdict(sign('TP','approve-template-publish','template-publication',prepared['object_digest'],
             subject_id=self.request['subject']['approver_subject_id'],scope=self.request['scope'],
             tenant_id=self.request['subject']['tenant_id'])))
         published=self.workflow.publish(self.request_path,approval,**self.publish_kwargs)

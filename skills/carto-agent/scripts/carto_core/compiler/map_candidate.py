@@ -192,12 +192,12 @@ class MapCandidateCompiler:
                 scene, candidate["execution"], self.context)
             profile.component("candidate_compiler")(self.path_guard, self.registry,
                 project_root=self.project_root, context=self.context).verify_request(request, scene, inputs)
-            template_style = contracts["scenario"].get("embedded", {}).get("cartography")
+            template_style = contracts["scenario"].get("embedded", {}).get("style")
             if scene['resolved_layout']['template_contract'] != contracts['scenario']['embedded']['layout']:
                 raise ProtocolError('LAYOUT_TEMPLATE_MISMATCH','Layout differs from installed template')
             if any(layer['portrayal']['portrayal'] != contracts['portrayal'] for layer in inputs['layers'].values()):
                 raise ProtocolError('PORTRAYAL_TEMPLATE_MISMATCH','Expression differs from installed template')
-            if inputs["page"]["appearance"]["cartography"] != template_style:
+            if inputs["page"]["appearance"]["style"] != template_style:
                 raise ProtocolError("APPEARANCE_TEMPLATE_MISMATCH", "Page appearance differs from the installed template")
             if bundle is not None and _bundle_core(inputs["bundle"]) != _bundle_core(bundle):
                 raise ProtocolError("RASTER_CANDIDATE_BUNDLE_MISMATCH", "Candidate must preserve the prepared bundle")
@@ -212,7 +212,7 @@ class MapCandidateCompiler:
             profile.component("candidate_compiler")(self.path_guard, self.registry,
                 project_root=self.project_root, context=self.context).verify_request(request, scene, vector)
             if (scene["resolved_layout"]["template_contract"] != contracts["scenario"]["embedded"]["layout"]
-                    or vector["page"]["cartography"] != contracts["scenario"]["embedded"]["cartography"]):
+                    or vector["page"]["style"] != contracts["scenario"]["embedded"]["style"]):
                 raise ProtocolError("VECTOR_TEMPLATE_MISMATCH", "Page layout or appearance differs from the installed template")
             if bundle is not None and _bundle_core(bundle) != _bundle_core(vector["bundle"]):
                 raise ProtocolError("VECTOR_BUNDLE_MISMATCH", "Page does not preserve the prepared bundle")

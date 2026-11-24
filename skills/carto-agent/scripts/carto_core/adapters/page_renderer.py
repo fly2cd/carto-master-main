@@ -49,7 +49,7 @@ def page_renderer_digest(geometry: str = "raster") -> str:
         # freezing a page (compiler.vector_page) and re-validated by
         # static_page_renderer while painting one, so both geometries depend on it.
         path.parents[1] / "compiler" / "chart_core.py",
-        root / "schemas" / "cartography.schema.json",
+        root / "schemas" / "style.schema.json",
         root / "schemas" / "layout.schema.json",
         root / "schemas" / "resolved-appearance.schema.json",
         root / "schemas" / "page-bindings.schema.json",

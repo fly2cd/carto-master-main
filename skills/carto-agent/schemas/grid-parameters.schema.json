@@ -24,6 +24,13 @@
         "independent",
         "shared"
       ]
+    },
+    "legend_placement": {
+      "description": "Optional legend placement (plan phase 3). Defaults to outside when omitted (legacy behavior). inside places each independent legend fully within its own main-map frame; shared+inside is not opened.",
+      "enum": [
+        "outside",
+        "inside"
+      ]
     }
   }
 }

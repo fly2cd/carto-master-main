@@ -341,8 +341,8 @@ class TemplatePackageValidator:
                     raise ProtocolError("GRID_VALIDATION_CASE_MISMATCH", "Vector expression coverage differs")
             else:
                 page = preparation.document(scene["page_request_ref"], "page-request")
-            actual_style = page["cartography"] if scene["renderer_id"] == VECTOR_PAGE.renderer_id else page["appearance"]["cartography"]
-            if actual_style != snapshot["documents"]["scenario"]["embedded"]["cartography"]:
+            actual_style = page["style"] if scene["renderer_id"] == VECTOR_PAGE.renderer_id else page["appearance"]["style"]
+            if actual_style != snapshot["documents"]["scenario"]["embedded"]["style"]:
                 raise ProtocolError("APPEARANCE_TEMPLATE_MISMATCH", "Fixture style differs from template")
             expected_session = f"template-validation-{snapshot['package_digest'][7:23]}-{sha256_digest(scene)[7:23]}"
             if receipt["session_id"] != expected_session:

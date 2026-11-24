@@ -177,7 +177,7 @@ class AdmissionTests(unittest.TestCase):
         entry = scenario_registry._COMPONENTS["general-thematic"]
         self.assertEqual({"data_preparer", "planner", "candidate_compiler", "legend_checker",
                           "source_contract", "request_contract", "revision_contract", "author",
-                          "validation_data_checker", "validation_scene"},
+                          "validation_data_checker", "validation_scene", "segment_validation_host"},
                          set(entry))
         self.assertEqual({".scenarios.general_thematic.dispatch", ".scenarios.general_thematic.request_contract",
                           ".scenarios.general_thematic.revision"},
@@ -335,20 +335,14 @@ class CreateLineTests(unittest.TestCase):
         self.assertEqual([{"role_id": "classified-surface", "source_id": "legend-sample",
                            "geometry_types": ["none"], "value_field": "category_value",
                            "semantic_role": "category-value"}], briefed["brief"]["data_roles"])
-        self.assertEqual(sha256_digest(briefed["brief"]), briefed["approval"]["object_digest"])
-        self.assertEqual(("waiting_approval", "author"),
+        self.assertEqual(("pending", "author"),
                          (briefed["state"]["status"], briefed["state"]["step"]))
 
-    def test_author_requires_a_valid_t1_and_validate_fails_closed_on_fixture_render(self):
+    def test_author_needs_no_approval_and_validate_fails_closed_on_fixture_render(self):
         _, briefed = self.run_to_brief()
-        with self.assertRaisesRegex(ProtocolError, "BRIEF_NOT_CONFIRMED"):
-            self.workflow.author(self.request_path, None, **self.author_kwargs)
-        approval_path = self.root / "t1.yaml"
-        atomic_yaml(approval_path, asdict(self.t1("sha256:" + "0" * 64)), create_once=False)
-        with self.assertRaises(SecurityError):
-            self.workflow.author(self.request_path, approval_path, **self.author_kwargs)
-        atomic_yaml(approval_path, asdict(self.t1(sha256_digest(briefed["brief"]))), create_once=False)
-        authored = self.workflow.author(self.request_path, approval_path, **self.author_kwargs)
+        self.assertEqual(("pending", "author"),
+                         (briefed["state"]["status"], briefed["state"]["step"]))
+        authored = self.workflow.author(self.request_path)
         self.assertEqual(("pending", "validate"),
                          (authored["state"]["status"], authored["state"]["step"]))
         self.assertTrue((self.root / "work/staging/package/contracts/scenario.yaml").is_file())
@@ -524,9 +518,8 @@ class PublishLineTests(unittest.TestCase):
 
     def run_to_validated(self) -> dict:
         self.workflow.analyze(self.request_path)
-        briefed = self.workflow.brief(self.request_path)
-        atomic_yaml(self.root / "t1.yaml", asdict(self.t1(sha256_digest(briefed["brief"]))))
-        self.workflow.author(self.request_path, self.root / "t1.yaml", **self.author_kwargs)
+        self.workflow.brief(self.request_path)
+        self.workflow.author(self.request_path)
         return self.workflow.validate(self.request_path, attestation_key=KEY,
                                       font_path=self.font_path)
 
@@ -538,7 +531,7 @@ class PublishLineTests(unittest.TestCase):
         self.assertIn("render_scene_ref", evidence)
         self.assertEqual({"pdf", "png"},
                          {item["target"] for item in evidence["preview_artifacts"]})
-        self.assertEqual(("pending", "publish"),
+        self.assertEqual(("pending", "prepare-publish"),
                          (validated["state"]["status"], validated["state"]["step"]))
         # The frozen scene carries its own font copy from the immutable store, so the
         # published package never depends on the authoring host's font file.
@@ -554,6 +547,11 @@ class PublishLineTests(unittest.TestCase):
         from carto_core.workflow.template_validation import TemplatePackageValidator
         cases = grid_cases(scene["resolved_layout"]["template_contract"])
         self.assertEqual(cases[1:], [item["parameters"] for item in evidence["grid_cases"]])
+        prepared = self.workflow.prepare_publication(
+            self.request_path, repository_root=self.root / "repo",
+            repository_scope="local:templates", idempotency_key="publish-general-00000001")
+        self.assertEqual(("waiting_approval", "publish"),
+                         (prepared["state"]["status"], prepared["state"]["step"]))
         state = self.workflow.state_store.load()
         evidence_ref = self.workflow.state_store.find_output_ref("template-validation-evidence")
         validator = TemplatePackageValidator(
@@ -609,11 +607,7 @@ class PublishLineTests(unittest.TestCase):
             preview_path.write_bytes(original_preview)
 
         # Untampered evidence publishes exactly once and replays idempotently.
-        publication_digest = sha256_digest({
-            "package_digest": evidence["package_ref"]["digest"],
-            "evidence_digest": evidence["evidence_digest"],
-            "repository_scope": "local:templates",
-        })
+        publication_digest = prepared["object_digest"]
         atomic_yaml(self.root / "tp.yaml", asdict(sign(
             "TP", "approve-template-publish", "template-publication", publication_digest,
             subject_id=self.request["subject"]["approver_subject_id"], scope=self.request["scope"],
@@ -826,7 +820,7 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
         compiled = self.compile_via_components()
         original = compiled["scene"]
         page = self.service.document(original["page_request_ref"], "page-request")
-        style = deepcopy(page["appearance"]["cartography"])
+        style = deepcopy(page["appearance"]["style"])
         style["typography"]["title_pt"] = 14
         raw = {k: deepcopy(v) for k, v in page.items() if k not in {"appearance", "bindings"}}
         raw["legends"]=[{"content_id":x["content_id"],"title":x["title"]} for x in raw["legends"]]

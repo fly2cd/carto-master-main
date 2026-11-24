@@ -106,7 +106,7 @@ class MatchingPrimitiveTests(unittest.TestCase):
 class SegmentScorerTests(unittest.TestCase):
     def setUp(self) -> None:
         self.policy = make_policy()
-        self.cartography = deepcopy(VALID_CASES["cartography"])
+        self.cartography = deepcopy(VALID_CASES["style"])
         self.layout = deepcopy(VALID_CASES["layout"])
 
     def test_identical_segments_score_one(self) -> None:
@@ -261,7 +261,17 @@ class RepositoryRetrievalTests(unittest.TestCase):
         evidence = {"evidence_digest": D}
         approval = {"synthetic": "s0-matching-test", "template_id": template_id}
         return self.repository.publish(package_root=staging, snapshot=snapshot, evidence=evidence,
-                                       approval=approval, idempotency_key=f"s0-matching-{template_id}-0001")
+                                       approval=approval, idempotency_key=f"s0-matching-{template_id}-0001",
+                                       publication_object={"schema_version": 1, "run_id": "s0-matching-run",
+                                                           "request_digest": D,
+                                                           "package_ref": {"kind": snapshot["manifest"]["package"]["kind"],
+                                                                           "id": template_id, "version": "1.0.0",
+                                                                           "digest": snapshot["package_digest"]},
+                                                           "evidence_ref": {"id": "template-validation-evidence", "version": "1.0.0",
+                                                                            "digest": D, "uri": "evidence.yaml"},
+                                                           "repository_scope": "local:templates",
+                                                           "repository_root": self.repository.root.as_posix(),
+                                                           "idempotency_key": f"s0-matching-{template_id}-0001"})
 
     def test_empty_repository_returns_no_candidates(self) -> None:
         self.assertEqual(self.repository.segment_candidates(kind="map-layout"), [])
@@ -343,7 +353,7 @@ class CliMatchTests(unittest.TestCase):
 
     def test_segment_must_match_kind_contract(self) -> None:
         request = {"schema_version": 1, "kind": "map-layout",
-                   "segment": deepcopy(VALID_CASES["cartography"])}
+                   "segment": deepcopy(VALID_CASES["style"])}
         code, payload = self.run_cli(request)
         self.assertEqual(code, 2)
         self.assertEqual(payload["code"], "SCHEMA_VALIDATION_FAILED")

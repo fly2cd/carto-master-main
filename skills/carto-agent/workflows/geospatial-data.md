@@ -10,7 +10,7 @@
 | `gis-raster-statistics` | `geo_raster_statistics` | 同上，operation=statistics |
 | `gis-raster-reproject` | `geo_raster_info` → `geo_raster_reproject` → `geo_get_task_info` → `geo_get_artifact_info` → resources/read | 仅 ToolGateway 适配器；无变换 CLI/业务场景 |
 
-数据检查不是新业务路由，不能替代 `create-template` / `generate-map` 或 T1 / TP / G1 / G2 / G3。本批不注册场景、不制作地图。
+数据检查不是新业务路由，不能替代 `create-template` / `generate-map` 或 TP / G1 / G2 / G3。本批不注册场景、不制作地图。
 
 ## 环境与运维配置
 

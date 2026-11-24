@@ -44,7 +44,27 @@
             }
           }
         },
-        "cartography": {
+        "style": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "new_value"
+          ],
+          "properties": {
+            "new_value": {
+              "description": "Partial or full style contract applied as revised_cartography (top-level key merge, 裁决4). Validated closed-world against the style schema downstream; unknown keys are rejected there.",
+              "type": "object",
+              "minProperties": 1,
+              "properties": {
+                "typography": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "color_scheme": {
+          "description": "裁决4/6: preview palette revision. A category-contract-scoped value->hex effective-color overlay applied at compile time (baseline prepared colors stay frozen; the bundle is reused). scope is the shared-legend category contract id; colors keyed by category code (data value), never by legend order.",
           "type": "object",
           "additionalProperties": false,
           "required": [
@@ -53,19 +73,39 @@
           "properties": {
             "new_value": {
               "type": "object",
-              "minProperties": 1,
+              "additionalProperties": false,
+              "required": [
+                "scope",
+                "colors"
+              ],
               "properties": {
-                "typography": {
-                  "type": "object"
+                "scope": {
+                  "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
                 },
-                "color_scheme": {
-                  "type": "object"
-                },
-                "legend_style": {
-                  "type": "object"
-                },
-                "scale_bar_style": {
-                  "type": "object"
+                "colors": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 256,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "value",
+                      "color"
+                    ],
+                    "properties": {
+                      "value": {
+                        "type": "integer",
+                        "minimum": -2147483648,
+                        "maximum": 4294967295
+                      },
+                      "color": {
+                        "type": "string",
+                        "pattern": "^#[0-9A-F]{6}$"
+                      }
+                    }
+                  }
                 }
               }
             }

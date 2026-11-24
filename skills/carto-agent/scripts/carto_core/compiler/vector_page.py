@@ -98,7 +98,7 @@ def compile_page(service, *, layout, cartography, panels, font, texts, legend_ti
             colors.append({'view_id': panel['view_id'], 'ref': item['portrayal_ref']})
     # Layer stack: the frozen paint order (figure-ground is a declared contract).
     layer_stack = (['basemap'] if basemap is not None else []) + ['thematic', 'legends', 'charts', 'furniture']
-    page = {'schema_version': 4, 'geometry': 'vector', 'resolved_layout': deepcopy(layout), 'cartography': deepcopy(cartography),
+    page = {'schema_version': 4, 'geometry': 'vector', 'resolved_layout': deepcopy(layout), 'style': deepcopy(cartography),
             'panels': resolved_panels, 'font': deepcopy(font), 'texts': deepcopy(texts), 'legends': legends,
             'charts': deepcopy(resolved_charts), 'layer_stack': layer_stack,
             **({'basemap': deepcopy(basemap)} if basemap is not None else {}),
@@ -139,7 +139,7 @@ def compile_page(service, *, layout, cartography, panels, font, texts, legend_ti
 
 def validate_page(service, page, context):
     service.registry.validate('page-request', page)
-    expected = compile_page(service, layout=page['resolved_layout'], cartography=page['cartography'],
+    expected = compile_page(service, layout=page['resolved_layout'], cartography=page['style'],
                             panels=[{k: v for k, v in p.items() if k != 'frame_id'} for p in page['panels']],
                             font=page['font'], texts=page['texts'],
                             legend_titles={l['content_id']: l['title'] for l in page['legends']}, context=context,

@@ -33,7 +33,8 @@
   ],
   "properties": {
     "schema_version": {
-      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"
+      "description": "v2: single-publication-approval flow (no T1). Old v1 runs are not auto-migrated; they fail closed on request re-validation.",
+      "const": 2
     },
     "request_id": {
       "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
@@ -238,7 +239,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "cartography": {
+        "style": {
           "allOf": [
             {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/templateRef"},
             {"properties": {"kind": {"const": "map-style"}}}

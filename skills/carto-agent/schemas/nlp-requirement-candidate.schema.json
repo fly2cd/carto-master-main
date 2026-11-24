@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/nlp-requirement-candidate.schema.json",
+  "description": "UNTRUSTED NLP requirement candidate (design §5.4). The adapter output is a candidate, not an effective requirement or publication request: it carries no publish/approval/library-path/tool-parameter fields (additionalProperties:false rejects them). source_ref is a host-injected/verified artifact ref the model cannot replace; claims reuse the closed §6.5 predicate vocabulary; source_locator is a half-open Unicode code-point span [start,end) into the host-provided source text. origin=user-stated or high confidence does NOT prove the interpretation correct; deterministic conversions are re-verified by trusted rules and complex semantics stay tentative until user confirmation. author-proposed never becomes a confirmed hard requirement.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "source_ref", "claims"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "source_ref": {"type": "string", "minLength": 1, "maxLength": 512},
+    "claims": {
+      "type": "array", "maxItems": 64,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "origin", "strength", "predicate", "source_locator"],
+        "properties": {
+          "id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+          "origin": {"enum": ["user-stated", "author-proposed", "image-observed"]},
+          "strength": {"enum": ["hard", "soft"]},
+          "predicate": {"$ref": "https://schemas.carto-agent.local/v1/design-requirement.schema.json#/properties/conditions/items/properties/predicate"},
+          "source_locator": {
+            "type": "object", "additionalProperties": false,
+            "required": ["start", "end"],
+            "properties": {
+              "start": {"type": "integer", "minimum": 0},
+              "end": {"type": "integer", "minimum": 1}
+            }
+          }
+        }
+      }
+    },
+    "open_questions": {
+      "type": "array", "maxItems": 16,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "condition_ids", "question", "blocking_for"],
+        "properties": {
+          "id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+          "condition_ids": {"type": "array", "items": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"}},
+          "question": {"type": "string", "minLength": 1, "maxLength": 500},
+          "blocking_for": {"enum": ["retrieval", "creation", "execution", "publication"]}
+        }
+      }
+    }
+  }
+}

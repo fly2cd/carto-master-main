@@ -191,7 +191,7 @@ class GeneralThematicCandidateCompiler:
              'resolved_layout':resolved,'font':{'path':str(font_path),'digest':preparation.digest_bytes(font_bytes),'size_bytes':len(font_bytes)},
              'texts':texts,'legends':[{'content_id':f['content_id'],'title':resolved['contract'].get('legend_title',LEGEND_TITLE)} for f in resolved['frames'] if f['type']=='legend'],
              'scale_bar':None,'grid_north':None}
-        page=compile_page_request(preparation,raw,contracts['scenario']['embedded']['cartography'],context,BundlePreparer)
+        page=compile_page_request(preparation,raw,contracts['scenario']['embedded']['style'],context,BundlePreparer,contracts.get('revised_color_scheme'))
         stats=[{'source_id':b['source_id'],'counts':b['category_counts']} for b in bundle['role_bindings']]
         if (plan['bindings']!=page['bindings'] or plan['layout_parameters']!=request['layout_parameters']
             or plan['decisions']['thematic_views'] != raster_views(request,bundle,self.registry)
@@ -412,7 +412,7 @@ def require_admitted(request: dict[str, Any], brief: dict[str, Any], *,
         raise ProtocolError("TEMPLATE_BRIEF_MISMATCH", "Brief does not describe this template")
 
 
-def cartography_contract(*, version: str = VERSION) -> dict[str, Any]:
+def style_contract(*, version: str = VERSION) -> dict[str, Any]:
     return {
         "schema_version": 2,
         "style_id": STYLE_ID,
@@ -474,7 +474,7 @@ def scenario_contract(request: dict[str, Any], *, version: str = VERSION,
     # and fonts from the generate request.
     refs = {segment: deepcopy(reference)
             for segment, reference in sorted(request.get("segment_refs", {}).items())}
-    embedded = {"cartography": cartography_contract(version=version),
+    embedded = {"style": style_contract(version=version),
                 "layout": layout_contract(version=version)}
     for segment in refs:
         embedded.pop(segment)
@@ -863,7 +863,8 @@ def validation_scene(package_root: Path, snapshot: dict[str, Any], targets: list
                      font: Path, validator_version: str, *,
                      context: ExecutionContext | None = None,
                      workspace: Path | None = None,
-                     registry: SchemaRegistry | None = None, layout_parameters=None) -> dict[str, Any]:
+                     registry: SchemaRegistry | None = None, layout_parameters=None,
+                     category_colors=None) -> dict[str, Any]:
     """Freeze the deterministic synthetic raster scene for controlled fixture rendering.
 
     The fixture raster derives only from the packaged synthetic legend sample and
@@ -943,6 +944,11 @@ def validation_scene(package_root: Path, snapshot: dict[str, Any], targets: list
                    "value_column": "value", "label_column": "label", "color_column": None},
         "palette": "carto-categorical-v1", "legend_policy": "observed",
     }
+    if category_colors is not None:
+        # Path A: the host renders with the segment-under-test's lifted category colors as
+        # the single authority (palette/CSV color column stay null).
+        request["palette"] = None
+        request["category_colors"] = category_colors
     prepared = preparation.analyze(request, context, _fixture_gateway(preparation, workspace))
     report, _ = preparation.load_verified(prepared.ref())
     if report["status"] != "ready":
@@ -985,7 +991,7 @@ def validation_scene(package_root: Path, snapshot: dict[str, Any], targets: list
     for frame in resolved_layout['frames']:
         if frame['content_id'].startswith('caption-'):
             page_request['texts'].append({'content_id':frame['content_id'],'text':'Panel '+frame['content_id'].removeprefix('caption-')})
-    page_request = compile_page_request(preparation, page_request, scenario["embedded"]["cartography"], context, BundlePreparer)
+    page_request = compile_page_request(preparation, page_request, scenario["embedded"]["style"], context, BundlePreparer)
     scene_id = "validation-scene-" + sha256_digest({
         "package_digest": snapshot["package_digest"],
         "fixture_set_digest": snapshot["fixture_set_digest"],
@@ -998,3 +1004,85 @@ def validation_scene(package_root: Path, snapshot: dict[str, Any], targets: list
                                environment=environment_snapshot).compile(
         bundle_ref=deepcopy(bundle_ref), page_request=page_request, context=context,
         scene_id=scene_id, targets=tuple(sorted(targets)))
+
+
+def segment_validation_host(kind: str, design: dict[str, Any], *, host_root: Path,
+                            registry: SchemaRegistry) -> tuple[Path, dict[str, Any], dict[str, Any], Any]:
+    """Platform validation-host shell for independent segment validation (plan 裁决2).
+
+    Builds a deterministic synthetic scenario shell from the canonical contract builders,
+    injects the segment-under-test into its embedded slot (style or layout), and returns
+    (host_root, snapshot, descriptor). The complementary slot keeps the canonical contract.
+    This is NOT a published business template and never enters the business index; the kernel
+    reaches it through the registered ``segment_validation_host`` component hook.
+    """
+    from ...artifacts import file_digest
+    from ...compiler.dependencies import DependencyResolver
+    from ...repository.template_matching import SEGMENT_CONTRACTS
+    from ...scenario_registry import ScenarioRegistry
+    if kind not in SEGMENT_CONTRACTS:
+        raise ProtocolError("SEGMENT_KIND_UNSUPPORTED", kind)
+    host_root = Path(host_root)
+    host_root.mkdir(parents=True, exist_ok=True)
+    request = {
+        "supported_uses": ["engineering-preview"],
+        "excluded_uses": ["navigation", "formal-delivery"],
+        "display_crs": {"authority": "EPSG", "code": "3857"},
+        "targets": ["pdf", "png"],
+    }
+    scenario = scenario_contract(request)
+    canonical_style = deepcopy(scenario["embedded"]["style"])
+    canonical_layout = deepcopy(scenario["embedded"]["layout"])
+    segment = "style" if kind == "map-style" else "layout"
+    scenario["embedded"][segment] = deepcopy(design)
+    spatial = spatial_behavior_contract(request)
+    portrayal = raster_portrayal_contract(registry)
+    fixture_text = fixture_csv()
+    fixture_path = host_root / FIXTURE_PATH
+    fixture_path.parent.mkdir(parents=True, exist_ok=True)
+    fixture_path.write_bytes(fixture_text.encode("utf-8"))
+    identity = package_identity()
+    manifest = {
+        "schema_version": 1,
+        "package": {**identity, "status": "draft", "summary": "segment validation host shell"},
+        "business_contracts": dict(DependencyResolver.MAP_SCENARIO_CONTRACTS),
+        "dependencies": [], "dependency_lock": "dependencies.lock.yaml",
+        "targets": ["pdf", "png"],
+    }
+    documents = {"scenario": scenario, "spatial_behavior": spatial, "portrayal": portrayal}
+    fixture_digest = file_digest(fixture_path)
+    snapshot = {
+        "manifest": manifest, "documents": documents, "fixture_paths": [FIXTURE_PATH],
+        "fixture_set_digest": fixture_digest,
+        "package_digest": sha256_digest({"host": "general-thematic-raster-host",
+                                         "version": "1.0.0", "design": sha256_digest(design)}),
+        "manifest_digest": sha256_digest(manifest),
+        "dependency_lock_digest": sha256_digest([]),
+    }
+    output = ScenarioRegistry(registry).for_template(manifest["package"]).definition["output_profile"]
+    descriptor = {
+        "schema_version": 1, "host_id": "general-thematic-raster-host", "version": "1.0.0",
+        "shell_digest": sha256_digest({"scenario": scenario, "spatial_behavior": spatial,
+                                       "portrayal": portrayal}),
+        "style_digest": sha256_digest(canonical_style),
+        "layout_digest": sha256_digest(canonical_layout),
+        "fixture_digest": fixture_digest,
+        "display_crs": deepcopy(request["display_crs"]),
+        "output_profile": {"width_mm": output["width_mm"], "height_mm": output["height_mm"],
+                           "dpi": output["dpi"]},
+    }
+    registry.validate("validation-host", descriptor)
+    # Path A host接色: a map-style under test carrying discrete role colors renders the
+    # sample with those colors lifted through an explicit synthetic host binding (role ->
+    # fixture code). A style without discrete role colors keeps the legacy palette path.
+    category_colors = None
+    if kind == "map-style":
+        from ...compiler.style_colors import resolve_style_category_colors, style_discrete_colors
+        role_colors = style_discrete_colors(design)
+        if role_colors:
+            fixture_codes = [int(code) for code, _ in FIXTURE_ROWS]
+            role_ids = list(role_colors)
+            binding = {role_ids[i]: fixture_codes[i]
+                       for i in range(min(len(role_ids), len(fixture_codes)))}
+            category_colors = resolve_style_category_colors(design, binding)
+    return host_root, snapshot, descriptor, category_colors

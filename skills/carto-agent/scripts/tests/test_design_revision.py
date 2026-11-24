@@ -1,41 +1,38 @@
-"""A1.2 – Design revision, proposal, and persistent budget tests."""
+"""Design revision proposals, persistent budgets and dependency invalidation."""
 from __future__ import annotations
 
 import json
-import os
-import tempfile
-import time
-import unittest
 from pathlib import Path
+import sys
+import tempfile
+import unittest
 
-import pytest
+SCRIPTS_ROOT = Path(__file__).resolve().parents[1]
+if str(SCRIPTS_ROOT) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_ROOT))
 
-from carto_core.artifacts import atomic_yaml, sha256_digest
-from carto_core.canonical import sha256_digest as _sha256
-from carto_core.errors import ProtocolError, SecurityError
-from carto_core.schema_registry import SchemaRegistry, load_document
-from carto_core.workflow.budget_store import BudgetStore
 from carto_core.contracts.execution import ExecutionBudget
+from carto_core.errors import ProtocolError
+from carto_core.schema_registry import SchemaRegistry
+from carto_core.workflow.budget_store import BudgetStore
+from carto_core.workflow.revision_graph import bundle_input_digest, compute_invalidation
+from carto_core.scenarios.general_thematic.revision import REVISION_CONTRACT
 
-# ----- helpers ---------------------------------------------------------------
-
-APPROVAL_KEY = b"test-revision-approval-key-32bytes!"  # >= 32 bytes
-
-
-def _temp_run_root():
-    return Path(tempfile.mkdtemp(prefix="a12-test-"))
-
-
-# =============================================================================
-# BudgetStore
-# =============================================================================
+# The generic graph consumes change rules and bundle keys supplied by the scenario.
+RULES = REVISION_CONTRACT.rules()
+BUNDLE_INPUT_KEYS = REVISION_CONTRACT.bundle_input_keys()
 
 
 class BudgetStoreTests(unittest.TestCase):
     """Persistent budget survives save/load round-trips."""
 
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix="carto-budget-test-")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+
     def test_fresh_budget_has_defaults(self):
-        store = BudgetStore(_temp_run_root())
+        store = BudgetStore(self.root)
         budget = store.load()
         assert budget.tool_calls == 0
         assert budget.model_calls == 0
@@ -46,7 +43,7 @@ class BudgetStoreTests(unittest.TestCase):
         assert budget.max_revisions == 2
 
     def test_save_and_reload_preserves_counters(self):
-        root = _temp_run_root()
+        root = self.root
         store = BudgetStore(root)
         budget = store.load()
         budget.consume("tool_calls", 3)
@@ -69,7 +66,7 @@ class BudgetStoreTests(unittest.TestCase):
         assert restored.max_revisions == 2
 
     def test_load_with_defaults_overrides_limits(self):
-        root = _temp_run_root()
+        root = self.root
         store = BudgetStore(root)
         custom = ExecutionBudget(max_revisions=5, max_model_calls=3)
         budget = store.load(defaults=custom)
@@ -77,15 +74,15 @@ class BudgetStoreTests(unittest.TestCase):
         assert budget.max_model_calls == 3
 
     def test_budget_exhaustion_raises(self):
-        root = _temp_run_root()
+        root = self.root
         store = BudgetStore(root)
         budget = store.load()
         budget.consume("revisions", 2)  # hits max_revisions=2
-        with pytest.raises(ProtocolError, match="EXECUTION_BUDGET_EXCEEDED"):
+        with self.assertRaisesRegex(ProtocolError, "EXECUTION_BUDGET_EXCEEDED"):
             budget.consume("revisions", 1)
 
     def test_budget_file_validates_schema(self):
-        root = _temp_run_root()
+        root = self.root
         store = BudgetStore(root)
         store.save(store.load())
 
@@ -95,20 +92,15 @@ class BudgetStoreTests(unittest.TestCase):
         raw["tool_calls"] = -1  # invalid
         path.write_text(json.dumps(raw), encoding="utf-8")
 
-        with pytest.raises(ProtocolError):  # schema validation fails
+        with self.assertRaises(ProtocolError):  # schema validation fails
             store.load()
 
     def test_budget_store_exists(self):
-        root = _temp_run_root()
+        root = self.root
         store = BudgetStore(root)
         assert not store.exists()
         store.save(store.load())
         assert store.exists()
-
-
-# =============================================================================
-# Design Revision Proposal – schema validation
-# =============================================================================
 
 
 class DesignRevisionProposalTests(unittest.TestCase):
@@ -135,18 +127,18 @@ class DesignRevisionProposalTests(unittest.TestCase):
 
     def test_proposal_without_changes_is_rejected(self):
         registry = SchemaRegistry()
-        with pytest.raises(ProtocolError):
+        with self.assertRaises(ProtocolError):
             registry.validate("design-revision-proposal", self._valid_proposal(changes={}))
 
     def test_proposal_without_justification_is_rejected(self):
         registry = SchemaRegistry()
-        with pytest.raises(ProtocolError):
+        with self.assertRaises(ProtocolError):
             registry.validate("design-revision-proposal",
                               {k: v for k, v in self._valid_proposal().items() if k != "justification"})
 
     def test_proposal_with_unknown_field_is_rejected(self):
         registry = SchemaRegistry()
-        with pytest.raises(ProtocolError):
+        with self.assertRaises(ProtocolError):
             registry.validate("design-revision-proposal",
                               {**self._valid_proposal(), "data_source": "new-source"})
 
@@ -162,7 +154,7 @@ class DesignRevisionProposalTests(unittest.TestCase):
         registry = SchemaRegistry()
         proposal = self._valid_proposal()
         proposal["changes"] = {
-            "cartography": {"new_value": {"typography": {"title_pt": 18}}},
+            "style": {"new_value": {"typography": {"title_pt": 18}}},
         }
         registry.validate("design-revision-proposal", proposal)
 
@@ -172,20 +164,16 @@ class DesignRevisionProposalTests(unittest.TestCase):
         proposal["changes"] = {
             "map_title": {"new_value": "New Title"},
             "layout_parameters": {"new_value": {"columns": 1}},
-            "cartography": {"new_value": {"color_scheme": {"primary": "#FF0000"}}},
+            "color_scheme": {"new_value": {"scope": "cat-contract",
+                                            "colors": [{"value": 1, "color": "#FF0000"}]}},
         }
         registry.validate("design-revision-proposal", proposal)
 
     def test_unknown_change_key_is_rejected(self):
         registry = SchemaRegistry()
-        with pytest.raises(ProtocolError):
+        with self.assertRaises(ProtocolError):
             registry.validate("design-revision-proposal",
                               {**self._valid_proposal(), "changes": {"data_source": {"new_value": "x"}}})
-
-
-# =============================================================================
-# Budget CLI integration (via workflow init)
-# =============================================================================
 
 
 class BudgetWorkflowIntegrationTests(unittest.TestCase):
@@ -193,7 +181,6 @@ class BudgetWorkflowIntegrationTests(unittest.TestCase):
 
     def test_workflow_creates_budget_store(self):
         from carto_core.workflow.map_generation import MapGenerationWorkflow
-        from carto_core.security.paths import PathGuard
 
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -247,3 +234,63 @@ class BudgetWorkflowIntegrationTests(unittest.TestCase):
             )
             budget2 = wf2._budget_store.load()
             assert budget2.revisions == 1
+
+
+class ComputeInvalidationTests(unittest.TestCase):
+    """Layer-1 rules mirror the revision-impact table (Standard Thematic doc §7)."""
+
+    def test_appearance_changes_invalidate_compilation_only(self) -> None:
+        for key in ("style", "layout_parameters", "map_title"):
+            with self.subTest(key=key):
+                result = compute_invalidation({key: {"new_value": {}}}, RULES)
+                self.assertEqual(result["invalidated_nodes"],
+                                 ["candidate", "preflight", "preview", "scene"])
+                self.assertTrue(result["data_evidence_reusable"])
+                self.assertEqual("compile", result["earliest_step"])
+
+    def test_panel_designs_invalidate_plan_too(self) -> None:
+        result = compute_invalidation({"panel_designs": {"new_value": {}}}, RULES)
+        self.assertIn("plan", result["invalidated_nodes"])
+        self.assertEqual(5, len(result["invalidated_nodes"]))
+
+    def test_combined_changes_union(self) -> None:
+        result = compute_invalidation({"style": {"new_value": {}},
+                                       "panel_designs": {"new_value": {}}}, RULES)
+        self.assertEqual(sorted(result["invalidated_nodes"]),
+                         ["candidate", "plan", "preflight", "preview", "scene"])
+
+    def test_unknown_change_key_rejected(self) -> None:
+        with self.assertRaisesRegex(ProtocolError, "REVISION_CHANGES_UNKNOWN"):
+            compute_invalidation({"data_sources": {"new_value": {}}}, RULES)
+
+    def test_empty_changes_rejected(self) -> None:
+        with self.assertRaisesRegex(ProtocolError, "REVISION_CHANGES_REQUIRED"):
+            compute_invalidation({}, RULES)
+
+
+class BundleInputDigestTests(unittest.TestCase):
+    """The digest gate separates data inputs from design-layer inputs."""
+
+    def test_design_changes_do_not_alter_bundle_inputs(self) -> None:
+        before = {"source_bindings": [{"role": "r"}], "map_title": "A",
+                  "revised_cartography": {"typography": {}}}
+        after = {"source_bindings": [{"role": "r"}], "map_title": "B",
+                 "revised_cartography": {"typography": {"title_pt": 18}}}
+        self.assertEqual(bundle_input_digest(before, BUNDLE_INPUT_KEYS),
+                         bundle_input_digest(after, BUNDLE_INPUT_KEYS))
+
+    def test_data_changes_alter_bundle_inputs(self) -> None:
+        before = {"source_bindings": [{"role": "r", "path": "a.tif"}]}
+        after = {"source_bindings": [{"role": "r", "path": "b.tif"}]}
+        self.assertNotEqual(bundle_input_digest(before, BUNDLE_INPUT_KEYS),
+                            bundle_input_digest(after, BUNDLE_INPUT_KEYS))
+
+    def test_digest_covers_only_bundle_keys(self) -> None:
+        request = {key: None for key in BUNDLE_INPUT_KEYS}
+        request["unrelated"] = "anything"
+        self.assertEqual(bundle_input_digest(request, BUNDLE_INPUT_KEYS),
+                         bundle_input_digest({key: None for key in BUNDLE_INPUT_KEYS}, BUNDLE_INPUT_KEYS))
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -30,20 +30,24 @@ def load_layers(service, references, context, bundles):
     return layers,bundle,prototype,assignments
 
 
-def resolve_legends(service, bindings, legends, layers, context):
+def resolve_legends(service, bindings, legends, layers, context, color_scheme=None):
+    from .style_colors import overlay_legend_colors
     titles=index_by(legends,'content_id');result=[]
     if set(titles)!={x['id'] for x in bindings['legends']}:
         raise ProtocolError('PAGE_BINDING_LEGEND','Legend titles must match template slots')
     for binding in bindings['legends']:
         refs=[layers[vid]['portrayal_ref'] for vid in binding['view_ids']]
-        if len(refs)>1:items=resolve_shared_legend(service,refs,context)
+        if len(refs)>1:
+            items=resolve_shared_legend(service,refs,context)
+            if color_scheme is not None:
+                items=overlay_legend_colors(items,color_scheme)
         else:items=deepcopy(layers[binding['view_ids'][0]]['portrayal']['legend_items'])
         if not items:raise ProtocolError('RASTER_LEGEND_CAPACITY','Every legend must be nonempty')
         result.append({'content_id':binding['id'],'title':titles[binding['id']]['title'],'items':items})
     return result
 
 
-def compile_page_request(service, request, cartography, context, bundles):
+def compile_page_request(service, request, cartography, context, bundles, color_scheme=None):
     if request.get('schema_version')!=4:
         raise ProtocolError('PAGE_CONTRACT_VERSION','An explicit v4 page design is required')
     if any(k in request for k in ('typography','appearance','bindings','portrayal_ref','legend')):
@@ -52,10 +56,19 @@ def compile_page_request(service, request, cartography, context, bundles):
         raise ProtocolError('PAGE_DESIGN_ALREADY_RESOLVED','Legend entries come only from verified sources')
     result=deepcopy(request);result['portrayals']=sorted(result['portrayals'],key=lambda x:x['view_id'])
     layers,bundle,prototype,assignments=load_layers(service,result['portrayals'],context,bundles)
+    if color_scheme is not None:
+        # 裁决4: apply the compile-time effective-color overlay to the frozen portrayal rows
+        # and legend items; the prepared report/bundle stays frozen and reusable.
+        from .style_colors import apply_color_scheme
+        from .raster_portrayal import legend_items
+        for layer in layers.values():
+            effective,_=apply_color_scheme(layer['portrayal']['lookup_table'],color_scheme,registry=service.registry)
+            layer['portrayal']['lookup_table']=effective
+            layer['portrayal']['legend_items']=legend_items(effective)
     layout=result['resolved_layout']['contract']
     result['bindings']=build_page_bindings(layout,prototype,bundle,assignments,service.registry)
     result['appearance']=resolve_appearance(cartography,layout,result['portrayals'],service.registry)
-    result['legends']=resolve_legends(service,result['bindings'],result['legends'],layers,context)
+    result['legends']=resolve_legends(service,result['bindings'],result['legends'],layers,context,color_scheme)
     result['schema_version'] = 4; result['geometry'] = 'raster'
     service.registry.validate('page-request', result)
     return result

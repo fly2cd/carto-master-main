@@ -140,11 +140,11 @@ def page_request(service, prepared, context, font_source=None, *, dpi=300):
                           for x in result["legends"]]
     from carto_core.compiler.raster_page_contract import compile_page_request
     from carto_core.workflow.preparation_bundle import BundlePreparer
-    return compile_page_request(service, result, VALID_CASES["cartography"], context, BundlePreparer)
+    return compile_page_request(service, result, VALID_CASES["style"], context, BundlePreparer)
 
 
 def rebind_page(service, page, context):
-    style = page["appearance"]["cartography"]
+    style = page["appearance"]["style"]
     unresolved = {k: deepcopy(v) for k, v in page.items()
                    if k not in {"appearance", "bindings"}}
     unresolved["legends"] = [{"content_id": x["content_id"], "title": x["title"]}
@@ -288,7 +288,7 @@ class VectorFixture:
 
     def page(self, modes=("single", "categorical", "choropleth", "proportional"), shared=False):
         from carto_core.compiler.layout import LayoutResolver
-        from carto_core.scenarios.general_thematic.raster import cartography_contract, layout_contract
+        from carto_core.scenarios.general_thematic.raster import style_contract, layout_contract
         from carto_core.compiler.vector_portrayal import VectorPortrayalCompiler
         from carto_core.compiler.vector_page import compile_page
         from carto_core.artifacts import file_digest
@@ -312,7 +312,7 @@ class VectorFixture:
             })
         return compile_page(
             self.service, layout=layout,
-            cartography=cartography_contract(), panels=panels,
+            cartography=style_contract(), panels=panels,
             font={"path": str(self.font), "digest": file_digest(self.font),
                   "size_bytes": self.font.stat().st_size},
             texts=[{"content_id": f["content_id"], "text": "Synthetic map"}

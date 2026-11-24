@@ -103,33 +103,33 @@ class LabelHaloTests(unittest.TestCase):
         cls.registry = SchemaRegistry()
 
     def _cartography(self):
-        return deepcopy(VALID_CASES["cartography"])
+        return deepcopy(VALID_CASES["style"])
 
     def test_cartography_without_halo_still_valid(self) -> None:
-        self.registry.validate("cartography", self._cartography())
+        self.registry.validate("style", self._cartography())
 
     def test_halo_accepted(self) -> None:
         value = self._cartography()
         value["labeling"]["halo"] = {"color": "#FFFFFF", "width_mm": 0.5}
-        self.registry.validate("cartography", value)
+        self.registry.validate("style", value)
 
     def test_halo_bad_color_rejected(self) -> None:
         value = self._cartography()
         value["labeling"]["halo"] = {"color": "white", "width_mm": 0.5}
         with self.assertRaises(ProtocolError):
-            self.registry.validate("cartography", value)
+            self.registry.validate("style", value)
 
     def test_halo_missing_width_rejected(self) -> None:
         value = self._cartography()
         value["labeling"]["halo"] = {"color": "#FFFFFF"}
         with self.assertRaises(ProtocolError):
-            self.registry.validate("cartography", value)
+            self.registry.validate("style", value)
 
     def test_halo_out_of_range_width_rejected(self) -> None:
         value = self._cartography()
         value["labeling"]["halo"] = {"color": "#FFFFFF", "width_mm": 5}
         with self.assertRaises(ProtocolError):
-            self.registry.validate("cartography", value)
+            self.registry.validate("style", value)
 
 
 if __name__ == "__main__":

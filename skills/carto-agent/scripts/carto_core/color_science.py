@@ -51,6 +51,55 @@ def delta_e76(hex1: str, hex2: str) -> float:
     return math.sqrt((l1 - l2) ** 2 + (a1 - a2) ** 2 + (b1 - b2) ** 2)
 
 
+def delta_e2000_lab(lab1, lab2) -> float:
+    """CIEDE2000 (Sharma et al. 2005) on two CIELAB tuples. Perceptually uniform."""
+    l1, a1, b1 = lab1
+    l2, a2, b2 = lab2
+    c1 = math.hypot(a1, b1)
+    c2 = math.hypot(a2, b2)
+    cb = (c1 + c2) / 2
+    g = 0.5 * (1 - math.sqrt(cb ** 7 / (cb ** 7 + 25 ** 7)))
+    a1p, a2p = (1 + g) * a1, (1 + g) * a2
+    c1p, c2p = math.hypot(a1p, b1), math.hypot(a2p, b2)
+    h1p = math.degrees(math.atan2(b1, a1p)) % 360
+    h2p = math.degrees(math.atan2(b2, a2p)) % 360
+    dl = l2 - l1
+    dc = c2p - c1p
+    if c1p * c2p == 0:
+        dh = 0.0
+    elif abs(h2p - h1p) <= 180:
+        dh = h2p - h1p
+    elif h2p - h1p > 180:
+        dh = h2p - h1p - 360
+    else:
+        dh = h2p - h1p + 360
+    dH = 2 * math.sqrt(c1p * c2p) * math.sin(math.radians(dh) / 2)
+    lb = (l1 + l2) / 2
+    cp = (c1p + c2p) / 2
+    if c1p * c2p == 0:
+        hp = h1p + h2p
+    elif abs(h1p - h2p) <= 180:
+        hp = (h1p + h2p) / 2
+    elif h1p + h2p < 360:
+        hp = (h1p + h2p + 360) / 2
+    else:
+        hp = (h1p + h2p - 360) / 2
+    t = (1 - 0.17 * math.cos(math.radians(hp - 30)) + 0.24 * math.cos(math.radians(2 * hp))
+         + 0.32 * math.cos(math.radians(3 * hp + 6)) - 0.20 * math.cos(math.radians(4 * hp - 63)))
+    sl = 1 + 0.015 * (lb - 50) ** 2 / math.sqrt(20 + (lb - 50) ** 2)
+    sc = 1 + 0.045 * cp
+    sh = 1 + 0.015 * cp * t
+    rt = (-2 * math.sqrt(cp ** 7 / (cp ** 7 + 25 ** 7))
+          * math.sin(math.radians(60 * math.exp(-(((hp - 275) / 25) ** 2)))))
+    return math.sqrt((dl / sl) ** 2 + (dc / sc) ** 2 + (dH / sh) ** 2
+                     + rt * (dc / sc) * (dH / sh))
+
+
+def delta_e2000(hex1: str, hex2: str) -> float:
+    """CIEDE2000 between two sRGB hex colors."""
+    return delta_e2000_lab(srgb_to_lab(hex1), srgb_to_lab(hex2))
+
+
 def relative_luminance(hex_str: str) -> float:
     """WCAG 2.2 relative luminance (linearised sRGB, Rec.709 coefficients)."""
     r, g, b = _srgb_to_linear(hex_str)

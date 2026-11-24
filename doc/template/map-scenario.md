@@ -443,18 +443,19 @@ content_requirements:
 MapScenario 创建使用独立的 `create-template` 工作流：
 
 ```text
-analyze → brief → T1 → author → validate → TP → publish
+analyze → brief → author → validate → prepare-publish → TP → publish
 ```
 
 | 阶段 | 主要工作 | 产物与边界 |
 |---|---|---|
 | analyze | 分析获准来源和可复用规则，区分事实、决定、建议与推导 | 来源快照、分析与缺口；不把业务数据复制进模板 |
-| brief | 确认方案身份、用途、角色、目标和创建范围 | TemplateBrief 与 T1 批准对象 |
-| author | 在 T1 后编写完整模板包 | 六契约、Design Spec、依赖与合成 Fixture；不自报验证通过 |
+| brief | 确认方案身份、用途、角色、目标和创建范围 | TemplateBrief（设计意图记录，非审批对象） |
+| author | 在 brief 后确定性编写完整模板包（无需 T1） | 六契约、Design Spec、依赖与合成 Fixture；不自报验证通过 |
 | validate | 结构、语义、依赖、检查器及 Fixture 渲染验证 | 验证报告、预览、RenderReceipt 和绑定证据 |
+| prepare-publish | 机器固化待确认发布对象（绑定目标库 root） | template-publication 对象；不消费 nonce |
 | publish | 重验包与证据，校验并消费精确 TP | 不可变版本、发布记录和权威索引 |
 
-T1 批准创建简报，TP 批准具体发布对象。二者都不能用作地图项目的 G1、G2 或 G3。
+TP 批准具体发布对象（含目标库规范化 root）。它不能用作地图项目的 G1、G2 或 G3。单一审批门为 TP；brief/author 不再设人工审批。
 
 当前已注册 general-thematic-authoring 作者与分类栅格样张分支，不代表可以创建任意 Scenario。新增组件、组合与作者策略仍需协议、实现、合法/非法样例及验证证据。
 
@@ -588,6 +589,6 @@ Manifest 管理身份、文件闭包和依赖入口；依赖锁固定表达、�
 - 框架已有候选、G2、正式渲染、终检、G3 和交付事务，不等于真实用户数据、身份和本机依赖已经验收。
 - page-bindings v2、**map-plan / page-request / page-output v4**、cartography v2 及 ResolvedLayout v2 已接入有限多图；每图显式源/范围/图层，完整类别定义兼容时可共享整页图例。通用组件引用、自动分面、任意共享组仍受限；矢量已作为同一档案下的几何变体登记为受限工程能力，不等于生产准入。
 
-S1 已统一编码、Appearance、Composition、空间与输出的来源并完成有限参数化多图闭环；可核对锚点：[grid_layout.py](../../skills/carto-agent/scripts/carto_core/compiler/grid_layout.py)、[test_s1cd_grid.py](../../skills/carto-agent/scripts/tests/test_s1cd_grid.py)、[test_general_thematic.py](../../skills/carto-agent/scripts/tests/test_general_thematic.py)。独立模板类型是复用分类，不必作为每个增量的前置条件；也不为每种布局×表达×后端的组合新增业务场景。
+S1 已统一编码、Appearance、Composition、空间与输出的来源并完成有限参数化多图闭环；可核对锚点：[grid_layout.py](../../skills/carto-agent/scripts/carto_core/compiler/grid_layout.py)、[test_grid_layout.py](../../skills/carto-agent/scripts/tests/test_grid_layout.py)、[test_general_thematic.py](../../skills/carto-agent/scripts/tests/test_general_thematic.py)。独立模板类型是复用分类，不必作为每个增量的前置条件；也不为每种布局×表达×后端的组合新增业务场景。
 
 所有目标均通过唯一 CLI、严格协议、版本化策略和既有审批实施；不修改旧包和旧锁，不新增旧格式兼容旁路。合同引用、声明参数和受限作用域调整只有在实现、注册与验收后才能执行。

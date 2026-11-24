@@ -8,14 +8,14 @@ from ..schema_registry import SchemaRegistry
 
 def resolve_appearance(cartography, layout, color_sources, registry=None):
     registry = registry or SchemaRegistry()
-    registry.validate("cartography", cartography)
+    registry.validate("style", cartography)
     registry.validate("layout", layout)
     if "content_padding_mm" not in layout:
         raise ProtocolError("PAGE_PADDING_REQUIRED", "The layout must declare content padding")
     typography = deepcopy(cartography["typography"])
     typography["padding_mm"] = layout["content_padding_mm"]
-    result = {"schema_version": 2, "cartography": deepcopy(cartography),
-              "style_ref": artifact_ref("cartography", cartography),
+    result = {"schema_version": 2, "style": deepcopy(cartography),
+              "style_ref": artifact_ref("style", cartography),
               "color_sources": deepcopy(color_sources), "typography": typography}
     registry.validate("resolved-appearance", result)
     return result
@@ -24,5 +24,5 @@ def resolve_appearance(cartography, layout, color_sources, registry=None):
 def require_appearance(appearance, layout, color_sources, registry=None):
     registry = registry or SchemaRegistry()
     registry.validate("resolved-appearance", appearance)
-    if appearance != resolve_appearance(appearance["cartography"], layout, color_sources, registry):
+    if appearance != resolve_appearance(appearance["style"], layout, color_sources, registry):
         raise ProtocolError("APPEARANCE_BINDING_MISMATCH", "Appearance differs from declared sources")

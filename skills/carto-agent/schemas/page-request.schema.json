@@ -72,8 +72,8 @@
         }
       }
     },
-    "cartography": {
-      "$ref": "https://schemas.carto-agent.local/v2/cartography.schema.json"
+    "style": {
+      "$ref": "https://schemas.carto-agent.local/v2/style.schema.json"
     },
     "coordinate_mode": {
       "const": "native-no-reprojection"
@@ -213,7 +213,7 @@
         ],
         "not": {
           "required": [
-            "cartography",
+            "style",
             "coordinate_mode",
             "panels"
           ]
@@ -493,7 +493,7 @@
         "required": [
           "appearance",
           "bindings",
-          "cartography",
+          "style",
           "coordinate_mode",
           "font",
           "geometry",

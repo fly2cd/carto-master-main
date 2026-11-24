@@ -10,7 +10,7 @@ from .dependencies import DependencyResolver
 class OwnershipResolver:
     OWNERS = {"platform", "map-style", "map-layout", "map-scenario", "project"}
     KIND_TO_SEGMENT = {
-        "map-style": "cartography",
+        "map-style": "style",
         "map-layout": "layout",
     }
     SEGMENT_TO_KIND = {segment: kind for kind, segment in KIND_TO_SEGMENT.items()}
@@ -43,7 +43,7 @@ class OwnershipResolver:
         if set(embedded) != required_segments or not all(isinstance(value, dict) for value in embedded.values()):
             raise ProtocolError(
                 "SCENARIO_EMBEDDED_INVALID",
-                "scenario.embedded must contain exactly identity, cartography, and layout objects",
+                "scenario.embedded must contain exactly the style and layout segment objects",
             )
 
         replaceable = scenario.get("replaceable_segments", [])

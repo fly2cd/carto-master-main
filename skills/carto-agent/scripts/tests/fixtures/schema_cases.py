@@ -43,7 +43,7 @@ PACKAGE_FILES = [*BUSINESS_CONTRACTS.values(), "dependencies.lock.yaml"]
 MAP_EXPRESSION = {"schema_version": 1, "expression_id": "choropleth/sequential", "version": "1.0.0", "title": "Sequential choropleth", "status": "active", "geometry_types": ["polygon"], "field_requirements": [{"semantic_role": "thematic-value", "value_type": "number", "required": True, "nullable": True}], "parameter_definitions": [{"name": "class-count", "type": "integer", "required": True, "default": 5}], "visual_variables": [{"variable": "fill-color", "source_role": "thematic-value", "algorithm_id": "sequential-classification"}], "legend": {"type": "classed-color", "show_no_data": True, "label_source": "class-breaks"}, "missing_value_policy": "explicit-symbol", "outlier_policy": "clip-to-domain", "checker_refs": [{"id": "protocol.schema-valid", "version": "1.0.0"}], "fixture_refs": [A]}
 
 TEMPLATE_CREATE_REQUEST = {
-    "schema_version": 1,
+    "schema_version": 2,
     "request_id": "test-template-request",
     "kind": "map-scenario",
     "namespace": "local",
@@ -152,10 +152,10 @@ VALID_CASES = {
     "template-analysis": TEMPLATE_ANALYSIS,
     "template-brief": TEMPLATE_BRIEF,
     "prototype-description": PROTOTYPE_DESCRIPTION,
-    "cartography": CARTOGRAPHY,
+    "style": CARTOGRAPHY,
     "layout": LAYOUT,
     "resolved-layout": RESOLVED_LAYOUT,
-    "scenario": {"schema_version": 1, "scenario_id": "test-scenario", "version": "1.0.0", "business_scene": "general_thematic_mapping", "tasks": ["thematic-map"], "owned_segments": ["scenario", "data", "spatial-behavior", "portrayal", "delivery", "quality-gates"], "embedded": {"cartography": CARTOGRAPHY, "layout": LAYOUT}, "replaceable_segments": ["cartography", "layout"], "data_role_refs": ["area-role", "point-role"], "target_ids": ["a3-pdf", "a3-png"], "application": {"supported_uses": ["engineering-preview"], "excluded_uses": ["navigation", "formal-delivery"]}, "compatibility": {"target_profiles": ["a3-landscape"], "placeholders": ["{{MAP_TITLE}}", "{{MAP_FRAME}}"]}, "rules": [R]},
+    "scenario": {"schema_version": 1, "scenario_id": "test-scenario", "version": "1.0.0", "business_scene": "general_thematic_mapping", "tasks": ["thematic-map"], "owned_segments": ["scenario", "data", "spatial-behavior", "portrayal", "delivery", "quality-gates"], "embedded": {"style": CARTOGRAPHY, "layout": LAYOUT}, "replaceable_segments": ["style", "layout"], "data_role_refs": ["area-role", "point-role"], "target_ids": ["a3-pdf", "a3-png"], "application": {"supported_uses": ["engineering-preview"], "excluded_uses": ["navigation", "formal-delivery"]}, "compatibility": {"target_profiles": ["a3-landscape"], "placeholders": ["{{MAP_TITLE}}", "{{MAP_FRAME}}"]}, "rules": [R]},
     "data-role": {"schema_version": 1, "roles": [{"id": "area-role", "required": True, "geometry_types": ["polygon", "multipolygon"], "fields": [{"name": "thematic_value", "type": "number", "unit": "percent", "nullable": True, "semantic_role": "thematic-value"}], "join": {"key": "admin_code", "minimum_coverage": 0.98}, "freshness": {"max_age_days": 30}, "license_policy": "project-approved"}]},
     "spatial-behavior": {"schema_version": 1, "source_crs_policy": "reproject-approved", "display_crs": {"authority": "EPSG", "code": "4490"}, "extent_policy": "administrative-boundary", "scale_bands": [{"id": "regional", "min_denominator": 10000, "max_denominator": 1000000, "generalization": "simplify"}], "topology": {"preserve_adjacency": True, "preserve_route_order": False}, "rules": [R]},
     "portrayal": {"schema_version": 1, "layers": [{"id": "area-layer", "data_role": "area-role", "geometry": "polygon", "z_order": 10, "map_expression_ref": {"id": "choropleth/sequential", "version": "1.0.0", "digest": D}, "value_role": "thematic-value", "symbol": {"catalog_ref": "ramps/test-theme@1.0.0", "parameters": {"opacity": 0.8}}, "classification": {"method": "quantile", "classes": 4, "field_role": "thematic-value"}, "no_data": "explicit-symbol"}], "legend": {"generated_from_layers": True, "show_no_data": True, "overflow_policy": "reject"}, "rules": [R]},
@@ -165,7 +165,14 @@ VALID_CASES = {
     "template-index": {"schema_version": 1, "index_id": "local-template-index", "version": "1.0.0", "repository_scope": "local:templates", "entries": [{"namespace": "local", "kind": "map-scenario", "id": "test-scenario", "version": "1.0.0", "digest": D, "manifest_path": "map-scenario/test-scenario/1.0.0/manifest.yaml", "manifest_digest": D, "evidence_digest": D, "publication_receipt_path": "transactions/publication.yaml", "status": "published", "published_at": "2026-09-17T00:00:00Z"}], "generated_at": "2026-09-17T00:00:00Z", "digest": D},
     "dependency-lock": {"schema_version": 1, "lock_id": "test-scenario-lock", "package": {"namespace": "local", "kind": "map-scenario", "id": "test-scenario", "version": "1.0.0", "digest": D}, "dependencies": [], "resources": [{"id": "choropleth/sequential", "version": "1.0.0", "digest": D}, {"id": "proportional-symbol/count", "version": "1.0.0", "digest": D}], "resolver_version": "1.0.0", "generated_at": "2026-09-17T00:00:00Z"},
     "template-validation-evidence": {"schema_version": 1, "evidence_id": "validation-evidence-one", "namespace": "local", "package_ref": T, "manifest_digest": D, "dependency_lock_digest": D, "fixture_set_digest": D, "checker_set_digest": D, "renderer": {"renderer_id": "maplibre-web", "renderer_profile_digest": D, "adapter_version": "1.0.0", "frontend_build": "2026.09.18", "renderer_version": "1.0.0", "maplibre_version": "3.6.0", "overlay_engine_version": "1.0.0", "environment_fingerprint": D}, "render_receipt_ref": A, "preview_artifacts": [{"target": "svg", "artifact_ref": A}], "status": "passed", "counts": {"blocker": 0, "error": 0, "warning": 0, "info": 0}, "results": [{"check_id": "template.package-closed", "version": "1.0.0", "status": "passed", "severity": "blocker", "details": {}}], "created_at": "2026-09-18T00:00:00Z", "evidence_digest": D},
-    "publication-receipt": {"schema_version": 1, "receipt_id": "publication-receipt-one", "namespace": "local", "package_ref": T, "manifest_digest": D, "evidence_ref": A, "dependency_lock_ref": A, "index_digest_before": D, "index_digest_after": D, "repository_scope": "local:templates", "approval_ref": A, "published_at": "2026-09-17T00:00:00Z", "idempotency_key": "publish-test-0001"},
+    "publication-receipt": {"schema_version": 1, "receipt_id": "publication-receipt-one", "namespace": "local", "package_ref": T, "manifest_digest": D, "evidence_ref": A, "dependency_lock_ref": A, "index_digest_before": D, "index_digest_after": D, "repository_scope": "local:templates", "approval_ref": A, "publication_object_ref": A, "published_at": "2026-09-17T00:00:00Z", "idempotency_key": "publish-test-0001"},
+    "template-publication": {"schema_version": 1, "run_id": "run-one", "request_digest": D, "package_ref": T, "evidence_ref": A, "repository_scope": "local:templates", "repository_root": "/tmp/carto-repo", "idempotency_key": "publish-test-0001"},
+    "template-proposal": {"schema_version": 1, "proposal_id": "prop-one", "kind": "derive", "base_ref": T, "change_set": {"typography": {"title_pt": 20}}, "recovered": {}, "unrecoverable": [{"field": "crs", "reason": "not in image", "requires_user": True}], "confidence": {"palette": 0.0, "layout": 0.0, "typography": 0.0}, "provenance": {"source_type": "derived", "source_ref": "base", "method": "restricted-change-set"}, "selected_segments": ["style"]},
+    "segment-create-request": {"schema_version": 1, "request_id": "seg-request-one", "kind": "map-style", "namespace": "local", "template_id": "seg-style", "version": "1.0.0", "purpose": "段作者协议测试", "audience": ["cartographer"], "reuse_intent": "复用外观", "supported_uses": ["engineering-preview"], "excluded_uses": ["navigation"], "authoring_mode": "standard", "targets": ["png"], "scope": "project:test-project", "subject": {"tenant_id": "tenant-one", "project_id": "test-project", "requester_subject_id": "user-1", "approver_subject_id": "approver-1", "environment": "test"}, "design": deepcopy(CARTOGRAPHY), "requested_at": "2026-11-23T00:00:00Z"},
+    "segment-analysis": {"schema_version": 1, "analysis_id": "analysis-seg-request-one", "request_digest": D, "design_digest": D, "kind": "map-style", "evidence_records": [{"path": "/purpose", "value_origin": "user_decision", "value": "段作者协议测试", "source_ref": "request:seg-request-one"}], "open_questions": []},
+    "segment-brief": {"schema_version": 1, "brief_id": "brief-seg-request-one", "kind": "map-style", "namespace": "local", "template_id": "seg-style", "version": "1.0.0", "scope": "project:test-project", "purpose": "段作者协议测试", "audience": ["cartographer"], "reuse_intent": "复用外观", "supported_uses": ["engineering-preview"], "excluded_uses": ["navigation"], "authoring_mode": "standard", "targets": ["png"], "design_digest": D, "evidence_records": [{"path": "/purpose", "value_origin": "user_decision", "value": "段作者协议测试", "source_ref": "request:seg-request-one"}], "decisions": [{"path": "/purpose", "value_origin": "user_decision", "value": "段作者协议测试", "source_ref": "request:seg-request-one"}], "open_questions": [], "revision": 1},
+    "validation-host": {"schema_version": 1, "host_id": "general-thematic-raster-host", "version": "1.0.0", "shell_digest": D, "style_digest": D, "layout_digest": D, "fixture_digest": D, "display_crs": {"authority": "EPSG", "code": "3857"}, "output_profile": {"width_mm": 297, "height_mm": 210, "dpi": 300}},
+    "segment-validation-evidence": {"schema_version": 1, "evidence_id": "seg-validation-one", "namespace": "local", "package_ref": T, "manifest_digest": D, "dependency_lock_digest": D, "design_digest": D, "host_ref": A, "checker_set_digest": D, "status": "passed", "counts": {"blocker": 0, "error": 0, "warning": 0, "info": 0}, "results": [{"check_id": "segment.package-closed", "version": "1.0.0", "status": "passed", "severity": "info", "details": {}}], "renderer": {"renderer_id": "rasterio-matplotlib-page"}, "render_receipt_ref": A, "render_scene_ref": A, "preview_artifacts": [{"target": "png", "artifact_ref": A}], "created_at": "2026-11-23T00:00:00Z", "evidence_digest": D},
     "generate-request": {"schema_version": 1, "request_id": "request-one", "project_id": "test-project", "goal": "校验制图请求结构", "geometry": "raster", "panels": [{"id": "base-view", "source_id": "ref-a", "title": "Base"}], "sources": [A], "requested_outputs": ["pdf", "png"], "subject": {"subject_id": "user-1", "tenant_id": "tenant-one", "namespace": "project-one"}, "idempotency_key": "request-one-00001"},
     "map-intent": {"schema_version": 1, "intent_id": "intent-one", "revision": 1, "profile_version": "2.0.0", "business_scene": "general_thematic_mapping", "theme_tags": ["unit-theme"], "tasks": ["thematic-map"], "intent_status": "resolved", "readiness_status": "ready", "missing_items": [], "evidence_refs": [A]},
     "intent-profiles": {'schema_version': 1, 'catalog_version': '2.0.0', 'profiles': [{'business_scene': 'unit_scene', 'purpose_terms': ['unit purpose'], 'task_ids': ['unit-task'], 'required_information': ['theme_tags'], 'unsupported_actions': []}], 'themes': [{'id': 'unit-theme', 'label': 'Unit topic', 'terms': ['unit topic']}]},
@@ -359,6 +366,53 @@ LAYOUT_CONTAINMENT_VALID = {
     ],
 }
 
+VALID_CASES["reference-intake"] = {
+    "schema_version": 1, "intake_id": "intake-fixture", "source_image": deepcopy(A),
+    "width_px": 64, "height_px": 64, "format": "PNG", "color_mode": "RGB",
+    "license": "CC-BY-4.0", "byte_size": 1024, "dpi": 300.0,
+}
+
+VALID_CASES["design-requirement"] = {
+    "schema_version": 1, "requirement_id": "req-fixture", "revision": 1, "object_scope": "layout",
+    "conditions": [
+        {"id": "c-width", "strength": "hard", "source_ref": "user:msg-1",
+         "predicate": {"kind": "measure", "path": "/canvas/width", "op": "eq", "value": 420, "unit": "mm"}},
+        {"id": "c-count", "strength": "hard", "source_ref": "user:msg-1",
+         "predicate": {"kind": "count", "role": "main-map", "op": "eq", "value": 2}},
+    ],
+}
+
+VALID_CASES["design-resolution-result"] = {
+    "schema_version": 1, "requirement_id": "req-fixture", "revision": 1, "branch": "reuse",
+    "assessments": [
+        {"candidate_ref": deepcopy(T), "usable": True, "structural_aggregate": "satisfied",
+         "parameter_domain": "not-applicable", "execution_admission": "allowed",
+         "validation_coverage": "covered"},
+    ],
+}
+
+VALID_CASES["publication-request"] = {
+    "schema_version": 1, "publication_request_id": "pubreq-fixture", "request_id": "seg-request-one",
+    "kind": "map-style", "intent_state": "ready",
+    "target": {"repository_scope": "local:templates", "namespace": "local",
+               "template_id": "seg-style", "version": "1.0.0"},
+}
+
+VALID_CASES["draft-import-record"] = {
+    "schema_version": 1, "import_id": "import-seg-publish-b", "source_run_id": "seg-request-one",
+    "source_draft_digest": D, "source_evidence_digest": D, "source_evidence_id": "seg-validation-one",
+    "imported_design_digest": D, "created_at": "2026-11-23T00:00:00Z",
+}
+
+VALID_CASES["nlp-requirement-candidate"] = {
+    "schema_version": 1, "source_ref": "artifact:msg-1",
+    "claims": [
+        {"id": "c-count", "origin": "user-stated", "strength": "hard",
+         "predicate": {"kind": "count", "role": "main-map", "op": "eq", "value": 2},
+         "source_locator": {"start": 0, "end": 4}},
+    ],
+}
+
 INVALID_CASES = {}
 for name, case in VALID_CASES.items():
     invalid = deepcopy(case)
@@ -379,9 +433,9 @@ _invalid_scenario = deepcopy(VALID_CASES["scenario"])
 _invalid_scenario["owned_segments"] = list(reversed(_invalid_scenario["owned_segments"]))
 SEMANTIC_INVALID_CASES["scenario-contract-order"] = ("scenario", _invalid_scenario)
 
-_invalid_cartography = deepcopy(VALID_CASES["cartography"])
+_invalid_cartography = deepcopy(VALID_CASES["style"])
 _invalid_cartography["defaults"]["renderer_script"] = "dynamic()"
-SEMANTIC_INVALID_CASES["cartography-open-defaults"] = ("cartography", _invalid_cartography)
+SEMANTIC_INVALID_CASES["cartography-open-defaults"] = ("style", _invalid_cartography)
 
 _invalid_layout = deepcopy(VALID_CASES["layout"])
 _invalid_layout["frames"][0]["bounds"] = [-1, 30, 380, 230]
@@ -424,6 +478,10 @@ SEMANTIC_INVALID_CASES["dependency-lock-floating-version"] = ("dependency-lock",
 _invalid_publication = deepcopy(VALID_CASES["publication-receipt"])
 _invalid_publication["command"] = "publish --force"
 SEMANTIC_INVALID_CASES["publication-receipt-command"] = ("publication-receipt", _invalid_publication)
+
+_invalid_pub_object = deepcopy(VALID_CASES["template-publication"])
+_invalid_pub_object.pop("repository_root")
+SEMANTIC_INVALID_CASES["template-publication-missing-root"] = ("template-publication", _invalid_pub_object)
 
 _invalid_template_request = deepcopy(VALID_CASES["template-create-request"])
 _invalid_template_request["contains_production_data"] = "yes"

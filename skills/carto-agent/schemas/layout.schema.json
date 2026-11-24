@@ -25,6 +25,7 @@
       "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"
     },
     "category": {
+      "description": "DEPRECATED (map-layout.md §5.4): presentational tag, not a design decision; retained for v1 consumers.",
       "enum": [
         "general",
         "report",
@@ -136,11 +137,33 @@
             "items": {
               "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"
             }
+          },
+          "view": {
+            "description": "Inset-only: independent geographic view extent [minx,miny,maxx,maxy] in the declared CRS. An inset is a real secondary map view, never a pasted image.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["extent"],
+            "properties": {
+              "extent": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"type": "number"}}
+            }
+          },
+          "main_map_ref": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier",
+            "description": "Inset-only: the main map view this locator associates with."
+          },
+          "highlight_id": {
+            "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier",
+            "description": "Inset-only: optional object id highlighted in the locator view."
+          },
+          "content_role": {
+            "description": "Page content semantic role (design §6.6), the single authority for main-map/inset-map/legend-group counting. Distinct from Style symbol_roles (thematic symbol semantics). Optional: contracts without it yield unknown role counts, never an auto-assumed main-map.",
+            "enum": ["main-map", "inset-map", "legend-group", "title", "text", "chart", "decoration"]
           }
         }
       }
     },
     "placeholders": {
+      "description": "DEPRECATED (map-layout.md §5.4): superseded by content_slots; retained for v1 consumers.",
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
@@ -150,6 +173,7 @@
       }
     },
     "capacity": {
+      "description": "DEPRECATED as hand-written limit (map-layout.md §5.4): target derives capacity from geometry/typography; retained required for v1 render capacity checks.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -183,9 +207,11 @@
     "grid": {
       "type": "object",
       "additionalProperties": false,
+      "anyOf": [
+        {"required": ["allowed_cases"]},
+        {"required": ["allowed_shapes", "legend_modes"]}
+      ],
       "required": [
-        "allowed_shapes",
-        "legend_modes",
         "panel_area",
         "shared_panel_area",
         "shared_legend_bounds",
@@ -279,6 +305,54 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 4
+        },
+        "allowed_cases": {
+          "description": "Reviewed finite parameter domain (plan phase 3, design §6.7). When present this is the SINGLE authority for admitted combinations, superseding allowed_shapes x legend_modes (no duplicate authority). Each case is a full tuple; legend_placement defaults to outside. A combination without an implemented consumer stays not-implemented.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["rows", "columns", "legend_mode"],
+            "properties": {
+              "rows": {"type": "integer", "minimum": 1, "maximum": 2},
+              "columns": {"type": "integer", "minimum": 1, "maximum": 2},
+              "legend_mode": {"enum": ["independent", "shared"]},
+              "legend_placement": {"enum": ["outside", "inside"]}
+            }
+          }
+        },
+        "inside_legend": {
+          "description": "Author-declared inside-legend geometry (plan phase 3 §6.2). The grid mechanically derives each independent legend's bounds from this anchor/offset/size/padding relative to its own main-map frame and verifies full enclosure. Required when legend_placement=inside; never a free solver.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["anchor", "offset_mm", "width_mm", "height_mm", "padding_mm"],
+          "properties": {
+            "anchor": {"enum": ["top-left", "top-right", "bottom-left", "bottom-right"]},
+            "offset_mm": {"type": "number", "minimum": 0, "maximum": 1000},
+            "width_mm": {"type": "number", "exclusiveMinimum": 0, "maximum": 1000},
+            "height_mm": {"type": "number", "exclusiveMinimum": 0, "maximum": 1000},
+            "padding_mm": {"type": "number", "minimum": 0, "maximum": 1000}
+          }
+        }
+      }
+    },
+    "content_slots": {
+      "description": "Target (map-layout.md §5.4/§6.3): typed content interfaces (role, accepted types, count, requiredness). Optional until the slot migration lands; does not carry business text or data paths.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["slot_id", "accepts_types"],
+        "properties": {
+          "slot_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+          "accepts_types": {
+            "type": "array", "minItems": 1, "uniqueItems": true,
+            "items": {"enum": ["map", "legend", "title", "text", "image", "chart", "scale-bar", "north-arrow"]}
+          },
+          "required": {"type": "boolean"},
+          "max_count": {"type": "integer", "minimum": 1}
         }
       }
     }

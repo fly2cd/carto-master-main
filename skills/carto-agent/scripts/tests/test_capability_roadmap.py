@@ -12,7 +12,7 @@ from carto_core.compiler.layout import LayoutResolver
 from carto_core.errors import ConfigurationError, ProtocolError
 from carto_core.schema_registry import SchemaRegistry, load_document
 from carto_core.scenario_registry import ScenarioRegistry
-from tests.fixtures.schema_cases import INVALID_CASES, VALID_CASES
+from tests.fixtures.schema_cases import VALID_CASES
 
 POLICY = Path(scenario_registry.__file__).resolve().parents[2] / "policies" / "scenario-capabilities.yaml"
 
@@ -33,11 +33,6 @@ def _three_map_contract():
 class RoadmapTaxonomyTest(unittest.TestCase):
     def setUp(self):
         self.registry = SchemaRegistry()
-
-    def test_schema_cases_registered(self):
-        self.registry.validate("capability-roadmap", VALID_CASES["capability-roadmap"])
-        with self.assertRaises(ProtocolError):
-            self.registry.validate("capability-roadmap", INVALID_CASES["capability-roadmap"])
 
     def test_undeclared_feature_is_configuration_error(self):
         with self.assertRaisesRegex(ConfigurationError, "ROADMAP_FEATURE_UNDECLARED"):

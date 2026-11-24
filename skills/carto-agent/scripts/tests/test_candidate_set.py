@@ -144,7 +144,7 @@ class CompileVariantsTests(unittest.TestCase):
     def test_design_overrides_are_injected_per_variant(self) -> None:
         self._run([{"variant_id": "variant-a", "revised_cartography": {"typography": {"title_pt": 18}}},
                    {"variant_id": "variant-b", "output_profile": {"width_mm": 400}}])
-        self.assertEqual(self.seen_contracts[0]["scenario"]["embedded"]["cartography"],
+        self.assertEqual(self.seen_contracts[0]["scenario"]["embedded"]["style"],
                          {"typography": {"title_pt": 18}})
         self.assertEqual(self.seen_contracts[1]["scenario"]["embedded"]["layout"]["canvas"]["width"], 400)
 

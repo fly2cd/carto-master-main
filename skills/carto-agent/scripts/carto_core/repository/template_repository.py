@@ -65,7 +65,7 @@ class TemplateRepository:
         self._load_index()
 
     def lookup_idempotency(self, idempotency_key: str, *, package_digest: str,
-                           evidence_digest: str) -> dict[str, Any] | None:
+                           evidence_digest: str, publication_digest: str) -> dict[str, Any] | None:
         path = self._transaction_path(idempotency_key)
         if not path.is_file():
             return None
@@ -74,12 +74,63 @@ class TemplateRepository:
         if (receipt["idempotency_key"] != idempotency_key
                 or receipt["package_ref"]["digest"] != package_digest
                 or receipt["evidence_ref"]["digest"] != evidence_digest
+                or receipt["publication_object_ref"]["digest"] != publication_digest
                 or receipt["repository_scope"] != self.repository_scope):
             raise ProtocolError("IDEMPOTENCY_CONFLICT", idempotency_key)
         entry = self._find_entry(self._load_index(), receipt["package_ref"], receipt.get("namespace"))
         if entry is None or entry["publication_receipt_path"] != path.relative_to(self.root).as_posix():
-            raise ProtocolError("PUBLICATION_TRANSACTION_INCOMPLETE", idempotency_key)
+            return self._recover_interrupted(receipt, path)
         return receipt
+
+    def _recover_interrupted(self, receipt: dict[str, Any], path: Path) -> dict[str, Any]:
+        """Bounded recovery of a publish interrupted between receipt and index commit.
+
+        Only proceeds when every binding (object, approval, package tree) verifies and
+        the current index still equals index_digest_before; the rebuilt index must equal
+        index_digest_after. Never overwrites an unrelated publication, never relaxes nonce.
+        """
+        obj = self.load_publication_object(receipt)
+        approval = self.load_publication_approval(receipt)
+        if sha256_digest(obj) != receipt["publication_object_ref"]["digest"]:
+            raise ProtocolError("PUBLICATION_TRANSACTION_INCOMPLETE", receipt["idempotency_key"])
+        if sha256_digest(approval) != receipt["approval_ref"]["digest"]:
+            raise ProtocolError("PUBLICATION_TRANSACTION_INCOMPLETE", receipt["idempotency_key"])
+        manifest = self.path_guard.resolve(self.root / self._manifest_path(receipt), must_exist=True)
+        self._verify_package_tree(manifest.parent, receipt["package_ref"]["digest"], receipt["manifest_digest"], published=True)
+        index = self._load_index()
+        if index["digest"] != receipt["index_digest_before"]:
+            raise ProtocolError("PUBLICATION_TRANSACTION_INCOMPLETE", receipt["idempotency_key"])
+        rebuilt = self._rebuild_index(index, receipt)
+        if rebuilt["digest"] != receipt["index_digest_after"]:
+            raise ProtocolError("PUBLICATION_TRANSACTION_INCOMPLETE", receipt["idempotency_key"])
+        atomic_yaml(self.index_path, rebuilt, create_once=False)
+        read_back = self._load_index()
+        if read_back["digest"] != rebuilt["digest"]:
+            raise ProtocolError("INDEX_COMMIT_VERIFICATION_FAILED", receipt["package_ref"]["id"])
+        return receipt
+
+    def _manifest_path(self, receipt: dict[str, Any]) -> str:
+        ref = receipt["package_ref"]
+        return (Path("packages") / receipt["namespace"] / ref["kind"] / ref["id"] / ref["version"] / "manifest.yaml").as_posix()
+
+    def _rebuild_index(self, index: dict[str, Any], receipt: dict[str, Any]) -> dict[str, Any]:
+        ref = receipt["package_ref"]
+        relative_package = Path("packages") / receipt["namespace"] / ref["kind"] / ref["id"] / ref["version"]
+        entry = {
+            "namespace": receipt["namespace"], "kind": ref["kind"], "id": ref["id"], "version": ref["version"],
+            "digest": ref["digest"],
+            "manifest_path": (relative_package / "manifest.yaml").as_posix(),
+            "manifest_digest": receipt["manifest_digest"],
+            "evidence_digest": receipt["evidence_ref"]["digest"],
+            "publication_receipt_path": self._transaction_path(receipt["idempotency_key"]).relative_to(self.root).as_posix(),
+            "status": "published", "published_at": receipt["published_at"],
+        }
+        updated = sorted([*index["entries"], entry], key=lambda item: (item["namespace"], item["kind"], item["id"], item["version"]))
+        new_index = {"schema_version": 1, "index_id": index["index_id"], "version": index["version"],
+                     "repository_scope": index["repository_scope"], "entries": updated,
+                     "generated_at": receipt["published_at"]}
+        new_index["digest"] = sha256_digest(new_index)
+        return new_index
 
     def load_publication_approval(self, publication: dict[str, Any]) -> dict[str, Any]:
         """Read and authenticate the approval retained by an immutable publication transaction."""
@@ -101,8 +152,29 @@ class TemplateRepository:
             raise ProtocolError("PUBLICATION_APPROVAL_DRIFT", reference["uri"])
         return approval
 
+    def load_publication_object(self, publication: dict[str, Any]) -> dict[str, Any]:
+        """Read and authenticate the frozen publication object retained by a transaction."""
+        self.registry.validate("publication-receipt", publication)
+        reference = publication["publication_object_ref"]
+        uri = Path(reference["uri"])
+        if uri.is_absolute() or ".." in uri.parts:
+            raise ProtocolError("PUBLICATION_OBJECT_REF_INVALID", reference["uri"])
+        path = self.path_guard.resolve(self.root / uri, must_exist=True)
+        try:
+            path.relative_to(self.root)
+        except ValueError as exc:
+            raise ProtocolError("PUBLICATION_OBJECT_REF_INVALID", reference["uri"]) from exc
+        obj = load_document(path)
+        if not isinstance(obj, dict):
+            raise ProtocolError("PUBLICATION_OBJECT_INVALID", reference["uri"])
+        self.registry.validate("template-publication", obj)
+        if sha256_digest(obj) != reference["digest"]:
+            raise ProtocolError("PUBLICATION_OBJECT_DRIFT", reference["uri"])
+        return obj
+
     def publish(self, *, package_root: Path, snapshot: dict[str, Any], evidence: dict[str, Any],
-                approval: dict[str, Any], idempotency_key: str) -> dict[str, Any]:
+                approval: dict[str, Any], idempotency_key: str,
+                publication_object: dict[str, Any]) -> dict[str, Any]:
         package_root = self.path_guard.resolve(package_root, must_exist=True)
         if not package_root.is_dir():
             raise ProtocolError("STAGING_PACKAGE_MISSING", str(package_root))
@@ -110,6 +182,7 @@ class TemplateRepository:
             prior = self.lookup_idempotency(
                 idempotency_key, package_digest=snapshot["package_digest"],
                 evidence_digest=evidence["evidence_digest"],
+                publication_digest=sha256_digest(publication_object),
             )
             if prior is not None:
                 return prior
@@ -131,6 +204,9 @@ class TemplateRepository:
             approval_path = self.root / "approvals" / f"{approval_digest[7:]}.yaml"
             atomic_yaml(evidence_path, evidence, create_once=True)
             atomic_yaml(approval_path, approval, create_once=True)
+            object_digest = sha256_digest(publication_object)
+            object_path = self.root / "publications" / f"{object_digest[7:]}.yaml"
+            atomic_yaml(object_path, publication_object, create_once=True)
 
             published_at = utc_now()
             receipt_path = self._transaction_path(idempotency_key)
@@ -170,6 +246,8 @@ class TemplateRepository:
                 "repository_scope": self.repository_scope,
                 "approval_ref": {"id": "publication-approval", "version": "1.0.0",
                                  "digest": approval_digest, "uri": approval_path.relative_to(self.root).as_posix()},
+                "publication_object_ref": {"id": "template-publication", "version": "1.0.0",
+                                           "digest": object_digest, "uri": object_path.relative_to(self.root).as_posix()},
                 "published_at": published_at, "idempotency_key": idempotency_key,
             }
             self.registry.validate("publication-receipt", receipt)

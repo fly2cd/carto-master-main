@@ -216,7 +216,7 @@ class GeneralVectorCandidateCompiler:
                               'extent': list(declared_basemap['extent'])}
             if declared_basemap.get('style'):
                 frozen_basemap['style'] = deepcopy(declared_basemap['style'])
-        page = compile_page(service, layout=layout, cartography=contracts['scenario']['embedded']['cartography'],
+        page = compile_page(service, layout=layout, cartography=contracts['scenario']['embedded']['style'],
                             panels=inputs, font={'path': str(font_path), 'digest': service.digest_bytes(font), 'size_bytes': len(font)},
                             texts=texts, legend_titles={f['content_id']: 'Legend' for f in layout['contract']['frames'] if f['type'] == 'legend'}, context=context,
                             charts=request.get('charts'), basemap=frozen_basemap)
@@ -404,7 +404,7 @@ def validation_scene(package_root, snapshot, targets, font, validator_version, *
     texts = [{'content_id': f['content_id'], 'text': 'Vector validation' if f['type'] == 'title' else (profile.notice if f['content_id'] == 'source' else 'Panel')}
              for f in layout['contract']['frames'] if f['type'] not in {'map', 'legend'}]
     font_bytes = service.read_bytes(Path(font), 32 * 1024 * 1024)
-    page = compile_page(service, layout=layout, cartography=template['embedded']['cartography'], panels=panels,
+    page = compile_page(service, layout=layout, cartography=template['embedded']['style'], panels=panels,
         font={'path': str(font), 'digest': service.digest_bytes(font_bytes), 'size_bytes': len(font_bytes)}, texts=texts,
         legend_titles={f['content_id']: 'Legend' for f in layout['contract']['frames'] if f['type'] == 'legend'}, context=context)
     bundle = BundlePreparer(service, "vector").build_many([prepared.ref()], context)

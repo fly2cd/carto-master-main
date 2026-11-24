@@ -62,6 +62,11 @@ profiles:
       - 1×1
       - 1×2
       - 2×2
+      # plan phase 3: independent+inside legend generation implemented (shared+inside stays
+      # rejected at instantiation). Additive; omitting this field defaults to outside-only.
+      legend_placements:
+      - outside
+      - inside
   internal_field_names: []
   geometry_variants:
   - geometry: raster

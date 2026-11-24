@@ -89,13 +89,16 @@ class GeneralRequestContract:
         return plan
 
     def override_keys(self) -> tuple[str, ...]:
-        return ("revised_cartography", "output_profile")
+        return ("revised_cartography", "output_profile", "revised_color_scheme")
 
     def apply_overrides(self, overrides: dict[str, Any], contracts: dict[str, Any]) -> dict[str, Any]:
         # R6: revised_cartography -> embedded cartography; R6b: output_profile -> canvas mm.
         if overrides.get("revised_cartography"):
             contracts.setdefault("scenario", {}).setdefault("embedded", {})
-            contracts["scenario"]["embedded"]["cartography"] = deepcopy(overrides["revised_cartography"])
+            contracts["scenario"]["embedded"]["style"] = deepcopy(overrides["revised_cartography"])
+        if overrides.get("revised_color_scheme"):
+            # 裁决4: compile-time effective-color overlay; the prepared bundle stays frozen.
+            contracts["revised_color_scheme"] = deepcopy(overrides["revised_color_scheme"])
         if overrides.get("output_profile"):
             contracts.setdefault("scenario", {}).setdefault("embedded", {}).setdefault("layout", {}).setdefault("canvas", {})
             op = overrides["output_profile"]
