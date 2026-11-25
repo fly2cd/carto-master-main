@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/annotation-placement.schema.json",
+  "description": "P6 field-mapping N[id] / D5 / X09: an instance annotation placement selection. mode=preferred means the offset is a suggestion the solver may change (recording the adopted rule and result); mode=fixed means the offset is binding and the solver must not move it. Geographic anchors come from data evidence, never from this placement; the solved position is a derived value, not a new business fact. Offsets use discriminated symbol measurements. Closed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["mode", "offset"],
+  "properties": {
+    "mode": {"enum": ["preferred", "fixed"]},
+    "offset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": {"$ref": "https://schemas.carto-agent.local/v1/symbol-measurement.schema.json"},
+        "y": {"$ref": "https://schemas.carto-agent.local/v1/symbol-measurement.schema.json"}
+      }
+    }
+  }
+}

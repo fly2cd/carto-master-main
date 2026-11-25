@@ -132,6 +132,43 @@ def required_components_for_routes(routes: list[str]) -> set[str]:
 
 
 @dataclass(frozen=True)
+class CapabilityContext:
+    """P3a: Trusted capability context — the single authoritative snapshot of what
+    a registered capability permits for this composition.
+
+    Built once at intake from the policy definition + resolved intent + geometry.
+    Consumed everywhere downstream (compile, preview, freeze, render, check,
+    review, deliver, recovery). Never recomputed or guessed from request fields.
+    The context is immutable by construction: template selection never overrides
+    business facts, and the same judgment applies across all entry points.
+
+    This is the P3a narrow increment: it formalizes the capability boundary
+    while keeping the registered Scenario identity set. Full identity decoupling
+    (arbitrary Scenario IDs) is P3b, to be separately governed.
+    """
+
+    capability_id: str
+    capability_version: str
+    capability_digest: str
+    implementation: str
+    business_scene: str
+    allowed_tasks: frozenset[str]
+    allowed_theme_tags: frozenset[str]
+    required_theme_tags: frozenset[str]
+    geometry: str
+    allowed_geometries: frozenset[str]
+    renderer_id: str
+    output_constraints: dict[str, Any]
+    layout_constraints: dict[str, Any]
+    data_nature: str
+    production_enabled: bool
+    notice: str
+    licenses: list[str]
+    template: dict[str, Any]
+    intent_constraints: dict[str, Any]
+
+
+@dataclass(frozen=True)
 class ScenarioCapability:
     """A validated, trusted capability definition; not a user-selected executable."""
 
@@ -159,6 +196,104 @@ class ScenarioCapability:
             raise ProtocolError("CAPABILITY_NOT_AVAILABLE", "Scenario component is not registered")
         module, attribute = entry
         return getattr(import_module(module, package=__package__), attribute)
+
+    # ── P3a: Capability context ──────────────────────────────────────────
+
+    def build_context(self, geometry: str, intent: dict[str, Any]) -> CapabilityContext:
+        """Build the trusted capability context for a composition (P3a).
+
+        The authoritative snapshot of what this capability permits, derived only from
+        the registered policy definition plus the resolved geometry/intent — never from
+        mutable request fields. It is built at the compile admission gate and validated
+        by validate_suitability. Downstream stages (preview, freeze, render, check,
+        review, deliver, recovery) re-verify the same capability binding through
+        for_execution / require_request_intent against the frozen execution and the
+        fingerprint-locked request; the context object itself is not yet persisted as a
+        public protocol artifact (that is part of the pending protocol-version decision).
+        """
+        definition = self._definition
+        constraints = definition.get("intent_constraints", {})
+        return CapabilityContext(
+            capability_id=definition["id"],
+            capability_version=definition["version"],
+            capability_digest=sha256_digest(semantic_definition(self._definition)),
+            implementation=definition["implementation"],
+            business_scene=constraints.get("business_scene", ""),
+            allowed_tasks=frozenset(constraints.get("allowed_tasks", [])),
+            allowed_theme_tags=frozenset(constraints.get("allowed_theme_tags", [])),
+            required_theme_tags=frozenset(constraints.get("required_theme_tags", [])),
+            geometry=geometry,
+            allowed_geometries=frozenset(definition.get("allowed_geometries", GEOMETRIES)),
+            renderer_id=definition.get("renderer_id", ""),
+            output_constraints=deepcopy(definition.get("output_constraints", {})),
+            layout_constraints=deepcopy(definition.get("layout_constraints", {})),
+            data_nature=definition.get("data_nature", ""),
+            production_enabled=bool(definition.get("production_enabled")),
+            notice=definition.get("notice", ""),
+            licenses=list(definition.get("licenses", [])),
+            template=deepcopy(definition.get("template", {})),
+            intent_constraints=deepcopy(constraints),
+        )
+
+    def validate_suitability(self, context: "CapabilityContext",
+                            style_ref: dict[str, Any] | None = None,
+                            layout_ref: dict[str, Any] | None = None) -> None:
+        """P3a: validate the capability context and the selected components' admission.
+
+        Narrow increment — does NOT expand the allowed Scenario identity set (P3b).
+        Checks actually performed:
+        1. Context self-consistency: the context's capability identity, digest,
+           business scene, implementation and admitted backend must equal the
+           registered definition. A drifted/tampered context is refused, so the
+           snapshot cannot silently disagree with the policy it claims to represent.
+        2. Geometry is admitted by the capability.
+        3. Scenario identity matches the registered template (kind/id/version).
+        4. Selected Style/Layout refs (when supplied) are kind-bound and exactly pinned.
+
+        Contract-level joint compatibility (roles, capacity, fonts, output) is enforced
+        downstream by load_contracts ownership rules and check_candidate; this gate is
+        the capability-admission layer, not a substitute for those content checks.
+        """
+        definition = self._definition
+        constraints = definition.get("intent_constraints", {})
+
+        # 1. Context self-consistency against the authoritative registered definition.
+        expected_digest = sha256_digest(semantic_definition(self._definition))
+        if (context.capability_id != definition["id"]
+                or context.capability_version != definition["version"]
+                or context.capability_digest != expected_digest
+                or context.implementation != definition["implementation"]
+                or context.business_scene != constraints.get("business_scene", "")
+                or context.renderer_id != definition.get("renderer_id", "")):
+            raise ProtocolError("CAPABILITY_CONTEXT_DRIFT",
+                                "Capability context differs from the registered definition")
+
+        # 2. Geometry must be admitted.
+        allowed = set(definition.get("allowed_geometries", GEOMETRIES))
+        if context.geometry not in allowed:
+            raise ProtocolError("CAPABILITY_NOT_AVAILABLE",
+                              f"Geometry '{context.geometry}' is not admitted by {definition['id']}")
+
+        # 3. P3a narrow increment: the Scenario identity is still from the registered
+        # set. Arbitrary Scenario IDs are rejected (P3b expands this).
+        scenario_template = definition.get("template", {})
+        if (context.template.get("kind") != scenario_template.get("kind")
+                or context.template.get("id") != scenario_template.get("id")
+                or context.template.get("version") != scenario_template.get("version")):
+            raise ProtocolError("SCENARIO_PROFILE_DRIFT",
+                              "Selected scenario does not match the registered capability identity")
+
+        # 4. Selected segment refs must be kind-bound and exactly pinned.
+        for ref, expected_kind, label in ((style_ref, "map-style", "Style"),
+                                          (layout_ref, "map-layout", "Layout")):
+            if ref is None:
+                continue
+            if ref.get("kind") != expected_kind:
+                raise ProtocolError("SEGMENT_KIND_UNSUPPORTED",
+                                    f"{label} segment kind must be '{expected_kind}', got '{ref.get('kind')}'")
+            if not all(ref.get(key) for key in ("id", "version", "digest")):
+                raise ProtocolError("SEGMENT_REF_UNPINNED",
+                                    f"{label} segment reference must be exactly pinned")
 
     def require_semantics(self, business_scene: str, tasks: list[str], theme_tags: list[str]) -> None:
         constraints = self.definition["intent_constraints"]
@@ -346,11 +481,36 @@ class ScenarioRegistry:
             raise ProtocolError("MAP_INTENT_INPUT_DRIFT", "Persisted intent differs from the user request and current policy")
         return profile
 
+    # ── P3a: Capability context entry points ─────────────────────────────
+
+    def capability_context(self, request: dict[str, Any]) -> CapabilityContext:
+        """P3a: Build the trusted capability context from a validated generate request.
+
+        This is the single entry point for all downstream consumers (compile,
+        preview, freeze, render, check, review, deliver, recovery). It captures
+        the capability snapshot exactly once and is idempotent for the same input.
+
+        The context is NOT exposed as a public protocol field yet — it is consumed
+        internally by the workflow layer to gate suitability checks.
+        """
+        profile, intent = self.resolve_generate(request)
+        return profile.build_context(_request_geometry(request), intent)
+
     def for_execution(self, execution: dict[str, Any]) -> ScenarioCapability:
         templates = execution.get("template_refs", [])
-        if len(templates) != 1:
+        # P4: exactly one map-scenario ref remains the capability dispatch key;
+        # optional map-style/map-layout refs bind the project-level segment
+        # selection (at most one per kind). Unknown kinds and duplicate segment
+        # kinds are refused — the frozen execution must name its components exactly.
+        scenarios = [item for item in templates if item.get("kind") == "map-scenario"]
+        segments = [item for item in templates if item.get("kind") != "map-scenario"]
+        if len(scenarios) != 1 or len(scenarios) + len(segments) != len(templates):
             raise ProtocolError("SCENARIO_PROFILE_BINDING_INVALID", "Execution needs exactly one scenario template")
-        profile = self.for_template(templates[0])
+        segment_kinds = [item.get("kind") for item in segments]
+        if (any(kind not in ("map-style", "map-layout") for kind in segment_kinds)
+                or len(segment_kinds) != len(set(segment_kinds))):
+            raise ProtocolError("SCENARIO_PROFILE_BINDING_INVALID", "Execution segment refs must be unique map-style/map-layout")
+        profile = self.for_template(scenarios[0])
         if execution.get("profile_refs") != [self.intent_resolver.catalog_ref, profile.ref]:
             raise ProtocolError("SCENARIO_PROFILE_DRIFT", "Frozen execution no longer matches the scenario policy")
         semantics = execution.get("shared_semantics", {})

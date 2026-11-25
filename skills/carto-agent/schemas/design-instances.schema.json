@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/design-instances.schema.json",
+  "description": "P6 S5/S8: the adopted design instances that become the running visual authority (replacing the private image_itinerary). Carries Style role appearance (A), component internal parameters (J), annotation placements (N), content selections and group bindings (I), and basemap display (V). components.parameters validate at runtime against the referenced component definition's parameter_schema (closed). This is the resolved source the compiler and frontend consume; the backend drawing functions derive copies from it and add no independent defaults.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["group_definitions", "group_bindings", "legend_labels", "group_resolution", "style_roles", "components", "annotations", "content", "basemap_display"],
+  "properties": {
+    "group_definitions": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "display_label"],
+        "properties": {
+          "id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+          "display_label": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "group_bindings": {"$ref": "https://schemas.carto-agent.local/v4/map-plan.schema.json#/properties/group_bindings"},
+    "legend_labels": {"$ref": "https://schemas.carto-agent.local/v4/map-plan.schema.json#/properties/legend_labels"},
+    "group_resolution": {"$ref": "https://schemas.carto-agent.local/v4/map-plan.schema.json#/properties/group_resolution"},
+    "style_roles": {
+      "type": "object",
+      "additionalProperties": {"$ref": "https://schemas.carto-agent.local/v1/role-appearance.schema.json"}
+    },
+    "components": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object", "additionalProperties": false,
+        "required": ["type", "parameters"],
+        "properties": {
+          "type": {"enum": ["information-card", "linked-label", "double-outline", "classified-route", "numbered-stop-marker"]},
+          "parameters": {"type": "object", "minProperties": 1}
+        }
+      }
+    },
+    "annotations": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object", "additionalProperties": false,
+        "required": ["placement"],
+        "properties": {
+          "placement": {"$ref": "https://schemas.carto-agent.local/v1/annotation-placement.schema.json"}
+        }
+      }
+    },
+    "content": {"$ref": "https://schemas.carto-agent.local/v4/map-plan.schema.json#/properties/content"},
+    "basemap_display": {"$ref": "https://schemas.carto-agent.local/v1/basemap-display.schema.json"}
+  }
+}

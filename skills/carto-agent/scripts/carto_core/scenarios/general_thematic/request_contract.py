@@ -42,6 +42,19 @@ class GeneralRequestContract:
         return extra
 
     def validate_body(self, request: dict[str, Any]) -> None:
+        # P4 ownership rule: a replaced segment has exactly one effective source.
+        # revised_cartography owns the whole style segment and output_profile patches
+        # the layout canvas — combining either with a request segment replacement of
+        # the same segment is duplicate ownership and is refused, never layered.
+        # Multi-candidate composition (segment_refs + design_variants) is P5 scope.
+        refs = request.get("segment_refs") or {}
+        if refs.get("style") and request.get("revised_cartography"):
+            raise ProtocolError("SEGMENT_DOUBLE_SOURCED", "style")
+        if refs.get("layout") and request.get("output_profile"):
+            raise ProtocolError("SEGMENT_DOUBLE_SOURCED", "layout")
+        if refs and request.get("design_variants"):
+            raise ProtocolError("SEGMENT_VARIANTS_UNSUPPORTED",
+                                "Project-level segment selection with design variants is not admitted")
         def identity(ref: dict[str, Any]) -> tuple[str, str, str]:
             return ref["id"], ref["version"], ref["digest"]
         if "vector_sources" in request:

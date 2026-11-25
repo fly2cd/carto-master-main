@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/basemap-display.schema.json",
+  "description": "P6 field-mapping V[id] / D6 / M40: a view's basemap DISPLAY contract (crop/window strategy), distinct from source facts (image bytes, original size, CRS, registration) which remain independent evidence. white_threshold is a display-processing parameter, not a skin/appearance knob; changing colors must not change it. The processing method is defined by a trusted display component. Closed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["crop"],
+  "properties": {
+    "crop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["parameters"],
+      "properties": {
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["white_threshold"],
+          "properties": {
+            "white_threshold": {"type": "integer", "minimum": 0, "maximum": 255}
+          }
+        }
+      }
+    }
+  }
+}

@@ -23,6 +23,9 @@ class GeneralRevisionContract:
             "map_title": _COMPILATION_NODES,
             "color_scheme": _COMPILATION_NODES,
             "panel_designs": ("plan",) + _COMPILATION_NODES,
+            # P4: replacing a component re-plans and recompiles; the prepared data
+            # evidence stays reusable because bundle inputs are untouched.
+            "segment_refs": ("plan",) + _COMPILATION_NODES,
         }
 
     def bundle_input_keys(self) -> tuple[str, ...]:

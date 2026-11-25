@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/symbol-measurement.schema.json",
+  "description": "P6 field-mapping §2.2: discriminated symbol measurement representation. Q(v) carries a reference-design-px value bound to a precise measurement rule (U); the reference-design domain is signed (coordinates/displacements, e.g. a y-down offset Q(-135)), while size positivity is enforced by the consuming parameter schema. PT(v)/MM(v) carry physical magnitudes (positive) that must NOT participate in reference-design pixel scaling. The unit is discriminated by 'kind', never inferred from a field-name suffix. Closed: unknown kinds and extra fields are rejected.",
+  "type": "object",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "value", "rule_ref"],
+      "properties": {
+        "kind": {"const": "reference-design-px"},
+        "value": {"type": "number"},
+        "rule_ref": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"}
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "value"],
+      "properties": {
+        "kind": {"const": "physical-pt"},
+        "value": {"type": "number", "exclusiveMinimum": 0}
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "value"],
+      "properties": {
+        "kind": {"const": "physical-mm"},
+        "value": {"type": "number", "exclusiveMinimum": 0}
+      }
+    }
+  ]
+}

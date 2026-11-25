@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/measurement-rule.schema.json",
+  "description": "P6 field-mapping §2.2 / X03 / §5.4: an explicit symbol measurement rule (U). Declares the reference design canvas, the scale function and its floor. The baseline preset (2381x1684, floor 1.0, min-ratio-floor) is an explicitly adopted design preset, NOT an implicit universal constant for every Style or backend. A physical-symbol mode is a separate explicit design choice, not reverse-engineered from a render result.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "rule_id", "version", "reference_width_px", "reference_height_px", "scale_floor", "scale_function"],
+  "properties": {
+    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
+    "rule_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"},
+    "reference_width_px": {"type": "number", "exclusiveMinimum": 0},
+    "reference_height_px": {"type": "number", "exclusiveMinimum": 0},
+    "scale_floor": {"type": "number", "minimum": 0},
+    "scale_function": {"const": "min-ratio-floor"}
+  }
+}

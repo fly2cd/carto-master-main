@@ -107,6 +107,12 @@ class RouteRequestContract:
     # ------------------------------------------------------------------
 
     def validate_body(self, request: dict[str, Any]) -> None:
+        # P4 boundary: this scenario's visual authority is portrayal.image_itinerary;
+        # project-level Style/Layout replacement is not wired here (P6 migration).
+        # Refuse explicitly instead of accepting a selection the compiler would ignore.
+        if request.get("segment_refs"):
+            raise ProtocolError("SEGMENT_SELECTION_UNSUPPORTED",
+                                "leadership_visit does not admit project-level segment replacement")
         # itinerary_structure — source and normalized refs must be present
         itin = request.get("itinerary_structure")
         if not itin:
@@ -224,13 +230,20 @@ class RouteRequestContract:
         patch = overrides.get("style_overrides")
         if patch:
             contracts.setdefault("portrayal", {})
-            base = contracts["portrayal"].get("image_itinerary")
-            if not base:
+            # P6 S8: the adopted design instances are the authority. Resolve the effective
+            # style, apply the patch, and re-adopt the instances. The private image_itinerary
+            # contract is no longer stored or consulted.
+            instances = contracts["portrayal"].get("design_instances")
+            if not instances:
                 raise ProtocolError(
                     "LEADERSHIP_STYLE_CONTRACT_MISSING",
                     "style_overrides requires the template portrayal contract's "
-                    "image_itinerary section")
-            contracts["portrayal"]["image_itinerary"] = _merge_style_override(base, patch)
+                    "design_instances section")
+            from .contract_migration import migrate_image_itinerary, resolve_effective_style
+            base = resolve_effective_style(instances)
+            patched = _merge_style_override(base, patch)
+            rule_ref = instances["style_roles"]["route"]["stroke"]["width"]["rule_ref"]
+            contracts["portrayal"]["design_instances"] = migrate_image_itinerary(patched, rule_ref=rule_ref)
         return contracts
 
 

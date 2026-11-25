@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/role-appearance.schema.json",
+  "description": "P6 field-mapping A[role]: a typed visual-role appearance entry in the selected Style. Each role uses the subset of channels it needs (font / stroke / color / opacity / radius / display_offset). Sizes carry discriminated symbol measurements (reference-design-px or physical pt/mm); physical page furniture stays pt/mm and does not participate in reference-px scaling. The Style provides role values; it does not know business group names (those bind via I.group_bindings). Closed: unknown channels rejected; no open extension bag.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "font": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "size": {"$ref": "https://schemas.carto-agent.local/v1/symbol-measurement.schema.json"},
+        "weight": {"type": "integer", "minimum": 100, "maximum": 900},
+        "color": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"}
+      }
+    },
+    "stroke": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width"],
+      "properties": {
+        "width": {"$ref": "https://schemas.carto-agent.local/v1/symbol-measurement.schema.json"},
+        "color": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"}
+      }
+    },
+    "color": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+    "opacity": {"type": "number", "minimum": 0, "maximum": 1},
+    "radius": {"$ref": "https://schemas.carto-agent.local/v1/symbol-measurement.schema.json"},
+    "display_offset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["distance"],
+      "properties": {
+        "distance": {"$ref": "https://schemas.carto-agent.local/v1/symbol-measurement.schema.json"}
+      }
+    }
+  }
+}

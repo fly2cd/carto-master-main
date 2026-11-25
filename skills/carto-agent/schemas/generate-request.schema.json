@@ -213,6 +213,42 @@
         "vector"
       ]
     },
+    "segment_refs": {
+      "description": "P4 project-level composition: replace scenario segments declared in replaceable_segments with exactly pinned published Style/Layout segments. Resolution happens at the contract load boundary through the trusted repository; the installed scenario package is never rewritten. Each segment has exactly one effective source: a request reference supersedes the author baseline (embedded or author-declared segment_refs) and is recorded in execution ownership and template_refs. Combining a replaced segment with a design override that owns the same segment (revised_cartography for style, output_profile for layout) is rejected as duplicate ownership.",
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "style": {
+          "allOf": [
+            {
+              "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/templateRef"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "map-style"
+                }
+              }
+            }
+          ]
+        },
+        "layout": {
+          "allOf": [
+            {
+              "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/templateRef"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "map-layout"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
     "design_variants": {
       "description": "Optional externally supplied design variants for multi-candidate comparison. The program compiles each deterministically and never ranks or selects among them; selection is a separate external decision (select-candidate). Absent means single-candidate compilation.",
       "type": "array",

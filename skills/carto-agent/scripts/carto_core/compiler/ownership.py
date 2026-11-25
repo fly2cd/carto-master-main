@@ -123,6 +123,35 @@ class OwnershipResolver:
             ownership[segment] = expected_kind
         return ownership
 
+    def validate_request_segment_refs(self, scenario: dict[str, Any],
+                                      refs: dict[str, Any]) -> dict[str, str]:
+        """P4: validate project-level segment replacement against the scenario contract.
+
+        A request reference may only target a segment the scenario declares
+        replaceable. The reference supersedes the author baseline (embedded or
+        author-declared segment_refs) — exactly one effective source remains, and
+        the returned ownership map records the replacing kind as the owner.
+        Every reference must be exactly pinned and kind-bound; unknown segments,
+        non-replaceable segments and floating references are refused.
+        """
+        if not isinstance(refs, dict) or not refs:
+            raise ProtocolError("SEGMENT_REFS_INVALID", "segment_refs must be a non-empty object")
+        replaceable = scenario.get("replaceable_segments", [])
+        if not isinstance(replaceable, list):
+            raise ProtocolError("SCENARIO_REPLACEABLE_INVALID", "replaceable_segments must be an array")
+        ownership: dict[str, str] = {}
+        for segment, reference in sorted(refs.items()):
+            if segment not in self.SEGMENT_TO_KIND:
+                raise ProtocolError("SEGMENT_KIND_UNSUPPORTED", segment)
+            if segment not in replaceable:
+                raise ProtocolError("SEGMENT_NOT_REPLACEABLE", segment)
+            expected_kind = self.SEGMENT_TO_KIND[segment]
+            if not isinstance(reference, dict) or reference.get("kind") != expected_kind:
+                raise ProtocolError("KIND_BOUNDARY_VIOLATION", f"{segment} must reference {expected_kind}")
+            DependencyResolver.require_pinned(reference)
+            ownership[segment] = expected_kind
+        return ownership
+
     def validate_segment_lock(self, scenario: dict[str, Any], lock: dict[str, Any]) -> None:
         """S1 lock rule: segment_refs must equal the segment-kind entries pinned in
         dependency-lock.dependencies (which must also equal manifest.dependencies).

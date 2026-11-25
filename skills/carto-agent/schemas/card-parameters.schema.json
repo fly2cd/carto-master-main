@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/card-parameters.schema.json",
+  "description": "P6 field-mapping C[information-card] / J[card]: component-internal typography parameters for an information card instance. These belong to the component definition's parameter interface, NOT page Layout (D4). Width mode and limit are one contract (M14+M26): fixed uses limit as the width; fit-content-up-to-limit measures content width up to limit, never silently shrinking font or dropping fields. sections.gap is the FULL title/body section gap (M18: baseline = 2 x old line_gap), divider at its midpoint. title.wrap_mode is explicit (M24): single-line-reject-overflow refuses overflow; a wrap mode must be declared by the component. Closed: unknown parameters rejected; no open extension bag.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["sizing", "inset", "sections", "title"],
+  "properties": {
+    "sizing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width"],
+      "properties": {
+        "width": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "limit"],
+          "properties": {
+            "mode": {"enum": ["fixed", "fit-content-up-to-limit"]},
+            "limit": {"$ref": "https://schemas.carto-agent.local/v1/symbol-measurement.schema.json"}
+          }
+        }
+      }
+    },
+    "inset": {"$ref": "https://schemas.carto-agent.local/v1/symbol-measurement.schema.json"},
+    "sections": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gap"],
+      "properties": {
+        "gap": {"$ref": "https://schemas.carto-agent.local/v1/symbol-measurement.schema.json"}
+      }
+    },
+    "title": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wrap_mode"],
+      "properties": {
+        "wrap_mode": {"enum": ["single-line-reject-overflow", "wrap-by-character"]}
+      }
+    },
+    "structure": {
+      "description": "P6 X05: the registered card internal-structure preset (declared, not an implicit renderer convention). section_order is the painted order; divider_position locates the body/title divider; empty_body is the single-line label behavior. The baseline preset is body-divider-title with the divider at the section-gap midpoint and centered empty-body labels. A different structure is a new explicit design choice.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["section_order", "divider_position", "empty_body"],
+      "properties": {
+        "section_order": {"const": ["body", "divider", "title"]},
+        "divider_position": {"const": "gap-midpoint"},
+        "empty_body": {"const": "center"}
+      }
+    }
+  }
+}

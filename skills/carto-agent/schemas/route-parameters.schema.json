@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/route-parameters.schema.json",
+  "description": "P6 field-mapping C[classified-route] / J[route]: route expression component parameters. Arrow head size and repeat spacing (M10/M11) are symbol-repeat parameters; direction and placement along the line are derived by the algorithm from the adopted parameters, not chosen by the backend. Stroke width/halo/display offset live in the Style route role appearance (A), not here. Closed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["arrows"],
+  "properties": {
+    "arrows": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["head_size", "repeat_spacing"],
+      "properties": {
+        "head_size": {"$ref": "https://schemas.carto-agent.local/v1/symbol-measurement.schema.json"},
+        "repeat_spacing": {"$ref": "https://schemas.carto-agent.local/v1/symbol-measurement.schema.json"}
+      }
+    }
+  }
+}

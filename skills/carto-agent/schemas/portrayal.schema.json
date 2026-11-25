@@ -34,6 +34,10 @@
     "image_itinerary": {
       "$ref": "https://schemas.carto-agent.local/v1/image-itinerary-style.schema.json"
     },
+    "design_instances": {
+      "description": "P6 S5/S8: adopted design instances (Style roles / component parameters / annotation placements / content / group bindings / basemap display) that become the running visual authority. When present, the compiler and frontend resolve the effective design from these instances, not from image_itinerary.",
+      "$ref": "https://schemas.carto-agent.local/v1/design-instances.schema.json"
+    },
     "legend": {
       "type": "object",
       "additionalProperties": false,
@@ -532,8 +536,9 @@
   "allOf": [
     {
       "if": {
-        "required": [
-          "image_itinerary"
+        "anyOf": [
+          {"required": ["image_itinerary"]},
+          {"required": ["design_instances"]}
         ]
       },
       "then": {

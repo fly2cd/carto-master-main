@@ -38,7 +38,6 @@ from ...security.paths import PathGuard
 from .style import apply_grouped_style
 
 FIXTURE_KEY = "fixtures/visit-route.synthetic.geojson"
-_MAIN_FRAME = "main-map"
 _SYNTHETIC_BASEMAP = (2381, 1684)
 _SYNTHETIC_BORDER = 60
 _PX_PER_KM = 100.0
@@ -159,7 +158,11 @@ def route_validation_scene(package_root: Path, snapshot: dict[str, Any], targets
     workspace.mkdir(parents=True, exist_ok=True)
     documents = snapshot["documents"]
     scenario = documents["scenario"]
-    style = documents["portrayal"]["image_itinerary"]
+    # P6 S8: resolve the effective style from the adopted design instances (the authority).
+    from .contract_migration import resolve_effective_style
+    instances = documents["portrayal"]["design_instances"]
+    registry.validate("design-instances", instances)
+    style = resolve_effective_style(instances)
     registry.validate("image-itinerary-style", style)
     fixture = _fixture_document(package_root, snapshot)
 
@@ -224,11 +227,15 @@ def route_validation_scene(package_root: Path, snapshot: dict[str, Any], targets
     window = display_result["display_window"]
     role = {r["id"]: r for r in documents["data_schema"]["roles"]}["route-stops"]
     fields = {"route-stops": {field["semantic_role"]: field["name"] for field in role["fields"]}}
+    # P6 §13.3: bind graphics to the layout's actual map frame, not a hardcoded string.
+    map_frames = [f for f in scenario["embedded"]["layout"]["frames"] if f["type"] == "map"]
+    if len(map_frames) != 1:
+        raise ProtocolError("ITINERARY_FRAME_BINDING_INVALID", "validation layout needs exactly one map frame")
     styled = apply_grouped_style(style, {"basemap": {"source_size": {"width_px": width, "height_px": height},
                                                      "display_window": window}},
                                  {"projection": projection, "sources": {"route-stops": fixture,
                                                                         "route-line": route_fc},
-                                  "fields": fields})
+                                  "fields": fields}, frame_id=map_frames[0]["id"])
 
     # --- Frozen page request and scene ----------------------------------------
     from ...scenario_registry import ScenarioRegistry

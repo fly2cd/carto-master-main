@@ -56,7 +56,7 @@ class MapCandidateCompiler:
         return port
 
     def load_contracts(self, installation: dict[str, Any], *,
-                       repository=None) -> dict[str, Any]:
+                       repository=None, segment_refs: dict[str, Any] | None = None) -> dict[str, Any]:
         root = self.path_guard.resolve(installation["package_path"], must_exist=True)
         if not root.is_dir():
             raise ProtocolError("TEMPLATE_INSTALL_INCOMPLETE", str(root))
@@ -118,6 +118,33 @@ class MapCandidateCompiler:
             contracts["scenario"] = repository.resolve_scenario_segments(
                 contracts["scenario"], namespace=manifest["package"]["namespace"], lock=lock)
             self.registry.validate("scenario", contracts["scenario"])
+        # P4: project-level composition. A request segment reference supersedes the
+        # author baseline for segments the scenario declares replaceable. Resolution
+        # uses the same trusted repository fetch (exact identity + digest + package
+        # integrity) as author refs — one ownership model, no second override engine.
+        # The installed package is never rewritten; the effective selection is
+        # recorded separately so execution can bind the exact replacing refs.
+        if segment_refs:
+            if repository is None:
+                raise ProtocolError("SEGMENT_REPOSITORY_REQUIRED",
+                                    "Referenced segments require the published template repository")
+            from .ownership import OwnershipResolver
+            resolver = OwnershipResolver()
+            selection_ownership = resolver.validate_request_segment_refs(contracts["scenario"], segment_refs)
+            resolved = deepcopy(contracts["scenario"])
+            superseded: dict[str, Any] = {}
+            for segment, reference in sorted(segment_refs.items()):
+                author_refs = contracts["scenario"].get("segment_refs", {})
+                superseded[segment] = deepcopy(author_refs.get(segment)) if segment in author_refs else "embedded"
+                resolved["embedded"][segment] = repository.fetch_segment(
+                    reference, namespace=manifest["package"]["namespace"])
+            self.registry.validate("scenario", resolved)
+            contracts["scenario"] = resolved
+            contracts["segment_selection"] = {
+                "refs": deepcopy(segment_refs),
+                "ownership": selection_ownership,
+                "superseded": superseded,
+            }
         self._validate_expression_bindings(contracts["portrayal"], lock)
         self._validate_rules(contracts)
         return {"root": root, "manifest": manifest, "lock": lock, **contracts}
@@ -174,6 +201,12 @@ class MapCandidateCompiler:
         self.registry.validate("render-scene", scene)
         if candidate["execution_digest"] != sha256_digest(candidate["execution"]):
             raise ProtocolError("CANDIDATE_EXECUTION_DIGEST_MISMATCH", candidate["candidate_id"])
+        # P4: the frozen component binding must equal the selection authorized by the
+        # fingerprint-locked request and the trusted installed package. Content checks
+        # below verify the page; this verifies the *identity* of every component ref,
+        # so a smuggled / missing / drifted segment ref cannot ride a passing page into
+        # G2 and the lock. Shared by preflight, preview, freeze and lock re-verification.
+        self._require_selection_binding(request, candidate, contracts)
         if candidate["execution"].get("render_scene_ref", {}).get("digest") != sha256_digest(scene):
             raise ProtocolError("CANDIDATE_SCENE_DIGEST_MISMATCH", candidate["candidate_id"])
         self._require_port("material_facts")(
@@ -218,6 +251,52 @@ class MapCandidateCompiler:
                 raise ProtocolError("VECTOR_BUNDLE_MISMATCH", "Page does not preserve the prepared bundle")
         return MapQualityChecks(self.registry).inspect(
             candidate, scene, contracts["quality_gates"], profile=profile, raster=inputs, vector=vector)
+
+    def _require_selection_binding(self, request: dict[str, Any], candidate: dict[str, Any],
+                                   contracts: dict[str, Any]) -> None:
+        """P4: the frozen component binding must equal the request-authorized selection.
+
+        Derives the expected segment binding from the fingerprint-locked request and
+        compares ``execution.template_refs`` segment refs and ``ownership`` exactly.
+        Missing, extra, or id/version/digest-drifted segment refs are refused, so a
+        component declaration inconsistent with the G1 request cannot reach G2 or the
+        lock even when the rendered page content still matches. This is the identity
+        counterpart to the page-content checks in ``check_candidate``.
+
+        The scenario component's identity is bound transitively by for_execution
+        (registered capability) + require_contract (installed scenario contract) +
+        load_contracts package-integrity verification, so this gate focuses on the
+        project-level segment selection that those gates do not compare to the request.
+        """
+        execution = candidate["execution"]
+        refs = execution.get("template_refs", [])
+        scenario_refs = [r for r in refs if r.get("kind") == "map-scenario"]
+        if len(scenario_refs) != 1:
+            raise ProtocolError("CANDIDATE_COMPONENT_SELECTION_MISMATCH",
+                                "Execution must bind exactly one scenario component")
+        expected_segments = request.get("segment_refs") or {}
+        expected_by_kind = {ref["kind"]: ref for ref in expected_segments.values()}
+        actual_segments = {r["kind"]: r for r in refs if r.get("kind") in ("map-style", "map-layout")}
+        if set(actual_segments) != set(expected_by_kind):
+            raise ProtocolError("CANDIDATE_COMPONENT_SELECTION_MISMATCH",
+                                "Execution segment refs differ from the request selection")
+        for kind, ref in expected_by_kind.items():
+            actual = actual_segments[kind]
+            if any(actual.get(key) != ref.get(key) for key in ("id", "version", "digest")):
+                raise ProtocolError("CANDIDATE_COMPONENT_SELECTION_MISMATCH",
+                                    f"{kind} ref identity/digest differs from the request selection")
+        ownership = execution.get("ownership", {})
+        if ownership.get("scenario") != "map-scenario":
+            raise ProtocolError("CANDIDATE_COMPONENT_OWNERSHIP_MISMATCH",
+                                "Execution must record scenario ownership")
+        for segment in ("style", "layout"):
+            if segment in expected_segments:
+                if ownership.get(segment) != expected_segments[segment]["kind"]:
+                    raise ProtocolError("CANDIDATE_COMPONENT_OWNERSHIP_MISMATCH",
+                                        f"{segment} ownership differs from the selection")
+            elif segment in ownership:
+                raise ProtocolError("CANDIDATE_COMPONENT_OWNERSHIP_MISMATCH",
+                                    f"Unselected {segment} ownership is present")
 
     @staticmethod
     def require_execution_intent(execution: dict[str, Any], intent: dict[str, Any]) -> None:

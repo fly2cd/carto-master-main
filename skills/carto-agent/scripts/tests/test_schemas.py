@@ -70,6 +70,17 @@ class SchemaTests(unittest.TestCase):
                 with self.assertRaises(ProtocolError):
                     self.registry.validate(schema_name, instance)
 
+    def test_p4_generate_segment_refs_legal_sample_validates(self) -> None:
+        """P4: the legal project-level segment selection sample validates on both
+        the open envelope and the closed general profile; each illegal mutation in
+        SEMANTIC_INVALID_CASES is rejected above."""
+        from copy import deepcopy
+        from tests.fixtures.schema_cases import GENERATE_REQUEST_SEGMENT_REFS, SEGMENT_REF_LAYOUT
+        self.registry.validate("generate-request", GENERATE_REQUEST_SEGMENT_REFS)
+        general = deepcopy(VALID_CASES["general-generate-request"])
+        general["segment_refs"] = {"layout": deepcopy(SEGMENT_REF_LAYOUT)}
+        self.registry.validate("general-generate-request", general)
+
     def test_basemap_component_accepts_both_registrations_and_rejects_mixing(self) -> None:
         from tests.fixtures.schema_cases import VARIANT_CASES, VARIANT_INVALID_CASES
         self.registry.validate("basemap", VALID_CASES["basemap"])

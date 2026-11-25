@@ -377,12 +377,14 @@ class ImagePageRenderer:
             if graphic["type"] == "point":
                 radius = graphic.get("radius_px", 12) * scale
                 if graphic.get("shape", "pin") == "pin":
-                    self._pin(axes, x, y, radius, color)
+                    self._pin(axes, x, y, radius, color, graphic.get("edge_color", "#FFFFFF"))
                 else:
-                    axes.add_patch(Circle((x, y), radius, facecolor=color, edgecolor="#FFFFFF",
+                    axes.add_patch(Circle((x, y), radius, facecolor=color,
+                                          edgecolor=graphic.get("edge_color", "#FFFFFF"),
                                           linewidth=2 * scale, zorder=7))
                 if graphic.get("show_number", True):
-                    axes.text(x, y - 2 * radius, str(graphic["visit_order"]), color="#FFFFFF",
+                    axes.text(x, y - 2 * radius, str(graphic["visit_order"]),
+                              color=graphic.get("text_color", "#FFFFFF"),
                               fontsize=graphic.get("font_size_px", 12) * scale * 72 / dpi,
                               family=family, ha="center", va="center", zorder=8)
                 continue
@@ -462,14 +464,16 @@ class ImagePageRenderer:
         return outputs
 
     @staticmethod
-    def _pin(axes, x: float, y: float, radius: float, color: str) -> None:
-        """Teardrop pin: circular head, tapered tail, contrasting inner dot."""
+    def _pin(axes, x: float, y: float, radius: float, color: str,
+             edge_color: str = "#FFFFFF") -> None:
+        """Teardrop pin: circular head, tapered tail, contrasting inner dot.
+        X07: edge/dot color comes from the Style role (derived graphic), not a fixed default."""
         from matplotlib.patches import Circle, Polygon
-        head = Circle((x, y - 2 * radius), radius, facecolor=color, edgecolor="#FFFFFF",
+        head = Circle((x, y - 2 * radius), radius, facecolor=color, edgecolor=edge_color,
                       linewidth=1, zorder=7)
         tail = Polygon([[x - radius * .35, y - radius * 1.1], [x + radius * .35, y - radius * 1.1], [x, y]],
                        closed=True, facecolor=color, edgecolor="none", zorder=7)
-        dot = Circle((x, y - 2 * radius), radius * .55, facecolor="#FFFFFF", edgecolor="none", zorder=8)
+        dot = Circle((x, y - 2 * radius), radius * .55, facecolor=edge_color, edgecolor="none", zorder=8)
         axes.add_patch(head)
         axes.add_patch(tail)
         axes.add_patch(dot)

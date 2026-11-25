@@ -148,6 +148,60 @@ def build_installation(package_path: Path, package: dict[str, str]) -> dict:
     }
 
 
+def publish_segment(repository, root: Path, kind: str, seg_id: str, contract: dict, idem: str) -> dict:
+    """Publish one synthetic Style/Layout segment through the real repository publish path.
+    Returns the exactly pinned templateRef. Uses the SEGMENT_CONTRACTS path convention."""
+    from carto_core.repository.template_matching import SEGMENT_CONTRACTS
+    from tests.fixtures.schema_cases import D
+    relative, _schema = SEGMENT_CONTRACTS[kind]
+    staging = root / f"staging-{seg_id}"
+    (staging / "contracts").mkdir(parents=True, exist_ok=True)
+    (staging / relative).write_text(json.dumps(contract), encoding="utf-8")
+    lock = deepcopy(VALID_CASES["dependency-lock"])
+    lock["package"] = {"namespace": "local", "kind": kind, "id": seg_id, "version": "1.0.0", "digest": D}
+    lock["dependencies"] = []
+    (staging / "dependencies.lock.yaml").write_text(json.dumps(lock), encoding="utf-8")
+    files = ["dependencies.lock.yaml", relative]
+    manifest = {"schema_version": 1,
+                "package": {"namespace": "local", "kind": kind, "id": seg_id, "version": "1.0.0",
+                            "status": "published", "summary": f"Synthetic {kind} segment"},
+                "dependency_lock": "dependencies.lock.yaml", "files": files,
+                "checksums": {rel: file_digest(staging / rel) for rel in files}}
+    (staging / "manifest.yaml").write_text(json.dumps(manifest), encoding="utf-8")
+    manifest_digest = file_digest(staging / "manifest.yaml")
+    lines = [f"{manifest['checksums'][rel][7:]}  {rel}" for rel in files]
+    lines.append(f"{manifest_digest[7:]}  manifest.yaml")
+    (staging / "checksums.sha256").write_text("\n".join(sorted(lines)) + "\n", encoding="utf-8")
+    snapshot = {"package_digest": file_digest(staging / "checksums.sha256"),
+                "manifest_digest": manifest_digest, "manifest": manifest,
+                "dependency_lock_digest": file_digest(staging / "dependencies.lock.yaml")}
+    publication = repository.publish(
+        package_root=staging, snapshot=snapshot, evidence={"evidence_digest": D},
+        approval={"synthetic": "acceptance-segment"}, idempotency_key=idem,
+        publication_object={"schema_version": 1, "run_id": "acceptance-seg-run", "request_digest": D,
+                            "package_ref": {"kind": kind, "id": seg_id, "version": "1.0.0",
+                                            "digest": snapshot["package_digest"]},
+                            "evidence_ref": {"id": "template-validation-evidence", "version": "1.0.0",
+                                             "digest": D, "uri": "evidence.yaml"},
+                            "repository_scope": "local:templates",
+                            "repository_root": repository.root.as_posix(),
+                            "idempotency_key": idem})
+    return {"kind": kind, "id": seg_id, "version": "1.0.0", "digest": publication["package_ref"]["digest"]}
+
+
+def author_referenced_scenario(guard, registry, root: Path, refs: dict, work_name: str) -> dict:
+    """Author a general-thematic scenario whose listed segments are replaceable published refs."""
+    from carto_core.scenarios.general_thematic.raster import GeneralThematicAuthor
+    create = deepcopy(VALID_CASES["general-template-create-request"])
+    create["source_crs"] = deepcopy(CRS_26911)
+    create["display_crs"] = deepcopy(CRS_26911)
+    create["segment_refs"] = deepcopy(refs)
+    work = root / work_name
+    work.mkdir(parents=True, exist_ok=True)
+    package = GeneralThematicAuthor(guard, work, registry).author(create, BRIEF_STUB)
+    return build_installation(Path(package["package_path"]), package)
+
+
 class AdmissionTests(unittest.TestCase):
     """The registered profile states a purpose, and both overlays only ever narrow."""
 
@@ -893,7 +947,7 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
         request_path = self.root / "generate-request.yaml"
         atomic_yaml(request_path, self.generate)
         repository_root = self.root / "template-repo"
-        repository_root.mkdir()
+        repository_root.mkdir(exist_ok=True)
         workflow = MapGenerationWorkflow(allowed_roots=[self.root], project_root=self.root,
                                          workdir=self.work, registry=self.registry,
                                          repository_root=repository_root,
@@ -991,6 +1045,390 @@ class GenerationTests(PreparationFixture, unittest.TestCase):
 
     def test_full_workflow_preview_g2_render_check_g3_delivery(self):
         self._exercise_full_workflow()
+
+    def test_p4_request_segment_replacement_through_real_compile(self):
+        """P4/A07: a request-level layout replacement flows through the real workflow
+        compile entry; the replaced published segment reaches the frozen scene and
+        execution binds the exact replacing ref + ownership. No scenario code change."""
+        from carto_core.repository.template_repository import TemplateRepository
+        from carto_core.scenarios.general_thematic.raster import GeneralThematicAuthor, layout_contract
+        from tests.fixtures.schema_cases import D
+
+        repo_root = self.root / "template-repo"
+        repo_root.mkdir(exist_ok=True)
+        repository = TemplateRepository(path_guard=self.guard, root=repo_root,
+                                        repository_scope="local:templates", registry=self.registry)
+
+        def publish_layout(seg_id, contract, idem):
+            staging = self.root / f"staging-{seg_id}"
+            (staging / "contracts").mkdir(parents=True)
+            (staging / "contracts/layout.yaml").write_text(json.dumps(contract), encoding="utf-8")
+            lock = deepcopy(VALID_CASES["dependency-lock"])
+            lock["package"] = {"namespace": "local", "kind": "map-layout", "id": seg_id,
+                               "version": "1.0.0", "digest": D}
+            lock["dependencies"] = []
+            (staging / "dependencies.lock.yaml").write_text(json.dumps(lock), encoding="utf-8")
+            files = ["dependencies.lock.yaml", "contracts/layout.yaml"]
+            manifest = {"schema_version": 1,
+                        "package": {"namespace": "local", "kind": "map-layout", "id": seg_id,
+                                    "version": "1.0.0", "status": "published",
+                                    "summary": "Synthetic P4 workflow layout"},
+                        "dependency_lock": "dependencies.lock.yaml", "files": files,
+                        "checksums": {rel: file_digest(staging / rel) for rel in files}}
+            (staging / "manifest.yaml").write_text(json.dumps(manifest), encoding="utf-8")
+            manifest_digest = file_digest(staging / "manifest.yaml")
+            lines = [f"{manifest['checksums'][rel][7:]}  {rel}" for rel in files]
+            lines.append(f"{manifest_digest[7:]}  manifest.yaml")
+            (staging / "checksums.sha256").write_text("\n".join(sorted(lines)) + "\n", encoding="utf-8")
+            snapshot = {"package_digest": file_digest(staging / "checksums.sha256"),
+                        "manifest_digest": manifest_digest, "manifest": manifest,
+                        "dependency_lock_digest": file_digest(staging / "dependencies.lock.yaml")}
+            publication = repository.publish(
+                package_root=staging, snapshot=snapshot, evidence={"evidence_digest": D},
+                approval={"synthetic": "p4-wf-test"}, idempotency_key=idem,
+                publication_object={"schema_version": 1, "run_id": "p4-wf-run", "request_digest": D,
+                                    "package_ref": {"kind": "map-layout", "id": seg_id, "version": "1.0.0",
+                                                    "digest": snapshot["package_digest"]},
+                                    "evidence_ref": {"id": "template-validation-evidence", "version": "1.0.0",
+                                                     "digest": D, "uri": "evidence.yaml"},
+                                    "repository_scope": "local:templates",
+                                    "repository_root": repo_root.as_posix(),
+                                    "idempotency_key": idem})
+            return {"kind": "map-layout", "id": seg_id, "version": "1.0.0",
+                    "digest": publication["package_ref"]["digest"]}
+
+        baseline_layout = layout_contract()
+        variant_layout = deepcopy(baseline_layout)
+        variant_layout["capacity"]["legend_items"] = 8
+        layout_a = publish_layout("p4-wf-layout-a", baseline_layout, "p4-wf-layout-a-00000001")
+        layout_b = publish_layout("p4-wf-layout-b", variant_layout, "p4-wf-layout-b-00000001")
+
+        # Author a scenario whose layout is the replaceable published reference A.
+        create = deepcopy(VALID_CASES["general-template-create-request"])
+        create["source_crs"] = deepcopy(CRS_26911)
+        create["display_crs"] = deepcopy(CRS_26911)
+        create["segment_refs"] = {"layout": deepcopy(layout_a)}
+        author_work = self.root / "p4-author"
+        author_work.mkdir()
+        author = GeneralThematicAuthor(self.guard, author_work, self.registry)
+        package = author.author(create, BRIEF_STUB)
+        self.installation = build_installation(Path(package["package_path"]), package)
+
+        # The generate request independently selects published layout B.
+        self.generate = self.build_request()
+        self.generate["segment_refs"] = {"layout": deepcopy(layout_b)}
+        canonical_request(self.generate)
+        self.registry.validate("general-generate-request", self.generate)
+        self.intent = self.scenarios.generate_intent(self.generate)
+
+        workflow, request_path = self.workflow_at_compile()
+        compiled = workflow.compile(request_path, self.root / "workflow-g1.yaml",
+                                    approval_key=APPROVAL_KEY)
+        self.assertEqual("preview", compiled["state"]["step"])
+        self.assertEqual(compiled["scene"]["resolved_layout"]["template_contract"], variant_layout)
+        execution = compiled["candidate"]["execution"]
+        self.assertIn(layout_b, execution["template_refs"])
+        self.assertEqual(execution["ownership"]["layout"], "map-layout")
+        self.assertEqual(execution["ownership"]["scenario"], "map-scenario")
+
+        # The selection survives the full freeze/render/delivery chain: preview and
+        # freeze re-load contracts with the same request segment_refs, render consumes
+        # the frozen scene, and G3 delivers. No re-selection happens after freeze.
+        previewed = workflow.preview(request_path, attestation_key=KEY)
+        self.assertEqual(("waiting_approval", "freeze"),
+                         (previewed["state"]["status"], previewed["state"]["step"]))
+        atomic_yaml(self.root / "workflow-g2.yaml", asdict(sign(
+            "G2", "approve-freeze", "resolved-map", previewed["approval_object_digest"],
+            subject_id=self.generate["subject"]["approver_subject_id"], scope=self.generate["scope"])), create_once=False)
+        frozen = workflow.freeze(request_path, self.root / "workflow-g2.yaml",
+                                 approval_key=APPROVAL_KEY, attestation_key=KEY)
+        self.assertEqual("render", frozen["state"]["step"])
+        self.assertIn(layout_b, frozen["lock"]["execution"]["template_refs"])
+        rendered = workflow.render(request_path, attestation_key=KEY)
+        self.assertEqual("check", rendered["state"]["step"])
+        checked = workflow.check(request_path, attestation_key=KEY)
+        self.assertEqual("passed", checked["validation_report"]["status"])
+        review_receipt = sign("REVIEW", "approve-product-review", "validation-report",
+                              sha256_digest(checked["validation_report"]),
+                              subject_id=self.generate["subject"]["approver_subject_id"], scope=self.generate["scope"])
+        atomic_yaml(self.root / "workflow-review.yaml", asdict(review_receipt), create_once=False)
+        reviewed = workflow.review(request_path, self.root / "workflow-review.yaml",
+                                   approval_key=APPROVAL_KEY, attestation_key=KEY,
+                                   recipient_id="synthetic-recipient", recipient_type="project-user",
+                                   destination="deliveries/p4", idempotency_key="p4-delivery-00000001")
+        manifest = reviewed["delivery_manifest"]
+        atomic_yaml(self.root / "workflow-g3.yaml", asdict(sign(
+            "G3", "approve-delivery", "delivery-manifest", sha256_digest(manifest),
+            subject_id=self.generate["subject"]["approver_subject_id"], scope=self.generate["scope"])), create_once=False)
+        delivered = workflow.deliver(request_path, self.root / "workflow-g3.yaml", approval_key=APPROVAL_KEY)
+        self.assertEqual(("succeeded", "deliver"),
+                         (delivered["state"]["status"], delivered["state"]["step"]))
+        final = self.root / "deliveries/p4"
+        self.assertEqual({"map.pdf", "map.png", "README.md", "delivery-manifest.yaml",
+                          "checksums.sha256"}, {item.name for item in final.iterdir()})
+
+    def test_p0_author_segment_refs_through_real_workflow(self):
+        """P0/B03 workflow-level proof: a scenario with AUTHOR-declared segment_refs and
+        NO request-level selection compiles through the real single-candidate workflow.
+        This fails with SEGMENT_REPOSITORY_REQUIRED if _compile_approved_candidate drops
+        the repository parameter — the exact B03 regression, at the real entry point."""
+        from carto_core.repository.template_repository import TemplateRepository
+        from carto_core.scenarios.general_thematic.raster import GeneralThematicAuthor, layout_contract
+        from tests.fixtures.schema_cases import D
+        repo_root = self.root / "template-repo"
+        repo_root.mkdir(exist_ok=True)
+        repository = TemplateRepository(path_guard=self.guard, root=repo_root,
+                                        repository_scope="local:templates", registry=self.registry)
+        baseline = layout_contract()
+        staging = self.root / "staging-p0-layout"
+        (staging / "contracts").mkdir(parents=True)
+        (staging / "contracts/layout.yaml").write_text(json.dumps(baseline), encoding="utf-8")
+        lock = deepcopy(VALID_CASES["dependency-lock"])
+        lock["package"] = {"namespace": "local", "kind": "map-layout", "id": "p0-wf-layout",
+                           "version": "1.0.0", "digest": D}
+        lock["dependencies"] = []
+        (staging / "dependencies.lock.yaml").write_text(json.dumps(lock), encoding="utf-8")
+        files = ["dependencies.lock.yaml", "contracts/layout.yaml"]
+        manifest = {"schema_version": 1,
+                    "package": {"namespace": "local", "kind": "map-layout", "id": "p0-wf-layout",
+                                "version": "1.0.0", "status": "published", "summary": "Synthetic P0 layout"},
+                    "dependency_lock": "dependencies.lock.yaml", "files": files,
+                    "checksums": {rel: file_digest(staging / rel) for rel in files}}
+        (staging / "manifest.yaml").write_text(json.dumps(manifest), encoding="utf-8")
+        manifest_digest = file_digest(staging / "manifest.yaml")
+        lines = [f"{manifest['checksums'][rel][7:]}  {rel}" for rel in files]
+        lines.append(f"{manifest_digest[7:]}  manifest.yaml")
+        (staging / "checksums.sha256").write_text("\n".join(sorted(lines)) + "\n", encoding="utf-8")
+        snapshot = {"package_digest": file_digest(staging / "checksums.sha256"),
+                    "manifest_digest": manifest_digest, "manifest": manifest,
+                    "dependency_lock_digest": file_digest(staging / "dependencies.lock.yaml")}
+        publication = repository.publish(
+            package_root=staging, snapshot=snapshot, evidence={"evidence_digest": D},
+            approval={"synthetic": "p0-wf-test"}, idempotency_key="p0-wf-layout-00000001",
+            publication_object={"schema_version": 1, "run_id": "p0-wf-run", "request_digest": D,
+                                "package_ref": {"kind": "map-layout", "id": "p0-wf-layout",
+                                                "version": "1.0.0", "digest": snapshot["package_digest"]},
+                                "evidence_ref": {"id": "template-validation-evidence", "version": "1.0.0",
+                                                 "digest": D, "uri": "evidence.yaml"},
+                                "repository_scope": "local:templates",
+                                "repository_root": repo_root.as_posix(),
+                                "idempotency_key": "p0-wf-layout-00000001"})
+        layout_ref = {"kind": "map-layout", "id": "p0-wf-layout", "version": "1.0.0",
+                      "digest": publication["package_ref"]["digest"]}
+        create = deepcopy(VALID_CASES["general-template-create-request"])
+        create["source_crs"] = deepcopy(CRS_26911)
+        create["display_crs"] = deepcopy(CRS_26911)
+        create["segment_refs"] = {"layout": deepcopy(layout_ref)}
+        author_work = self.root / "p0-author"
+        author_work.mkdir()
+        package = GeneralThematicAuthor(self.guard, author_work, self.registry).author(create, BRIEF_STUB)
+        self.installation = build_installation(Path(package["package_path"]), package)
+        self.generate = self.build_request()
+        self.assertNotIn("segment_refs", self.generate)  # author refs only, no request selection
+        canonical_request(self.generate)
+        self.registry.validate("general-generate-request", self.generate)
+        self.intent = self.scenarios.generate_intent(self.generate)
+        workflow, request_path = self.workflow_at_compile()
+        compiled = workflow.compile(request_path, self.root / "workflow-g1.yaml",
+                                    approval_key=APPROVAL_KEY)
+        self.assertEqual("preview", compiled["state"]["step"])
+        # The author-referenced layout was resolved through the repository at the real
+        # single-candidate entry; execution binds only the scenario (no request selection).
+        self.assertEqual(compiled["scene"]["resolved_layout"]["template_contract"], baseline)
+        self.assertEqual(len(compiled["candidate"]["execution"]["template_refs"]), 1)
+
+    def test_p4_smuggled_component_ref_rejected_at_real_preview(self):
+        """Blocking-defect regression (request↔candidate↔lock consistency): a component
+        ref NOT authorized by the request must not ride a content-matching page through
+        preflight/preview/freeze. Reproduces the evaluator counterexample through the real
+        workflow: compile without segment_refs, inject an unselected/unpublished Style ref
+        into execution.template_refs, recompute the execution digest (attacker best case),
+        then preview must refuse — the page content still matches, only the identity lies."""
+        workflow, request_path = self.workflow_at_compile()
+        compiled = workflow.compile(request_path, self.root / "workflow-g1.yaml",
+                                    approval_key=APPROVAL_KEY)
+        self.assertEqual("preview", compiled["state"]["step"])
+        self.assertNotIn("segment_refs", self.generate)
+        candidate_path = self.work / "candidates/resolved-map.yaml"
+        candidate = load_document(candidate_path)
+        smuggled = {"kind": "map-style", "id": "not-selected-not-published", "version": "9.9.9",
+                    "digest": "sha256:" + "0" * 64}
+        candidate["execution"]["template_refs"].append(smuggled)
+        candidate["execution_digest"] = sha256_digest(candidate["execution"])
+        import yaml
+        candidate_path.write_text(yaml.safe_dump(candidate, sort_keys=False, allow_unicode=True), encoding="utf-8")
+        with self.assertRaises(ProtocolError) as caught:
+            workflow.preview(request_path, attestation_key=KEY)
+        self.assertEqual(caught.exception.code, "CANDIDATE_COMPONENT_SELECTION_MISMATCH")
+
+    def test_p4_drifted_selected_ref_rejected_at_real_preview(self):
+        """With a legitimate selection, drifting the selected ref's digest in the frozen
+        candidate (while page content still matches) must also be refused."""
+        from carto_core.repository.template_repository import TemplateRepository
+        from carto_core.scenarios.general_thematic.raster import GeneralThematicAuthor, layout_contract
+        from tests.fixtures.schema_cases import D
+        repo_root = self.root / "template-repo"
+        repo_root.mkdir(exist_ok=True)
+        repository = TemplateRepository(path_guard=self.guard, root=repo_root,
+                                        repository_scope="local:templates", registry=self.registry)
+        baseline = layout_contract()
+        staging = self.root / "staging-drift-layout"
+        (staging / "contracts").mkdir(parents=True)
+        (staging / "contracts/layout.yaml").write_text(json.dumps(baseline), encoding="utf-8")
+        lock = deepcopy(VALID_CASES["dependency-lock"])
+        lock["package"] = {"namespace": "local", "kind": "map-layout", "id": "p4-drift-layout",
+                           "version": "1.0.0", "digest": D}
+        lock["dependencies"] = []
+        (staging / "dependencies.lock.yaml").write_text(json.dumps(lock), encoding="utf-8")
+        files = ["dependencies.lock.yaml", "contracts/layout.yaml"]
+        manifest = {"schema_version": 1,
+                    "package": {"namespace": "local", "kind": "map-layout", "id": "p4-drift-layout",
+                                "version": "1.0.0", "status": "published", "summary": "Synthetic drift layout"},
+                    "dependency_lock": "dependencies.lock.yaml", "files": files,
+                    "checksums": {rel: file_digest(staging / rel) for rel in files}}
+        (staging / "manifest.yaml").write_text(json.dumps(manifest), encoding="utf-8")
+        manifest_digest = file_digest(staging / "manifest.yaml")
+        lines = [f"{manifest['checksums'][rel][7:]}  {rel}" for rel in files]
+        lines.append(f"{manifest_digest[7:]}  manifest.yaml")
+        (staging / "checksums.sha256").write_text("\n".join(sorted(lines)) + "\n", encoding="utf-8")
+        snapshot = {"package_digest": file_digest(staging / "checksums.sha256"),
+                    "manifest_digest": manifest_digest, "manifest": manifest,
+                    "dependency_lock_digest": file_digest(staging / "dependencies.lock.yaml")}
+        publication = repository.publish(
+            package_root=staging, snapshot=snapshot, evidence={"evidence_digest": D},
+            approval={"synthetic": "p4-drift-test"}, idempotency_key="p4-drift-layout-00000001",
+            publication_object={"schema_version": 1, "run_id": "p4-drift-run", "request_digest": D,
+                                "package_ref": {"kind": "map-layout", "id": "p4-drift-layout",
+                                                "version": "1.0.0", "digest": snapshot["package_digest"]},
+                                "evidence_ref": {"id": "template-validation-evidence", "version": "1.0.0",
+                                                 "digest": D, "uri": "evidence.yaml"},
+                                "repository_scope": "local:templates",
+                                "repository_root": repo_root.as_posix(),
+                                "idempotency_key": "p4-drift-layout-00000001"})
+        layout_ref = {"kind": "map-layout", "id": "p4-drift-layout", "version": "1.0.0",
+                      "digest": publication["package_ref"]["digest"]}
+        create = deepcopy(VALID_CASES["general-template-create-request"])
+        create["source_crs"] = deepcopy(CRS_26911)
+        create["display_crs"] = deepcopy(CRS_26911)
+        create["segment_refs"] = {"layout": deepcopy(layout_ref)}
+        author_work = self.root / "p4-drift-author"
+        author_work.mkdir()
+        package = GeneralThematicAuthor(self.guard, author_work, self.registry).author(create, BRIEF_STUB)
+        self.installation = build_installation(Path(package["package_path"]), package)
+        self.generate = self.build_request()
+        self.generate["segment_refs"] = {"layout": deepcopy(layout_ref)}
+        canonical_request(self.generate)
+        self.registry.validate("general-generate-request", self.generate)
+        self.intent = self.scenarios.generate_intent(self.generate)
+        workflow, request_path = self.workflow_at_compile()
+        workflow.compile(request_path, self.root / "workflow-g1.yaml", approval_key=APPROVAL_KEY)
+        candidate_path = self.work / "candidates/resolved-map.yaml"
+        candidate = load_document(candidate_path)
+        for ref in candidate["execution"]["template_refs"]:
+            if ref["kind"] == "map-layout":
+                ref["digest"] = "sha256:" + "1" * 64  # drift identity, page content unchanged
+        candidate["execution_digest"] = sha256_digest(candidate["execution"])
+        import yaml
+        candidate_path.write_text(yaml.safe_dump(candidate, sort_keys=False, allow_unicode=True), encoding="utf-8")
+        with self.assertRaises(ProtocolError) as caught:
+            workflow.preview(request_path, attestation_key=KEY)
+        self.assertEqual(caught.exception.code, "CANDIDATE_COMPONENT_SELECTION_MISMATCH")
+
+    def test_p4_a10_style_replacement_changes_actual_page_appearance(self):
+        """A10: replacing the Style segment with different typography changes the ACTUAL
+        frozen page appearance (not accept-but-ignore). title_pt 18 -> 20 reaches the page."""
+        from carto_core.repository.template_repository import TemplateRepository
+        from carto_core.scenarios.general_thematic.raster import style_contract
+        repo_root = self.root / "template-repo"
+        repo_root.mkdir(exist_ok=True)
+        repository = TemplateRepository(path_guard=self.guard, root=repo_root,
+                                        repository_scope="local:templates", registry=self.registry)
+        style_a_contract = style_contract()
+        style_b_contract = deepcopy(style_a_contract)
+        style_b_contract["style_id"] = "p4-a10-style-b"
+        style_b_contract["typography"]["title_pt"] = 20
+        style_a = publish_segment(repository, self.root, "map-style", "p4-a10-style-a",
+                                  style_a_contract, "p4-a10-style-a-00000001")
+        style_b = publish_segment(repository, self.root, "map-style", "p4-a10-style-b",
+                                  style_b_contract, "p4-a10-style-b-00000001")
+        self.installation = author_referenced_scenario(self.guard, self.registry, self.root,
+                                                       {"style": style_a}, "p4-a10-author")
+        self.generate = self.build_request()
+        self.generate["segment_refs"] = {"style": deepcopy(style_b)}
+        canonical_request(self.generate)
+        self.registry.validate("general-generate-request", self.generate)
+        self.intent = self.scenarios.generate_intent(self.generate)
+        workflow, request_path = self.workflow_at_compile()
+        compiled = workflow.compile(request_path, self.root / "workflow-g1.yaml",
+                                    approval_key=APPROVAL_KEY)
+        page = load_document(self.guard.resolve(compiled["scene"]["page_request_ref"]["uri"], must_exist=True))
+        self.assertEqual(page["appearance"]["style"], style_b_contract)
+        self.assertEqual(page["appearance"]["style"]["typography"]["title_pt"], 20)
+        self.assertEqual(compiled["candidate"]["execution"]["ownership"]["style"], "map-style")
+
+    def test_p4_a09_replaced_layout_capacity_conflict_reported(self):
+        """A09: a replaced Layout whose legend capacity is below the actual class count
+        raises a locatable capacity conflict — never silently shrinks font or drops content."""
+        from carto_core.repository.template_repository import TemplateRepository
+        from carto_core.scenarios.general_thematic.raster import layout_contract
+        repo_root = self.root / "template-repo"
+        repo_root.mkdir(exist_ok=True)
+        repository = TemplateRepository(path_guard=self.guard, root=repo_root,
+                                        repository_scope="local:templates", registry=self.registry)
+        baseline = layout_contract()
+        small = deepcopy(baseline)
+        small["layout_id"] = "p4-a09-small"
+        small["capacity"]["legend_items"] = 1  # data has 3 classes -> conflict
+        layout_a = publish_segment(repository, self.root, "map-layout", "p4-a09-layout-a",
+                                   baseline, "p4-a09-layout-a-00000001")
+        layout_small = publish_segment(repository, self.root, "map-layout", "p4-a09-layout-small",
+                                       small, "p4-a09-layout-small-00000001")
+        self.installation = author_referenced_scenario(self.guard, self.registry, self.root,
+                                                       {"layout": layout_a}, "p4-a09-author")
+        self.generate = self.build_request()
+        self.generate["segment_refs"] = {"layout": deepcopy(layout_small)}
+        canonical_request(self.generate)
+        self.registry.validate("general-generate-request", self.generate)
+        self.intent = self.scenarios.generate_intent(self.generate)
+        workflow, request_path = self.workflow_at_compile()
+        with self.assertRaises(ProtocolError) as caught:
+            workflow.compile(request_path, self.root / "workflow-g1.yaml", approval_key=APPROVAL_KEY)
+        self.assertEqual(caught.exception.code, "RASTER_PAGE_LEGEND_CAPACITY")
+
+    def test_p4_a20_selection_change_after_g1_requires_revision(self):
+        """A20: changing the component selection after G1 (without a revision) is refused
+        by the request fingerprint gate; the old approval cannot authorize a new组合."""
+        from carto_core.repository.template_repository import TemplateRepository
+        from carto_core.scenarios.general_thematic.raster import layout_contract
+        repo_root = self.root / "template-repo"
+        repo_root.mkdir(exist_ok=True)
+        repository = TemplateRepository(path_guard=self.guard, root=repo_root,
+                                        repository_scope="local:templates", registry=self.registry)
+        baseline = layout_contract()
+        variant = deepcopy(baseline)
+        variant["layout_id"] = "p4-a20-b"
+        variant["capacity"]["legend_items"] = 8
+        layout_a = publish_segment(repository, self.root, "map-layout", "p4-a20-a",
+                                   baseline, "p4-a20-a-00000001")
+        layout_b = publish_segment(repository, self.root, "map-layout", "p4-a20-b",
+                                   variant, "p4-a20-b-00000001")
+        self.installation = author_referenced_scenario(self.guard, self.registry, self.root,
+                                                       {"layout": layout_a}, "p4-a20-author")
+        self.generate = self.build_request()
+        self.generate["segment_refs"] = {"layout": deepcopy(layout_b)}
+        canonical_request(self.generate)
+        self.registry.validate("general-generate-request", self.generate)
+        self.intent = self.scenarios.generate_intent(self.generate)
+        workflow, request_path = self.workflow_at_compile()
+        workflow.compile(request_path, self.root / "workflow-g1.yaml", approval_key=APPROVAL_KEY)
+        # Mutate the selection in the request after G1/compile: a different pinned digest.
+        drifted = deepcopy(self.generate)
+        drifted["segment_refs"]["layout"]["digest"] = "sha256:" + "1" * 64
+        import yaml
+        request_path.write_text(yaml.safe_dump(drifted, sort_keys=False, allow_unicode=True), encoding="utf-8")
+        with self.assertRaises(ProtocolError) as caught:
+            workflow.preview(request_path, attestation_key=KEY)
+        self.assertEqual(caught.exception.code, "JOB_INPUT_DRIFT")
 
     def _exercise_full_workflow(self, recover_delivery=False):
         workflow, request_path = self.workflow_at_compile()

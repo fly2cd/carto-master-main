@@ -127,6 +127,18 @@ def _require_admitted(request: dict[str, Any], brief: dict[str, Any]) -> None:
         raise ProtocolError("TEMPLATE_BRIEF_MISMATCH", "Brief does not describe this template")
 
 
+def _design_instances() -> dict[str, Any]:
+    """P6 S5: the adopted design instances emitted by the author (offline author migration,
+    mapping §9.3). The baseline U rule is pinned by precise reference; the new instances
+    become the running visual authority consumed by the compiler and frontend."""
+    from ...compiler.image_symbols import BASELINE_MEASUREMENT_RULE
+    from .contract_migration import migrate_image_itinerary
+    rule_ref = {"id": BASELINE_MEASUREMENT_RULE["rule_id"],
+                "version": BASELINE_MEASUREMENT_RULE["version"],
+                "digest": _sha(BASELINE_MEASUREMENT_RULE)}
+    return migrate_image_itinerary(TEMPLATE_STYLE, rule_ref=rule_ref)
+
+
 def template_documents(request: dict[str, Any] | None = None) -> dict[str, Any]:
     """The closed package documents (single content source for author and tests)."""
     identity = {"namespace": NAMESPACE, "kind": KIND, "id": SCENARIO_ID, "version": VERSION}
@@ -195,7 +207,7 @@ def template_documents(request: dict[str, Any] | None = None) -> dict[str, Any]:
             "rules": []},
         "contracts/portrayal.yaml": {
             "schema_version": 1, "rules": [], "layer_ids": [LAYER_ID],
-            "image_itinerary": TEMPLATE_STYLE},
+            "design_instances": _design_instances()},
         "contracts/delivery.yaml": {
             "schema_version": 1,
             "targets": [

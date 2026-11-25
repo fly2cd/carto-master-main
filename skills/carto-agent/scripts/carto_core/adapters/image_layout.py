@@ -28,20 +28,32 @@ MAX_IMAGE_SIDE = 16384
 
 
 def furniture_font_pt(item: dict[str, Any], bounds_px: tuple[float, float, float, float],
-                      pt_per_px: float) -> float:
+                      pt_per_px: float, *, fit_mode: str = "shrink-to-fit",
+                      min_pt: float = 4.0) -> float:
     """Nominal page-furniture font in points — the shared derivation BOTH renderers
     consume (PDF and frontend map_json stay pixel-consistent).
 
-    Precedence: the frozen page contract's ``font_pt`` (from the style contract's
-    ``page_furniture``) wins; absent falls back to the historical renderer nominal
-    (title 18pt / other 9pt). The frame-capacity fit stays authoritative in both
-    cases — an explicit value is a nominal size, never an overflow bypass.
+    X10: the capacity-fit behavior is an EXPLICIT adopted mode, not an implicit authority:
+      * ``shrink-to-fit`` (recorded baseline preset): clamp the nominal size down to the
+        frame capacity, floored at ``min_pt``;
+      * ``reject-overflow``: the nominal size must fit; otherwise refuse (design revision),
+        never silently shrink.
+    The frozen page contract's ``font_pt`` wins as the nominal size; absent falls back to
+    the historical renderer nominal (title 18pt / other 9pt). An explicit value is a nominal
+    size, never an overflow bypass.
     """
+    if fit_mode not in {"shrink-to-fit", "reject-overflow"}:
+        raise ProtocolError("FONT_FIT_MODE_UNSUPPORTED", fit_mode)
     _x, _y, w, h = bounds_px
     nominal = float(item.get("font_pt", 18.0 if item.get("content_id") == "title" else 9.0))
     fit_width = (w - 8) * pt_per_px / max(1, len(item.get("text", "")))
     fit_height = h * 0.8 * pt_per_px
-    return max(4.0, min(nominal, fit_width, fit_height))
+    capacity = min(fit_width, fit_height)
+    if fit_mode == "reject-overflow":
+        if nominal > capacity:
+            raise ProtocolError("FONT_CAPACITY_OVERFLOW", item.get("content_id", "furniture"))
+        return nominal
+    return max(min_pt, min(nominal, capacity))
 
 
 def legend_font_pt(legend: dict[str, Any], bounds_px: tuple[float, float, float, float],
@@ -63,15 +75,21 @@ def legend_font_pt(legend: dict[str, Any], bounds_px: tuple[float, float, float,
 
 
 def frame_border_rects(placement: dict[str, float], border: dict[str, Any],
-                       px_per_mm: float) -> tuple[dict[str, float], dict[str, float]]:
+                       px_per_mm: float, *, surrounds: str = "placed-map-content"
+                       ) -> tuple[dict[str, float], dict[str, float]]:
     """Inner and outer map-frame border rectangles in page pixels — the shared
     geometry BOTH renderers draw.
 
-    The inner stroke rides the map-frame path; the outer path sits
-    ``gap_mm + (inner + outer) / 2`` outward so the visual edge-to-edge distance
-    between the two strokes is ``gap_mm`` (strokes are centred on their paths in
-    both renderers). Widths travel with the border dict in millimetres.
+    X06: ``surrounds`` is an EXPLICIT binding, not an implicit choice. The baseline
+    ``placed-map-content`` rides the actual contain-placed image rectangle (including
+    letterbox whitespace); ``view-frame`` (surrounding the whole map frame) is a separate
+    explicit design choice and is not admitted by this baseline preset. The inner stroke
+    rides the bound path; the outer path sits ``gap_mm + (inner + outer) / 2`` outward so
+    the visual edge-to-edge distance between the two strokes is ``gap_mm`` (strokes are
+    centred on their paths in both renderers). Widths travel in millimetres.
     """
+    if surrounds != "placed-map-content":
+        raise ProtocolError("BORDER_SURROUNDS_UNSUPPORTED", surrounds)
     gap = float(border["gap_mm"]) * px_per_mm
     inner_w = float(border["inner_width_mm"]) * px_per_mm
     outer_w = float(border["outer_width_mm"]) * px_per_mm
@@ -154,9 +172,14 @@ def callout_text(graphic: dict) -> tuple[list[str], float]:
             raise ProtocolError("IMAGE_CALLOUT_TEXT_OVERFLOW", graphic["id"])
         wrapped = [title]
     gap = graphic["line_gap_px"]
-    height = 2 * graphic["padding_px"] + len(wrapped) * title_font * 1.25
+    # X04: line-height multipliers are explicit design parameters (recorded baseline
+    # preset 1.25 / 1.3), carried on the graphic instance — not hidden literals. Both
+    # renderers measure with the same declared values.
+    title_line_height = graphic.get("title_line_height", 1.25)
+    body_line_height = graphic.get("body_line_height", 1.3)
+    height = 2 * graphic["padding_px"] + len(wrapped) * title_font * title_line_height
     if graphic["lines"]:
-        height += len(graphic["lines"]) * body_font * 1.3 + 2 * gap
+        height += len(graphic["lines"]) * body_font * body_line_height + 2 * gap
     return wrapped, height
 
 

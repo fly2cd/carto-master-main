@@ -158,6 +158,42 @@ class DesignRevisionProposalTests(unittest.TestCase):
         }
         registry.validate("design-revision-proposal", proposal)
 
+    def test_segment_refs_change_is_accepted_and_invalidates_plan(self):
+        """P4: component replacement is a legal revision key; it re-plans and
+        recompiles while leaving the prepared data evidence reusable."""
+        from carto_core.workflow.revision_graph import compute_invalidation
+        from carto_core.scenarios.general_thematic.revision import REVISION_CONTRACT
+        registry = SchemaRegistry()
+        ref = {"kind": "map-layout", "id": "p4-rev-layout", "version": "1.0.0",
+               "digest": "sha256:" + "0" * 64}
+        proposal = self._valid_proposal()
+        proposal["changes"] = {"segment_refs": {"new_value": {"layout": ref}}}
+        registry.validate("design-revision-proposal", proposal)
+        analysis = compute_invalidation(proposal["changes"], REVISION_CONTRACT.rules())
+        self.assertIn("plan", analysis["invalidated_nodes"])
+        self.assertIn("candidate", analysis["invalidated_nodes"])
+        self.assertTrue(analysis["data_evidence_reusable"])
+        # The generic apply path rebinds the whole selection wholesale.
+        revised = REVISION_CONTRACT.apply_changes({"run_id": "run-test-001"}, proposal["changes"])
+        self.assertEqual(revised["segment_refs"], {"layout": ref})
+
+    def test_segment_refs_change_rejects_unpinned_kind_and_unknown(self):
+        registry = SchemaRegistry()
+        good = {"kind": "map-layout", "id": "p4-rev-layout", "version": "1.0.0",
+                "digest": "sha256:" + "0" * 64}
+        bad_values = [
+            {},                                              # empty selection
+            {"layout": {k: v for k, v in good.items() if k != "digest"}},  # unpinned
+            {"layout": {**good, "kind": "map-scenario"}},     # kind boundary
+            {"portrayal": good},                             # unknown segment
+        ]
+        for value in bad_values:
+            with self.subTest(value=value):
+                proposal = self._valid_proposal()
+                proposal["changes"] = {"segment_refs": {"new_value": value}}
+                with self.assertRaises(ProtocolError):
+                    registry.validate("design-revision-proposal", proposal)
+
     def test_combined_changes_are_accepted(self):
         registry = SchemaRegistry()
         proposal = self._valid_proposal()

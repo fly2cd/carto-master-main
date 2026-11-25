@@ -296,6 +296,7 @@ MapScenario
 以下摘取现有洪涝示例的场景契约字段，用于说明组织关系。它省略了必需的 `embedded`、`compatibility` 和 `rules` 等内容，不是可单独校验或提交的完整文件。
 
 ```yaml
+# illustrative: map-scenario.md §10.1（结构骨架，省略必需的 embedded/compatibility/rules，非完整可校验文件）
 schema_version: 1
 scenario_id: urban-flood-risk
 version: 1.0.0

@@ -64,6 +64,13 @@ STYLE = {
     "white_threshold": 245,
 }
 
+
+def _migrate_style(style):
+    """Test helper: adopt design instances from a style baseline (P6 S8 authority)."""
+    from carto_core.scenarios.leadership_visit.contract_migration import migrate_image_itinerary
+    return migrate_image_itinerary(style, rule_ref={"id": "reference-design-a3-144dpi",
+                                                    "version": "1.0.0", "digest": "sha256:" + "0" * 64})
+
 LAYOUT_CONTRACT = {
     "schema_version": 1, "layout_id": "leadership-a3-landscape", "version": "1.0.0",
     "category": "report",
@@ -271,7 +278,8 @@ class LeadershipFixture(unittest.TestCase):
             "scenario": {"business_scene": "leadership_visit", "tasks": ["visit-route-map"],
                          "scenario_id": "leadership-visit-map", "version": "1.0.0",
                          "embedded": {"layout": LAYOUT_CONTRACT}},
-            "portrayal": {"schema_version": 1, "rules": [], "image_itinerary": STYLE},
+            "portrayal": {"schema_version": 1, "rules": [],
+                          "design_instances": _migrate_style(STYLE)},
         }
         cls.brief = {"brief_id": "brief-test-run", "revision": 1}
 
@@ -343,7 +351,7 @@ class StyleTests(LeadershipFixture, unittest.TestCase):
         styled = apply_grouped_style(STYLE, page_request,
                                      {"projection": projection, "sources": {"route-stops": self.stops_fc,
                                                                             "route-line": self.route_fc},
-                                      "fields": fields})
+                                      "fields": fields}, frame_id="main-map")
         graphics = styled["graphics"]
         types = {g["type"] for g in graphics}
         self.assertEqual({"line", "point", "callout"}, types)
@@ -369,8 +377,141 @@ class StyleTests(LeadershipFixture, unittest.TestCase):
                                                     "display_window": window}},
                                 {"projection": projection, "sources": {"route-stops": shifted,
                                                                        "route-line": self.route_fc},
-                                 "fields": {"route-stops": {"itinerary-group": "itinerary_group"}}})
+                                 "fields": {"route-stops": {"itinerary-group": "itinerary_group"}}}, frame_id="main-map")
         self.assertEqual("ITINERARY_GROUP_UNKNOWN", raised.exception.code)
+
+    def test_p6_graphics_bind_resolved_frame_not_hardcoded_main_map(self):
+        """P6 §13.3: graphics bind to the resolved map frame's actual id. A Layout whose
+        map frame is named differently (e.g. 'atlas-map') works; the implicit 'main-map'
+        string requirement is gone. validate_image_geometry matches the real frame id."""
+        projection = project_features(self.parameters, self.image_bytes, self.stops_fc, self.route_fc)
+        window = display_bounds(self.image_bytes)
+        page_request = {"basemap": {"source_size": {"width_px": 400, "height_px": 300},
+                                    "display_window": window}}
+        fields = {"route-stops": {item["semantic_role"]: item["source_field"]
+                                  for item in self.request["source_bindings"][0]["field_bindings"]},
+                  "route-line": {}}
+        styled = apply_grouped_style(STYLE, page_request,
+                                     {"projection": projection, "sources": {"route-stops": self.stops_fc,
+                                                                            "route-line": self.route_fc},
+                                      "fields": fields}, frame_id="atlas-map")
+        self.assertTrue(styled["graphics"])
+        for graphic in styled["graphics"]:
+            self.assertEqual("atlas-map", graphic["frame_id"])
+        # The geometry gate accepts graphics bound to the actual frame id ...
+        source_size = projection["source_size"]
+        placement = contain_layout({"width_px": window["width"], "height_px": window["height"]},
+                                   {"x": 0, "y": 0, "width": source_size["width_px"],
+                                    "height": source_size["height_px"]})
+        frame_context = {"id": "atlas-map", "frame": placement,
+                         "source_size": source_size, "display_window": window}
+        viewport = {"width_px": source_size["width_px"], "height_px": source_size["height_px"]}
+        validate_image_geometry(frame_context, styled["graphics"], viewport)
+        # ... and rejects them against a differently-named frame (binding is real, not decorative).
+        with self.assertRaises(ProtocolError) as raised:
+            validate_image_geometry({**frame_context, "id": "main-map"}, styled["graphics"], viewport)
+        self.assertEqual("IMAGE_GRAPHIC_FRAME_UNKNOWN", raised.exception.code)
+
+    def test_p6_apply_grouped_style_requires_frame_binding(self):
+        projection = project_features(self.parameters, self.image_bytes, self.stops_fc, self.route_fc)
+        window = display_bounds(self.image_bytes)
+        with self.assertRaises(ProtocolError) as raised:
+            apply_grouped_style(STYLE, {"basemap": {"source_size": {"width_px": 400, "height_px": 300},
+                                                    "display_window": window}},
+                                {"projection": projection, "sources": {"route-stops": self.stops_fc,
+                                                                       "route-line": self.route_fc},
+                                 "fields": {}}, frame_id="")
+        self.assertEqual("ITINERARY_FRAME_BINDING_INVALID", raised.exception.code)
+
+    def test_p6_s5_graphics_equivalence_from_new_instances(self):
+        """S5: graphics driven by the resolved new contract instances are byte-identical to
+        graphics driven by the private baseline — the new instances are a sufficient source
+        and the backend drawing function consumes a derived copy (mapping §5.2/§9.3)."""
+        from carto_core.scenarios.leadership_visit.contract_migration import (
+            migrate_image_itinerary, resolve_effective_style,
+        )
+        from carto_core.scenarios.leadership_visit.route_author import TEMPLATE_STYLE
+        from tests.fixtures.schema_cases import A
+        resolved = resolve_effective_style(migrate_image_itinerary(TEMPLATE_STYLE, rule_ref=A))
+        projection = project_features(self.parameters, self.image_bytes, self.stops_fc, self.route_fc)
+        window = display_bounds(self.image_bytes)
+        page_request = {"basemap": {"source_size": {"width_px": 400, "height_px": 300},
+                                    "display_window": window}}
+        fields = {"route-stops": {item["semantic_role"]: item["source_field"]
+                                  for item in self.request["source_bindings"][0]["field_bindings"]},
+                  "route-line": {}}
+        itinerary = {"projection": projection, "sources": {"route-stops": self.stops_fc,
+                                                           "route-line": self.route_fc}, "fields": fields}
+        baseline = apply_grouped_style(TEMPLATE_STYLE, page_request, itinerary, frame_id="main-map")
+        from_new = apply_grouped_style(resolved, page_request, itinerary, frame_id="main-map")
+        self.assertEqual(baseline["graphics"], from_new["graphics"])
+        self.assertEqual(baseline["legend_items"], from_new["legend_items"])
+
+
+    def test_p7_a17_change_style_role_preserves_business_facts(self):
+        """A17: changing a Style role (group color) changes only appearance; stop positions,
+        visit_order, route geometry and legend labels (business facts) are unchanged."""
+        from copy import deepcopy
+        from carto_core.scenarios.leadership_visit.contract_migration import (
+            migrate_image_itinerary, resolve_effective_style,
+        )
+        from carto_core.scenarios.leadership_visit.route_author import TEMPLATE_STYLE
+        from tests.fixtures.schema_cases import A
+        instances = migrate_image_itinerary(TEMPLATE_STYLE, rule_ref=A)
+        projection = project_features(self.parameters, self.image_bytes, self.stops_fc, self.route_fc)
+        window = display_bounds(self.image_bytes)
+        page_request = {"basemap": {"source_size": {"width_px": 400, "height_px": 300},
+                                    "display_window": window}}
+        fields = {"route-stops": {item["semantic_role"]: item["source_field"]
+                                  for item in self.request["source_bindings"][0]["field_bindings"]},
+                  "route-line": {}}
+        itinerary = {"projection": projection, "sources": {"route-stops": self.stops_fc,
+                                                           "route-line": self.route_fc}, "fields": fields}
+        before = apply_grouped_style(resolve_effective_style(instances), page_request, itinerary, frame_id="main-map")
+        # Change only the morning group's visual color role (appearance), not business binding.
+        changed = deepcopy(instances)
+        changed["style_roles"]["group-morning"]["color"] = "#228833"
+        after = apply_grouped_style(resolve_effective_style(changed), page_request, itinerary, frame_id="main-map")
+        # Legend TEXT/shape (business semantics) unchanged; legend COLOR derives from the
+        # actual visual mapping so it legitimately follows the role color change (§6.2).
+        self.assertEqual([(i["label"], i["shape"]) for i in before["legend_items"]],
+                         [(i["label"], i["shape"]) for i in after["legend_items"]])
+        self.assertEqual(len(before["graphics"]), len(after["graphics"]))
+        for gb, ga in zip(before["graphics"], after["graphics"]):
+            self.assertEqual(gb["id"], ga["id"])
+            self.assertEqual(gb["type"], ga["type"])
+            if gb["type"] == "line":
+                self.assertEqual(gb["points"], ga["points"])  # route geometry unchanged
+            else:
+                self.assertEqual(gb["position"], ga["position"])  # stop anchor unchanged
+            if gb.get("visit_order") is not None:
+                self.assertEqual(gb["visit_order"], ga["visit_order"])
+        # at least one graphic's color actually changed (appearance took effect)
+        self.assertTrue(any(gb.get("color") != ga.get("color")
+                            for gb, ga in zip(before["graphics"], after["graphics"])))
+
+
+    def test_x02_role_classification_decoupled_from_style_existence(self):
+        """X02: a departure stop is classified from data, not from support_label existence.
+        Removing the support appearance role refuses (not silently downgrades to visit)."""
+        from copy import deepcopy
+        departure_stops = deepcopy(self.stops_fc)
+        departure_stops["features"][0]["properties"]["stop_type"] = "departure"
+        projection = project_features(self.parameters, self.image_bytes, departure_stops, self.route_fc)
+        window = display_bounds(self.image_bytes)
+        page_request = {"basemap": {"source_size": {"width_px": 400, "height_px": 300},
+                                    "display_window": window}}
+        fields = {"route-stops": {item["semantic_role"]: item["source_field"]
+                                  for item in self.request["source_bindings"][0]["field_bindings"]},
+                  "route-line": {}}
+        fields["route-stops"]["stop-type"] = "stop_type"
+        itinerary = {"projection": projection, "sources": {"route-stops": departure_stops,
+                                                           "route-line": self.route_fc}, "fields": fields}
+        no_support = deepcopy(STYLE)
+        no_support.pop("support_label")
+        with self.assertRaises(ProtocolError) as raised:
+            apply_grouped_style(no_support, page_request, itinerary, frame_id="main-map")
+        self.assertEqual("LEADERSHIP_SUPPORT_ROLE_MISSING", raised.exception.code)
 
 
 class StyleOverrideTests(LeadershipFixture, unittest.TestCase):
@@ -426,16 +567,19 @@ class StyleOverrideTests(LeadershipFixture, unittest.TestCase):
 
     def test_apply_overrides_merges_into_portrayal_contract(self):
         from carto_core.scenarios.leadership_visit.request_contract import REQUEST_CONTRACT
+        from carto_core.scenarios.leadership_visit.contract_migration import resolve_effective_style
         self.assertEqual(("map_title", "style_overrides"), REQUEST_CONTRACT.override_keys())
         request = self._request_with_override()
         contracts = deepcopy(self.contracts)
         REQUEST_CONTRACT.apply_overrides(request, contracts)
         self.assertEqual(
-            "#228833", contracts["portrayal"]["image_itinerary"]["groups"][0]["color"])
+            "#228833",
+            resolve_effective_style(contracts["portrayal"]["design_instances"])["groups"][0]["color"])
         # The fixture's template contract itself stays untouched (merge copies).
         self.assertEqual(
-            "#1769D2", self.contracts["portrayal"]["image_itinerary"]["groups"][0]["color"])
-        # A template without an image_itinerary section cannot be overridden.
+            "#1769D2",
+            resolve_effective_style(self.contracts["portrayal"]["design_instances"])["groups"][0]["color"])
+        # A template without a design_instances section cannot be overridden.
         with self.assertRaises(ProtocolError) as raised:
             REQUEST_CONTRACT.apply_overrides({"style_overrides": {"pin": {"radius_px": 20}}},
                                              {"portrayal": {}})
@@ -1671,7 +1815,7 @@ class DesignRevisionTests(EndToEndWorkflowTests):
                          furniture["frame_border"])
         # The authored style freezes through the compile chain unchanged.
         contracts = deepcopy(self.contracts)
-        contracts["portrayal"]["image_itinerary"] = json.loads(json.dumps(TEMPLATE_STYLE))
+        contracts["portrayal"]["design_instances"] = _migrate_style(TEMPLATE_STYLE)
         plan = RoutePlanner().build(self.request, self.intent, self.brief, self.bundle,
                                     self.installation, contracts)
         compiler = RouteCandidateCompiler(self.guard, self.registry, project_root=self.root,
@@ -1791,10 +1935,12 @@ class TemplateLifecycleTests(LeadershipFixture, unittest.TestCase):
         authored = self.workflow.author(self.create_path)
         package_path = Path(authored["package"]["package_path"])
         portrayal = load_document(package_path / "contracts" / "portrayal.yaml")
-        # The authored portrayal carries the tuned old-framework 1.2.0 style values.
-        self.assertEqual(2, portrayal["image_itinerary"]["groups"][0]["right_offset_px"])
-        self.assertEqual(45, portrayal["image_itinerary"]["callout"]["offset_x_px"])
-        self.assertTrue(portrayal["image_itinerary"]["callout"]["fit_content"])
+        # The authored design instances resolve to the tuned old-framework 1.2.0 values.
+        from carto_core.scenarios.leadership_visit.contract_migration import resolve_effective_style
+        effective = resolve_effective_style(portrayal["design_instances"])
+        self.assertEqual(2, effective["groups"][0]["right_offset_px"])
+        self.assertEqual(45, effective["callout"]["offset_x_px"])
+        self.assertTrue(effective["callout"]["fit_content"])
         validated = self.workflow.validate(self.create_path, attestation_key=KEY,
                                            font_path=self.font_path)
         evidence = validated["evidence"]

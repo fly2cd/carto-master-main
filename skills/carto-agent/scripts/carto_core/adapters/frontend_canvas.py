@@ -25,7 +25,6 @@ from ..schema_registry import SchemaRegistry
 from .image_layout import callout_text, contain_layout, frame_border_rects, furniture_font_pt, legend_font_pt
 from .route_display import display_points
 
-MAIN_FRAME = "main-map"
 
 
 def stop_card_index(graphics: list[dict[str, Any]]) -> dict[int, int]:

@@ -225,5 +225,66 @@ class GeometryVariantPolicyTests(unittest.TestCase):
         self.assert_code("SCENARIO_PROFILE_DUPLICATE", lambda: self.registry_for(policy))
 
 
+class P3aSuitabilityTests(unittest.TestCase):
+    """P3a: validate_suitability must be a real admission guard, not a no-op.
+
+    Reproduces the evaluator counterexample: a context whose business scene, backend
+    or capability digest has been altered must be refused; selected segment refs must
+    be kind-bound and exactly pinned. The registered identity set is not expanded.
+    """
+
+    def setUp(self):
+        from dataclasses import replace
+        self.replace = replace
+        self.registry = ScenarioRegistry(SchemaRegistry())
+        self.profile = self.registry.for_template(
+            {"kind": "map-scenario", "id": "general-thematic-map", "version": "3.0.0"})
+        self.intent = {"business_scene": "general_thematic_mapping", "tasks": ["thematic-map"],
+                       "theme_tags": ["land-cover"]}
+        self.context = self.profile.build_context("raster", self.intent)
+        self.style_ref = {"kind": "map-style", "id": "s", "version": "1.0.0", "digest": "sha256:" + "0" * 64}
+        self.layout_ref = {"kind": "map-layout", "id": "l", "version": "1.0.0", "digest": "sha256:" + "0" * 64}
+
+    def assert_code(self, code, action):
+        with self.assertRaises(ProtocolError) as raised:
+            action()
+        self.assertEqual(code, raised.exception.code)
+
+    def test_valid_context_and_pinned_refs_pass(self):
+        self.profile.validate_suitability(self.context, style_ref=self.style_ref,
+                                          layout_ref=self.layout_ref)
+
+    def test_altered_business_scene_backend_or_digest_refused(self):
+        for field, value in (("business_scene", "leadership_visit"),
+                             ("renderer_id", "image-itinerary-page"),
+                             ("capability_digest", "sha256:" + "1" * 64),
+                             ("capability_id", "other-capability"),
+                             ("implementation", "leadership-visit")):
+            with self.subTest(field=field):
+                drifted = self.replace(self.context, **{field: value})
+                self.assert_code("CAPABILITY_CONTEXT_DRIFT",
+                                 lambda: self.profile.validate_suitability(drifted))
+
+    def test_unadmitted_geometry_refused(self):
+        drifted = self.replace(self.context, geometry="vector",
+                               allowed_geometries=frozenset({"vector"}))
+        # geometry vector is not admitted by the raster variant context's definition
+        self.assert_code("CAPABILITY_NOT_AVAILABLE",
+                         lambda: self.profile.validate_suitability(drifted))
+
+    def test_unpinned_or_wrong_kind_segment_ref_refused(self):
+        self.assert_code("SEGMENT_REF_UNPINNED",
+                         lambda: self.profile.validate_suitability(
+                             self.context, style_ref={k: v for k, v in self.style_ref.items() if k != "digest"}))
+        self.assert_code("SEGMENT_KIND_UNSUPPORTED",
+                         lambda: self.profile.validate_suitability(
+                             self.context, layout_ref={**self.layout_ref, "kind": "map-scenario"}))
+
+    def test_altered_scenario_identity_refused(self):
+        drifted = self.replace(self.context, template={**self.context.template, "id": "unregistered"})
+        self.assert_code("SCENARIO_PROFILE_DRIFT",
+                         lambda: self.profile.validate_suitability(drifted))
+
+
 if __name__ == "__main__":
     unittest.main()

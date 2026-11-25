@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/linked-label-parameters.schema.json",
+  "description": "P6 field-mapping C[linked-label] / J[support-label]: auxiliary linked-label component internal parameters. inset (M33) participates in content-fit sizing; it is component-local, not a page Frame padding. Single-line centering behavior for empty-body labels is a declared structure preset (X05), not a missing-field fallback. Closed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["inset"],
+  "properties": {
+    "inset": {"$ref": "https://schemas.carto-agent.local/v1/symbol-measurement.schema.json"}
+  }
+}

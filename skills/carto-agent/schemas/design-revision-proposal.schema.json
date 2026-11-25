@@ -158,6 +158,51 @@
             }
           }
         },
+        "segment_refs": {
+          "description": "P4: replace the project-level segment selection wholesale. new_value is the complete replacement segment_refs object (exactly pinned map-style/map-layout refs); it supersedes the previous selection, never merges into it. Invalidates plan and compilation; data evidence stays reusable when bundle inputs are unchanged. Combining a replaced segment with an override owning the same segment is refused downstream as duplicate ownership.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "new_value"
+          ],
+          "properties": {
+            "new_value": {
+              "type": "object",
+              "additionalProperties": false,
+              "minProperties": 1,
+              "properties": {
+                "style": {
+                  "allOf": [
+                    {
+                      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/templateRef"
+                    },
+                    {
+                      "properties": {
+                        "kind": {
+                          "const": "map-style"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "layout": {
+                  "allOf": [
+                    {
+                      "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/templateRef"
+                    },
+                    {
+                      "properties": {
+                        "kind": {
+                          "const": "map-layout"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
         "page_layout": {
           "type": "object",
           "additionalProperties": false,

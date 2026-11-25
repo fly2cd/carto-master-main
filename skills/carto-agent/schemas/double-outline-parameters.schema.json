@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/double-outline-parameters.schema.json",
+  "description": "P6 field-mapping C[double-outline] / J[map-border]: the double-line map-frame border structure (M44/M45/M46). Inner and outer stroke widths and the gap between them are physical mm (never multiplied by reference-px scale). The gap is the appearance spacing between the two border lines, not a Layout container margin; outer offset is mechanically computed from gap plus half-widths. Border color lives in the Style map_border role (A). What the border surrounds (placed-map-content vs view-frame) is a binding decision (X06), baseline placed-map-content. Closed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["inner_stroke_width", "stroke_gap", "outer_stroke_width"],
+  "properties": {
+    "inner_stroke_width": {"$ref": "https://schemas.carto-agent.local/v1/symbol-measurement.schema.json"},
+    "stroke_gap": {"$ref": "https://schemas.carto-agent.local/v1/symbol-measurement.schema.json"},
+    "outer_stroke_width": {"$ref": "https://schemas.carto-agent.local/v1/symbol-measurement.schema.json"}
+  }
+}

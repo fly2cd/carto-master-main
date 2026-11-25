@@ -260,6 +260,90 @@
     "theme_tags": {
       "$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/themeTags"
     },
+    "components": {
+      "description": "P6 field-mapping I.components[id] / J[id]: adopted component instances keyed by stable id. component_ref pins a registered C[type] definition; parameters MUST validate at runtime against that definition's parameter_schema (closed, e.g. card-parameters) — this is not an open extension bag. structure_mode is one of the definition's admitted modes. preset_ref optionally pins the adopted default preset expanded before compile.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["component_ref", "structure_mode", "parameters"],
+        "properties": {
+          "component_ref": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"},
+          "structure_mode": {"type": "string", "minLength": 1},
+          "parameters": {"type": "object", "minProperties": 1},
+          "preset_ref": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"}
+        }
+      }
+    },
+    "annotations": {
+      "description": "P6 field-mapping I.annotations[id] / N[id]: instance annotation placement selections keyed by id. component_ref pins the annotation component; anchor_ref binds the data-derived geographic anchor (never modified by placement); placement carries preferred/fixed semantics.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["component_ref", "anchor_ref", "placement"],
+        "properties": {
+          "component_ref": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"},
+          "anchor_ref": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/artifactRef"},
+          "placement": {"$ref": "https://schemas.carto-agent.local/v1/annotation-placement.schema.json"}
+        }
+      }
+    },
+    "content": {
+      "description": "P6 field-mapping I.content: adopted display content selections under scenario required/allowed constraints. card.fields lists chosen content roles (e.g. arrival-time, M25); numbering.display_order is the display-order rule (M39), distinct from the visit_order fact.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "card": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fields"],
+          "properties": {
+            "fields": {"type": "array", "uniqueItems": true, "items": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"}}
+          }
+        },
+        "numbering": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["display_order"],
+          "properties": {
+            "display_order": {"enum": ["per-date-group", "global"]}
+          }
+        }
+      }
+    },
+    "group_bindings": {
+      "description": "P6 field-mapping I.group_bindings (M02/M04): explicit binding of a business semantic_group to a Style visual_role. Style does not know business group names; the binding connects them. Not name-similarity matching.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["semantic_group", "visual_role"],
+        "properties": {
+          "semantic_group": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+          "visual_role": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"}
+        }
+      }
+    },
+    "legend_labels": {
+      "description": "P6 field-mapping I.legend_labels[group] (M03): adopted legend display labels keyed by business group; generated from the actual mapping, not a separate hand-maintained color/label table.",
+      "type": "object",
+      "additionalProperties": {"type": "string", "minLength": 1}
+    },
+    "group_resolution": {
+      "description": "P6 field-mapping I.group_resolution (M06): the adopted allowed fallback for missing group values. Unknown non-empty groups are still refused; this does not covertly decide legend color.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fallback_group"],
+      "properties": {
+        "fallback_group": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"}
+      }
+    },
+    "basemap_display": {
+      "description": "P6 field-mapping V[id] (M40): per-view basemap display contracts keyed by view id (crop/window strategy), distinct from source facts.",
+      "type": "object",
+      "additionalProperties": {"$ref": "https://schemas.carto-agent.local/v1/basemap-display.schema.json"}
+    },
     "bindings": {
       "$ref": "https://schemas.carto-agent.local/v2/page-bindings.schema.json"
     },

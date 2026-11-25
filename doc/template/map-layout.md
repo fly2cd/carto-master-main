@@ -430,6 +430,7 @@ canvas → frames → content_slots
 以下为拟议的下一版机器契约示例，`schema_version: 2` 仅用于与当前 v1 区分；它不是已注册协议，不能直接提交给现有 CLI。全部长度使用 `canvas.unit`，`content_slots` 中的 role 通过实例绑定获得具体内容。
 
 ```yaml
+# illustrative: map-layout.md §10.2（schema_version 2 提案，非现行协议，不参与现行 Schema 校验）
 schema_version: 2
 layout_id: a3-landscape-sidebar
 version: 1.0.0
@@ -571,6 +572,47 @@ extension_policy:
       allowed_choices: [[1], [2], [1, 2]]
   add_frames: derived-layout-required
   pagination: forbidden
+```
+
+### 10.3 现行 v1 有效示例（由 layout 契约生成）
+
+下例由现行 `layout` 契约生成并通过 `layout.schema.json` 校验（守卫测试 `test_doc_examples.py` 持续验证）。首行 `# schema-check: layout` 是机器可辨标记：表示“现行有效完整示例，必须通过该 Schema”。它与 §10.2 的 `# illustrative`（目标/示意/不完整片段）形成对照——读者与智能体据此区分“可照抄的现行协议”与“仅供理解的目标设计”。注意现行 v1 仍要求 `capacity`（已标 deprecated，保留供 v1 渲染容量检查）与 `placeholders`；`content_slots` 为目标可选字段。
+
+```yaml
+# schema-check: layout
+schema_version: 1
+layout_id: a3-landscape
+version: 1.0.0
+category: report
+canvas:
+  width: 420
+  height: 297
+  unit: mm
+  orientation: landscape
+  safe_margin: 10
+frames:
+- id: main-map
+  content_id: main-view
+  type: map
+  coordinate_space: page
+  bounds:
+  - 20
+  - 30
+  - 380
+  - 230
+  overflow_policy: clip
+placeholders:
+- '{{MAP_TITLE}}'
+- '{{MAP_FRAME}}'
+capacity:
+  legend_items: 12
+  title_characters: 40
+rules:
+- id: required-rule
+  strength: hard_rule
+  path: /value
+  description: 必须满足
+content_padding_mm: 2
 ```
 
 示例中，`viewport_clip` 只限制绘制发生在地图框内；`preserve_map_coverage` 要求空间适配仍完整满足业务范围，二者含义不同。`required-notice` 的模板数量下限为零表示 Layout 可用于没有声明的场景；Scenario 一旦要求该角色，其绑定在本次地图中即为必需。

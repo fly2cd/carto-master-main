@@ -211,15 +211,25 @@ class GeneralThematicCandidateCompiler:
 
     def _execution_base(self, intent: dict[str, Any], installation: dict[str, Any],
                         bundle: dict[str, Any], profile: Any, contracts: dict[str, Any]) -> dict[str, Any]:
+        # P4: a project-level segment selection binds the exact replacing refs into
+        # template_refs and records per-segment ownership. Without a selection the
+        # execution shape stays byte-identical to the legacy baseline.
+        template_refs = [deepcopy(installation["template_ref"])]
+        ownership = {"scenario": "map-scenario"}
+        selection = contracts.get("segment_selection")
+        if selection:
+            for segment, reference in sorted(selection["refs"].items()):
+                template_refs.append(deepcopy(reference))
+                ownership[segment] = selection["ownership"][segment]
         return {
             "intent_ref": {"id": "map-intent", "version": "1.0.0", "digest": sha256_digest(intent)},
             "profile_refs": [deepcopy(intent["evidence_refs"][0]), deepcopy(intent["evidence_refs"][-1])],
             "business_scene": intent["business_scene"],
             "map_tasks": list(intent["tasks"]),
-            "template_refs": [deepcopy(installation["template_ref"])],
+            "template_refs": template_refs,
             "dependency_refs": [deepcopy(contracts['portrayal']['layers'][0]['map_expression_ref'])],
             "policy_refs": [profile.ref],
-            "ownership": {"scenario": "map-scenario"},
+            "ownership": ownership,
             "shared_semantics": {"theme_tags": list(intent["theme_tags"]),
                                  "data_nature": bundle["summary"]["data_nature"]},
             "material_facts_refs": [deepcopy(bundle["data_facts"])] if bundle.get("data_facts") else [],

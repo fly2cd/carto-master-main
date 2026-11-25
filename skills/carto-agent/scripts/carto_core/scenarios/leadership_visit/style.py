@@ -14,11 +14,12 @@ import math
 from typing import Any
 
 from ...adapters.image_layout import callout_text
+from ...compiler.image_symbols import (
+    REFERENCE_HEIGHT_PX, REFERENCE_WIDTH_PX, symbol_scale,
+)
 from ...errors import ProtocolError
+from . import content_contract
 
-MAIN_FRAME = "main-map"
-REFERENCE_WIDTH_PX = 2381   # A3 landscape at the 144-DPI reference design
-REFERENCE_HEIGHT_PX = 1684
 
 
 def itinerary_value(feature: dict, fields: dict, role: str):
@@ -73,7 +74,8 @@ def _place(graphic: dict, window: dict, placed: list, explicit: bool, anchors: l
 
 
 def apply_grouped_style(style: dict[str, Any], page_request: dict[str, Any],
-                        itinerary_data: dict[str, Any]) -> dict[str, Any]:
+                        itinerary_data: dict[str, Any], *, frame_id: str,
+                        appearance_roles: dict[str, Any] | None = None) -> dict[str, Any]:
     """Compile the frozen style contract + projected itinerary to pixel graphics.
 
     Inputs:
@@ -83,10 +85,15 @@ def apply_grouped_style(style: dict[str, Any], page_request: dict[str, Any],
       itinerary_data -- {"projection": frozen projection document,
                          "sources": {"route-stops": FeatureCollection, "route-line": ...},
                          "fields": {role: {semantic_role: source_field}}}
+      frame_id       -- the resolved map frame's actual id (P6 §13.3: graphics bind to
+                        the verified view/content frame, not a hardcoded "main-map"
+                        string imposed on every Layout).
 
     Output: {"graphics": [...], "legend_items": [...]} where graphics use
-    original-image pixel anchors on the main map frame.
+    original-image pixel anchors on the resolved map frame.
     """
+    if not isinstance(frame_id, str) or not frame_id:
+        raise ProtocolError("ITINERARY_FRAME_BINDING_INVALID", "a resolved map frame id is required")
     basemap = page_request.get("basemap") or {}
     window = basemap.get("display_window")
     source_size = basemap.get("source_size")
@@ -107,7 +114,7 @@ def apply_grouped_style(style: dict[str, Any], page_request: dict[str, Any],
         used.add(key)
         return groups[key]
 
-    scale = max(1.0, min(window["width"] / REFERENCE_WIDTH_PX, window["height"] / REFERENCE_HEIGHT_PX))
+    scale = symbol_scale(window)
     used: set[str] = set()
     graphics: list[dict] = []
     placed: list = []
@@ -129,7 +136,7 @@ def apply_grouped_style(style: dict[str, Any], page_request: dict[str, Any],
         if "arrows" in style["route"]:
             route_style["arrows"] = {k: v * scale for k, v in style["route"]["arrows"].items()}
         for j, part in enumerate(route["parts"]):
-            graphics.append({"id": f"image-route-{i + 1}-{j + 1}", "frame_id": MAIN_FRAME,
+            graphics.append({"id": f"image-route-{i + 1}-{j + 1}", "frame_id": frame_id,
                              "coordinate_space": "image-pixel", "type": "line", "points": part,
                              "color": color, "route_mode": route["route_mode"], **route_style})
     metadata = fields.get("route-stops", {})
@@ -152,9 +159,12 @@ def apply_grouped_style(style: dict[str, Any], page_request: dict[str, Any],
         source = stops.get(stop["feature_id"], {"properties": {}})
         selected_group = group(source, "route-stops")
         color = selected_group["color"]
-        base = {"frame_id": MAIN_FRAME, "coordinate_space": "image-pixel", "position": stop["position"]}
+        base = {"frame_id": frame_id, "coordinate_space": "image-pixel", "position": stop["position"]}
         support = style.get("support_label")
-        kind = itinerary_value(source, metadata, "stop-type") if support else "visit"
+        # X02: role classification reads the data fact (stop-type/map-role), never the
+        # existence of a style section. A non-visit role requires the support appearance
+        # role; missing it is refused, not silently downgraded to a normal visit point.
+        kind = itinerary_value(source, metadata, "stop-type")
         if kind is None or kind == "":
             kind = "visit"
         if not isinstance(kind, str) or kind not in {"departure", "visit", "transit"}:
@@ -164,6 +174,9 @@ def apply_grouped_style(style: dict[str, Any], page_request: dict[str, Any],
             if not isinstance(map_role, str) or map_role not in {"origin", "visit", "waypoint", "destination"}:
                 raise ProtocolError("ITINERARY_MAP_ROLE_INVALID", "map-role")
             kind = "visit" if map_role == "visit" else "transit"
+        if kind != "visit" and support is None:
+            raise ProtocolError("LEADERSHIP_SUPPORT_ROLE_MISSING",
+                                f"stop role '{kind}' requires the support_label appearance role")
         title = source["properties"].get(metadata.get("stop-label", "stop_name"), "")
         if not isinstance(title, str) or not title.strip() or len(title) > 200 or any(c in title for c in "\r\n"):
             raise ProtocolError("ITINERARY_METADATA_INVALID", "stop-label")
@@ -191,31 +204,36 @@ def apply_grouped_style(style: dict[str, Any], page_request: dict[str, Any],
             finish(graphic, source)
             support_seen[label_key] = graphic
             continue
-        graphics.append({**base, "id": f"image-stop-{order}", "type": "point", "visit_order": order,
-                         "shape": "pin", "color": color, "group": selected_group["id"],
-                         "radius_px": style["pin"]["radius_px"] * scale,
-                         "font_size_px": style["pin"]["font_size_px"] * scale, "show_number": True})
+        pin_graphic = {**base, "id": f"image-stop-{order}", "type": "point", "visit_order": order,
+                       "shape": "pin", "color": color, "group": selected_group["id"],
+                       "radius_px": style["pin"]["radius_px"] * scale,
+                       "font_size_px": style["pin"]["font_size_px"] * scale, "show_number": True}
+        # X07: number text / marker edge colors come from Style roles (A), not renderer defaults.
+        if appearance_roles:
+            pin_graphic["text_color"] = appearance_roles.get("visit-order-text", {}).get("color", "#FFFFFF")
+            pin_graphic["edge_color"] = appearance_roles.get("numbered-stop-marker", {}).get("stroke", {}).get("color", "#FFFFFF")
+        graphics.append(pin_graphic)
         date = _text(itinerary_value(source, metadata, "visit-date"), "visit-date")
         period = _text(itinerary_value(source, metadata, "visit-period"), "visit-period")
         key = (date, selected_group["id"])
         group_counts[key] = group_counts.get(key, 0) + 1
         display_order = group_counts[key] if style.get("numbering", "global") == "per-date-group" else order
-        lines = [f"{date}{period}行程点{display_order}"]
+        lines = [content_contract.stop_line(date, period, display_order)]
         config = style["callout"]
         if config.get("show_arrival_time", True):
             arrival = _text(itinerary_value(source, metadata, "arrival-time"), "arrival-time")
             if arrival:
-                lines.append("到达时间：" + arrival)
+                lines.append(content_contract.arrival_line(arrival))
         travel = []
-        for role, suffix in (("distance-km", "公里"), ("duration-min", "分钟")):
+        for role in ("distance-km", "duration-min"):
             value = itinerary_value(source, metadata, role)
             if value is not None:
                 value = _number(value, role)
                 if value < 0 or value > 100000:
                     raise ProtocolError("ITINERARY_METADATA_INVALID", role)
-                travel.append(("约" if role == "distance-km" else "车程约") + f"{value:g}" + suffix)
+                travel.append(content_contract.travel_line(role, value))
         if travel:
-            lines.append("，".join(travel))
+            lines.append(content_contract.TRAVEL_JOINER.join(travel))
         graphic = {**base, "id": f"image-callout-{order}", "type": "callout", "title": title,
                    "stop_orders": [order], "lines": lines, "color": color,
                    "group": selected_group["id"],
@@ -232,7 +250,9 @@ def apply_grouped_style(style: dict[str, Any], page_request: dict[str, Any],
     graphics = sorted(graphics, key=lambda g: (rank[g["type"]], g["id"]))
     legend_items = [{"label": g["label"], "color": g["color"], "shape": "line"}
                     for g in style["groups"] if g["id"] in used]
-    legend_items += [{"label": "行程点", "color": groups[style["default_group"]]["color"], "shape": "pin"}]
+    legend_items += [{"label": content_contract.LEGEND_STOP_LABEL,
+                      "color": groups[style["default_group"]]["color"], "shape": "pin"}]
     if support_seen:
-        legend_items.append({"label": "起始/折返点", "color": style["support_label"]["color"], "shape": "pin"})
+        legend_items.append({"label": content_contract.LEGEND_SUPPORT_LABEL,
+                             "color": style["support_label"]["color"], "shape": "pin"})
     return {"graphics": graphics, "legend_items": legend_items}

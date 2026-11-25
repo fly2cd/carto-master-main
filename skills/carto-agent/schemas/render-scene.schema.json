@@ -519,6 +519,14 @@
               "show_number": {
                 "type": "boolean"
               },
+              "text_color": {
+                "type": "string",
+                "pattern": "^#[0-9A-Fa-f]{6}$"
+              },
+              "edge_color": {
+                "type": "string",
+                "pattern": "^#[0-9A-Fa-f]{6}$"
+              },
               "title": {
                 "type": "string",
                 "maxLength": 200

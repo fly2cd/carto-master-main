@@ -44,7 +44,8 @@ from ...schema_registry import SchemaRegistry, load_document
 from ...security.paths import PathGuard
 from .frontend_document import FrontendDocumentBuilder
 from .request_contract import REQUEST_CONTRACT
-from .style import MAIN_FRAME, apply_grouped_style
+from .style import apply_grouped_style
+from .contract_migration import resolve_effective_style
 
 _TARGET_PREFIX = "leadership-map"
 _DISPLAY_CRS = {"authority": "EPSG", "code": "4326"}
@@ -134,11 +135,21 @@ class RouteCandidateCompiler:
         if route_binding is not None:
             projection_input["route_ref"] = deepcopy(route_binding["prepared_ref"])
         projection, projection_receipt = self._invoke_tool(gateway, PROJECTION_CAPABILITY, projection_input)
-        style = deepcopy(contracts["portrayal"]["image_itinerary"])
+        portrayal = contracts["portrayal"]
+        # P6 S8: the adopted design instances are the sole running visual authority.
+        # Resolve the effective style as a derived copy; the same resolved style feeds
+        # graphics construction and the frontend. The private image_itinerary is gone.
+        instances = portrayal.get("design_instances")
+        if instances is None:
+            raise ProtocolError("LEADERSHIP_STYLE_CONTRACT_MISSING",
+                                "leadership portrayal requires design_instances")
+        self.registry.validate("design-instances", instances)
+        style = resolve_effective_style(instances)
+        white_threshold = int(instances["basemap_display"]["crop"]["parameters"]["white_threshold"])
         self.registry.validate("image-itinerary-style", style)
         display_input = {"schema_version": 1,
                          "image_ref": deepcopy(basemap_request["image_ref"]),
-                         "white_threshold": int(style.get("white_threshold", DEFAULT_WHITE_THRESHOLD))}
+                         "white_threshold": white_threshold}
         display_result, display_receipt = self._invoke_tool(gateway, DISPLAY_CAPABILITY, display_input)
         window = display_result["display_window"]
         source_size = deepcopy(projection["source_size"])
@@ -163,7 +174,8 @@ class RouteCandidateCompiler:
                                                            "route-line": route_document or {}},
                      "fields": fields}
         styled = apply_grouped_style(style, {"basemap": {"source_size": source_size,
-                                                         "display_window": window}}, itinerary)
+                                                         "display_window": window}}, itinerary,
+                                     frame_id=frame["id"], appearance_roles=instances["style_roles"])
         graphics = styled["graphics"]
 
         # --- Optional annotation solver (greedy + annealing, fixed seed) ------

@@ -174,6 +174,16 @@ VALID_CASES = {
     "validation-host": {"schema_version": 1, "host_id": "general-thematic-raster-host", "version": "1.0.0", "shell_digest": D, "style_digest": D, "layout_digest": D, "fixture_digest": D, "display_crs": {"authority": "EPSG", "code": "3857"}, "output_profile": {"width_mm": 297, "height_mm": 210, "dpi": 300}},
     "segment-validation-evidence": {"schema_version": 1, "evidence_id": "seg-validation-one", "namespace": "local", "package_ref": T, "manifest_digest": D, "dependency_lock_digest": D, "design_digest": D, "host_ref": A, "checker_set_digest": D, "status": "passed", "counts": {"blocker": 0, "error": 0, "warning": 0, "info": 0}, "results": [{"check_id": "segment.package-closed", "version": "1.0.0", "status": "passed", "severity": "info", "details": {}}], "renderer": {"renderer_id": "rasterio-matplotlib-page"}, "render_receipt_ref": A, "render_scene_ref": A, "preview_artifacts": [{"target": "png", "artifact_ref": A}], "created_at": "2026-11-23T00:00:00Z", "evidence_digest": D},
     "generate-request": {"schema_version": 1, "request_id": "request-one", "project_id": "test-project", "goal": "校验制图请求结构", "geometry": "raster", "panels": [{"id": "base-view", "source_id": "ref-a", "title": "Base"}], "sources": [A], "requested_outputs": ["pdf", "png"], "subject": {"subject_id": "user-1", "tenant_id": "tenant-one", "namespace": "project-one"}, "idempotency_key": "request-one-00001"},
+    "measurement-rule": {"schema_version": 1, "rule_id": "reference-design-a3-144dpi", "version": "1.0.0", "reference_width_px": 2381, "reference_height_px": 1684, "scale_floor": 1.0, "scale_function": "min-ratio-floor"},
+    "symbol-measurement": {"kind": "reference-design-px", "value": 6, "rule_ref": deepcopy(A)},
+    "card-parameters": {"sizing": {"width": {"mode": "fit-content-up-to-limit", "limit": {"kind": "reference-design-px", "value": 500, "rule_ref": deepcopy(A)}}}, "inset": {"kind": "reference-design-px", "value": 4, "rule_ref": deepcopy(A)}, "sections": {"gap": {"kind": "reference-design-px", "value": 6, "rule_ref": deepcopy(A)}}, "title": {"wrap_mode": "single-line-reject-overflow"}},
+    "component-definition": {"schema_version": 1, "component_id": "information-card", "version": "1.0.0", "type": "information-card", "parameter_schema": "card-parameters", "structure_modes": ["atomic-card"], "measurement_modes": ["reference-design-px"], "backend_capabilities": ["image-overlay"], "appearance_roles": ["card-title", "card-body", "card-background", "card-leader"], "content_roles": ["card-title-text", "card-body-lines"]},
+    "annotation-placement": {"mode": "preferred", "offset": {"x": {"kind": "reference-design-px", "value": 45, "rule_ref": deepcopy(A)}, "y": {"kind": "reference-design-px", "value": -135, "rule_ref": deepcopy(A)}}},
+    "basemap-display": {"crop": {"parameters": {"white_threshold": 245}}},
+    "role-appearance": {"font": {"size": {"kind": "reference-design-px", "value": 22, "rule_ref": deepcopy(A)}, "weight": 700, "color": "#FFFFFF"}},
+    "route-parameters": {"arrows": {"head_size": {"kind": "reference-design-px", "value": 8, "rule_ref": deepcopy(A)}, "repeat_spacing": {"kind": "reference-design-px", "value": 200, "rule_ref": deepcopy(A)}}},
+    "linked-label-parameters": {"inset": {"kind": "reference-design-px", "value": 4, "rule_ref": deepcopy(A)}},
+    "double-outline-parameters": {"inner_stroke_width": {"kind": "physical-mm", "value": 0.25}, "stroke_gap": {"kind": "physical-mm", "value": 1.0}, "outer_stroke_width": {"kind": "physical-mm", "value": 0.5}},
     "map-intent": {"schema_version": 1, "intent_id": "intent-one", "revision": 1, "profile_version": "2.0.0", "business_scene": "general_thematic_mapping", "theme_tags": ["unit-theme"], "tasks": ["thematic-map"], "intent_status": "resolved", "readiness_status": "ready", "missing_items": [], "evidence_refs": [A]},
     "intent-profiles": {'schema_version': 1, 'catalog_version': '2.0.0', 'profiles': [{'business_scene': 'unit_scene', 'purpose_terms': ['unit purpose'], 'task_ids': ['unit-task'], 'required_information': ['theme_tags'], 'unsupported_actions': []}], 'themes': [{'id': 'unit-theme', 'label': 'Unit topic', 'terms': ['unit topic']}]},
     "map-brief": {"schema_version": 1, "brief_id": "map-brief-one", "revision": 1, "intent_ref": A, "purpose": "空间信息展示", "audience": "授权使用者", "source_plan": [{"role": "area-role", "source_ref": A, "allowed_operations": ["read", "join", "classify"]}], "targets": ["pdf", "png"], "template_candidates": [T], "delegation": {"allow_data_agent": False, "max_tool_calls": 10}, "approval_required": True, "business_scene": "government_thematic", "theme_tags": ["unit-theme"], "tasks": ["indicator-map"]},
@@ -732,6 +742,75 @@ SEMANTIC_INVALID_CASES["template-create-request-segment-ref-kind"] = ("template-
 _invalid_create_ref_segment = deepcopy(VALID_CASES["template-create-request"])
 _invalid_create_ref_segment["segment_refs"] = {"portrayal": deepcopy(SEGMENT_REF_LAYOUT)}
 SEMANTIC_INVALID_CASES["template-create-request-segment-ref-unknown"] = ("template-create-request", _invalid_create_ref_segment)
+
+# P4: project-level segment selection on the generate request. Legal sample plus
+# kind-boundary / unknown-segment / unpinned / empty refusals (same shape and kind
+# binding as scenario.segment_refs and template-create-request.segment_refs).
+SEGMENT_REF_STYLE = {"kind": "map-style", "id": "test-style", "version": "1.0.0", "digest": D}
+GENERATE_REQUEST_SEGMENT_REFS = deepcopy(VALID_CASES["generate-request"])
+GENERATE_REQUEST_SEGMENT_REFS["segment_refs"] = {"layout": deepcopy(SEGMENT_REF_LAYOUT),
+                                                 "style": deepcopy(SEGMENT_REF_STYLE)}
+
+_invalid_generate_ref_kind = deepcopy(GENERATE_REQUEST_SEGMENT_REFS)
+_invalid_generate_ref_kind["segment_refs"]["layout"]["kind"] = "map-scenario"
+SEMANTIC_INVALID_CASES["generate-request-segment-ref-kind"] = ("generate-request", _invalid_generate_ref_kind)
+
+_invalid_generate_ref_segment = deepcopy(GENERATE_REQUEST_SEGMENT_REFS)
+_invalid_generate_ref_segment["segment_refs"]["portrayal"] = deepcopy(SEGMENT_REF_LAYOUT)
+SEMANTIC_INVALID_CASES["generate-request-segment-ref-unknown"] = ("generate-request", _invalid_generate_ref_segment)
+
+_invalid_generate_ref_unpinned = deepcopy(GENERATE_REQUEST_SEGMENT_REFS)
+_invalid_generate_ref_unpinned["segment_refs"]["layout"].pop("digest")
+SEMANTIC_INVALID_CASES["generate-request-segment-ref-unpinned"] = ("generate-request", _invalid_generate_ref_unpinned)
+
+_invalid_generate_ref_empty = deepcopy(GENERATE_REQUEST_SEGMENT_REFS)
+_invalid_generate_ref_empty["segment_refs"] = {}
+SEMANTIC_INVALID_CASES["generate-request-segment-ref-empty"] = ("generate-request", _invalid_generate_ref_empty)
+
+# P6 measurement contracts: discriminated unit, closed kind, precise rule binding.
+_invalid_measurement_kind = {"kind": "physical-cm", "value": 6}
+SEMANTIC_INVALID_CASES["symbol-measurement-unknown-kind"] = ("symbol-measurement", _invalid_measurement_kind)
+
+_invalid_measurement_missing_rule = {"kind": "reference-design-px", "value": 6}
+SEMANTIC_INVALID_CASES["symbol-measurement-reference-missing-rule"] = ("symbol-measurement", _invalid_measurement_missing_rule)
+
+_invalid_measurement_physical_extra = {"kind": "physical-pt", "value": 12, "rule_ref": deepcopy(A)}
+SEMANTIC_INVALID_CASES["symbol-measurement-physical-extra-field"] = ("symbol-measurement", _invalid_measurement_physical_extra)
+
+_invalid_measurement_negative = {"kind": "physical-mm", "value": -1}
+SEMANTIC_INVALID_CASES["symbol-measurement-negative-value"] = ("symbol-measurement", _invalid_measurement_negative)
+
+_invalid_rule_function = deepcopy(VALID_CASES["measurement-rule"])
+_invalid_rule_function["scale_function"] = "linear-no-floor"
+SEMANTIC_INVALID_CASES["measurement-rule-unknown-function"] = ("measurement-rule", _invalid_rule_function)
+
+_invalid_rule_reference = deepcopy(VALID_CASES["measurement-rule"])
+_invalid_rule_reference["reference_width_px"] = 0
+SEMANTIC_INVALID_CASES["measurement-rule-zero-reference"] = ("measurement-rule", _invalid_rule_reference)
+
+_invalid_card_wrap = deepcopy(VALID_CASES["card-parameters"])
+_invalid_card_wrap["title"]["wrap_mode"] = "auto-shrink"
+SEMANTIC_INVALID_CASES["card-parameters-unknown-wrap-mode"] = ("card-parameters", _invalid_card_wrap)
+
+_invalid_card_width = deepcopy(VALID_CASES["card-parameters"])
+_invalid_card_width["sizing"]["width"].pop("limit")
+SEMANTIC_INVALID_CASES["card-parameters-width-missing-limit"] = ("card-parameters", _invalid_card_width)
+
+_invalid_card_bag = deepcopy(VALID_CASES["card-parameters"])
+_invalid_card_bag["extra_knob"] = 1
+SEMANTIC_INVALID_CASES["card-parameters-open-extension-bag"] = ("card-parameters", _invalid_card_bag)
+
+_invalid_component_type = deepcopy(VALID_CASES["component-definition"])
+_invalid_component_type["type"] = "map-card"
+SEMANTIC_INVALID_CASES["component-definition-unknown-type"] = ("component-definition", _invalid_component_type)
+
+_invalid_placement_mode = deepcopy(VALID_CASES["annotation-placement"])
+_invalid_placement_mode["mode"] = "auto"
+SEMANTIC_INVALID_CASES["annotation-placement-unknown-mode"] = ("annotation-placement", _invalid_placement_mode)
+
+_invalid_basemap_threshold = deepcopy(VALID_CASES["basemap-display"])
+_invalid_basemap_threshold["crop"]["parameters"]["white_threshold"] = 300
+SEMANTIC_INVALID_CASES["basemap-display-threshold-range"] = ("basemap-display", _invalid_basemap_threshold)
 
 _invalid_redlines_enforcement = deepcopy(VALID_CASES["color-redlines-policy"])
 _invalid_redlines_enforcement["enforcement"]["cvd_safety"] = "sometimes"

@@ -232,9 +232,18 @@ class GeneralVectorCandidateCompiler:
         # into execution and verified by the shared generation workflow.
         scene = compiler.compile(bundle_ref=service.save('prepared-data-bundle', bundle_core(bundle)).ref(), page_request=page, context=context,
                                  scene_id='scene-' + request['run_id'], targets=tuple(request['requested_outputs']))
+        # P4: bind the exact project-level segment selection (if any) into execution;
+        # without a selection the shape stays byte-identical to the legacy baseline.
+        template_refs = [deepcopy(installation['template_ref'])]
+        ownership = {'scenario': 'map-scenario'}
+        selection = contracts.get('segment_selection')
+        if selection:
+            for segment, reference in sorted(selection['refs'].items()):
+                template_refs.append(deepcopy(reference))
+                ownership[segment] = selection['ownership'][segment]
         base = {'intent_ref': artifact_ref('map-intent', intent), 'profile_refs': [intent['evidence_refs'][0], intent['evidence_refs'][-1]],
-                'business_scene': intent['business_scene'], 'map_tasks': intent['tasks'], 'template_refs': [installation['template_ref']],
-                'dependency_refs': list({v['expression_ref']['id']:v['expression_ref'] for v in expected_views}.values()), 'policy_refs': [profile.ref], 'ownership': {'scenario': 'map-scenario'},
+                'business_scene': intent['business_scene'], 'map_tasks': intent['tasks'], 'template_refs': template_refs,
+                'dependency_refs': list({v['expression_ref']['id']:v['expression_ref'] for v in expected_views}.values()), 'policy_refs': [profile.ref], 'ownership': ownership,
                 'shared_semantics': {'theme_tags': intent['theme_tags'], 'data_nature': bundle['summary']['data_nature']},
                 'material_facts_refs': [deepcopy(bundle['data_facts'])] if bundle.get('data_facts') else []}
         base['thematic_plan_ref'] = artifact_ref('map-plan', plan)

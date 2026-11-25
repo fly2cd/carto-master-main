@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/component-definition.schema.json",
+  "description": "P6 field-mapping C[type] / D3: a registered expression/content component definition. It defines input semantics, the strict parameter schema, admitted structure modes, measurement modes, required backend capabilities and the appearance/content roles it consumes. It does NOT choose undeclared design at execution; default structure must come from a precisely referenced preset expanded before compile. Card-like composite content extends via this trusted component protocol, not by pretending to be a geographic layer expression, and not by adding a parallel owner enum (D1/D3). Closed: unknown fields rejected.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "component_id", "version", "type", "parameter_schema", "structure_modes", "measurement_modes", "backend_capabilities", "appearance_roles", "content_roles"],
+  "properties": {
+    "schema_version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/schemaVersion"},
+    "component_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+    "version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"},
+    "type": {"enum": ["information-card", "linked-label", "double-outline", "classified-route", "numbered-stop-marker"]},
+    "parameter_schema": {"type": "string", "minLength": 1},
+    "structure_modes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "measurement_modes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["reference-design-px", "physical-pt", "physical-mm"]}},
+    "backend_capabilities": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "appearance_roles": {"type": "array", "uniqueItems": true, "items": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"}},
+    "content_roles": {"type": "array", "uniqueItems": true, "items": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"}}
+  }
+}

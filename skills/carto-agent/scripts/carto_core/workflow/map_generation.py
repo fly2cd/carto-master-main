@@ -131,6 +131,14 @@ class MapGenerationWorkflow:
         profile = ScenarioRegistry(self.registry).require_request_intent(request, intent)
         brief = self._load("brief/map-brief.yaml", "map-brief")
         profile.require_intent_projection(brief, intent, kind="BRIEF")
+        # P3a: build the trusted capability context and validate admission suitability,
+        # including the actual Style/Layout refs selected by this request. Contract-level
+        # joint compatibility is enforced downstream by load_contracts + check_candidate.
+        registry = ScenarioRegistry(self.registry)
+        context = registry.capability_context(request)
+        selection = request.get("segment_refs") or {}
+        profile.validate_suitability(context, style_ref=selection.get("style"),
+                                     layout_ref=selection.get("layout"))
         approval_file = self._resolve_project_path(approval_path, must_exist=True)
         approval_value = load_document(approval_file)
         if not isinstance(approval_value, dict):
@@ -201,7 +209,8 @@ class MapGenerationWorkflow:
         bundle_target = self.path_guard.resolve(self._design_path("data/prepared-data-bundle.yaml"))
         atomic_yaml(bundle_target, bundle)
         compiler = self._candidate_compiler(request)
-        contracts = compiler.load_contracts(installation)
+        contracts = compiler.load_contracts(installation, repository=self._repository_optional(),
+                                            segment_refs=request.get("segment_refs"))
         # R6/R6b: design-revision cartography + optional page-size overrides are scenario
         # request-body semantics, applied through the request_contract hook.
         ScenarioRegistry(self.registry).for_generate(request).component("request_contract").apply_overrides(request, contracts)
@@ -250,7 +259,8 @@ class MapGenerationWorkflow:
         bundle_target = self.path_guard.resolve(self._design_path("data/prepared-data-bundle.yaml"))
         atomic_yaml(bundle_target, bundle)
         compiler = self._candidate_compiler(request)
-        contracts = compiler.load_contracts(installation, repository=self._repository_optional())
+        contracts = compiler.load_contracts(installation, repository=self._repository_optional(),
+                                            segment_refs=request.get("segment_refs"))
         plan = MapPlanner(self.registry, project_root=self.project_root).build(
             request, intent, brief, bundle, installation, contracts)
         plan_target = self.path_guard.resolve(self._design_path("plan/map-plan.yaml"))
@@ -327,7 +337,8 @@ class MapGenerationWorkflow:
         installation = self._load("templates/installed-template.yaml")
         self._verify_installed_template(installation)
         contracts = MapCandidateCompiler(self.path_guard, self.registry).load_contracts(
-            installation, repository=self._repository_optional())
+            installation, repository=self._repository_optional(),
+            segment_refs=request.get("segment_refs"))
         self._verify_candidate_inputs(candidate, scene, contracts, preflight)
         service = MapPreviewService(path_guard=self.path_guard,
                                     output_root=self.path_guard.resolve(self._design_path("previews")),
@@ -369,7 +380,8 @@ class MapGenerationWorkflow:
         installation = self._load("templates/installed-template.yaml")
         self._verify_installed_template(installation)
         contracts = MapCandidateCompiler(self.path_guard, self.registry).load_contracts(
-            installation, repository=self._repository_optional())
+            installation, repository=self._repository_optional(),
+            segment_refs=request.get("segment_refs"))
         self._verify_candidate_inputs(candidate, scene, contracts, preflight)
         service = MapPreviewService(path_guard=self.path_guard,
                                     output_root=self.path_guard.resolve(self._design_path("previews"), must_exist=True),
@@ -1453,7 +1465,8 @@ class MapGenerationWorkflow:
                 raise ProtocolError("MAP_SPEC_LOCK_PREVIEW_RECEIPT_DRIFT", lock["lock_id"])
             self._verify_installed_template(installation)
             contracts = MapCandidateCompiler(self.path_guard, self.registry).load_contracts(
-                installation, repository=self._repository_optional())
+                installation, repository=self._repository_optional(),
+                segment_refs=request.get("segment_refs"))
             self._verify_candidate_inputs(candidate, scene, contracts, preflight)
             preview_service = MapPreviewService(
                 path_guard=self.path_guard,
