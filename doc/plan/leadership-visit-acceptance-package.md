@@ -14,8 +14,11 @@
 
 命令：`python -m pytest skills/carto-agent/scripts/tests/ -q -rs`（geo313）
 
-<!-- REGRESSION_RESULT -->
-（最终全量回归运行中，完成后填入：通过 / 失败 / 跳过明细）
+**结果：1126 passed, 9 skipped, 968 subtests passed, 0 failed, 0 errors**（2147.99s / 35:47，PYTEST_EXIT=0）。
+
+- 通过：1126 项测试 + 968 子测试。
+- 失败：0。
+- 跳过：9 项（均环境门控，明细如下，不计为通过）。
 
 跳过项分类（环境门控，非代码回归）：
 - Windows 符号链接权限：test_geospatial_mcp / test_host_probe / test_security
@@ -90,6 +93,19 @@
 - **内容选择生效**：arrival-time 内容选择实际控制到达时间行（test_content_selection_arrival_time_effective）。
 - **分组绑定生效**：group 角色色变化仅影响绑定组图形（test_nonbaseline_group_color_role_changes_only_that_group）。
 
+### 4.1 事项1 — 新合同实际消费收口（ContractConsumptionTests）
+
+消除"字段接受了但运行仍按固定名称/默认规则"：
+
+| 收口项 | 实现 | 验收证据 |
+|---|---|---|
+| 1.1 度量判别解析 | `_ref_px`（要求 reference-design-px + 钉住 rule_ref）/`_physical`（要求 pt/mm）；不支持单位组合拒绝；mm/pt 不当参考像素 | test_physical_unit_in_symbol_field_refused（MEASUREMENT_UNIT_MISMATCH）；test_reference_px_missing_rule_ref_refused |
+| 1.2 显式角色绑定 | resolve 经 `_binding_map` 从 group_bindings 找 visual_role/route_role，不拼接业务组名；重复/缺失/悬挂拒绝 | test_binding_drives_color_not_name_concatenation（重绑定→色随绑定）；test_duplicate_missing_dangling_binding_refused |
+| 1.3 组件定义校验 | `compiler/component_registry.py` 受信定义注册表；compile 入口 `validate_design_components` 按定义校验参数（闭合 schema）/结构模式/类型；未知参数拒绝不丢弃 | test_unknown_component_parameter_refused_not_dropped（COMPONENT_DEFINITION_UNKNOWN / 闭合参数拒绝） |
+| 1.4 内容/放置生效 | apply_grouped_style 消费 annotations；fixed 模式进入 _place 真实约束（求解器不移动） | test_fixed_annotation_mode_enters_layout_constraint |
+
+**目标达成**：修改一个合法新合同选择（重绑定角色/改度量单位/改组件参数/改放置模式），输出或拒绝结果符合其语义；不存在"接受但按固定名称/默认执行"。
+
 ## 5. 新实例修订不丢失无关选择
 
 | 用例 | 证据 |
@@ -114,6 +130,12 @@
 - **旧模板切换**：S8 后 compiler 强制 design_instances；**旧 image_itinerary-only 已发布模板须重新作者化+重新验证发布**（映射 §9.3：不原地改写、无自动迁移器）。
 - **旧锁/回执**：不原地改写；需新设计的运行重新准备/审批/编译/冻结。
 - **协议治理待补**：正式版本决定/生产者—消费者清单/摘要影响报告（映射 §9.2）尚未形式化（见 §8 限制）。
+
+### 7.1 候选策略边界（2026-11-26 设计决策）
+
+- **领导调研：单候选**。`design_variants` 被显式拒绝（`LEADERSHIP_VARIANTS_UNSUPPORTED`，forbidden 边界）；风格/版式调整走 `style_overrides` 对当前合同直接覆盖（单候选）。证据：test_leadership_single_candidate_boundary。
+- **多候选（开放设计/对比风格版式）：保留给政务制图（通用专题）**。当前通用专题 `_compile_variant_set` 共享一份 plan、逐候选 apply_overrides；改 plan 影响字段（如 output_profile 画布）的 variant 与共享 plan 不一致是潜在点。修复方向"逐候选 plan"登记 roadmap `general-multi-variant-per-candidate-plan`（P5），落地后再开放受 plan 影响的多候选差异。
+- 领导调研当前从**逐候选 contracts**（非共享 plan）读实例，故无"接受但不生效"问题；单候选边界是设计选择，非缺陷修复。
 
 ## 8. 已验收能力 / 版本 / 环境 / 限制
 

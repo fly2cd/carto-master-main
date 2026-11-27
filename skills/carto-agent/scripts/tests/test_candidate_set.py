@@ -133,6 +133,30 @@ class CompileVariantsTests(unittest.TestCase):
         with self.assertRaisesRegex(ProtocolError, "CANDIDATE_VARIANTS_REQUIRED"):
             self._run([])
 
+    def test_per_candidate_plan_factory(self) -> None:
+        """P5-6: with a plan_factory each variant is compiled against its OWN plan built
+        from its variant_request, not a stale shared plan (output_profile variants)."""
+        seen_plans = []
+
+        def fake_compile(request, intent, plan, bundle, installation, contracts, font_path):
+            seen_plans.append(plan)
+            return {"candidate": {"candidate_id": "c", "execution": {}, "execution_digest": D},
+                    "scene": {"scene_id": "s"},
+                    "preflight": {"status": "passed", "report_id": "r", "subject_digest": "x"}}
+
+        def factory(vr, vc):
+            return {"plan_for": vr.get("output_profile")}
+
+        with mock.patch.object(self.compiler, "compile", side_effect=fake_compile), \
+                mock.patch.object(self.compiler, "check_candidate", side_effect=self._stub_check("passed")):
+            self.compiler.compile_variants(
+                self.request, {}, {}, {}, {}, deepcopy(self.contracts), Path("font.ttf"),
+                [{"variant_id": "a", "output_profile": {"width_mm": 297}},
+                 {"variant_id": "b", "output_profile": {"width_mm": 420}}],
+                plan_factory=factory)
+        self.assertEqual(seen_plans, [{"plan_for": {"width_mm": 297}},
+                                      {"plan_for": {"width_mm": 420}}])
+
     def test_duplicate_variant_rejected(self) -> None:
         with self.assertRaisesRegex(ProtocolError, "CANDIDATE_VARIANT_DUPLICATE"):
             self._run([{"variant_id": "variant-a"}, {"variant_id": "variant-a"}])

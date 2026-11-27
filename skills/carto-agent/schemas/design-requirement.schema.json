@@ -16,6 +16,16 @@
     "requirement_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
     "revision": {"type": "integer", "minimum": 1},
     "object_scope": {"enum": ["layout", "style", "scenario", "layout+style"]},
+    "context": {
+      "description": "P5-1: trusted business context for resolution. The resolver selects the capability profile by this context (business_scene + geometry), never a hardcoded scenario. Absent context yields clarify, not a default.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["business_scene", "geometry"],
+      "properties": {
+        "business_scene": {"type": "string", "minLength": 1},
+        "geometry": {"enum": ["raster", "vector"]}
+      }
+    },
     "conditions": {
       "type": "array",
       "maxItems": 64,
@@ -68,6 +78,27 @@
                   "relation": {"const": "contained-legend"},
                   "scope": {"const": "each-main-map"},
                   "mode": {"const": "independent"}
+                }
+              },
+              {
+                "type": "object", "additionalProperties": false,
+                "required": ["kind", "path", "op", "value"],
+                "properties": {
+                  "kind": {"const": "style-enum"},
+                  "path": {"enum": ["/visual_language", "/symbolization/color_system"]},
+                  "op": {"const": "eq"},
+                  "value": {"type": "string", "minLength": 1}
+                }
+              },
+              {
+                "type": "object", "additionalProperties": false,
+                "required": ["kind", "path", "op", "value", "unit"],
+                "properties": {
+                  "kind": {"const": "style-measure"},
+                  "path": {"enum": ["/typography/title_pt", "/typography/body_pt", "/typography/legend_pt"]},
+                  "op": {"enum": ["eq", "gte", "lte"]},
+                  "value": {"type": "number", "exclusiveMinimum": 0},
+                  "unit": {"const": "pt"}
                 }
               }
             ]

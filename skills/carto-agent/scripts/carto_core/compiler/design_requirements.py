@@ -88,11 +88,35 @@ def _contained_legend(pred: dict[str, Any], fact: dict[str, Any]) -> tuple[str, 
     return "satisfied", len(mains), "each main-map has exactly one independent fully-inside legend"
 
 
+def _style_enum(pred: dict[str, Any], fact: dict[str, Any]) -> tuple[str, Any, str]:
+    """P5-2: Style enum fact (visual_language / color_system), read from Style's own facts."""
+    key = "visual_language" if pred["path"] == "/visual_language" else "color_system"
+    actual = fact.get(key)
+    if actual is None:
+        return "unknown", None, f"{pred['path']} not declared"
+    ok = actual == pred["value"]
+    return ("satisfied" if ok else "violated"), actual, f"{pred['path']} eq {pred['value']}"
+
+
+def _style_measure(pred: dict[str, Any], fact: dict[str, Any]) -> tuple[str, Any, str]:
+    """P5-2: Style typography measure (pt), read from Style's own facts (not Layout)."""
+    key = pred["path"].rsplit("/", 1)[-1]  # title_pt / body_pt / legend_pt
+    actual = fact.get("typography", {}).get(key)
+    if actual is None:
+        return "unknown", None, f"{pred['path']} not measured"
+    if not math.isfinite(actual):
+        raise ProtocolError("REQUIREMENT_FACT_INVALID", f"non-finite {key}")
+    ok = _OPS[pred["op"]](actual, pred["value"])
+    return ("satisfied" if ok else "violated"), actual, f"{pred['path']} {pred['op']} {pred['value']} pt"
+
+
 _EVALUATORS = {
     "measure": _measure,
     "enum": _enum,
     "count": _count,
     "relation": _contained_legend,
+    "style-enum": _style_enum,
+    "style-measure": _style_measure,
 }
 
 
@@ -163,6 +187,22 @@ def layout_fact_view(resolved: dict[str, Any]) -> dict[str, Any]:
             "frames": frames, "roles_complete": roles_complete}
 
 
+def style_fact_view(contract: dict[str, Any]) -> dict[str, Any]:
+    """P5-2: deterministic Style fact view from a verified style contract.
+
+    Reads Style's OWN facts (visual_language, color_system, typography, ramps, labeling)
+    so style requirements are evaluated against style facts, never via LayoutResolver.
+    Pure: does not mutate the contract or access the repository.
+    """
+    return {
+        "visual_language": contract.get("visual_language"),
+        "color_system": contract.get("symbolization", {}).get("color_system"),
+        "typography": dict(contract.get("typography", {})),
+        "ramps": list(contract.get("symbolization", {}).get("symbol_catalogs", [])),
+        "labeling": dict(contract.get("labeling", {})),
+    }
+
+
 def assess_candidate(requirement: dict[str, Any], fact: dict[str, Any], *,
                      parameter_status: str = "not-applicable",
                      execution_admission: str = "unknown",
@@ -194,7 +234,8 @@ _RESOLUTION_BRANCHES = ("reuse", "instantiate", "derive", "create", "clarify",
 
 def resolve_requirement(requirement: dict[str, Any],
                         assessments: list[dict[str, Any]], *,
-                        search_complete: bool = True) -> dict[str, Any]:
+                        search_complete: bool = True,
+                        search_metadata: dict[str, Any] | None = None) -> dict[str, Any]:
     """Deterministic resolution decision over candidate assessments (design §7/§12).
 
     Each assessment is an ``assess_candidate`` result plus a ``candidate_ref``. Branch priority:
@@ -230,4 +271,6 @@ def resolve_requirement(requirement: dict[str, Any],
         "validation_coverage": a["validation_coverage"],
     } for a in assessments]
     return {"schema_version": 1, "requirement_id": requirement["requirement_id"],
-            "revision": requirement["revision"], "branch": branch, "assessments": flattened}
+            "revision": requirement["revision"], "branch": branch, "assessments": flattened,
+            "search_metadata": search_metadata if search_metadata is not None else {
+                "search_complete": search_complete}}

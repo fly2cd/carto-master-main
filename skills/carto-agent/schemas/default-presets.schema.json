@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.carto-agent.local/v1/default-presets.schema.json",
+  "description": "Explicit registered default design presets (design-principles: defaults are explicit optional presets, not kernel hardcoding). Each preset maps a business context (business_scene + geometry) to a default published SCENARIO template whose embedded style/layout are the declared visual defaults. Expansion requires confirmation and kernel re-verification; an explicit template always wins.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "presets"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "presets": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["business_scene", "geometry", "template"],
+        "properties": {
+          "business_scene": {"type": "string", "minLength": 1},
+          "geometry": {"enum": ["raster", "vector"]},
+          "template": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["namespace", "kind", "id", "version"],
+            "properties": {
+              "namespace": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+              "kind": {"const": "map-scenario"},
+              "id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+              "version": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/semanticVersion"},
+              "digest": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/digest"}
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -308,11 +308,15 @@ class MapCandidateCompiler:
             raise ProtocolError("CANDIDATE_INTENT_MISMATCH", "Execution must preserve the resolved user intent")
 
     def compile_variants(self, request, intent, plan, bundle, installation, contracts,
-                         font_path, variants):
+                         font_path, variants, plan_factory=None):
         # Deterministically compile each externally supplied design variant into its own
         # candidate and assemble a candidate-set. The program compiles, formally validates
         # (preflight) and presents the comparison only; it never ranks or selects among
         # variants -- creative choice stays with the LLM/human (design-principles).
+        # P5-6: when a plan_factory is injected (by the workflow), each variant gets its OWN
+        # plan built from its variant_request + variant_contracts, so a variant that changes
+        # plan-affecting fields (e.g. output_profile) is not bound to a stale shared plan.
+        # Without a factory the legacy shared plan is used (single-plan path).
         if not isinstance(variants, list) or not variants:
             raise ProtocolError("CANDIDATE_VARIANTS_REQUIRED", "At least one design variant is required")
         if len(variants) > 8:
@@ -334,7 +338,9 @@ class MapCandidateCompiler:
                 else:
                     variant_request.pop(key, None)
             variant_contracts = request_contract.apply_overrides(variant, deepcopy(contracts))
-            compiled = self.compile(variant_request, intent, plan, bundle, installation,
+            variant_plan = (plan_factory(variant_request, variant_contracts)
+                            if plan_factory is not None else plan)
+            compiled = self.compile(variant_request, intent, variant_plan, bundle, installation,
                                     variant_contracts, font_path)
             candidate = compiled["candidate"]
             candidate["candidate_id"] = "candidate-" + request["run_id"] + "-" + variant_id

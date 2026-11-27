@@ -937,6 +937,24 @@ class CompilerTests(LeadershipFixture, unittest.TestCase):
         self.assertTrue(compiled["scene"]["image_graphics"])
 
 
+class P6CrossSceneLayoutTests(LeadershipFixture, unittest.TestCase):
+    """P6/A18 real: cross-scene Layout reuse in a real leadership compile (own fixture root)."""
+
+    def test_p6_a18_leadership_consumes_general_shared_layout(self):
+        from carto_core.repository.general_layout_presets import general_single_map_layout
+        general_layout = general_single_map_layout("A3", "landscape")
+        contracts = deepcopy(self.contracts)
+        contracts["scenario"]["embedded"]["layout"] = general_layout
+        plan = RoutePlanner().build(self.request, self.intent, self.brief, self.bundle,
+                                    self.installation, contracts)
+        compiler = RouteCandidateCompiler(self.guard, self.registry, project_root=self.root,
+                                          context=ExecutionContext.from_generate_request(self.request))
+        compiled = compiler.compile(self.request, self.intent, plan, self.bundle,
+                                    self.installation, contracts, self.font_path)
+        self.assertEqual(compiled["scene"]["resolved_layout"]["template_contract"], general_layout)
+        self.assertEqual(compiled["scene"]["resolved_layout"]["page"]["width_mm"], 420)
+
+
 class ImageToolGatewayTests(LeadershipFixture, unittest.TestCase):
     """The migrated image algorithms execute only as authorized ToolGateway capabilities.
 

@@ -313,7 +313,7 @@
       }
     },
     "group_bindings": {
-      "description": "P6 field-mapping I.group_bindings (M02/M04): explicit binding of a business semantic_group to a Style visual_role. Style does not know business group names; the binding connects them. Not name-similarity matching.",
+      "description": "P6 field-mapping I.group_bindings (M02/M04): explicit binding of a business semantic_group to a Style visual_role (color) and optional route_role (display offset). The consumer resolves roles via these declared bindings, never by concatenating the business group name into a Style role name. Duplicate/missing/dangling bindings are refused at resolution.",
       "type": "array",
       "items": {
         "type": "object",
@@ -321,7 +321,8 @@
         "required": ["semantic_group", "visual_role"],
         "properties": {
           "semantic_group": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
-          "visual_role": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"}
+          "visual_role": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
+          "route_role": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"}
         }
       }
     },

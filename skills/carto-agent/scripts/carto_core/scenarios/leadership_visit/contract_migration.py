@@ -59,7 +59,8 @@ def migrate_image_itinerary(style: dict[str, Any], *, rule_ref: dict[str, Any]) 
 
     # --- S business definitions + I group bindings / labels / resolution (M02/M03/M04/M06)
     group_definitions = [{"id": g["id"], "display_label": g["label"]} for g in groups]
-    group_bindings = [{"semantic_group": g["id"], "visual_role": f"group-{g['id']}"} for g in groups]
+    group_bindings = [{"semantic_group": g["id"], "visual_role": f"group-{g['id']}",
+                       "route_role": f"route-{g['id']}"} for g in groups]
     legend_labels = {g["id"]: g["label"] for g in groups}
     group_resolution = {"fallback_group": style["default_group"]}
 
@@ -174,9 +175,49 @@ def migrate_image_itinerary(style: dict[str, Any], *, rule_ref: dict[str, Any]) 
     }
 
 
-def _value(measurement: dict[str, Any]) -> float:
-    """Extract the numeric value from a discriminated measurement (derived copy)."""
+def _ref_px(measurement: dict[str, Any]) -> float:
+    """Resolve a reference-design-px symbol measurement (事项1.1).
+
+    Requires the declared kind to be reference-design-px and a present rule_ref; a
+    physical pt/mm value must NOT be silently used as reference pixels. Unsupported
+    unit combinations are refused.
+    """
+    if not isinstance(measurement, dict) or measurement.get("kind") != "reference-design-px":
+        raise ProtocolError("MEASUREMENT_UNIT_MISMATCH",
+                            f"expected reference-design-px, got {measurement.get('kind') if isinstance(measurement, dict) else measurement}")
+    rule_ref = measurement.get("rule_ref")
+    if not isinstance(rule_ref, dict) or not all(rule_ref.get(k) for k in ("id", "version", "digest")):
+        raise ProtocolError("MEASUREMENT_RULE_REF_INVALID", "reference-design-px requires a pinned rule_ref")
     return measurement["value"]
+
+
+def _physical(measurement: dict[str, Any], unit: str) -> float:
+    """Resolve a physical measurement (pt or mm); refuses reference-px or wrong unit."""
+    expected = f"physical-{unit}"
+    if not isinstance(measurement, dict) or measurement.get("kind") != expected:
+        raise ProtocolError("MEASUREMENT_UNIT_MISMATCH",
+                            f"expected {expected}, got {measurement.get('kind') if isinstance(measurement, dict) else measurement}")
+    return measurement["value"]
+
+
+def _binding_map(migrated: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """事项1.2: index group_bindings by semantic_group, refusing duplicate, missing
+    visual_role and dangling bindings. The consumer resolves roles via the declared
+    binding, never by concatenating the business group name into a Style role name."""
+    roles = migrated["style_roles"]
+    bindings: dict[str, dict[str, Any]] = {}
+    for binding in migrated.get("group_bindings", []):
+        semantic = binding["semantic_group"]
+        if semantic in bindings:
+            raise ProtocolError("GROUP_BINDING_DUPLICATE", semantic)
+        visual = binding.get("visual_role")
+        if visual not in roles:
+            raise ProtocolError("GROUP_BINDING_DANGLING", f"{semantic}->{visual}")
+        bindings[semantic] = binding
+    for definition in migrated["group_definitions"]:
+        if definition["id"] not in bindings:
+            raise ProtocolError("GROUP_BINDING_MISSING", definition["id"])
+    return bindings
 
 
 def resolve_effective_style(migrated: dict[str, Any]) -> dict[str, Any]:
@@ -188,11 +229,16 @@ def resolve_effective_style(migrated: dict[str, Any]) -> dict[str, Any]:
     placements / content selections — not the private image_itinerary defaults. This is
     the resolution direction; migrate_image_itinerary is the authoring direction. Round
     trips must preserve the visible design (verified by equivalence tests).
+
+    事项1: measurements are resolved by declared kind (reference-px vs physical pt/mm,
+    unsupported combinations refused); group colors/offsets resolve via declared
+    group_bindings (not name concatenation), with duplicate/missing/dangling refused.
     """
     roles = migrated["style_roles"]
     components = migrated["components"]
     annotations = migrated["annotations"]
     content = migrated["content"]
+    bindings = _binding_map(migrated)
     card = components["card"]["parameters"]
     route_comp = components["route"]["parameters"]
     border = components.get("map-border", {}).get("parameters")
@@ -200,23 +246,26 @@ def resolve_effective_style(migrated: dict[str, Any]) -> dict[str, Any]:
     groups = []
     for definition in migrated["group_definitions"]:
         gid = definition["id"]
+        binding = bindings[gid]
+        color_role = roles[binding["visual_role"]]
         group = {"id": gid, "label": migrated["legend_labels"][gid],
-                 "color": roles[f"group-{gid}"]["color"]}
-        offset = _value(roles[f"route-{gid}"]["display_offset"]["distance"])
+                 "color": color_role["color"]}
+        route_role = roles[binding["route_role"]] if "route_role" in binding else None
+        offset = _ref_px(route_role["display_offset"]["distance"]) if route_role else 0
         if offset != 0:
             group["right_offset_px"] = offset
         groups.append(group)
 
     callout = {
-        "width_px": _value(card["sizing"]["width"]["limit"]),
-        "title_font_px": _value(roles["card-title"]["font"]["size"]),
-        "body_font_px": _value(roles["card-body"]["font"]["size"]),
-        "padding_px": _value(card["inset"]),
-        "line_gap_px": _value(card["sections"]["gap"]) / 2,  # reverse M18
+        "width_px": _ref_px(card["sizing"]["width"]["limit"]),
+        "title_font_px": _ref_px(roles["card-title"]["font"]["size"]),
+        "body_font_px": _ref_px(roles["card-body"]["font"]["size"]),
+        "padding_px": _ref_px(card["inset"]),
+        "line_gap_px": _ref_px(card["sections"]["gap"]) / 2,  # reverse M18
         "opacity": roles["card-background"]["opacity"],
-        "leader_width_px": _value(roles["card-leader"]["stroke"]["width"]),
-        "offset_x_px": _value(annotations["card"]["placement"]["offset"]["x"]),
-        "offset_y_px": _value(annotations["card"]["placement"]["offset"]["y"]),
+        "leader_width_px": _ref_px(roles["card-leader"]["stroke"]["width"]),
+        "offset_x_px": _ref_px(annotations["card"]["placement"]["offset"]["x"]),
+        "offset_y_px": _ref_px(annotations["card"]["placement"]["offset"]["y"]),
         "font_weight": roles["card-title"]["font"]["weight"],
         "title_wrap": card["title"]["wrap_mode"] == "wrap-by-character",
         "show_arrival_time": "arrival-time" in content["card"]["fields"],
@@ -230,13 +279,13 @@ def resolve_effective_style(migrated: dict[str, Any]) -> dict[str, Any]:
         "groups": groups,
         "default_group": migrated["group_resolution"]["fallback_group"],
         "route": {
-            "width_px": _value(roles["route"]["stroke"]["width"]),
-            "halo_width_px": _value(roles["route-halo"]["stroke"]["width"]),
-            "arrows": {"size_px": _value(route_comp["arrows"]["head_size"]),
-                       "spacing_px": _value(route_comp["arrows"]["repeat_spacing"])},
+            "width_px": _ref_px(roles["route"]["stroke"]["width"]),
+            "halo_width_px": _ref_px(roles["route-halo"]["stroke"]["width"]),
+            "arrows": {"size_px": _ref_px(route_comp["arrows"]["head_size"]),
+                       "spacing_px": _ref_px(route_comp["arrows"]["repeat_spacing"])},
         },
-        "pin": {"radius_px": _value(roles["numbered-stop-marker"]["radius"]),
-                "font_size_px": _value(roles["visit-order-text"]["font"]["size"])},
+        "pin": {"radius_px": _ref_px(roles["numbered-stop-marker"]["radius"]),
+                "font_size_px": _ref_px(roles["visit-order-text"]["font"]["size"])},
         "callout": callout,
         "numbering": content["numbering"]["display_order"],
         "white_threshold": migrated["basemap_display"]["crop"]["parameters"]["white_threshold"],
@@ -244,27 +293,27 @@ def resolve_effective_style(migrated: dict[str, Any]) -> dict[str, Any]:
     if "page-title" in roles or "source-notice" in roles or border is not None:
         furniture: dict[str, Any] = {}
         if "page-title" in roles:
-            furniture["title_font_pt"] = _value(roles["page-title"]["font"]["size"])
+            furniture["title_font_pt"] = _physical(roles["page-title"]["font"]["size"], "pt")
         if "source-notice" in roles:
-            furniture["body_font_pt"] = _value(roles["source-notice"]["font"]["size"])
+            furniture["body_font_pt"] = _physical(roles["source-notice"]["font"]["size"], "pt")
         if border is not None:
             furniture["frame_border"] = {"color": roles["map-border"]["color"],
-                                         "inner_width_mm": _value(border["inner_stroke_width"]),
-                                         "gap_mm": _value(border["stroke_gap"]),
-                                         "outer_width_mm": _value(border["outer_stroke_width"])}
+                                         "inner_width_mm": _physical(border["inner_stroke_width"], "mm"),
+                                         "gap_mm": _physical(border["stroke_gap"], "mm"),
+                                         "outer_width_mm": _physical(border["outer_stroke_width"], "mm")}
         style["page_furniture"] = furniture
     if "support-label" in components:
         support = components["support-label"]["parameters"]
         style["support_label"] = {
             "color": roles["support-accent"]["color"],
             "text_color": roles["support-label-text"]["color"],
-            "point_radius_px": _value(roles["support-marker"]["radius"]),
-            "font_size_px": _value(roles["support-label-text"]["font"]["size"]),
-            "padding_px": _value(support["inset"]),
+            "point_radius_px": _ref_px(roles["support-marker"]["radius"]),
+            "font_size_px": _ref_px(roles["support-label-text"]["font"]["size"]),
+            "padding_px": _ref_px(support["inset"]),
             "opacity": roles["support-label-background"]["opacity"],
-            "leader_width_px": _value(roles["support-label-leader"]["stroke"]["width"]),
-            "offset_x_px": _value(annotations["support-label"]["placement"]["offset"]["x"]),
-            "offset_y_px": _value(annotations["support-label"]["placement"]["offset"]["y"]),
+            "leader_width_px": _ref_px(roles["support-label-leader"]["stroke"]["width"]),
+            "offset_x_px": _ref_px(annotations["support-label"]["placement"]["offset"]["x"]),
+            "offset_y_px": _ref_px(annotations["support-label"]["placement"]["offset"]["y"]),
             "font_weight": roles["support-label-text"]["font"]["weight"],
         }
     return style

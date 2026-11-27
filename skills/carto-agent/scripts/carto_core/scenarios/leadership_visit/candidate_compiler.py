@@ -144,6 +144,11 @@ class RouteCandidateCompiler:
             raise ProtocolError("LEADERSHIP_STYLE_CONTRACT_MISSING",
                                 "leadership portrayal requires design_instances")
         self.registry.validate("design-instances", instances)
+        # 事项1.3: validate adopted components against their trusted definitions (closed
+        # parameter schemas, admitted structure modes) — consumer validation, not just
+        # container Schema legality. Unknown parameters are refused, not dropped.
+        from ...compiler.component_registry import validate_design_components
+        validate_design_components(instances, self.registry)
         style = resolve_effective_style(instances)
         white_threshold = int(instances["basemap_display"]["crop"]["parameters"]["white_threshold"])
         self.registry.validate("image-itinerary-style", style)
@@ -175,7 +180,8 @@ class RouteCandidateCompiler:
                      "fields": fields}
         styled = apply_grouped_style(style, {"basemap": {"source_size": source_size,
                                                          "display_window": window}}, itinerary,
-                                     frame_id=frame["id"], appearance_roles=instances["style_roles"])
+                                     frame_id=frame["id"], appearance_roles=instances["style_roles"],
+                                     annotations=instances["annotations"])
         graphics = styled["graphics"]
 
         # --- Optional annotation solver (greedy + annealing, fixed seed) ------

@@ -16,6 +16,19 @@
     "requirement_id": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/identifier"},
     "revision": {"type": "integer", "minimum": 1},
     "branch": {"enum": ["reuse", "instantiate", "derive", "create", "clarify", "unsupported", "search-incomplete"]},
+    "search_metadata": {
+      "description": "P5-4: search completeness record (source scope, filters, candidate budget, examined, truncated). Budget exhaustion yields search-incomplete, never a silent 'should create'.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["search_complete"],
+      "properties": {
+        "search_complete": {"type": "boolean"},
+        "source_scope": {"type": "string"},
+        "candidate_budget": {"type": "integer", "minimum": 0},
+        "examined": {"type": "integer", "minimum": 0},
+        "truncated": {"type": "boolean"}
+      }
+    },
     "action": {"enum": ["return-published-ref", "draft", "stop"]},
     "published_ref": {"$ref": "https://schemas.carto-agent.local/v1/common.schema.json#/$defs/templateRef"},
     "draft_ref": {

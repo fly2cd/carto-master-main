@@ -75,7 +75,8 @@ def _place(graphic: dict, window: dict, placed: list, explicit: bool, anchors: l
 
 def apply_grouped_style(style: dict[str, Any], page_request: dict[str, Any],
                         itinerary_data: dict[str, Any], *, frame_id: str,
-                        appearance_roles: dict[str, Any] | None = None) -> dict[str, Any]:
+                        appearance_roles: dict[str, Any] | None = None,
+                        annotations: dict[str, Any] | None = None) -> dict[str, Any]:
     """Compile the frozen style contract + projected itinerary to pixel graphics.
 
     Inputs:
@@ -143,8 +144,12 @@ def apply_grouped_style(style: dict[str, Any], page_request: dict[str, Any],
     anchors = [(s["position"]["x"] - window["x"], s["position"]["y"] - window["y"],
                 style["pin"]["radius_px"] * scale) for s in projection.get("stops", [])]
 
+    # 事项1.4: the adopted annotation placement mode enters the real layout constraint.
+    # A fixed card placement is binding (solver must not move it); preferred may be solved.
+    card_fixed = (annotations or {}).get("card", {}).get("placement", {}).get("mode") == "fixed"
+
     def finish(graphic: dict, source: dict) -> None:
-        explicit = False
+        explicit = card_fixed
         for role, key in (("callout-offset-x", "offset_x_px"), ("callout-offset-y", "offset_y_px")):
             value = itinerary_value(source, metadata, role)
             if value is not None:

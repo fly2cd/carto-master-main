@@ -65,6 +65,10 @@ items:
     status: planned
     target: U-P4
     note: 双 bundle 已合并为单一 general-thematic(S1 键统一与 S4 bundle/准入杆已落地,2026-11-11);S2 resolved-portrayal union 已落地(单一 schema:geometry 枚举 raster/vector + 共享 header + 几何条件 body + legend_items oneOf);剩余 S3 准备链 statistics strategy 与渲染表 renderer merge。
+  - id: general-multi-variant-per-candidate-plan
+    status: planned
+    target: P5
+    note: 开放式设计/多候选风格版式对比保留给政务制图(通用专题)。当前 _compile_variant_set 共享一份 plan、compile_variants 逐候选 apply_overrides;改 plan 影响字段(如 output_profile 画布)的 variant 会与共享 plan 不一致("接受了但不生效"潜在点)。修复方向:逐候选 plan(每候选独立蓝图)落地后再开放受 plan 影响的多候选差异。领导调研明确单候选(LEADERSHIP_VARIANTS_UNSUPPORTED),以 style_overrides 直接覆盖当前风格版式,不走多候选。
   - id: comparison-grid-shared-legend
     status: delivered
     target: U-P3.6

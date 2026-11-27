@@ -510,7 +510,8 @@ class S4MigrationTests(unittest.TestCase):
         self.assertEqual(self.result["group_resolution"]["fallback_group"], "default")
         # group color is a Style role bound via group_bindings, not taken from fallback.
         self.assertEqual(self.result["group_bindings"][0],
-                         {"semantic_group": "morning", "visual_role": "group-morning"})
+                         {"semantic_group": "morning", "visual_role": "group-morning",
+                          "route_role": "route-morning"})
         self.assertEqual(self.result["style_roles"]["group-morning"]["color"], "#1769D2")
 
     def test_all_produced_instances_validate_closed_contracts(self):

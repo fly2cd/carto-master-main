@@ -205,5 +205,118 @@ class InstanceConsistencyTests(LeadershipFixture, unittest.TestCase):
         self.assertEqual("LEADERSHIP_STYLE_CONTRACT_MISSING", raised.exception.code)
 
 
+class ContractConsumptionTests(LeadershipFixture, unittest.TestCase):
+    """事项1: a legal new-contract selection actually drives output/refusal by its semantics;
+    no 'field accepted but runs by fixed name/default'."""
+
+    def test_physical_unit_in_symbol_field_refused(self):
+        """事项1.1: a physical-mm value where reference-px is expected is refused, not used as px."""
+        instances = _migrate_style(STYLE)
+        instances["components"]["card"]["parameters"]["sizing"]["width"]["limit"] = {
+            "kind": "physical-mm", "value": 500}
+        with self.assertRaises(ProtocolError) as raised:
+            resolve_effective_style(instances)
+        self.assertEqual("MEASUREMENT_UNIT_MISMATCH", raised.exception.code)
+
+    def test_reference_px_missing_rule_ref_refused(self):
+        instances = _migrate_style(STYLE)
+        instances["components"]["card"]["parameters"]["inset"] = {"kind": "reference-design-px", "value": 4}
+        with self.assertRaises(ProtocolError) as raised:
+            resolve_effective_style(instances)
+        self.assertEqual("MEASUREMENT_RULE_REF_INVALID", raised.exception.code)
+
+    def test_binding_drives_color_not_name_concatenation(self):
+        """事项1.2: rebinding semantic_group to a different visual_role changes the color,
+        proving the consumer reads the binding, not a name-concatenated role."""
+        instances = _migrate_style(STYLE)
+        # add an alternate role and rebind morning to it
+        instances["style_roles"]["alternate-green"] = {"color": "#228833"}
+        for b in instances["group_bindings"]:
+            if b["semantic_group"] == "morning":
+                b["visual_role"] = "alternate-green"
+        resolved = resolve_effective_style(instances)
+        morning = next(g for g in resolved["groups"] if g["id"] == "morning")
+        self.assertEqual(morning["color"], "#228833")
+
+    def test_duplicate_missing_dangling_binding_refused(self):
+        instances = _migrate_style(STYLE)
+        dup = deepcopy(instances)
+        dup["group_bindings"].append(deepcopy(dup["group_bindings"][0]))
+        with self.assertRaises(ProtocolError) as r:
+            resolve_effective_style(dup)
+        self.assertEqual("GROUP_BINDING_DUPLICATE", r.exception.code)
+        missing = deepcopy(instances)
+        missing["group_bindings"] = [b for b in missing["group_bindings"] if b["semantic_group"] != "morning"]
+        with self.assertRaises(ProtocolError) as r:
+            resolve_effective_style(missing)
+        self.assertEqual("GROUP_BINDING_MISSING", r.exception.code)
+        dangling = deepcopy(instances)
+        dangling["group_bindings"][0]["visual_role"] = "no-such-role"
+        with self.assertRaises(ProtocolError) as r:
+            resolve_effective_style(dangling)
+        self.assertEqual("GROUP_BINDING_DANGLING", r.exception.code)
+
+    def test_unknown_component_parameter_refused_not_dropped(self):
+        """事项1.3: an unknown component parameter is refused by the closed definition schema."""
+        from carto_core.compiler.component_registry import validate_component_instance
+        from carto_core.schema_registry import SchemaRegistry
+        registry = SchemaRegistry()
+        instances = _migrate_style(STYLE)
+        bad = deepcopy(instances["components"]["card"])
+        bad["parameters"]["secret_knob"] = 1
+        with self.assertRaises(ProtocolError):
+            validate_component_instance(bad, registry)
+        # unknown component type refused
+        with self.assertRaises(ProtocolError) as r:
+            validate_component_instance({"type": "map-card", "parameters": {}}, registry)
+        self.assertEqual("COMPONENT_DEFINITION_UNKNOWN", r.exception.code)
+
+    def test_fixed_annotation_mode_enters_layout_constraint(self):
+        """事项1.4: a fixed card placement is binding; the solver does not move it."""
+        projection = project_features(self.parameters, self.image_bytes, self.stops_fc, self.route_fc)
+        window = display_bounds(self.image_bytes)
+        page = {"basemap": {"source_size": {"width_px": 400, "height_px": 300}, "display_window": window}}
+        fields = {"route-stops": {i["semantic_role"]: i["source_field"]
+                                  for i in self.request["source_bindings"][0]["field_bindings"]}, "route-line": {}}
+        itin = {"projection": projection, "sources": {"route-stops": self.stops_fc,
+                                                      "route-line": self.route_fc}, "fields": fields}
+        instances = _migrate_style(STYLE)
+        fixed_ann = {"card": {"placement": {"mode": "fixed",
+                                            "offset": {"x": {"kind": "reference-design-px", "value": 16, "rule_ref": _rule()},
+                                                       "y": {"kind": "reference-design-px", "value": -16, "rule_ref": _rule()}}}}}
+        g = apply_grouped_style(STYLE, page, itin, frame_id="main-map", annotations=fixed_ann)["graphics"]
+        callouts = [x for x in g if x["type"] == "callout"]
+        # fixed mode keeps the declared offsets (solver did not relocate)
+        self.assertTrue(all(c["offset_x_px"] == 16 and c["offset_y_px"] == -16 for c in callouts))
+
+    def test_leadership_single_candidate_boundary(self):
+        """领导调研单候选边界：design_variants 被显式拒绝；多候选保留给通用专题。
+        直接风格版式覆盖走 style_overrides（单候选）。"""
+        from carto_core.scenarios.leadership_visit.request_contract import REQUEST_CONTRACT
+        req = deepcopy(self.request)
+        req["design_variants"] = [{"variant_id": "a"}, {"variant_id": "b"}]
+        with self.assertRaises(ProtocolError) as raised:
+            REQUEST_CONTRACT.validate_body(req)
+        self.assertEqual("LEADERSHIP_VARIANTS_UNSUPPORTED", raised.exception.code)
+        # single-candidate request (no variants) passes the boundary
+        REQUEST_CONTRACT.validate_body(deepcopy(self.request))
+
+    def test_p6_layout_segment_admitted_style_refused(self):
+        """P6: leadership admits layout segment replacement (cross-scene reuse) but refuses
+        style segment replacement (design_instances owns style)."""
+        from carto_core.scenarios.leadership_visit.request_contract import REQUEST_CONTRACT
+        layout_ref = {"kind": "map-layout", "id": "general-single-map-a3-landscape",
+                      "version": "1.0.0", "digest": "sha256:" + "0" * 64}
+        req = deepcopy(self.request)
+        req["segment_refs"] = {"layout": layout_ref}
+        REQUEST_CONTRACT.validate_body(req)  # layout admitted
+        req_style = deepcopy(self.request)
+        req_style["segment_refs"] = {"style": {"kind": "map-style", "id": "s", "version": "1.0.0",
+                                               "digest": "sha256:" + "0" * 64}}
+        with self.assertRaises(ProtocolError) as raised:
+            REQUEST_CONTRACT.validate_body(req_style)
+        self.assertEqual("SEGMENT_SELECTION_UNSUPPORTED", raised.exception.code)
+
+
 if __name__ == "__main__":
     unittest.main()

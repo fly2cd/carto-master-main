@@ -45,6 +45,12 @@ def register(sub) -> None:
     orchestrate.add_argument("--base-ref", help="Published base package templateRef file (derive branch)")
     orchestrate.add_argument("--change-set", help="Restricted change-set file (derive branch)")
     orchestrate.add_argument("--design", help="Confirmed complete design file (create branch)")
+    expand = template_sub.add_parser(
+        "expand-default", help="Expand a template-less request with the registered default (requires --confirm)")
+    expand.add_argument("request")
+    expand.add_argument("--allowed-root", action="append", required=True)
+    expand.add_argument("--confirm", action="store_true", help="Explicit confirmation of the default choice")
+    expand.add_argument("--out", help="Write expanded request to this path (new request, pre-intake)")
 
 
 def handle(args) -> dict:
@@ -52,6 +58,8 @@ def handle(args) -> dict:
         return _orchestrate(args)
     if args.template_command == "resolve":
         return _resolve(args)
+    if args.template_command == "expand-default":
+        return _expand_default(args)
     if args.template_command != "match":
         raise ValueError(f"unknown template command: {args.template_command}")
     registry = SchemaRegistry()
@@ -81,6 +89,20 @@ def handle(args) -> dict:
     return {"match": result}
 
 
+def _expand_default(args) -> dict:
+    """Pre-intake default expansion: produce a NEW request with the registered default
+    template, only with explicit --confirm. Never mutates an intake'd request."""
+    from ..artifacts import atomic_yaml
+    from ..compiler.default_presets import expand_default_request
+    registry = SchemaRegistry()
+    guard = PathGuard(args.allowed_root)
+    request = load_document(guard.resolve(args.request, must_exist=True))
+    expanded = expand_default_request(request, confirmed=args.confirm, registry=registry)
+    if args.out:
+        atomic_yaml(guard.resolve(args.out), expanded)
+    return {"expanded_request": expanded}
+
+
 def _resolve(args) -> dict:
     """Read-only requirement resolution (plan phase 1): retrieve published candidates, build a
     verified fact view per candidate, assess structural satisfaction and decide a branch.
@@ -91,10 +113,13 @@ def _resolve(args) -> dict:
     writes repository state, creates, or publishes.
     """
     from pathlib import Path
-    from ..compiler.design_requirements import assess_candidate, layout_fact_view, resolve_requirement
+    from ..compiler.design_requirements import (
+        assess_candidate, layout_fact_view, resolve_requirement, style_fact_view,
+    )
     from ..compiler.layout import LayoutResolver
     from ..compiler.parameter_domain import layout_execution_admission
     from ..errors import CartoError
+    from ..scenario_registry import effective_definitions
     registry = SchemaRegistry()
     guard = PathGuard(args.allowed_root)
     requirement = load_document(guard.resolve(args.requirement, must_exist=True))
@@ -104,30 +129,54 @@ def _resolve(args) -> dict:
         raise ProtocolError("REQUIREMENT_SCOPE_UNSUPPORTED", requirement["object_scope"])
     capability_policy = load_document(
         Path(__file__).resolve().parents[3] / "policies/scenario-capabilities.yaml")
-    capability = next((p for p in capability_policy["profiles"]
-                       if p.get("implementation") == "general-thematic"), {})
+    # P5-1: select the capability by the requirement's trusted business context
+    # (business_scene + geometry), never a hardcoded scenario. No context -> no capability
+    # (admission unknown -> clarify), not a general-thematic default.
+    capability: dict = {}
+    context = requirement.get("context")
+    if context:
+        for definition in effective_definitions(capability_policy["profiles"]):
+            constraints = definition.get("intent_constraints", {})
+            if (constraints.get("business_scene") == context["business_scene"]
+                    and definition.get("template_geometry") == context["geometry"]):
+                capability = definition
+                break
     repository = TemplateRepository(
         path_guard=guard, root=args.repository_root,
         repository_scope=args.repository_scope, registry=registry)
     candidates = repository.segment_candidates(kind=seg_kind)
+    # P5-4: bounded search with completeness record; budget exhaustion -> search-incomplete.
+    budget = 50
+    examined = candidates[:budget]
+    truncated = len(candidates) > budget
+    search_metadata = {"search_complete": not truncated, "source_scope": seg_kind,
+                       "candidate_budget": budget, "examined": len(examined), "truncated": truncated}
     resolver = LayoutResolver(registry)
+    dpi = capability.get("output_profile", {}).get("dpi", 300)
     assessments = []
-    for entry, contract in candidates:
+    for entry, contract in examined:
         ref = {"kind": entry["kind"], "id": entry["id"],
                "version": entry["version"], "digest": entry["digest"]}
-        try:
-            fact = layout_fact_view(resolver.resolve(contract, 300))
+        # P5-2: Style requirements evaluate against Style's own facts; Layout against
+        # verified resolved-layout facts. Never route Style through LayoutResolver.
+        if seg_kind == "map-style":
+            fact = style_fact_view(contract)
             coverage = "covered"
-        except CartoError:
-            # Unresolvable without chosen parameters (e.g. grid base): keep unknown, never guess.
-            fact = {"canvas": {}, "frames": [], "roles_complete": False}
-            coverage = "unknown"
-        admission = layout_execution_admission(fact, capability)
+            admission = "allowed" if capability else "unknown"
+        else:
+            try:
+                fact = layout_fact_view(resolver.resolve(contract, dpi))
+                coverage = "covered"
+            except CartoError:
+                fact = {"canvas": {}, "frames": [], "roles_complete": False}
+                coverage = "unknown"
+            admission = layout_execution_admission(fact, capability)
         assessment = assess_candidate(requirement, fact,
                                       execution_admission=admission, validation_coverage=coverage)
         assessment["candidate_ref"] = ref
         assessments.append(assessment)
-    result = resolve_requirement(requirement, assessments)
+    result = resolve_requirement(requirement, assessments,
+                                 search_complete=not truncated, search_metadata=search_metadata)
     registry.validate("design-resolution-result", result)
     return {"resolution": result}
 

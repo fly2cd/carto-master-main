@@ -394,6 +394,35 @@ class ImagePageRenderer:
                 axes.text(lx, ly, graphic["content"], color=color,
                           fontsize=graphic.get("font_size_px", 16) * scale * 72 / dpi, family=family,
                           zorder=8)
+                continue
+            if graphic["type"] == "chart":
+                # P6: ONE chart component, kind-discriminated. Geographic anchoring is a
+                # placement concern (offset from the annotation solver), not a component.
+                # bar kinds draw paired vertical bars today; pie/line fail closed until
+                # their renderer branch lands (declared kind != implemented).
+                if graphic.get("kind") not in ("bar-vertical", "bar-horizontal"):
+                    raise ProtocolError("CHART_KIND_NOT_IMPLEMENTED", str(graphic.get("kind")))
+                left = x + graphic.get("offset_x_px", 0) * scale
+                base_y = y + graphic.get("offset_y_px", 0) * scale
+                bw = graphic["bar_width_px"] * scale
+                ch = graphic["chart_height_px"] * scale
+                vmax = graphic["max_value"]
+                for i, bar in enumerate(graphic["bars"]):
+                    bh = (bar["value"] / vmax) * ch
+                    bx = left + i * (bw + 2 * scale)
+                    axes.add_patch(Rectangle((bx, base_y - bh), bw, bh,
+                                             facecolor=bar["color"], edgecolor="none", zorder=6))
+                for i, label in enumerate(graphic.get("value_labels", [])):
+                    bx = left + i * (bw + 2 * scale) + bw / 2
+                    axes.text(bx, base_y + 4 * scale, label, color=graphic.get("body_color", "#17352D"),
+                              fontsize=graphic.get("font_size_px", 9) * scale * 72 / dpi,
+                              family=family, ha="center", va="top", zorder=7)
+                if graphic.get("ratio_label"):
+                    axes.text(left + bw, base_y - ch - 4 * scale, graphic["ratio_label"],
+                              color=graphic.get("title_color", "#C0392B"),
+                              fontsize=graphic.get("font_size_px", 9) * scale * 72 / dpi,
+                              family=family, ha="center", va="bottom", zorder=7)
+                continue
         # Page furniture: texts and legends in their layout frames. Nominal font
         # sizes come from the frozen page contract (style page_furniture) with the
         # historical 18pt/9pt fallback, capped so text always fits its frame —

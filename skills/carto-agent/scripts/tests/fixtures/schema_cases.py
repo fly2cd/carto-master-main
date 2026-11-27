@@ -184,6 +184,15 @@ VALID_CASES = {
     "route-parameters": {"arrows": {"head_size": {"kind": "reference-design-px", "value": 8, "rule_ref": deepcopy(A)}, "repeat_spacing": {"kind": "reference-design-px", "value": 200, "rule_ref": deepcopy(A)}}},
     "linked-label-parameters": {"inset": {"kind": "reference-design-px", "value": 4, "rule_ref": deepcopy(A)}},
     "double-outline-parameters": {"inner_stroke_width": {"kind": "physical-mm", "value": 0.25}, "stroke_gap": {"kind": "physical-mm", "value": 1.0}, "outer_stroke_width": {"kind": "physical-mm", "value": 0.5}},
+    "design-instances": __import__("carto_core.scenarios.leadership_visit.contract_migration", fromlist=["migrate_image_itinerary"]).migrate_image_itinerary(
+        __import__("carto_core.scenarios.leadership_visit.route_author", fromlist=["TEMPLATE_STYLE"]).TEMPLATE_STYLE,
+        rule_ref={"id": "reference-design-a3-144dpi", "version": "1.0.0", "digest": D}),
+    "default-presets": {"schema_version": 1, "presets": [
+        {"business_scene": "general_thematic_mapping", "geometry": "raster",
+         "template": {"namespace": "local", "kind": "map-scenario", "id": "general-thematic-map", "version": "3.0.0"}}]},
+    "chart-parameters": {"kind": "bar-vertical", "bar_width_px": 8, "chart_height_px": 60,
+                         "series": [{"role": "urban", "color": "#C8963E"}, {"role": "rural", "color": "#B03A48"}],
+                         "show_value_labels": True, "show_ratio_label": True, "font_size_px": 9},
     "map-intent": {"schema_version": 1, "intent_id": "intent-one", "revision": 1, "profile_version": "2.0.0", "business_scene": "general_thematic_mapping", "theme_tags": ["unit-theme"], "tasks": ["thematic-map"], "intent_status": "resolved", "readiness_status": "ready", "missing_items": [], "evidence_refs": [A]},
     "intent-profiles": {'schema_version': 1, 'catalog_version': '2.0.0', 'profiles': [{'business_scene': 'unit_scene', 'purpose_terms': ['unit purpose'], 'task_ids': ['unit-task'], 'required_information': ['theme_tags'], 'unsupported_actions': []}], 'themes': [{'id': 'unit-theme', 'label': 'Unit topic', 'terms': ['unit topic']}]},
     "map-brief": {"schema_version": 1, "brief_id": "map-brief-one", "revision": 1, "intent_ref": A, "purpose": "空间信息展示", "audience": "授权使用者", "source_plan": [{"role": "area-role", "source_ref": A, "allowed_operations": ["read", "join", "classify"]}], "targets": ["pdf", "png"], "template_candidates": [T], "delegation": {"allow_data_agent": False, "max_tool_calls": 10}, "approval_required": True, "business_scene": "government_thematic", "theme_tags": ["unit-theme"], "tasks": ["indicator-map"]},

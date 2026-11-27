@@ -267,7 +267,10 @@ class MapGenerationWorkflow:
         atomic_yaml(plan_target, plan)
         font = self.path_guard.resolve(request["font"]["path"], base_root=self.project_root, must_exist=True)
         result = compiler.compile_variants(request, intent, plan, bundle, installation,
-                                           contracts, font, request["design_variants"])
+                                           contracts, font, request["design_variants"],
+                                           plan_factory=lambda vr, vc: MapPlanner(
+                                               self.registry, project_root=self.project_root).build(
+                                               vr, intent, brief, bundle, installation, vc))
         outputs = [
             artifact_ref("installed-template", installation, installed_target),
             artifact_ref("prepared-data-bundle", bundle, bundle_target),

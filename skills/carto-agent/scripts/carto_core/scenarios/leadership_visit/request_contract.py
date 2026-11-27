@@ -107,12 +107,28 @@ class RouteRequestContract:
     # ------------------------------------------------------------------
 
     def validate_body(self, request: dict[str, Any]) -> None:
-        # P4 boundary: this scenario's visual authority is portrayal.image_itinerary;
-        # project-level Style/Layout replacement is not wired here (P6 migration).
-        # Refuse explicitly instead of accepting a selection the compiler would ignore.
-        if request.get("segment_refs"):
+        # P6/S8: the running visual (style) authority is portrayal.design_instances (the
+        # private image_itinerary contract has been retired). Style segment replacement is
+        # refused (design_instances owns style). Layout segment replacement IS admitted so a
+        # general shared Layout can be reused cross-scene (A18); the compiler consumes the
+        # resolved layout, so the selection is effective, not ignored.
+        segment_refs = request.get("segment_refs") or {}
+        if segment_refs.get("style"):
             raise ProtocolError("SEGMENT_SELECTION_UNSUPPORTED",
-                                "leadership_visit does not admit project-level segment replacement")
+                                "leadership_visit style authority is design_instances; "
+                                "style segment replacement is not admitted")
+        if set(segment_refs) - {"layout"}:
+            raise ProtocolError("SEGMENT_SELECTION_UNSUPPORTED",
+                                "leadership_visit admits only layout segment replacement")
+        # Single-candidate boundary: leadership visit maps use one candidate plus direct
+        # style/layout overrides (style_overrides). Multi-variant open design / comparison
+        # is reserved for government thematic mapping (general scenario); the shared-plan
+        # multi-variant path is not admitted here. Refuse explicitly (forbidden boundary).
+        if request.get("design_variants"):
+            raise ProtocolError("LEADERSHIP_VARIANTS_UNSUPPORTED",
+                                "leadership_visit is single-candidate; use style_overrides for "
+                                "direct style/layout changes. Multi-variant comparison is reserved "
+                                "for the general thematic scenario.")
         # itinerary_structure — source and normalized refs must be present
         itin = request.get("itinerary_structure")
         if not itin:

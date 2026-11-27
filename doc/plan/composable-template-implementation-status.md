@@ -34,7 +34,7 @@ P4 验收补齐与 P6 领导调研迁移均已完成，统一由下方"映射驱
 - §13.5 单位/几何验证：[报告](p6-unit-geometry-technical-validation.md)，几何/物理单位不变量成立。
 - 跨场景 A17/A18、删除 image_itinerary 私有权威：见 S7/S8（完成）。
 
-**代码稳定性（全量回归已完成）**：选择一致性门精简后 test_raster_formal 7 项失败已修复。步骤 3–4 共享改动（image_symbols 提取 + 显式框绑定 + 死代码移除）经**全量回归 1073 passed / 9 skipped（环境门控）/ 0 失败**确认无回归。注意：回归通过证明被测行为无已覆盖回归，单位测试证明几何/单位条件成立；两者均不单独证明合同职责已拆清或全部组合能力已实现。
+**代码稳定性（权威全量回归）**：含事项1收口 + design-instances 样例修复的最终全量回归 **1126 passed / 9 skipped（环境门控）/ 968 subtests / 0 失败 / exit 0**（geo313，35:47）。早期 test_raster_formal 7 项失败（选择一致性门冗余场景比对）与 design-instances 缺样例 1 项失败均已修复。注意：回归通过证明被测行为无已覆盖回归，单位测试证明几何/单位条件成立；合同职责拆清以验收包逐项证据为准。
 
 ## 映射驱动的主体迁移（2026-11-25，按 46 字段映射实施）
 
@@ -52,6 +52,65 @@ P4 验收补齐与 P6 领导调研迁移均已完成，统一由下方"映射驱
 | S8 权威切换 | 作者仅发射 design_instances（移除 image_itinerary）；compiler/override/route_validation 全从 design_instances 解析；portrayal 条件接纳 design_instances | **完成**：image_itinerary 私有权威退出运行链；领导调研 137 项（真实渲染/发布/生成/修订/在线底图）通过；后端绘图函数保留，消费解析派生副本。image-itinerary-style schema 仅用于校验解析后有效形状；TEMPLATE_STYLE 留作离线作者基线 |
 
 **纪律**：每阶段验证等价/反例；回归通过≠合同职责已拆清；旧已发布模板/锁不原地改写；不静默接受旧输入猜测转换；字重/测量算法变更与基线一致性分开验收（映射 §5.3）。
+
+### 事项1 — 新合同实际消费收口（2026-11-25，完成）
+
+消除"字段接受了但运行仍按固定名称/默认规则"（验收包 §4.1）：
+- **度量判别解析**：`_ref_px`/`_physical` 按声明 kind 解析，校验 rule_ref，拒绝不支持单位组合（mm/pt 不当参考像素）。
+- **显式角色绑定**：resolve 经 `_binding_map` 从 group_bindings 取 visual_role/route_role（不拼接业务组名）；重复/缺失/悬挂绑定拒绝。group_bindings schema 加 route_role。
+- **组件定义校验**：新增 `compiler/component_registry.py` 受信定义注册表；compile 入口 `validate_design_components` 按定义闭合参数 schema/结构模式/类型校验，未知参数拒绝不丢弃。
+- **内容/放置生效**：apply_grouped_style 消费 annotations，fixed 模式进入 _place 真实布局约束。
+- 证据：`test_p6_acceptance.py::ContractConsumptionTests`（6 项）+ 领导调研 92 passed。
+
+### 候选策略边界（2026-11-26 设计决策，完成）
+
+- **领导调研单候选**：`validate_body` 显式拒绝 `design_variants`（`LEADERSHIP_VARIANTS_UNSUPPORTED`）；风格版式走 `style_overrides` 直接覆盖。修正了过时的 image_itinerary 权威注释。
+- **多候选保留给政务制图（通用专题）**：roadmap 登记 `general-multi-variant-per-candidate-plan`（P5）——共享 plan 下改 plan 影响字段（output_profile）的 variant 不一致是潜在点，逐候选 plan 落地后再开放。
+- 证据：test_leadership_single_candidate_boundary + test_capability_roadmap；领导调研 92 passed。
+
+### P5 检索接入生成（2026-11-27，完成，全量回归确认）
+
+按确认方案实施 6 工作包（P5-1/2→P5-5→P5-3/4→P5-6）：
+
+| 工作包 | 实现 | 证据 |
+|---|---|---|
+| P5-1 受信上下文 | design-requirement 加 `context{business_scene,geometry}`；resolve 按上下文经 effective_definitions 选能力，无上下文→clarify 不默认 general | test_p5_resolution ContextSelectionTests |
+| P5-2 类型化事实 | 新增 `style_fact_view` + style-enum/style-measure 谓词；resolve 按 kind 选事实视图（Style 不走 LayoutResolver）；dpi 取自能力 output_profile | StyleFactAdaptationTests |
+| P5-3 联合检查 | `compiler/composition_check.py`：style+layout 跨组件检查（主图/标题/图例槽、字号×容量、图例容量、后端），冲突带来源+责任组件 | CompositionCheckTests |
+| P5-4 搜索完整性 | resolve 记录 search_metadata（source_scope/budget/examined/truncated）；预算耗尽→search-incomplete；design-resolution-result 加 search_metadata | SearchCompletenessTests |
+| P5-5 生成连接 | `compiler/generation_connection.py`：assemble_segment_refs（闭合、拒重复/未钉住）+ attach_resolution_evidence（选中须在被检索集内，否则拒绝；解释作证据非权威） | GenerationConnectionTests |
+| P5-6 逐候选 plan | compile_variants 接受注入 plan_factory，每候选独立 plan（修共享 plan）；workflow 注入 MapPlanner；领导调研保持单候选 | test_candidate_set test_per_candidate_plan_factory |
+
+协议变更：design-requirement（context+style 谓词）、design-resolution-result（search_metadata）加性扩展，配样例+测试。
+
+**全量回归**：1153 passed / 9 skipped（环境门控）/ 1012 subtests；唯一失败为 orchestrate 旧测试 req 缺 context（P5-1 预期行为变化），补 context 后 19 passed，回归干净。
+
+### 默认方案预设机制（2026-11-27，完成）
+
+回应"仅说目标如何带默认模板"：补**显式默认预设 + 经确认展开**，不硬编码。
+- `policies/default-presets.yaml` + `default-presets` schema：按 business_scene+geometry 登记默认**场景模板**（其内嵌 style/layout 即声明的视觉默认）；独立 policy，不漂移能力摘要。
+- `compiler/default_presets.py`：propose_default（advisory）+ expand_default_request（无显式模板时才提议；**必须 confirmed** 否则 DEFAULT_EXPANSION_UNCONFIRMED；显式模板永远优先；展开生成**新请求**带 default_provenance，不改已 intake 请求）。
+- CLI `template expand-default --confirm [--out]`：intake 前展开。
+- 内核 intake 仍复验模板 published+admitted。
+- 证据：test_default_presets 6 项（确认门槛/显式优先/未知拒绝/不 mutate）。
+
+### P6 剩余：跨场景真实复用（2026-11-27，完成，待全量回归确认）
+
+迁移主体已由 S1–S8 完成；本轮补"跨场景真实复用"：
+- **领导调研消费通用 Layout**：segment_refs 放宽为 layout-only（style 段仍拒绝，design_instances  owns style）；scenario 已声明 replaceable layout。
+- **A18 real**：领导调研真实 compile 消费通用 `general-single-map-a3-landscape`（resolved_layout.template_contract == 通用合同，width 420），与通用专题复用同一 Layout 合同。独立测试类避免共享 root  artifact 冲突。
+- **新增组件零改编译器**：通用 Layout 无需改领导调研候选编译器即可消费（A18 测试证明）。
+- 证据：test_p6_a18_leadership_consumes_general_shared_layout + test_p6_layout_segment_admitted_style_refused；领导调研+P6 验收 111 passed。
+- 共享表达组件定义（component_registry：information-card/classified-route/linked-label/double-outline/numbered-stop-marker）已登记，领导调研 design_instances.components 引用它们。
+
+### 地理锚点图表注记（双专题叠加缺口，2026-11-27，完成+重构防爆炸，待最终回归确认）
+
+回应收入图"面分级设色 + 每市锚定柱状图"双专题缺口：
+- **重构（消除组件爆炸缺陷）**：初版 `anchored-bar-chart`+`bar-chart-parameters` 把 chart 的一个 kind 提升为独立组件，偏离既有 chart 单组件+kind 判别设计，打开爆炸路径。已重构为**单一 C[chart] 组件**：`chart-parameters` schema 以 `kind`(bar-vertical/bar-horizontal/pie/line) 判别变体；锚定（地理 vs frame）为正交放置维度(N)，不进组件名。新增 kind = 扩枚举+渲染分支，零新组件。
+- `compiler/anchored_charts.py::build_anchored_charts`：数据锚点(I)+chart 参数(J)+放置(N) → 冻结 chart 图形；preferred 夹窗/fixed 不动；bar kinds 渲染，pie/line 声明但未实现→fail closed。
+- render-scene image_graphics `chart` 类型 + kind 字段；image_page_renderer chart 分派（kind 判别）。
+- 证据：test_anchored_charts 8 项（单组件无爆炸/新 kind 零新组件/pie fail-closed/fixed/preferred/闭合校验/graphic schema）。
+- 双专题叠加：canvas-overlay 页区域面 + 锚定 chart 组合；portrayal+overlay 混合为后续扩展。
 
 ## 已完成
 

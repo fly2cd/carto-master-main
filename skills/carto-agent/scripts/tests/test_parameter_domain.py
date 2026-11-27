@@ -273,6 +273,7 @@ class CliResolveTests(unittest.TestCase):
     def test_published_a4_single_map_satisfying_requirement_reuse(self):
         from carto_core.cli import match_cmd
         req = {"schema_version": 1, "requirement_id": "req-a4", "revision": 1, "object_scope": "layout",
+               "context": {"business_scene": "general_thematic_mapping", "geometry": "raster"},
                "conditions": [
                    {"id": "w", "strength": "hard", "source_ref": "u",
                     "predicate": {"kind": "measure", "path": "/canvas/width", "op": "eq", "value": 297, "unit": "mm"}},

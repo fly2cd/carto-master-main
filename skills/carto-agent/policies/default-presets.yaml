@@ -1,0 +1,14 @@
+schema_version: 1
+# Explicit registered default design presets. A default is a published scenario template
+# (its embedded style/layout are the declared visual defaults), selected only when the
+# request has no explicit template AND expansion is confirmed. Never a kernel hardcode.
+presets:
+  - business_scene: general_thematic_mapping
+    geometry: raster
+    template: {namespace: local, kind: map-scenario, id: general-thematic-map, version: 3.0.0}
+  - business_scene: general_thematic_mapping
+    geometry: vector
+    template: {namespace: local, kind: map-scenario, id: general-thematic-map, version: 4.0.0}
+  - business_scene: leadership_visit
+    geometry: vector
+    template: {namespace: local, kind: map-scenario, id: leadership-visit-map, version: 1.0.0}
